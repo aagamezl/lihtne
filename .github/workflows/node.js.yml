@@ -40,15 +40,15 @@ jobs:
           CI: true
         run: 'npm run coverage'
 
-      - name: 'Coveralls Parallel'
-        uses: 'coverallsapp/github-action@v2'
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          parallel: true
-          path-to-lcov: './coverage/lcov.info'
+      # - name: 'Coveralls Parallel'
+      #   uses: 'coverallsapp/github-action@v2'
+      #   with:
+      #     github-token: ${{ secrets.GITHUB_TOKEN }}
+      #     parallel: true
+      #     path-to-lcov: './coverage/lcov.info'
 
-      - name: 'Coveralls Finished'
-        uses: 'coverallsapp/github-action@v2'
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          parallel-finished: true
+      # - name: 'Coveralls Finished'
+      #   uses: 'coverallsapp/github-action@v2'
+      #   with:
+      #     github-token: ${{ secrets.GITHUB_TOKEN }}
+      #     parallel-finished: true
