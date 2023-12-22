@@ -1,0 +1,55 @@
+{
+  "name": "lihtne",
+  "version": "0.0.1",
+  "description": "Object-Relational Mapping (ORM) from Node.js",
+  "main": "index.js",
+  "type": "module",
+  "types": "types/index.d.ts",
+  "scripts": {
+    "test": "ava",
+    "coverage": "c8 --reporter=lcov ava",
+    "coverage:view": "c8 --reporter=html --reporter=text ava",
+    "lint": "standard",
+    "lint:fix": "standard --fix",
+    "build:types": "tsc -p tsconfig.build.types.json",
+    "lint:types": "tsc",
+    "prepare": "husky install",
+    "release:first": "npm run release -- --first-release",
+    "test:watch": "ava --watch"
+  },
+  "standard": {
+    "ignore": [
+      "examples"
+    ],
+    "includes": [
+      "test"
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:aagamezl/lihtne.git"
+  },
+  "keywords": [],
+  "author": {
+    "name": "Álvaro José Agámez Licha",
+    "email": "alvaroagamez@outlook.com"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "ava": "^6.0.1",
+    "c8": "^8.0.1",
+    "commitizen": "^4.3.0",
+    "cz-conventional-changelog": "^3.3.0",
+    "husky": "^8.0.3",
+    "sinon": "^17.0.1",
+    "standard": "^17.1.0"
+  },
+  "config": {
+    "commitizen": {
+      "path": "./node_modules/cz-conventional-changelog"
+    }
+  },
+  "dependencies": {
+    "@devnetic/utils": "^2.2.0"
+  }
+}
