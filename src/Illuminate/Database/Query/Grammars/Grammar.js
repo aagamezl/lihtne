@@ -1,10 +1,11 @@
 import { capitalize } from '@devnetic/utils'
 
-import CompilesJsonPaths from '../../Concerns/CompilesJsonPaths.js'
+import Arr from '../../../Collections/Arr.js'
 import BaseGrammar from '../../Grammar.js'
+import CompilesJsonPaths from '../../Concerns/CompilesJsonPaths.js'
 import JoinClause from './../JoinClause.js'
-import { collect, end, head, last, reset } from '../../../Collections/helpers.js'
 import use from '../../../Support/Traits/use.js'
+import { collect, end, head, last, reset } from '../../../Collections/helpers.js'
 import { isTruthy } from '../../../Support/index.js'
 
 export default class Grammar extends BaseGrammar {
@@ -52,6 +53,7 @@ export default class Grammar extends BaseGrammar {
    */
   compileAggregate (query, aggregate) {
     let column = this.columnize(aggregate.columns)
+
     // If the query has a "distinct" constraint and we're not asking for all columns
     // we need to prepend "distinct" onto the column name so that the query takes
     // it into account when it performs the aggregating operations on the data.
@@ -60,6 +62,7 @@ export default class Grammar extends BaseGrammar {
     } else if (isTruthy(query.distinctProperty) && column !== '*') {
       column = 'distinct ' + column
     }
+
     return 'select ' + aggregate.function + '(' + column + ') as aggregate'
   }
 
@@ -72,7 +75,7 @@ export default class Grammar extends BaseGrammar {
   compileBasicHaving (having) {
     const column = this.wrap(having.column)
     const parameter = this.parameter(having.value)
-    // return having.boolean + ' ' + column + ' ' + having.operator + ' ' + parameter
+
     return column + ' ' + having.operator + ' ' + parameter
   }
 
@@ -104,12 +107,15 @@ export default class Grammar extends BaseGrammar {
    */
   compileComponents (query) {
     const sql = {}
+
     for (const { name, property } of this.selectComponents) {
       if (this.isExecutable(query, property)) {
         const method = 'compile' + capitalize(name)
+
         sql[name] = this[method](query, query[property])
       }
     }
+
     return sql
   }
 
@@ -156,20 +162,24 @@ export default class Grammar extends BaseGrammar {
     // If the having clause is "raw", we can just return the clause straight away
     // without doing any more processing on it. Otherwise, we will compile the
     // clause into SQL based on the components that make it up from builder.
-    if (having.type === 'Raw') {
-      return having.sql
-    } else if (having.type === 'between') {
-      return this.compileHavingBetween(having)
-    } else if (having.type === 'Null') {
-      return this.compileHavingNull(having)
-    } else if (having.type === 'NotNull') {
-      return this.compileHavingNotNull(having)
-    } else if (having.type === 'bit') {
-      return this.compileHavingBit(having)
-    } else if (having.type === 'Nested') {
-      return this.compileNestedHavings(having)
+    switch (having.type) {
+      case 'Raw':
+        return having.sql
+      case 'between':
+        return this.compileHavingBetween(having)
+      case 'Null':
+        return this.compileHavingNull(having)
+      case 'NotNull':
+        return this.compileHavingNotNull(having)
+      case 'bit':
+        return this.compileHavingBit(having)
+      case 'Expression':
+        return this.compileHavingExpression(having)
+      case 'Nested':
+        return this.compileNestedHavings(having)
+      default:
+        return this.compileBasicHaving(having)
     }
-    return this.compileBasicHaving(having)
   }
 
   /**
@@ -196,6 +206,16 @@ export default class Grammar extends BaseGrammar {
     const column = this.wrap(having.column)
     const parameter = this.parameter(having.value)
     return '(' + column + ' ' + having.operator + ' ' + parameter + ') != 0'
+  }
+
+  /**
+ * Compile a having clause involving an expression.
+ *
+ * @param  {Having}  having
+ * @return {string}
+ */
+  compileHavingExpression (having) {
+    return having.column.getValue(this)
   }
 
   /**
@@ -229,7 +249,7 @@ export default class Grammar extends BaseGrammar {
  */
   compileHavings (query) {
     return 'having ' + this.removeLeadingBoolean(collect(query.havings).map((having) => {
-      return String(having.boolean) + ' ' + this.compileHaving(having)
+      return having.boolean + ' ' + this.compileHaving(having)
     }).implode(' '))
   }
 
@@ -301,7 +321,13 @@ export default class Grammar extends BaseGrammar {
    * @return {string}
    */
   compileInsertUsing (query, columns, sql) {
-    return `insert into ${this.wrapTable(query.fromProperty)} (${this.columnize(columns)}) ${sql}`
+    const table = this.wrapTable(query.fromProperty)
+
+    if (columns.length === 0 || columns[0] === '*') {
+      return `insert into ${table} ${sql}`
+    }
+
+    return `insert into ${table} (${this.columnize(columns)}) ${sql}`
   }
 
   /**
@@ -314,8 +340,11 @@ export default class Grammar extends BaseGrammar {
   compileJoins (query, joins) {
     return collect(joins).map((join) => {
       const table = this.wrapTable(join.table)
+
       const nestedJoins = join.joins.length === 0 ? '' : ' ' + this.compileJoins(query, join.joins)
+
       const tableAndNestedJoins = join.joins.length === 0 ? table : '(' + table + nestedJoins + ')'
+
       return `${join.type} join ${tableAndNestedJoins} ${this.compileWheres(join)}`.trim()
     }).implode(' ')
   }
@@ -380,6 +409,16 @@ export default class Grammar extends BaseGrammar {
   }
 
   /**
+   * Compile the random statement into SQL.
+   *
+   * @param  {string|number}  seed
+   * @return {string}
+   */
+  compileRandom (seed) {
+    return 'RANDOM()'
+  }
+
+  /**
    * Compile a select query into SQL.
    *
    * @param  {\Illuminate\Database\Query\Builder}  query
@@ -389,22 +428,90 @@ export default class Grammar extends BaseGrammar {
     if ((query.unions.length > 0 || query.havings.length > 0) && query.aggregateProperty !== undefined) {
       return this.compileUnionAggregate(query)
     }
+
     // If the query does not have any columns set, we'll set the columns to the
     // * character to just get all of the columns from the database. Then we
     // can build the query and concatenate all the pieces together as one.
     const original = query.columns
+
     if (query.columns.length === 0) {
       query.columns = ['*']
     }
+
     // To compile the query, we'll spin through each component of the query and
     // see if that component exists. If it does we'll just call the compiler
     // function for the component which is responsible for making the SQL.
     let sql = this.concatenate(this.compileComponents(query)).trim()
+
     if (query.unions.length > 0) {
       sql = this.wrapUnion(sql) + ' ' + this.compileUnions(query)
     }
+
     query.columns = original
+
     return sql
+  }
+
+  /**
+   * Compile an update statement into SQL.
+   *
+   * @param  {import('./../Builder.js').default}  query
+   * @param  array  values
+   * @return string
+   */
+  compileUpdate (query, values) {
+    const table = this.wrapTable(query.fromProperty)
+
+    const columns = this.compileUpdateColumns(query, values)
+
+    const where = this.compileWheres(query)
+
+    return (
+      query.joins.length > 0
+        ? this.compileUpdateWithJoins(query, table, columns, where)
+        : this.compileUpdateWithoutJoins(query, table, columns, where)
+    ).trim()
+  }
+
+  /**
+   * Compile the columns for an update statement.
+   *
+   * @param  {import('./../Builder.js').default}  query
+   * @param  {array}  values
+   * @return {string}
+   */
+  compileUpdateColumns (query, values) {
+    return collect(values).map((value, key) => {
+      return this.wrap(key) + ' = ' + this.parameter(value)
+    }).implode(', ')
+  }
+
+  /**
+   * Compile an update statement with joins into SQL.
+   *
+   * @param  {import('./../Builder.js').default}  query
+   * @param  {string}  table
+   * @param  {string}  columns
+   * @param  {string}  where
+   * @return {string}
+   */
+  compileUpdateWithJoins (query, table, columns, where) {
+    const joins = this.compileJoins(query, query.joins)
+
+    return `update ${table} ${joins} set ${columns} ${where}`
+  }
+
+  /**
+   * Compile an update statement without joins into SQL.
+   *
+   * @param  {import('./../Builder.js').default}  query
+   * @param  {string}  table
+   * @param  {string}  columns
+   * @param  {string}  where
+   * @return {string}
+   */
+  compileUpdateWithoutJoins (query, table, columns, where) {
+    return `update ${table} set ${columns} ${where}`
   }
 
   /**
@@ -466,13 +573,16 @@ export default class Grammar extends BaseGrammar {
     if (query.wheres.length === 0) {
       return ''
     }
+
     // If we actually have some where clauses, we will strip off the first boolean
     // operator, which is added by the query builders for convenience so we can
     // avoid checking for the first clauses in each of the compilers methods.
     const sql = this.compileWheresToArray(query)
+
     if (sql.length > 0) {
       return this.concatenateWhereClauses(query, sql)
     }
+
     return ''
   }
 
@@ -485,7 +595,8 @@ export default class Grammar extends BaseGrammar {
   compileWheresToArray (query) {
     return collect(query.wheres).map((where) => {
       const method = 'where' + where.type
-      return String(where.boolean) + ' ' + String(this[method](query, where))
+
+      return where.boolean + ' ' + this[method](query, where)
     }).all()
   }
 
@@ -510,6 +621,7 @@ export default class Grammar extends BaseGrammar {
    */
   concatenateWhereClauses (query, sql) {
     const conjunction = query instanceof JoinClause ? 'on' : 'where'
+
     return conjunction + ' ' + this.removeLeadingBoolean(sql.join(' '))
   }
 
@@ -546,13 +658,38 @@ export default class Grammar extends BaseGrammar {
 
   isExecutable (query, property) {
     const subject = Reflect.get(query, property)
+
     if (subject === undefined || subject === '') {
       return false
     }
+
     if (Array.isArray(subject) && subject.length === 0) {
       return false
     }
+
     return true
+  }
+
+  /**
+   * Prepare the bindings for an update statement.
+   *
+   * @param  {array}  bindings
+   * @param  {array}  values
+   * @return {array}
+   */
+  prepareBindingsForUpdate (bindings, values) {
+    const cleanBindings = Arr.except(bindings, ['select', 'join'])
+
+    // return Object.values(
+    //   // [bindings.join, ...values, ...Arr.flatten(cleanBindings)]
+    //   { ...bindings.join, ...values, ...Arr.flatten(cleanBindings) }
+    // )
+
+    return [
+      ...Object.values(bindings.join),
+      ...Object.values(values),
+      ...Object.values(Arr.flatten(cleanBindings))
+    ].flat()
   }
 
   /**
@@ -713,7 +850,7 @@ export default class Grammar extends BaseGrammar {
     // Here we will calculate what portion of the string we need to remove. If this
     // is a join clause query, we need to remove the "on" portion of the SQL and
     // if it is a normal query we need to take the leading "where" of queries.
-    const offset = query instanceof JoinClause ? 3 : 6
+    const offset = where.query instanceof JoinClause ? 3 : 6
     return '(' + this.compileWheres(where.query).substring(offset) + ')'
   }
 

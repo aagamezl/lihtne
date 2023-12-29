@@ -10,6 +10,7 @@ export default class BuildsQueries {
    */
   async first (columns = ['*']) {
     const result = await this.take(1).get(columns)
+
     return result.first()
   }
 
@@ -21,6 +22,7 @@ export default class BuildsQueries {
    */
   tap (callbackFunc) {
     callbackFunc(this)
+
     return this
   }
 }

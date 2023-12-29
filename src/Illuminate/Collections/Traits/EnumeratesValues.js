@@ -17,7 +17,8 @@ export class EnumeratesValues {
     } else if (items instanceof Collection) {
       return items.all()
     } else if (isPlainObject(items)) {
-      return [items]
+      this.entries = true
+      return Object.entries(items)
     } else if (items === undefined) {
       return []
     }

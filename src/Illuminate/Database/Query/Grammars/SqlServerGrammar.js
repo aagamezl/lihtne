@@ -145,16 +145,26 @@ export default class SqlServerGrammar extends Grammar {
   }
 
   /**
+   * Compile the random statement into SQL.
+   *
+   * @param  {string|int}  seed
+   * @return {string}
+   */
+  compileRandom (seed) {
+    return 'NEWID()'
+  }
+
+  /**
    * Compile the limit / offset row constraint for a query.
    *
    * @param  {\Illuminate\Database\Query\Builder}  query
    * @return {string}
    */
   compileRowConstraint (query) {
-    const start = Number(query.offsetProperty) + 1
+    const start = query.offsetProperty + 1
 
-    if (Number(query.limitProperty) > 0) {
-      const finish = Number(query.offsetProperty) + Number(query.limitProperty)
+    if (query.limitProperty > 0) {
+      const finish = query.offsetProperty + query.limitProperty
 
       return `between ${start} and ${finish}`
     }

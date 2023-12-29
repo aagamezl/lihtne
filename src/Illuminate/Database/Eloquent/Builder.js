@@ -15,6 +15,7 @@ export default class Builder {
    * @var Record<string, any>
    */
   static { this.macros = {} }
+
   /**
    * Create a new Eloquent query builder instance.
    *
@@ -30,12 +31,15 @@ export default class Builder {
      * @var Record<string, any>
      */
     this.localMacros = {}
+
     /**
      * The model being queried.
      *
      * @var \Illuminate\Database\Eloquent\Model
      */
+
     this.model = null
+
     /**
      * The methods that should be returned from query builder.
      *
@@ -64,6 +68,7 @@ export default class Builder {
       'sum',
       'toSql'
     ]
+
     /**
      * Applied global scopes.
      *
@@ -77,21 +82,23 @@ export default class Builder {
   }
 
   /**
- * Dynamically handle calls into the query instance.
- *
- * @param  {string}  method
- * @param  {any[]}  parameters
- * @return {any}
- */
+   * Dynamically handle calls into the query instance.
+   *
+   * @param  {string}  method
+   * @param  {any[]}  parameters
+   * @return {any}
+   */
   __call (method, ...parameters) {
     if (method === 'macro') {
       this.localMacros[parameters[0]] = parameters[1]
       return
     }
+
     if (this.hasMacro(method)) {
       parameters.unshift(this)
       return this.localMacros[method](...parameters)
     }
+
     if (Builder.hasGlobalMacro(method)) {
       let callable = Builder.macros[method]
       if (callable instanceof Function) {
@@ -99,13 +106,17 @@ export default class Builder {
       }
       return callable(...parameters)
     }
+
     if (this.hasNamedScope(method)) {
       return this.callNamedScope(method, parameters)
     }
+
     if (this.passthru.includes(method)) {
       return this.toBase()[method](...parameters)
     }
+
     this.forwardCallTo(this.query, method, parameters)
+
     return this
   }
 
@@ -121,25 +132,30 @@ export default class Builder {
     // rebuild them as nested queries by slicing the groups of wheres into
     // their own sections. This is to prevent any confusing logic order.
     const allWheres = query.wheres
+
     query.wheres = []
+
     this.groupWhereSliceForScope(query, allWheres.slice(0, originalWhereCount))
+
     this.groupWhereSliceForScope(query, allWheres.slice(originalWhereCount))
   }
 
   /**
     * Apply the scopes to the Eloquent builder instance and return it.
     *
-    * @return static
+    * @return {static}
     */
   applyScopes () {
     if (Object.keys(this.scopes).length === 0) {
       return this
     }
+
     const builder = clone(this)
     for (const [identifier, scope] of Object.entries(this.scopes)) {
       if (isFalsy(builder.scopes[identifier])) {
         continue
       }
+
       builder.callScope((builder) => {
         // If the scope is a Closure we will just go ahead and call the scope with the
         // builder instance. The "callScope" method will properly group the clauses
@@ -147,6 +163,7 @@ export default class Builder {
         if (scope instanceof Function) {
           scope(builder)
         }
+
         // If the scope is a scope object, we will call the apply method on this scope
         // passing in the builder and the model instance. After we run all of these
         // scopes we will return back the builder instance to the outside caller.
@@ -155,6 +172,7 @@ export default class Builder {
         }
       })
     }
+
     return builder
   }
 
@@ -180,17 +198,22 @@ export default class Builder {
    */
   callScope (scope, ...parameters) {
     parameters.unshift(this)
+
     const query = this.getQuery()
+
     // We will keep track of how many wheres are on the query before running the
     // scope so that we can properly group the added scope constraints in the
     // query as their own isolated nested where statement and avoid issues.
     const originalWhereCount = isNil(query.wheres)
       ? 0
       : query.wheres.length
+
     const result = scope(...parameters) ?? this
+
     if (query.wheres.length > originalWhereCount) {
       this.addNewWheresWithinGroup(query, originalWhereCount)
     }
+
     return result
   }
 
@@ -203,7 +226,9 @@ export default class Builder {
    */
   createNestedWhere (whereSlice, boolean = 'and') {
     const whereGroup = this.getQuery().forNestedWhere()
+
     whereGroup.wheres = whereSlice
+
     return { type: 'Nested', query: whereGroup, boolean }
   }
 
@@ -234,6 +259,7 @@ export default class Builder {
    */
   groupWhereSliceForScope (query, whereSlice) {
     const whereBooleans = collect(whereSlice).pluck('boolean')
+
     // Here we'll check if the given subset of where clauses contains any "or"
     // booleans and in this case create a nested where expression. That way
     // we don't add any unnecessary nesting thus keeping the query clean.

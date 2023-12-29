@@ -17,6 +17,13 @@ export default class Collection {
   constructor (items = []) {
     use(this.constructor, [EnumeratesValues, Macroable])
 
+    // We don't want to enumerate this property with Object.entries() or similar
+    Object.defineProperty(this, 'entries', {
+      enumerable: false,
+      value: false,
+      writable: true
+    })
+
     /**
    * The items contained in the collection.
    *
@@ -31,7 +38,7 @@ export default class Collection {
    * @return {unknown[]}
    */
   all () {
-    return this.items
+    return this.entries === true ? Object.fromEntries(this.items) : this.items
   }
 
   /**
@@ -48,8 +55,10 @@ export default class Collection {
         const placeholder = {}
         return this.first(key, placeholder) !== placeholder
       }
+
       return this.items.includes(key)
     }
+
     return this.contains(this.operatorForWhere.apply(null, arguments))
   }
 
@@ -62,6 +71,7 @@ export default class Collection {
     if (this.items instanceof Map) {
       return this.items.size
     }
+
     return Object.keys(this.items).length
   }
 
@@ -85,9 +95,11 @@ export default class Collection {
    */
   implode (value, glue) {
     const first = this.first()
+
     if (Array.isArray(first) || (isPlainObject(first) && typeof first !== 'string')) {
       return this.pluck(value).all().join(glue ?? '')
     }
+
     return this.items.join(value ?? '')
   }
 

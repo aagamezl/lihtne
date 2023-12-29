@@ -35,6 +35,19 @@ export default class Arr {
   }
 
   /**
+   * Get all of the given array except for a specified array of keys.
+   *
+   * @param  {array}  array
+   * @param  {array|string|number}  keys
+   * @return {array}
+   */
+  static except (array, keys) {
+    this.forget(array, keys)
+
+    return array
+  }
+
+  /**
    * Determine if the given key exists in the provided array.
    *
    * @param  {ArrayAccess|array}  array
@@ -92,20 +105,65 @@ export default class Arr {
   static flatten (array, depth = Number.POSITIVE_INFINITY) {
     const result = []
     const entries = array instanceof Map ? array.entries() : Object.entries(array)
+
     for (let [, item] of entries) {
       item = item instanceof Collection ? item.all() : item
+
       if (!Array.isArray(item) && !isPlainObject(item)) {
         result.push(item)
       } else {
         const values = depth === 1
           ? Object.values(item)
           : this.flatten(item, depth - 1)
+
         for (const value of values) {
           result.push(value)
         }
       }
     }
     return result
+  }
+
+  /**
+     * Remove one or many array items from a given array using "dot" notation.
+     *
+     * @param  {Object} array
+     * @param  {Array|string|number} keys
+     * @return {void}
+     */
+  static forget (array, keys) {
+    const original = array
+
+    keys = Array.isArray(keys) ? keys : [keys]
+
+    if (keys.length === 0) {
+      return
+    }
+
+    for (const key of keys) {
+      // if the exact key exists in the top-level, remove it
+      if (Arr.exists(array, key)) {
+        delete array[key]
+        return
+      }
+
+      const parts = key.split('.')
+
+      // clean up before each pass
+      array = original
+
+      while (parts.length > 1) {
+        const part = parts.shift()
+
+        if (array[part] !== undefined && Arr.accessible(array[part])) {
+          array = array[part]
+        } else {
+          continue
+        }
+      }
+
+      delete array[parts.shift()]
+    }
   }
 
   /**
@@ -229,7 +287,6 @@ export default class Arr {
    * @return {Array}
    */
   static wrap (value) {
-    // eslint-disable-next-line
     if (isFalsy(value)) {
       return []
     }

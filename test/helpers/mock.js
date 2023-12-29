@@ -16,6 +16,12 @@ const mock = () => {
 
       return newMock
     },
+    createStub: (target, method) => {
+      return sinon.stub(target, method)
+    },
+    restoreStub: (target, method) => {
+      target[method].restore()
+    },
     verifyMock: () => {
       mocks.forEach((mock) => {
         mock.verify()

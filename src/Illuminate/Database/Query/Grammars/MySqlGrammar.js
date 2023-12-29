@@ -41,6 +41,29 @@ export default class MySqlGrammar extends Grammar {
   }
 
   /**
+   * Compile an update statement without joins into SQL.
+   *
+   * @param  {import('./../Builder.js').default}  query
+   * @param  {string}  table
+   * @param  {string}  columns
+   * @param  {string}  where
+   * @return {string}
+   */
+  compileUpdateWithoutJoins (query, table, columns, where) {
+    let sql = super.compileUpdateWithoutJoins(query, table, columns, where)
+
+    if (query.orders.length > 0) {
+      sql += ' ' + this.compileOrders(query, query.orders)
+    }
+
+    if (query.limitProperty !== undefined) {
+      sql += ' ' + this.compileLimit(query, query.limitProperty)
+    }
+
+    return sql
+  }
+
+  /**
    * Compile a "where fulltext" clause.
    *
    * @param  {\Illuminate\Database\Query\Builder}  query
@@ -71,8 +94,10 @@ export default class MySqlGrammar extends Grammar {
    * @return {string}
    */
   whereNull (query, where) {
-    if (this.isJsonSelector(where.column)) {
-      const [field, path] = this.wrapJsonFieldAndPath(where.column)
+    const columnValue = this.getValue(where.column)
+
+    if (this.isJsonSelector(columnValue)) {
+      const [field, path] = this.wrapJsonFieldAndPath(columnValue)
 
       return '(json_extract(' + field + path + ') is null OR json_type(json_extract(' + field + path + ')) = \'NULL\')'
     }
@@ -88,8 +113,10 @@ export default class MySqlGrammar extends Grammar {
    * @return {string}
    */
   whereNotNull (query, where) {
-    if (this.isJsonSelector(where.column)) {
-      const [field, path] = this.wrapJsonFieldAndPath(where.column)
+    const columnValue = this.getValue(where.column)
+
+    if (this.isJsonSelector(columnValue)) {
+      const [field, path] = this.wrapJsonFieldAndPath(columnValue)
 
       return '(json_extract(' + field + path + ') is not null AND json_type(json_extract(' + field + path + ')) != \'NULL\')'
     }

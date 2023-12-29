@@ -1,10 +1,11 @@
 import { dateFormat, getValue, isFunction, isNumeric } from '@devnetic/utils'
 
-import QueryBuilder from './Query/Builder.js'
 import DetectsLostConnections from './DetectsLostConnections.js'
-import QueryGrammar from './Query/Grammars/Grammar.js'
+import Expression from './Query/Expression.js'
 import Processor from './Query/Processors/Processor.js'
+import QueryBuilder from './Query/Builder.js'
 import QueryExecuted from './Events/QueryExecuted.js'
+import QueryGrammar from './Query/Grammars/Grammar.js'
 import StatementPrepared from './Events/StatementPrepared.js'
 import use from '../Support/Traits/use.js'
 
@@ -412,6 +413,16 @@ export default class Connection {
   }
 
   /**
+   * Get a new raw query expression.
+   *
+   * @param  {unknown}  value
+   * @return {import('./Query/Expression.js').default}
+   */
+  raw (value) {
+    return new Expression(value)
+  }
+
+  /**
    * Reconnect to the database.
    *
    * @return {void}
@@ -608,6 +619,17 @@ export default class Connection {
       return this.runQueryCallback(query, bindings, callback)
     }
     throw error
+  }
+
+  /**
+   * Run an update statement against the database.
+   *
+   * @param  {string}  query
+   * @param  {unknown[]}  bindings
+   * @return {number}
+   */
+  update (query, bindings = []) {
+    return this.affectingStatement(query, bindings)
   }
 
   /**

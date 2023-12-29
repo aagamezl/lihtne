@@ -17,13 +17,18 @@ export default class JoinClause extends Builder {
    * @return {void}
    */
   constructor (parentQuery, type, table) {
-    super(parentQuery.getConnection(), parentQuery.getGrammar(), parentQuery.getProcessor())
+    const parentConnection = parentQuery.getConnection()
+    const parentGrammar = parentQuery.getGrammar()
+    const parentProcessor = parentQuery.getProcessor()
+
+    super(parentConnection, parentGrammar, parentProcessor)
+
     this.type = type
     this.table = table
     this.parentClass = parentQuery.constructor
-    this.parentGrammar = parentQuery.getGrammar()
-    this.parentProcessor = parentQuery.getProcessor()
     this.parentConnection = parentQuery.getConnection()
+    this.parentGrammar = parentGrammar
+    this.parentProcessor = parentProcessor
   }
 
   /**
@@ -78,6 +83,7 @@ export default class JoinClause extends Builder {
     if (first instanceof Function) {
       return this.whereNested(first, boolean)
     }
+
     return this.whereColumn(first, operator, second, boolean)
   }
 
