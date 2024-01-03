@@ -1,6 +1,6 @@
 import { lstatSync } from 'fs'
 
-import { getValue, isNil, isObject } from '@devnetic/utils'
+import { getValue, isFalsy, isNil, isObject, isTruthy } from '@devnetic/utils'
 
 import HigherOrderTapProxy from './HigherOrderTapProxy.js'
 
@@ -34,6 +34,7 @@ export const clone = (target) => {
   if (isNil(target) || !isObject(target)) {
     return target
   }
+
   return Object.create(Object.getPrototypeOf(target), Object.getOwnPropertyDescriptors(target))
 }
 
@@ -45,16 +46,14 @@ export const isDirectory = (path) => {
   }
 }
 
-export const isBoolean = (value) => {
-  return typeof value === 'boolean'
-}
+export const ksort = (value) => {
+  return Object.keys(value)
+    .sort()
+    .reduce((result, key) => {
+      result[key] = value[key]
 
-export const isFalsy = (value) => {
-  return !value
-}
-
-export const isTruthy = (value) => {
-  return !isFalsy(value)
+      return result
+    }, {})
 }
 
 export const objectDiffKey = (target, ...from) => {

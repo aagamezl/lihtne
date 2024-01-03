@@ -1,7 +1,6 @@
-import { clone, isNil, merge } from '@devnetic/utils'
+import { clone, isFalsy, isNil, isTruthy, merge } from '@devnetic/utils'
 
 import { collect } from '../../Collections/helpers.js'
-import { isFalsy, isTruthy } from '../../Support/helpers.js'
 import { instanceProxy } from '../../Support/Proxies/InstanceProxy.js'
 import ForwardsCalls from '../../Support/Traits/ForwardsCalls.js'
 import use from '../../Support/Traits/use.js'

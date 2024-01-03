@@ -1,12 +1,15 @@
-import { isNumeric, isString } from '@devnetic/utils'
+import { isNil, isNumeric, isString, isTruthy } from '@devnetic/utils'
 
 import Arr from '../../../Collections/Arr.js'
-import { clone, isFalsy, isTruthy } from '../../../Support/helpers.js'
 import Grammar from './Grammar.js'
+import Str from '../../../Support/Str.js'
+import { clone } from '../../../Support/helpers.js'
+import { collect, last, reset } from '../../../Collections/helpers.js'
 
 export default class SqlServerGrammar extends Grammar {
   constructor () {
     super(...arguments)
+
     /**
      * All of the available clause operators.
      *
@@ -17,55 +20,43 @@ export default class SqlServerGrammar extends Grammar {
       'like', 'not like', 'ilike',
       '&', '&=', '|', '|=', '^', '^='
     ]
-  }
 
-  /**
-   * Create a full ANSI offset clause for the query.
-   *
-   * @param  {\Illuminate\Database\Query\Builder}  query
-   * @param  {object}  components
-   * @return {string}
-   */
-  compileAnsiOffset (query, components) {
-    // An ORDER BY clause is required to make this offset query work, so if one does
-    // not exist we'll just create a dummy clause to trick the database and so it
-    // does not complain about the queries for not having an "order by" clause.
-    if (components.orders === undefined) {
-      components.orders = 'order by (select 0)'
-    }
-
-    // We need to add the row number to the query so we can compare it to the offset
-    // and limit values given for the statements. So we will add an expression to
-    // the "select" that will give back the row numbers on each of the records.
-    components.columns += this.compileOver(components.orders)
-    delete components.orders
-
-    if (this.queryOrderContainsSubquery(query)) {
-      query.bindings = this.sortBindingsForSubqueryOrderBy(query)
-    }
-
-    // Next we need to calculate the constraints that should be placed on the query
-    // to get the right offset and limit from our query but if there is no limit
-    // set we will just handle the offset only since that is all that matters.
-    const sql = this.concatenate(components)
-    return this.compileTableExpression(sql, query)
+    /**
+     * The components that make up a select clause.
+     *
+     * @type {import('./Grammar.js').SelectComponents}
+     */
+    this.selectComponents = [
+      { name: 'aggregate', property: 'aggregateProperty' },
+      { name: 'columns', property: 'columns' },
+      { name: 'from', property: 'fromProperty' },
+      { name: 'indexHint', property: 'indexHint' },
+      { name: 'joins', property: 'joins' },
+      { name: 'wheres', property: 'wheres' },
+      { name: 'groups', property: 'groups' },
+      { name: 'havings', property: 'havings' },
+      { name: 'orders', property: 'orders' },
+      { name: 'offset', property: 'offsetProperty' },
+      { name: 'limit', property: 'limitProperty' },
+      { name: 'lock', property: 'lockProperty' }
+    ]
   }
 
   /**
    * Compile the "select *" portion of the query.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
+   * @param  {import('./../Builder.js').default}  query
    * @param  {string[]}  columns
    * @return {string|undefined}
    */
   compileColumns (query, columns) {
-    if (query.aggregateProperty !== undefined) {
+    if (!isNil(query.aggregateProperty)) {
       return
     }
 
     let select = isTruthy(query.distinctProperty) ? 'select distinct ' : 'select '
-    const limit = Number(query.limitProperty ?? 0)
-    const offset = Number(query.offsetProperty ?? 0)
+    const limit = (query.limitProperty ?? 0) | 0
+    const offset = (query.offsetProperty ?? 0) | 0
 
     // If there is a limit on the query, but not an offset, we will add the top
     // clause to the query, which serves as a "limit" type clause within the
@@ -80,7 +71,7 @@ export default class SqlServerGrammar extends Grammar {
   /**
    * Compile an exists statement into SQL.
    *
-   * @param  {\Illuminate\Database\Query\Builder } query
+   * @param  {import('./../Builder.js').default} query
    * @return {string}
    */
   compileExists (query) {
@@ -94,7 +85,7 @@ export default class SqlServerGrammar extends Grammar {
   /**
    * Compile the "from" portion of the query.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
+   * @param  {import('./../Builder.js').default}  query
    * @param  {string}  table
    * @return {string}
    */
@@ -102,35 +93,163 @@ export default class SqlServerGrammar extends Grammar {
     const from = super.compileFrom(query, table)
 
     if (isString(query.lockProperty)) {
-      return from + ' ' + String(query.lockProperty)
+      return from + ' ' + query.lockProperty
     }
 
     if (query.lockProperty !== undefined) {
-      return from + ' with(rowlock,' + (query.lockProperty !== undefined ? 'updlock,' : '') + 'holdlock)'
+      return from + ' with(rowlock,' + (query.lockProperty ? 'updlock,' : '') + 'holdlock)'
     }
 
     return from
   }
 
   /**
+   * Compile a single having clause.
+   *
+   * @param  {import('./../Builder.js').Having}  having
+   * @return {string}
+   */
+  compileHaving (having) {
+    if (having.type === 'Bitwise') {
+      return this.compileHavingBitwise(having)
+    }
+
+    return super.compileHaving(having)
+  }
+
+  /**
+   * Compile a having clause involving a bitwise operator.
+   *
+   * @param  {import('./../Builder.js').Having}  having
+   * @return {string}
+   */
+  compileHavingBitwise (having) {
+    const column = this.wrap(having.column)
+
+    const parameter = this.parameter(having.value)
+
+    return '(' + column + ' ' + having.operator + ' ' + parameter + ') != 0'
+  }
+
+  /**
+ * Compile the index hints for the query.
+ *
+ * @param  {import('./../Builder.js').default}  query
+ * @param  {import('./../IndexHint.js').default}  indexHint
+ * @return {string}
+ */
+  compileIndexHint (query, indexHint) {
+    return indexHint.type === 'force'
+      ? `with (index(${indexHint.index}))`
+      : ''
+  }
+
+  /**
+   * Compile a "JSON contains" statement into SQL.
+   *
+   * @param  {string}  column
+   * @param  {string}  value
+   * @return {string}
+   */
+  compileJsonContains (column, value) {
+    const [field, path] = this.wrapJsonFieldAndPath(column)
+
+    return value + ' in (select [value] from openjson(' + field + path + '))'
+  }
+
+  /**
+   * Compile a "JSON contains key" statement into SQL.
+   *
+   * @param  {string}  column
+   * @return {string}
+   */
+  compileJsonContainsKey (column) {
+    const segments = column.split('->')
+
+    const lastSegment = segments.pop()
+
+    let key
+    const regex = /\[([0-9]+)\]$/
+    const matches = regex.exec(lastSegment)
+    if (matches !== null) {
+      segments.push(Str.beforeLast(lastSegment, matches[0]))
+
+      key = matches[1]
+    } else {
+      key = "'" + lastSegment.replace(/'/g, "''") + "'"
+    }
+
+    const [field, path] = this.wrapJsonFieldAndPath(segments.join('->'))
+
+    return key + ' in (select [key] from openjson(' + field + path + '))'
+  }
+
+  /**
+   * Compile a "JSON length" statement into SQL.
+   *
+   * @param  {string}  column
+   * @param  {string}  operator
+   * @param  {string}  value
+   * @return {string}
+   */
+  compileJsonLength (column, operator, value) {
+    const [field, path] = this.wrapJsonFieldAndPath(column)
+
+    return '(select count(*) from openjson(' + field + path + ')) ' + operator + ' ' + value
+  }
+
+  /**
+   * Compile a "JSON value cast" statement into SQL.
+   *
+   * @param  {string}  value
+   * @return {string}
+   */
+  compileJsonValueCast (value) {
+    return 'json_query(' + value + ')'
+  }
+
+  /**
    * Compile the "limit" portions of the query.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
+   * @param  {import('./../Builder.js').default}  query
    * @param  {number}  limit
    * @return {string}
    */
   compileLimit (query, limit) {
+    limit = limit | 0
+
+    if (limit && query.offsetProperty > 0) {
+      return `fetch next ${limit} rows only`
+    }
+
+    return ''
+  }
+
+  /**
+   * Compile the lock into SQL.
+   *
+   * @param  {import('./../Builder.js').default}  query
+   * @param  {boolean|string}  value
+  * @return {string}
+   */
+  compileLock (query, value) {
     return ''
   }
 
   /**
    * Compile the "offset" portions of the query.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
+   * @param  {import('./../Builder.js').default}  query
    * @param  {number}  offset
    * @return {string}
    */
   compileOffset (query, offset) {
+    offset = offset | 0
+
+    if (offset) {
+      return `offset ${offset} rows`
+    }
+
     return ''
   }
 
@@ -155,64 +274,96 @@ export default class SqlServerGrammar extends Grammar {
   }
 
   /**
-   * Compile the limit / offset row constraint for a query.
+   * Compile the SQL statement to define a savepoint.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
+   * @param  {string}  name
    * @return {string}
    */
-  compileRowConstraint (query) {
-    const start = query.offsetProperty + 1
+  compileSavepoint (name) {
+    return 'SAVE TRANSACTION ' + name
+  }
 
-    if (query.limitProperty > 0) {
-      const finish = query.offsetProperty + query.limitProperty
-
-      return `between ${start} and ${finish}`
-    }
-
-    return `>= ${start}`
+  /**
+   * Compile the SQL statement to execute a savepoint rollback.
+   *
+   * @param  {string}  name
+   * @return {string}
+   */
+  compileSavepointRollBack (name) {
+    return 'ROLLBACK TRANSACTION ' + name
   }
 
   /**
    * Compile a select query into SQL.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
+   * @param  {import('./../Builder.js').default}  query
    * @return {string}
    */
   compileSelect (query) {
-    if (isFalsy(query.offsetProperty)) {
-      return super.compileSelect(query)
+    // An order by clause is required for SQL Server offset to function...
+    if (query.offsetProperty && query.orders.length === 0) {
+      query.orders.push({ sql: '(SELECT 0)' })
     }
 
-    // If an offset is present on the query, we will need to wrap the query in
-    // a big "ANSI" offset syntax block. This is very nasty compared to the
-    // other database systems but is necessary for implementing features.
-    if (query.columns.length === 0) {
-      query.columns = ['*']
-    }
-
-    const components = this.compileComponents(query)
-
-    if (components.orders.length > 0) {
-      return super.compileSelect(query) + ` offset ${String(query.offsetProperty)} rows fetch next ${String(query.limitProperty)} rows only`
-    }
-
-    // If an offset is present on the query, we will need to wrap the query in
-    // a big "ANSI" offset syntax block. This is very nasty compared to the
-    // other database systems but is necessary for implementing features.
-    return this.compileAnsiOffset(query, components)
+    return super.compileSelect(query)
   }
 
   /**
-   * Compile a common table expression for a query.
+   * Compile an update statement with joins into SQL.
    *
-   * @param  {string}  sql
-   * @param  {\Illuminate\Database\Query\Builder}  query
+   * @param  {import('./../Builder.js').default}  query
+   * @param  {string}  table
+   * @param  {string}  columns
+   * @param  {string}  where
    * @return {string}
    */
-  compileTableExpression (sql, query) {
-    const constraint = this.compileRowConstraint(query)
+  compileUpdateWithJoins (query, table, columns, where) {
+    const alias = last(table.split(' as '))
 
-    return `select * from (${sql}) as temp_table where row_num ${constraint} order by row_num`
+    const joins = this.compileJoins(query, query.joins)
+
+    return `update ${alias} set ${columns} from ${table} ${joins} ${where}`
+  }
+
+  /**
+   * Compile an "upsert" statement into SQL.
+   *
+   * @param  {import('./../Builder.js').default}  query
+   * @param  {array}  values
+   * @param  {array}  uniqueBy
+   * @param  {array}  update
+   * @return {string}
+   */
+  compileUpsert (query, values, uniqueBy, update) {
+    const columns = this.columnize(Object.keys(reset(values)))
+
+    let sql = 'merge ' + this.wrapTable(query.fromProperty) + ' '
+
+    const parameters = collect(values).map((record) => {
+      return '(' + this.parameterize(record) + ')'
+    }).implode(', ')
+
+    sql += 'using (values ' + parameters + ') ' + this.wrapTable('lihtne_source') + ' (' + columns + ') '
+
+    const on = collect(uniqueBy).map((column) => {
+      return this.wrap('lihtne_source.' + column) + ' = ' + this.wrap(query.fromProperty + '.' + column)
+    }).implode(' and ')
+
+    sql += 'on ' + on + ' '
+
+    if (update) {
+      update = collect(update).map((value, key) => {
+        return isNumeric(key)
+          ? this.wrap(value) + ' = ' + this.wrap('lihtne_source.' + value)
+          : this.wrap(key) + ' = ' + this.parameter(value)
+      }).implode(', ')
+
+      sql += 'when matched then update set ' + update + ' '
+    }
+
+    sql += 'when not matched then insert (' + columns + ') values (' + columns + ');'
+
+    return sql
   }
 
   /**
@@ -225,63 +376,98 @@ export default class SqlServerGrammar extends Grammar {
   }
 
   /**
-   * Determine if the query's order by clauses contain a subquery.
+   * Prepare the binding for a "JSON contains" statement.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
-   * @return {boolean}
+   * @param  {unknown}  binding
+   * @return {string}
    */
-  queryOrderContainsSubquery (query) {
-    if (!Array.isArray(query.orders)) {
-      return false
-    }
-
-    return Arr.first(query.orders, (value) => {
-      return this.isExpression(value.column ?? undefined)
-    }, false) !== false
+  prepareBindingForJsonContains (binding) {
+    return typeof binding === 'boolean' ? JSON.stringify(binding) : binding
   }
 
   /**
-   * Move the order bindings to be after the "select" statement to account for a order by subquery.
+   * Prepare the bindings for an update statement.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
-   * @return {Array}
+   * @param  {array}  bindings
+   * @param  {array}  values
+   * @return {array}
    */
-  sortBindingsForSubqueryOrderBy (query) {
-    return Arr.sort(query.bindings, (bindings, key) => {
-      return ['select', 'order', 'from', 'join', 'where', 'groupBy', 'having', 'union', 'unionOrder'].indexOf(key)
-    })
+  prepareBindingsForUpdate (bindings, values) {
+    const cleanBindings = Arr.except(bindings, 'select')
+
+    return [
+      ...Object.values(values),
+      ...Object.values(Arr.flatten(cleanBindings))
+    ].flat()
+  }
+
+  /**
+   * {@inheritdoc}
+   *
+   * @param  {import('./../Builder.js').default}  query
+   * @param  {import('./../Builder.js').Where}  where
+   * @return {string}
+   */
+  whereBitwise (query, where) {
+    const value = this.parameter(where.value)
+
+    const operator = where.operator.replaceAll('?', '??')
+
+    return '(' + this.wrap(where.column) + ' ' + operator + ' ' + value + ') != 0'
   }
 
   /**
    * Compile a "where date" clause.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
-   * @param  {Where}  where
+   * @param  {import('./../Builder.js').default}  query
+   * @param  {import('./../Builder.js').Where}  where
    * @return {string}
    */
   whereDate (query, where) {
     const value = this.parameter(where.value)
 
-    return 'cast(' + this.wrap(where.column) + ' as date) ' + String(where.operator) + ' ' + value
+    return 'cast(' + this.wrap(where.column) + ' as date) ' + where.operator + ' ' + value
   }
 
   /**
-   * Compile a "where time" clause.
+   * Compile a "where date" clause.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
-   * @param  {Where}  where
+   * @param  {import('./../Builder.js').default}  query
+   * @param  {import('./../Builder.js').Where}  where
    * @return {string}
    */
   whereTime (query, where) {
     const value = this.parameter(where.value)
 
-    return 'cast(' + this.wrap(where.column) + ' as time) ' + String(where.operator) + ' ' + value
+    return 'cast(' + this.wrap(where.column) + ' as time) ' + where.operator + ' ' + value
+  }
+
+  /**
+   * Wrap the given JSON boolean value.
+   *
+   * @param  {string}  value
+   * @return {string}
+   */
+  wrapJsonBooleanValue (value) {
+    return "'" + value + "'"
+  }
+
+  /**
+   * Wrap the given JSON selector.
+   *
+   * @param  {string}  value
+   * @return {string}
+   */
+  wrapJsonSelector (value) {
+    const [field, path] = this.wrapJsonFieldAndPath(value)
+
+    return 'json_value(' + field + path + ')'
   }
 
   /**
    * Wrap a table in keyword identifiers.
    *
-   * @param  {\Illuminate\Database\Query\Expression|string}  table
+   * @param  {import('./../Expression.js').default|string}  table
    * @return {string}
    */
   wrapTable (table) {

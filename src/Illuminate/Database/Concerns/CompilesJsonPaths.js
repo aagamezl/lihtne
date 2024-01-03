@@ -13,12 +13,15 @@ export default class CompilesJsonPaths {
    */
   wrapJsonFieldAndPath (column) {
     const parts = column.split('->', 2)
+
     /**
      * The wrap method exists on the trait target prototype
      *
      * @ts-expect-error */
     const field = this.wrap(parts[0])
+
     const path = parts.length > 1 ? ', ' + this.wrapJsonPath(parts[1], '->') : ''
+
     return [field, path]
   }
 
@@ -31,9 +34,11 @@ export default class CompilesJsonPaths {
    */
   wrapJsonPath (value, delimiter = '->') {
     value = value.replace(/([\\]+)?'/g, '\'\'')
+
     const jsonPath = collect(value.split(delimiter))
       .map((segment) => this.wrapJsonPathSegment(String(segment)))
       .join('.')
+
     return "'$" + (jsonPath.startsWith('[') ? '' : '.') + jsonPath + "'"
   }
 

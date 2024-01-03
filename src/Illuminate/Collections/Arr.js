@@ -1,6 +1,5 @@
-import { /* isFalsy, */ isObject, isPlainObject } from '@devnetic/utils'
+import { isFalsy, isObject, isPlainObject } from '@devnetic/utils'
 
-import { isFalsy } from '../Support/index.js'
 import Collection from './Collection.js'
 import { dataGet, value as getValue } from './helpers.js'
 
@@ -42,9 +41,11 @@ export default class Arr {
    * @return {array}
    */
   static except (array, keys) {
-    this.forget(array, keys)
+    const cloned = structuredClone(array)
 
-    return array
+    this.forget(cloned, keys)
+
+    return cloned
   }
 
   /**
@@ -132,7 +133,7 @@ export default class Arr {
      * @return {void}
      */
   static forget (array, keys) {
-    const original = array
+    const original = structuredClone(array)
 
     keys = Array.isArray(keys) ? keys : [keys]
 
@@ -144,7 +145,7 @@ export default class Arr {
       // if the exact key exists in the top-level, remove it
       if (Arr.exists(array, key)) {
         delete array[key]
-        return
+        continue
       }
 
       const parts = key.split('.')
@@ -278,6 +279,17 @@ export default class Arr {
       result.push(value)
       return result
     }, [])
+  }
+
+  /**
+   * Filter the array using the given callback.
+   *
+   * @param  {unknown[]}  array
+   * @param  {Function}  callback
+   * @return {unknown[]}
+   */
+  static where (array, callback) {
+    return array.filter(callback)
   }
 
   /**

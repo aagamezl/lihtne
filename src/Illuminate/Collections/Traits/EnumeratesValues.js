@@ -27,6 +27,22 @@ export class EnumeratesValues {
   }
 
   /**
+   * Create a collection of all elements that do not pass a given truth test.
+   *
+   * @param  {((value: TValue, key: TKey) => boolean)|boolean|TValue}  [callback=true]
+   * @return {Collection}
+   */
+  reject (callback = true) {
+    const useAsCallable = this.useAsCallable(callback)
+
+    return this.filter((value, key) => {
+      return useAsCallable
+        ? !callback(value, key)
+        : value !== callback
+    })
+  }
+
+  /**
    * Determine if the given value is callable, but not a string.
    *
    * @param  {*}  value

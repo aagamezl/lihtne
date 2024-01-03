@@ -1,6 +1,6 @@
-// import { isFalsy, isTruthy } from '@devnetic/utils'
-import { isFalsy, isTruthy } from '../../Support/index.js'
+import { isFalsy, isTruthy } from '@devnetic/utils'
 
+// import { isFalsy, isTruthy } from '@devnetic/utils'
 export default class Conditionable {
   /**
    * Apply the callback's query changes if the given "value" is false.
@@ -12,11 +12,13 @@ export default class Conditionable {
    */
   unless (value, callbackFunc, defaultCallback) {
     value = value instanceof Function ? value(this) : value
+
     if (isFalsy(value)) {
       return callbackFunc(this, value) ?? this
     } else if (defaultCallback !== undefined) {
       return defaultCallback(this, value) ?? this
     }
+
     return this
   }
 
@@ -30,14 +32,13 @@ export default class Conditionable {
    */
   when (value, callbackFunc, defaultCallback) {
     value = value instanceof Function ? value(this) : value
-    // if (callbackFunc === undefined) {
-    //   return new HigherOrderWhenProxy(this, value)
-    // }
+
     if (isTruthy(value)) {
       return callbackFunc(this, value) ?? this
     } else if (defaultCallback !== undefined) {
       return defaultCallback(this, value) ?? this
     }
+
     return this
   }
 }

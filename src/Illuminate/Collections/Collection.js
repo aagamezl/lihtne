@@ -76,6 +76,20 @@ export default class Collection {
   }
 
   /**
+   * Run a filter over each of the items.
+   *
+   * @param  {(callable(TValue, TKey) => boolean)}  [callback]
+   * @return {static}
+   */
+  filter (callback) {
+    if (callback) {
+      return new Collection(Arr.where(this.items, callback))
+    }
+
+    return new Collection(this.items.filter(value => value))
+  }
+
+  /**
    * Get the first item from the collection passing the given truth test.
    *
    * @param  {Function}  [callback]

@@ -70,7 +70,7 @@ export default class Grammar {
   /**
    * Get the appropriate query parameter place-holder for a value.
    *
-   * @param  {any}  value
+   * @param  {unknown}  value
    * @return {string}
    */
   parameter (value) {

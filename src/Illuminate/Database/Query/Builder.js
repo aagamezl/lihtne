@@ -1,10 +1,15 @@
 import {
   clone,
   dateFormat,
+  isBoolean,
+  isFalsy,
+  isInteger,
   isNil,
   isNumeric,
   isPlainObject,
-  isString
+  isString,
+  isTruthy,
+  merge
 } from '@devnetic/utils'
 
 import Arr from '../../Collections/Arr.js'
@@ -15,8 +20,36 @@ import JoinClause from './JoinClause.js'
 import Macroable from '../../Macroable/Traits/Macroable.js'
 import Relation from '../Eloquent/Relations/Relation.js'
 import { collect, head, last, reset } from '../../Collections/helpers.js'
-import { castArray, changeKeyCase, isBoolean, isFalsy, isTruthy, tap } from '../../Support/index.js'
+import { castArray, changeKeyCase, ksort, tap } from '../../Support/index.js'
 import use from '../../Support/Traits/use.js'
+
+/**
+ * @typedef {Object} Having
+ * @property {string} type - The type of the condition.
+ * @property {string} column - The column name involved in the condition.
+ * @property {string} operator - The comparison operator used in the condition.
+ * @property {string} value - The value to compare in the condition.
+ * @property {string} boolean - The boolean operator connecting multiple conditions.
+ * @property {string} sql - The raw SQL expression for complex having conditions.
+ * @property {string[]} values - An array of values for conditions that involve multiple values.
+ * @property {boolean} not - A boolean indicating whether the condition is negated.
+ */
+
+/**
+ * @typedef {Object} Options
+ * @property {boolean} expanded
+ * @property {string} mode
+ */
+
+/**
+ * @typedef {Object} Where
+ * @property {string} type - The type of the date-based where clause.
+ * @property {string} column - The column name for the where condition.
+ * @property {string} operator - The comparison operator for the where condition.
+ * @property {unknown} value - The value to compare with in the where condition.
+ * @property {string} boolean - The boolean operator to combine multiple where conditions.
+ * @property {Options} options - The options for where conditions.
+ */
 
 export default class Builder {
   /**
@@ -34,14 +67,14 @@ export default class Builder {
     /**
      * An aggregate function and column to be run.
      *
-     * @member {object}
+     * @type {object}
      */
     this.aggregateProperty = undefined
 
     /**
      * The current query value bindings.
      *
-     * @member {Bindings}
+     * @type {Bindings}
      */
     this.bindings = {
       select: [],
@@ -58,7 +91,7 @@ export default class Builder {
     /**
      * All of the available bitwise operators.
      *
-     * @var string[]
+     * @type {string[]}
      */
     this.bitwiseOperators = [
       '&', '|', '^', '<<', '>>', '&~'
@@ -67,14 +100,14 @@ export default class Builder {
     /**
      * The callbacks that should be invoked before the query is executed.
      *
-     * @member {Array}
+     * @type {Array}
      */
     this.beforeQueryCallbacks = []
 
     /**
      * The columns that should be returned.
      *
-     * @var unknown[]
+     * @type {unknown[]}
      */
     this.columns = []
 
@@ -83,7 +116,7 @@ export default class Builder {
      *
      * Occasionally contains the columns that should be distinct.
      *
-     * @member {boolean|Array}
+     * @type {boolean|Array}
      */
     this.distinctProperty = false
 
@@ -123,6 +156,13 @@ export default class Builder {
     this.limitProperty = undefined
 
     /**
+     * Indicates whether row locking is being used.
+     *
+     * @type {string|boolean}
+     */
+    this.lockProperty = undefined
+
+    /**
      * The number of records to skip.
      *
      * @type {number}
@@ -132,7 +172,7 @@ export default class Builder {
     /**
      * All of the available clause operators.
      *
-     * @member {string[]}
+     * @type {string[]}
      */
     this.operators = [
       '=', '<', '>', '<=', '>=', '<>', '!=', '<=>',
@@ -146,42 +186,42 @@ export default class Builder {
     /**
      * The orderings for the query.
      *
-     * @member {string[]}
+     * @type {string[]}
      */
     this.orders = []
 
     /**
      * The maximum number of union records to return.
      *
-     * @member number
+     * @type {number}
      */
     this.unionLimit = undefined
 
     /**
      * The number of union records to skip.
      *
-     * @member number
+     * @type {number}
      */
     this.unionOffset = undefined
 
     /**
      * The orderings for the union query.
      *
-     * @member {Array}
+     * @type {Array}
      */
     this.unionOrders = []
 
     /**
      * The query union statements.
      *
-     * @member {Array}
+     * @type {Array}
      */
     this.unions = []
 
     /**
      * The where constraints for the query.
      *
-     * @var array
+     * @type {Where[]}
      */
     this.wheres = [] // TODO: verify the correct type
 
@@ -543,14 +583,18 @@ export default class Builder {
    */
   async exists () {
     this.applyBeforeQueryCallbacks()
+
     let results = await this.connection.select(this.grammar.compileExists(this), this.getBindings())
+
     // If the results has rows, we will get the row and see if the exists column is a
     // boolean true. If there is no results for this query we will return false as
     // there are no rows for this query at all and we can return that info here.
     if (results[0] !== undefined) {
       results = results[0]
+
       return Boolean(results.exists)
     }
+
     return false
   }
 
@@ -1208,9 +1252,11 @@ export default class Builder {
    */
   limit (value) {
     const property = this.unions.length > 0 ? 'unionLimit' : 'limitProperty'
+
     if (value >= 0) {
       this[property] = value
     }
+
     return this
   }
 
@@ -1369,14 +1415,18 @@ export default class Builder {
       column = new Expression('(' + query + ')')
       this.addBinding(bindings, this.unions?.length > 0 ? 'unionOrder' : 'order')
     }
+
     direction = direction.toLowerCase()
+
     if (!['asc', 'desc'].includes(direction)) {
       throw new Error('InvalidArgumentException: Order direction must be "asc" or "desc".')
     }
+
     this[this.unions.length > 0 ? 'unionOrders' : 'orders'].push({
       column,
       direction
     })
+
     return this
   }
 
@@ -2100,6 +2150,50 @@ export default class Builder {
    */
   unionAll (query) {
     return this.union(query, true)
+  }
+
+  /**
+   * Insert new records or update the existing ones.
+   *
+   * @param  {array}  values
+   * @param  {array|string}  uniqueBy
+   * @param  {array}  [update]
+   * @return {number}
+   */
+  upsert (values, uniqueBy, update) {
+    if (values.length === 0) {
+      return 0
+    } else if (update?.length === 0) {
+      return this.insert(values)
+    }
+
+    if (!Array.isArray(reset(values)) && !isPlainObject(reset(values))) {
+      values = [values]
+    } else {
+      for (let [key, value] of Object.entries(values)) {
+        value = ksort(value)
+
+        values[key] = value
+      }
+    }
+
+    if (isNil(update)) {
+      update = Object.keys(reset(values))
+    }
+
+    this.applyBeforeQueryCallbacks()
+
+    const bindings = this.cleanBindings(merge(
+      Arr.flatten(values, 1),
+      collect(update).reject(function (value, key) {
+        return isInteger(key)
+      }).all()
+    ))
+
+    return this.connection.affectingStatement(
+      this.grammar.compileUpsert(this, values, [uniqueBy], update),
+      bindings
+    )
   }
 
   /**

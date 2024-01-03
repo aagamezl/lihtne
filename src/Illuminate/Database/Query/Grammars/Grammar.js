@@ -1,4 +1,4 @@
-import { capitalize } from '@devnetic/utils'
+import { capitalize, isTruthy } from '@devnetic/utils'
 
 import Arr from '../../../Collections/Arr.js'
 import BaseGrammar from '../../Grammar.js'
@@ -6,27 +6,42 @@ import CompilesJsonPaths from '../../Concerns/CompilesJsonPaths.js'
 import JoinClause from './../JoinClause.js'
 import use from '../../../Support/Traits/use.js'
 import { collect, end, head, last, reset } from '../../../Collections/helpers.js'
-import { isTruthy } from '../../../Support/index.js'
+
+/**
+ * @typedef {Object} SelectComponent
+ * @property {string} name - The name of the select component.
+ * @property {string} property - The property associated with the select component.
+ */
+
+/**
+ * Array representing the select components for a query.
+ * @typedef {SelectComponent[]} SelectComponents
+ */
 
 export default class Grammar extends BaseGrammar {
   constructor () {
     super()
+
+    use(this.constructor, [CompilesJsonPaths])
+
     /**
-   * The grammar specific operators.
-   *
-   * @var string[]
-   */
+     * The grammar specific operators.
+     *
+     * @type {string[]}
+     */
     this.operators = []
+
     /**
      * The grammar specific bitwise operators.
      *
-     * @var array
+     * @type {array}
      */
     this.bitwiseOperators = []
+
     /**
      * The components that make up a select clause.
      *
-     * @var string[]
+     * @type {SelectComponents}
      */
     this.selectComponents = [
       { name: 'aggregate', property: 'aggregateProperty' },
@@ -41,7 +56,6 @@ export default class Grammar extends BaseGrammar {
       { name: 'offset', property: 'offsetProperty' },
       { name: 'lock', property: 'lockProperty' }
     ]
-    use(this.constructor, [CompilesJsonPaths])
   }
 
   /**
@@ -155,7 +169,7 @@ export default class Grammar extends BaseGrammar {
   /**
    * Compile a single having clause.
    *
-   * @param  {Having}  having
+   * @param  {import('./../Builder.js').Having}  having
    * @return {string}
    */
   compileHaving (having) {
@@ -512,6 +526,21 @@ export default class Grammar extends BaseGrammar {
    */
   compileUpdateWithoutJoins (query, table, columns, where) {
     return `update ${table} set ${columns} ${where}`
+  }
+
+  /**
+   * Compile an "upsert" statement into SQL.
+   *
+   * @param  {import('./../Builder.js').default}  query
+   * @param  {array}  values
+   * @param  {array}  uniqueBy
+   * @param  {array}  update
+   * @return {string}
+   *
+   * @throws {Error<RuntimeException>}
+   */
+  compileUpsert (query, values, uniqueBy, update) {
+    throw new Error('RuntimeException: This database engine does not support upserts.')
   }
 
   /**

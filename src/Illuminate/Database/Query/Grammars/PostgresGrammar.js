@@ -1,7 +1,7 @@
-// import { isTruthy } from '@devnetic/utils'
+import { isNumeric, isTruthy } from '@devnetic/utils'
+
 import Grammar from './Grammar.js'
 import { collect } from '../../../Collections/helpers.js'
-import { isTruthy } from '../../../Support/helpers.js'
 
 export default class PostgresGrammar extends Grammar {
   constructor () {
@@ -70,6 +70,29 @@ export default class PostgresGrammar extends Grammar {
    */
   compileInsertOrIgnore (query, values) {
     return this.compileInsert(query, values) + ' on conflict do nothing'
+  }
+
+  /**
+   * Compile an "upsert" statement into SQL.
+   *
+   * @param  {import('./../Builder.js').default}  query
+   * @param  {array}  values
+   * @param  {array}  uniqueBy
+   * @param  {array}  update
+   * @return {string}
+   */
+  compileUpsert (query, values, uniqueBy, update) {
+    let sql = this.compileInsert(query, values)
+
+    sql += ' on conflict (' + this.columnize(uniqueBy) + ') do update set '
+
+    const columns = collect(update).map((value, key) => {
+      return isNumeric(key)
+        ? this.wrap(value) + ' = ' + this.wrapValue('excluded') + '.' + this.wrap(value)
+        : this.wrap(key) + ' = ' + this.parameter(value)
+    }).implode(', ')
+
+    return sql + columns
   }
 
   /**

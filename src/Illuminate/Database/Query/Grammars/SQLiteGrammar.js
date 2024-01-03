@@ -1,4 +1,7 @@
+import { isNumeric } from '@devnetic/utils'
+
 import Grammar from './Grammar.js'
+import { collect } from '../../../Collections/helpers.js'
 
 export default class SQLiteGrammar extends Grammar {
   constructor () {
@@ -25,6 +28,29 @@ export default class SQLiteGrammar extends Grammar {
    */
   compileInsertOrIgnore (query, values) {
     return this.compileInsert(query, values).replace('insert', 'insert or ignore')
+  }
+
+  /**
+   * Compile an "upsert" statement into SQL.
+   *
+   * @param  {import('./../Builder.js').default}  query
+   * @param  {array}  values
+   * @param  {array}  uniqueBy
+   * @param  {array}  update
+   * @return {string}
+   */
+  compileUpsert (query, values, uniqueBy, update) {
+    let sql = this.compileInsert(query, values)
+
+    sql += ' on conflict (' + this.columnize(uniqueBy) + ') do update set '
+
+    const columns = collect(update).map((value, key) => {
+      return isNumeric(key)
+        ? this.wrap(value) + ' = ' + this.wrapValue('excluded') + '.' + this.wrap(value)
+        : this.wrap(key) + ' = ' + this.parameter(value)
+    }).implode(', ')
+
+    return sql + columns
   }
 
   /**
