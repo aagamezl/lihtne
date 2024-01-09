@@ -38,6 +38,7 @@ import use from '../../Support/Traits/use.js'
 /**
  * @typedef {Object} Options
  * @property {boolean} expanded
+ * @property {string} language
  * @property {string} mode
  */
 
@@ -49,6 +50,19 @@ import use from '../../Support/Traits/use.js'
  * @property {unknown} value - The value to compare with in the where condition.
  * @property {string} boolean - The boolean operator to combine multiple where conditions.
  * @property {Options} options - The options for where conditions.
+ */
+
+/**
+ * @typedef {Object} Bindings
+ * @property {unknown[]} select - Bindings for the SELECT statement.
+ * @property {unknown[]} from - Bindings for the FROM statement.
+ * @property {unknown[]} join - Bindings for JOIN statements.
+ * @property {unknown[]} where - Bindings for the WHERE statement.
+ * @property {unknown[]} groupBy - Bindings for the GROUP BY statement.
+ * @property {unknown[]} having - Bindings for the HAVING statement.
+ * @property {unknown[]} order - Bindings for the ORDER BY statement.
+ * @property {unknown[]} union - Bindings for the UNION statement.
+ * @property {unknown[]} unionOrder - Bindings for the ORDER BY statement in UNION.
  */
 
 export default class Builder {
@@ -144,7 +158,7 @@ export default class Builder {
     /**
      * The table joins for the query.
      *
-     * @var array
+     * @type {Builder[]}
      */
     this.joins = []
 
@@ -300,7 +314,7 @@ export default class Builder {
   /**
    * Add another query builder as a nested having to the query builder.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
+   * @param  {Builder}  query
    * @param  {string}  boolean
    * @return {this}
    */
@@ -359,15 +373,18 @@ export default class Builder {
   /**
    * Add an exists clause to the query.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
+   * @param  {Builder}  query
    * @param  {string}  boolean
    * @param  {boolean}  not
    * @return {this}
    */
   addWhereExistsQuery (query, boolean = 'and', not = false) {
     const type = not ? 'NotExists' : 'Exists'
+
     this.wheres.push({ type, query, boolean })
+
     this.addBinding(query.getBindings(), 'where')
+
     return this
   }
 
@@ -382,11 +399,14 @@ export default class Builder {
     // We need to save the original bindings, because the cloneWithoutBindings
     // method delete them from the builder object
     const bindings = clone(this.bindings)
+
     const results = await this.cloneWithout(this.unions.length > 0 || this.havings.length > 0 ? [] : ['columns'])
       .cloneWithoutBindings(this.unions.length > 0 || this.havings.length > 0 ? [] : ['select'])
       .setAggregate(functionName, columns)
       .get(columns)
+
     this.bindings = bindings
+
     if (!results.isEmpty()) {
       return results.all()[0].aggregate
     }
@@ -490,7 +510,7 @@ export default class Builder {
   /**
    * Creates a subquery and parse it.
    *
-   * @param  {Function|\Illuminate\Database\Query\Builder|EloquentBuilder|string}  query
+   * @param  {Function|Builder|EloquentBuilder|string}  query
    * @return {Array}
    */
   createSub (query) {
@@ -499,9 +519,12 @@ export default class Builder {
     // format and work with the query before we cast it to a raw SQL string.
     if (query instanceof Function) {
       const callback = query
+
       query = this.forSubQuery()
+
       callback(query)
     }
+
     return this.parseSub(query)
   }
 
@@ -525,7 +548,7 @@ export default class Builder {
   /**
    * Add a subquery cross join to the query.
    *
-   * @param  {Function|\Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder|string}  query
+   * @param  {Function|Builder|\Illuminate\Database\Eloquent\Builder|string}  query
    * @param  {string}  as
    * @return {this}
    */
@@ -655,7 +678,7 @@ export default class Builder {
   /**
    * Create a new query instance for nested where condition.
    *
-   * @return {\Illuminate\Database\Query\Builder}
+   * @return {Builder}
    */
   forNestedWhere () {
     return this.newQuery().from(this.fromProperty)
@@ -675,7 +698,7 @@ export default class Builder {
   /**
    * Create a new query instance for a sub-query.
    *
-   * @return {\Illuminate\Database\Query\Builder}
+   * @return {Builder}
    */
   forSubQuery () {
     return this.newQuery()
@@ -684,7 +707,7 @@ export default class Builder {
   /**
    * Set the table which the query is targeting.
    *
-   * @param  {Function|\Illuminate\Database\Query\Builder|string}  table
+   * @param  {Function|Builder|string}  table
    * @param  {string|undefined}  as
    * @return {this}
    * @memberof Builder
@@ -715,7 +738,7 @@ export default class Builder {
   /**
    * Makes "from" fetch from a subquery.
    *
-   * @param  {Function|\Illuminate\Database\Query\Builder|string}  query
+   * @param  {Function|Builder|string}  query
    * @param  {string}  as
    * @return {this}
    *
@@ -1091,7 +1114,7 @@ export default class Builder {
    * Insert new records into the table using a subquery.
    *
    * @param  {Array}  columns
-   * @param  {Function|\Illuminate\Database\Query\Builder|string}  query
+   * @param  {Function|Builder|string}  query
    * @return {Promise<number>}
    */
   insertUsing (columns, query) {
@@ -1201,7 +1224,7 @@ export default class Builder {
   /**
    * Add a subquery join clause to the query.
    *
-   * @param  {Function|\Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder|string}  query
+   * @param  {Function|Builder|\Illuminate\Database\Eloquent\Builder|string}  query
    * @param  {string}  as
    * @param  {Function|string}  first
    * @param  {string|undefined}  operator
@@ -1237,7 +1260,7 @@ export default class Builder {
   /**
    * Add an "order by" clause for a timestamp to the query.
    *
-   * @param  {Function|\Illuminate\Database\Query\Builder|\Illuminate\Contracts\Database\Query\Expression|string}  column
+   * @param  {Function|Builder|\Illuminate\Contracts\Database\Query\Expression|string}  column
    * @return {this}
    */
   latest (column = 'created_at') {
@@ -1276,7 +1299,7 @@ export default class Builder {
   /**
    * Add a subquery left join to the query.
    *
-   * @param  {Function|\Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder|string}  query
+   * @param  {Function|Builder|\Illuminate\Database\Eloquent\Builder|string}  query
    * @param  {string}  as
    * @param  {Function|string}  first
    * @param  {string}  operator
@@ -1313,7 +1336,7 @@ export default class Builder {
   /**
    * Merge an array of bindings into our bindings.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
+   * @param  {Builder}  query
    * @return {this}
    */
   mergeBindings (query) {
@@ -1337,7 +1360,7 @@ export default class Builder {
   /**
    * Get a new join clause.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  parentQuery
+   * @param  {Builder}  parentQuery
    * @param  {string}  type
    * @param  {string}  table
    * @return {\Illuminate\Database\Query\JoinClause}
@@ -1349,7 +1372,7 @@ export default class Builder {
   /**
    * Get a new instance of the query builder.
    *
-   * @return {\Illuminate\Database\Query\Builder}
+   * @return {Builder}
    */
   newQuery () {
     return new Builder(this.connection, this.grammar, this.processor)
@@ -1393,7 +1416,7 @@ export default class Builder {
   /**
    * Add an "order by" clause for a timestamp to the query.
    *
-   * @param  {Function|\Illuminate\Database\Query\Builder|\Illuminate\Contracts\Database\Query\Expression|string}  column
+   * @param  {Function|Builder|\Illuminate\Contracts\Database\Query\Expression|string}  column
    * @return {this}
    */
   oldest (column = 'created_at') {
@@ -1403,7 +1426,7 @@ export default class Builder {
   /**
    * Add an "order by" clause to the query.
    *
-   * @param  {Function|\Illuminate\Database\Query\Builder|\Illuminate\Database\Query\Expression|string}  column
+   * @param  {Function|Builder|\Illuminate\Database\Query\Expression|string}  column
    * @param  {string}  [direction=asc]
    * @return {this}
    *
@@ -1433,7 +1456,7 @@ export default class Builder {
   /**
    * Add a descending "order by" clause to the query.
    *
-   * @param  {Function|\Illuminate\Database\Query\Builder|\Illuminate\Database\Query\Expression|string}  column
+   * @param  {Function|Builder|\Illuminate\Database\Query\Expression|string}  column
    * @return {this}
    */
   orderByDesc (column) {
@@ -1908,7 +1931,7 @@ export default class Builder {
   /**
    * Add a subquery right join to the query.
    *
-   * @param  {Function|\Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder|string}  query
+   * @param  {Function|Builder|\Illuminate\Database\Eloquent\Builder|string}  query
    * @param  {string}  as
    * @param  {Function|string}  first
    * @param  {string|undefined}  [operator=undefined]
@@ -2015,7 +2038,7 @@ export default class Builder {
   /**
    * Add a subselect expression to the query.
    *
-   * @param {Function|\Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder|string}  query
+   * @param {Function|Builder|\Illuminate\Database\Eloquent\Builder|string}  query
    * @param {string}  as
    * @return {this}
    *
@@ -2123,7 +2146,7 @@ export default class Builder {
   /**
    * Add a union statement to the query.
    *
-   * @param  {\Illuminate\Database\Query\Builder|Function}  query
+   * @param  {Builder|Function}  query
    * @param  {boolean}  [all=false]
    * @return {this}
    */
@@ -2145,7 +2168,7 @@ export default class Builder {
   /**
    * Add a union all statement to the query.
    *
-   * @param  {\Illuminate\Database\Query\Builder|Function}  query
+   * @param  {Builder|Function}  query
    * @return {this}
    */
   unionAll (query) {
@@ -2185,7 +2208,7 @@ export default class Builder {
 
     const bindings = this.cleanBindings(merge(
       Arr.flatten(values, 1),
-      collect(update).reject(function (value, key) {
+      collect(update).reject((value, key) => {
         return isInteger(key)
       }).all()
     ))

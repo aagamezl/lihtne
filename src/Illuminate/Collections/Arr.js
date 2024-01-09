@@ -264,6 +264,47 @@ export default class Arr {
   }
 
   /**
+   * Set an array item to a given value using "dot" notation.
+   *
+   * If no key is given to the method, the entire array will be replaced.
+   *
+   * @param  {unknown[]}  array
+   * @param  {string|number|undefined}  key
+   * @param  {unknown}  value
+   * @return {unknown[]}
+   */
+  static set (array, key, value) {
+    if (key === undefined) {
+      array = value
+
+      return array
+    }
+
+    const keys = key.split('.')
+
+    keys.forEach((k, i) => {
+      if (keys.length === 1) {
+        return
+      }
+
+      keys.splice(i, 1)
+
+      // If the key doesn't exist at this depth, we will just create an empty array
+      // to hold the next value, allowing us to create the arrays to hold final
+      // values at the correct depth. Then we'll keep digging into the array.
+      if (array[key] === undefined || typeof array[k] !== 'object') {
+        array[k] = {}
+      }
+
+      array = array[k]
+    })
+
+    array[keys.shift()] = value
+
+    return array
+  }
+
+  /**
    * Sort the array using the given callback or "dot" notation.
    *
    * @param  {Record<string, any>}  array

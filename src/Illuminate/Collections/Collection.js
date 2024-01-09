@@ -1,11 +1,11 @@
-import { getType, isFunction, isPlainObject, isString, range } from '@devnetic/utils'
+import { getType, isFunction, isPlainObject, isString, merge, range } from '@devnetic/utils'
 
 import use from '../Support/Traits/use.js'
 import Arr from './Arr.js'
 import { EnumeratesValues } from './Traits/EnumeratesValues.js'
 import Macroable from '../Macroable/Traits/Macroable.js'
 import { dataGet } from './helpers.js'
-import { spaceship } from '../Support/index.js'
+import { objectDiffKey, spaceship } from '../Support/index.js'
 
 export default class Collection {
   /**
@@ -42,6 +42,15 @@ export default class Collection {
   }
 
   /**
+     * Collapse the collection of items into a single array.
+     *
+     * @return {Collection}
+     */
+  collapse () {
+    return new Collection(Arr.collapse(this.items))
+  }
+
+  /**
     * Determine if an item exists in the collection.
     *
     * @param  {*}  key
@@ -73,6 +82,16 @@ export default class Collection {
     }
 
     return Object.keys(this.items).length
+  }
+
+  /**
+     * Get the items in the collection that are not present in the given items.
+     *
+     * @param  {Object.<string, unknown>}  items
+     * @return {Collection}
+     */
+  diff (items) {
+    return new Collection(objectDiffKey(this.items, this.getArrayableItems(items)))
   }
 
   /**
@@ -184,6 +203,17 @@ export default class Collection {
       }
       return item
     }))
+  }
+
+  /**
+   * Merge the collection with the given items.
+   *
+   * @param  {*}  items
+   * @return {Collection}
+   */
+  merge (items) {
+    return new this.constructor(merge(this.items, this.getArrayableItems(items)))
+    // return new this.constructor([...this.items, ...this.getArrayableItems(Object.entries(items))])
   }
 
   /**
@@ -324,5 +354,14 @@ export default class Collection {
       return result
     })
     return new Collection(items)
+  }
+
+  /**
+   * Reset the keys on the underlying array.
+   *
+   * @return {Collection}
+   */
+  values () {
+    return new Collection(Object.values(this.items))
   }
 }

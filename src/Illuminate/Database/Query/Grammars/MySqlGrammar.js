@@ -1,4 +1,4 @@
-import { isBoolean, isNumeric, isTruthy } from '@devnetic/utils'
+import { isBoolean, isNumeric, isPlainObject, isTruthy } from '@devnetic/utils'
 
 import Grammar from './Grammar.js'
 import { collect } from '../../../Collections/helpers.js'
@@ -265,7 +265,7 @@ export default class MySqlGrammar extends Grammar {
     values = collect(values).reject(([column, value]) => {
       return this.isJsonSelector(column) && isBoolean(value)
     }).map((value) => {
-      return Array.isArray(value) ? JSON.stringify(value) : value
+      return (Array.isArray(value) || isPlainObject(value)) ? JSON.stringify(value) : value
     }).all()
 
     return super.prepareBindingsForUpdate(bindings, values)

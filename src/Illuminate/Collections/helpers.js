@@ -3,6 +3,11 @@ import { isObject } from '@devnetic/utils'
 import Arr from './Arr.js'
 import Collection from './Collection.js'
 
+/**
+ *
+ * @param {unknown} value
+ * @returns {Collection}
+ */
 export const collect = (value) => {
   return new Collection(value)
 }

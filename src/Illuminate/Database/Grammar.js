@@ -185,6 +185,7 @@ export default class Grammar {
     if (!this.isExpression(table)) {
       return this.wrap(this.tablePrefix + table, true)
     }
+
     return this.getValue(table)
   }
 

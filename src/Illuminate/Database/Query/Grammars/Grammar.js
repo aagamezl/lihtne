@@ -709,11 +709,6 @@ export default class Grammar extends BaseGrammar {
   prepareBindingsForUpdate (bindings, values) {
     const cleanBindings = Arr.except(bindings, ['select', 'join'])
 
-    // return Object.values(
-    //   // [bindings.join, ...values, ...Arr.flatten(cleanBindings)]
-    //   { ...bindings.join, ...values, ...Arr.flatten(cleanBindings) }
-    // )
-
     return [
       ...Object.values(bindings.join),
       ...Object.values(values),
