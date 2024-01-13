@@ -2741,7 +2741,7 @@ test('testMySqlInsertOrIgnoreMethod', async (t) => {
   const { createMock, verifyMock } = mock()
 
   const builder = getMySqlBuilder()
-  createMock(builder.getConnection()).expects('affectingStatement').once().withArgs('insert ignore into `users` (`email`) values (?)', ['foo']).returns(1)
+  createMock(builder.getConnection()).expects('affectingStatement').once().withArgs('insert ignore into `users` (`email`) values (?)', ['foo']).resolves(1)
   const result = await builder.from('users').insertOrIgnore({ email: 'foo' })
   t.is(1, result)
 
@@ -3037,157 +3037,171 @@ test('testUpdateMethodWithJoinsAndAliasesOnSqlServer', async (t) => {
   verifyMock()
 })
 
-// test('testUpdateMethodWithoutJoinsOnPostgres', async (t) => {
-//   const builder = getPostgresBuilder()
-//   builder.getConnection().shouldReceive('update').once().with('update "users" set "email" = ?, "name" = ? where "id" = ?', ['foo', 'bar', 1]).andReturn(1)
-//   result = builder.from('users').where('id', '=', 1).update(['users.email' => 'foo', 'name' => 'bar'])
-//   t.deepEqual(1, result)
+test('testUpdateMethodWithoutJoinsOnPostgres', async (t) => {
+  const { createMock, verifyMock } = mock()
 
-//   const builder = getPostgresBuilder()
-//   builder.getConnection().shouldReceive('update').once().with('update "users" set "email" = ?, "name" = ? where "id" = ?', ['foo', 'bar', 1]).andReturn(1)
-//   result = builder.from('users').where('id', '=', 1).selectRaw('?', ['ignore']).update(['users.email' => 'foo', 'name' => 'bar'])
-//   t.deepEqual(1, result)
+  let builder = getPostgresBuilder()
+  createMock(builder.getConnection()).expects('update').once().withArgs('update "users" set "email" = ?, "name" = ? where "id" = ?', ['foo', 'bar', 1]).resolves(1)
+  let result = await builder.from('users').where('id', '=', 1).update({ 'users.email': 'foo', name: 'bar' })
+  t.is(result, 1)
 
-//   const builder = getPostgresBuilder()
-//   builder.getConnection().shouldReceive('update').once().with('update "users"."users" set "email" = ?, "name" = ? where "id" = ?', ['foo', 'bar', 1]).andReturn(1)
-//   result = builder.from('users.users').where('id', '=', 1).selectRaw('?', ['ignore']).update(['users.users.email' => 'foo', 'name' => 'bar'])
-//   t.deepEqual(1, result)
-// })
+  builder = getPostgresBuilder()
+  createMock(builder.getConnection()).expects('update').once().withArgs('update "users" set "email" = ?, "name" = ? where "id" = ?', ['foo', 'bar', 1]).resolves(1)
+  result = await builder.from('users').where('id', '=', 1).selectRaw('?', ['ignore']).update({ 'users.email': 'foo', name: 'bar' })
+  t.is(result, 1)
 
-// test('testUpdateMethodWithJoinsOnPostgres', async (t) => {
-//   const builder = getPostgresBuilder()
-//   builder.getConnection().shouldReceive('update').once().with('update "users" set "email" = ?, "name" = ? where "ctid" in (select "users"."ctid" from "users" inner join "orders" on "users"."id" = "orders"."user_id" where "users"."id" = ?)', ['foo', 'bar', 1]).andReturn(1)
-//   result = builder.from('users').join('orders', 'users.id', '=', 'orders.user_id').where('users.id', '=', 1).update({ email: 'foo', name: 'bar' })
-//   t.deepEqual(1, result)
+  builder = getPostgresBuilder()
+  createMock(builder.getConnection()).expects('update').once().withArgs('update "users"."users" set "email" = ?, "name" = ? where "id" = ?', ['foo', 'bar', 1]).resolves(1)
+  result = await builder.from('users.users').where('id', '=', 1).selectRaw('?', ['ignore']).update({ 'users.users.email': 'foo', name: 'bar' })
+  t.is(result, 1)
 
-//   const builder = getPostgresBuilder()
-//   builder.getConnection().shouldReceive('update').once().with('update "users" set "email" = ?, "name" = ? where "ctid" in (select "users"."ctid" from "users" inner join "orders" on "users"."id" = "orders"."user_id" and "users"."id" = ?)', ['foo', 'bar', 1]).andReturn(1)
-//   result = builder.from('users').join('orders', function (join) {
-//     join.on('users.id', '=', 'orders.user_id')
-//       .where('users.id', '=', 1)
-//   }).update({ email: 'foo', name: 'bar' })
-//   t.deepEqual(1, result)
+  verifyMock()
+})
 
-//   const builder = getPostgresBuilder()
-//   builder.getConnection().shouldReceive('update').once().with('update "users" set "email" = ?, "name" = ? where "ctid" in (select "users"."ctid" from "users" inner join "orders" on "users"."id" = "orders"."user_id" and "users"."id" = ? where "name" = ?)', ['foo', 'bar', 1, 'baz']).andReturn(1)
-//   result = builder.from('users')
-//     .join('orders', function (join) {
-//       join.on('users.id', '=', 'orders.user_id')
-//         .where('users.id', '=', 1)
-//     }).where('name', 'baz')
-//     .update({ email: 'foo', name: 'bar' })
-//   t.deepEqual(1, result)
-// })
+test('testUpdateMethodWithJoinsOnPostgres', async (t) => {
+  const { createMock, verifyMock } = mock()
 
-// test('testUpdateFromMethodWithJoinsOnPostgres', async (t) => {
-//   const builder = getPostgresBuilder()
-//   builder.getConnection().shouldReceive('update').once().with('update "users" set "email" = ?, "name" = ? from "orders" where "users"."id" = ? and "users"."id" = "orders"."user_id"', ['foo', 'bar', 1]).andReturn(1)
-//   result = builder.from('users').join('orders', 'users.id', '=', 'orders.user_id').where('users.id', '=', 1).updateFrom({ email: 'foo', name: 'bar' })
-//   t.deepEqual(1, result)
+  let builder = getPostgresBuilder()
+  createMock(builder.getConnection()).expects('update').once().withArgs('update "users" set "email" = ?, "name" = ? where "ctid" in (select "users"."ctid" from "users" inner join "orders" on "users"."id" = "orders"."user_id" where "users"."id" = ?)', ['foo', 'bar', 1]).resolves(1)
+  let result = await builder.from('users').join('orders', 'users.id', '=', 'orders.user_id').where('users.id', '=', 1).update({ email: 'foo', name: 'bar' })
+  t.is(result, 1)
 
-//   const builder = getPostgresBuilder()
-//   builder.getConnection().shouldReceive('update').once().with('update "users" set "email" = ?, "name" = ? from "orders" where "users"."id" = "orders"."user_id" and "users"."id" = ?', ['foo', 'bar', 1]).andReturn(1)
-//   result = builder.from('users').join('orders', function (join) {
-//     join.on('users.id', '=', 'orders.user_id')
-//       .where('users.id', '=', 1)
-//   }).updateFrom({ email: 'foo', name: 'bar' })
-//   t.deepEqual(1, result)
+  builder = getPostgresBuilder()
+  createMock(builder.getConnection()).expects('update').once().withArgs('update "users" set "email" = ?, "name" = ? where "ctid" in (select "users"."ctid" from "users" inner join "orders" on "users"."id" = "orders"."user_id" and "users"."id" = ?)', ['foo', 'bar', 1]).resolves(1)
+  result = await builder.from('users').join('orders', (join) => {
+    join.on('users.id', '=', 'orders.user_id')
+      .where('users.id', '=', 1)
+  }).update({ email: 'foo', name: 'bar' })
+  t.is(result, 1)
 
-//   const builder = getPostgresBuilder()
-//   builder.getConnection().shouldReceive('update').once().with('update "users" set "email" = ?, "name" = ? from "orders" where "name" = ? and "users"."id" = "orders"."user_id" and "users"."id" = ?', ['foo', 'bar', 'baz', 1]).andReturn(1)
-//   result = builder.from('users')
-//     .join('orders', function (join) {
-//       join.on('users.id', '=', 'orders.user_id')
-//         .where('users.id', '=', 1)
-//     }).where('name', 'baz')
-//     .updateFrom({ email: 'foo', name: 'bar' })
-//   t.deepEqual(1, result)
-// })
+  builder = getPostgresBuilder()
+  createMock(builder.getConnection()).expects('update').once().withArgs('update "users" set "email" = ?, "name" = ? where "ctid" in (select "users"."ctid" from "users" inner join "orders" on "users"."id" = "orders"."user_id" and "users"."id" = ? where "name" = ?)', ['foo', 'bar', 1, 'baz']).resolves(1)
+  result = await builder.from('users')
+    .join('orders', (join) => {
+      join.on('users.id', '=', 'orders.user_id')
+        .where('users.id', '=', 1)
+    }).where('name', 'baz')
+    .update({ email: 'foo', name: 'bar' })
+  t.is(result, 1)
 
-// test('testUpdateMethodRespectsRaw', async (t) => {
-//   const builder = getBuilder()
-//   builder.getConnection().shouldReceive('update').once().with('update "users" set "email" = foo, "name" = ? where "id" = ?', ['bar', 1]).andReturn(1)
-//   result = builder.from('users').where('id', '=', 1).update(['email' => new Raw('foo'), 'name' => 'bar'])
-//   t.deepEqual(1, result)
-// })
+  verifyMock()
+})
 
-// test('testUpdateOrInsertMethod', async (t) => {
-//   const builder = m.mock(Builder.class.'[where,exists,insert]', [
-//     m.mock(ConnectionInterface.class),
-//     new Grammar,
-//     m.mock(Processor.class),
-//   ])
+test('testUpdateFromMethodWithJoinsOnPostgres', async (t) => {
+  const { createMock, verifyMock } = mock()
 
-//   builder.shouldReceive('where').once().with(['email' => 'foo']).andReturn(m.self())
-//   builder.shouldReceive('exists').once().andReturn(false)
-//   builder.shouldReceive('insert').once().with({ email: 'foo', name: 'bar' }).andReturn(true)
+  let builder = getPostgresBuilder()
+  createMock(builder.getConnection()).expects('update').once().withArgs('update "users" set "email" = ?, "name" = ? from "orders" where "users"."id" = ? and "users"."id" = "orders"."user_id"', ['foo', 'bar', 1]).resolves(1)
+  let result = await builder.from('users').join('orders', 'users.id', '=', 'orders.user_id').where('users.id', '=', 1).updateFrom({ email: 'foo', name: 'bar' })
+  t.is(result, 1)
 
-//   t.true(builder.updateOrInsert(['email' => 'foo'], ['name' => 'bar']))
+  builder = getPostgresBuilder()
+  createMock(builder.getConnection()).expects('update').once().withArgs('update "users" set "email" = ?, "name" = ? from "orders" where "users"."id" = "orders"."user_id" and "users"."id" = ?', ['foo', 'bar', 1]).resolves(1)
+  result = await builder.from('users').join('orders', (join) => {
+    join.on('users.id', '=', 'orders.user_id')
+      .where('users.id', '=', 1)
+  }).updateFrom({ email: 'foo', name: 'bar' })
+  t.is(result, 1)
 
-//   const builder = m.mock(Builder.class.'[where,exists,update]', [
-//     m.mock(ConnectionInterface.class),
-//     new Grammar,
-//     m.mock(Processor.class),
-//   ])
+  builder = getPostgresBuilder()
+  createMock(builder.getConnection()).expects('update').once().withArgs('update "users" set "email" = ?, "name" = ? from "orders" where "name" = ? and "users"."id" = "orders"."user_id" and "users"."id" = ?', ['foo', 'bar', 'baz', 1]).resolves(1)
+  result = await builder.from('users')
+    .join('orders', (join) => {
+      join.on('users.id', '=', 'orders.user_id')
+        .where('users.id', '=', 1)
+    }).where('name', 'baz')
+    .updateFrom({ email: 'foo', name: 'bar' })
+  t.is(result, 1)
 
-//   builder.shouldReceive('where').once().with(['email' => 'foo']).andReturn(m.self())
-//   builder.shouldReceive('exists').once().andReturn(true)
-//   builder.shouldReceive('take').andReturnSelf()
-//   builder.shouldReceive('update').once().with(['name' => 'bar']).andReturn(1)
+  verifyMock()
+})
 
-//   t.true(builder.updateOrInsert(['email' => 'foo'], ['name' => 'bar']))
-// })
+test('testUpdateMethodRespectsRaw', async (t) => {
+  const { createMock, verifyMock } = mock()
 
-// test('testUpdateOrInsertMethodWorksWithEmptyUpdateValues', async (t) => {
-//   const builder = m.spy(Builder.class.'[where,exists,update]', [
-//     m.mock(ConnectionInterface.class),
-//     new Grammar,
-//     m.mock(Processor.class),
-//   ])
+  const builder = getBuilder()
+  createMock(builder.getConnection()).expects('update').once().withArgs('update "users" set "email" = foo, "name" = ? where "id" = ?', ['bar', 1]).resolves(1)
+  const result = await builder.from('users').where('id', '=', 1).update({ email: new Raw('foo'), name: 'bar' })
+  t.deepEqual(result, 1)
 
-//   builder.shouldReceive('where').once().with(['email' => 'foo']).andReturn(m.self())
-//   builder.shouldReceive('exists').once().andReturn(true)
+  verifyMock()
+})
 
-//   t.true(builder.updateOrInsert(['email' => 'foo']))
-//   builder.shouldNotHaveReceived('update')
-// })
+test('testUpdateOrInsertMethod', async (t) => {
+  const { createStub } = mock()
 
-// test('testDeleteMethod', async (t) => {
-//   const builder = getBuilder()
-//   builder.getConnection().shouldReceive('delete').once().with('delete from "users" where "email" = ?', ['foo']).andReturn(1)
-//   result = builder.from('users').where('email', '=', 'foo').delete()
-//   t.deepEqual(1, result)
+  let builder = getBuilder()
+  createStub(builder, 'where').withArgs({ email: 'foo' }).onFirstCall().returns(builder)
+  createStub(builder, 'exists').resolves(false)
+  createStub(builder, 'insert').withArgs({ email: 'foo', name: 'bar' }).onFirstCall().resolves(true)
 
-//   const builder = getBuilder()
-//   builder.getConnection().shouldReceive('delete').once().with('delete from "users" where "users"."id" = ?', [1]).andReturn(1)
-//   result = builder.from('users').delete(1)
-//   t.deepEqual(1, result)
+  let result = await builder.updateOrInsert({ email: 'foo' }, { name: 'bar' })
+  t.true(result)
 
-//   const builder = getBuilder()
-//   builder.getConnection().shouldReceive('delete').once().with('delete from "users" where "users"."id" = ?', [1]).andReturn(1)
-//   result = builder.from('users').selectRaw('?', ['ignore']).delete(1)
-//   t.deepEqual(1, result)
+  builder = getBuilder()
 
-//   const builder = getSqliteBuilder()
-//   builder.getConnection().shouldReceive('delete').once().with('delete from "users" where "rowid" in (select "users"."rowid" from "users" where "email" = ? order by "id" asc limit 1)', ['foo']).andReturn(1)
-//   result = builder.from('users').where('email', '=', 'foo').orderBy('id').take(1).delete()
-//   t.deepEqual(1, result)
+  createStub(builder, 'where').withArgs({ email: 'foo' }).onFirstCall().returns(builder)
+  createStub(builder, 'exists').onFirstCall().resolves(true)
+  createStub(builder, 'take').resolvesThis(builder)
+  createStub(builder, 'update').withArgs({ name: 'bar' }).onFirstCall().resolves(1)
 
-//   const builder = getMySqlBuilder()
-//   builder.getConnection().shouldReceive('delete').once().with('delete from `users` where `email` = ? order by `id` asc limit 1', ['foo']).andReturn(1)
-//   result = builder.from('users').where('email', '=', 'foo').orderBy('id').take(1).delete()
-//   t.deepEqual(1, result)
+  result = await builder.updateOrInsert({ email: 'foo' }, { name: 'bar' })
+  t.true(result)
+})
 
-//   const builder = getSqlServerBuilder()
-//   builder.getConnection().shouldReceive('delete').once().with('delete from [users] where [email] = ?', ['foo']).andReturn(1)
-//   result = builder.from('users').where('email', '=', 'foo').delete()
-//   t.deepEqual(1, result)
+test('testUpdateOrInsertMethodWorksWithEmptyUpdateValues', async (t) => {
+  const { createStub } = mock()
 
-//   const builder = getSqlServerBuilder()
-//   builder.getConnection().shouldReceive('delete').once().with('delete top (1) from [users] where [email] = ?', ['foo']).andReturn(1)
-//   result = builder.from('users').where('email', '=', 'foo').orderBy('id').take(1).delete()
-//   t.deepEqual(1, result)
-// })
+  const builder = getBuilder()
+
+  createStub(builder, 'where').withArgs({ email: 'foo' }).onFirstCall().returns(builder)
+  createStub(builder, 'exists').onFirstCall().resolves(true)
+
+  const result = await builder.updateOrInsert({ email: 'foo' })
+  t.true(result)
+  t.true(createStub(builder, 'update').notCalled)
+})
+
+test('testDeleteMethod', async (t) => {
+  const { createMock, verifyMock } = mock()
+
+  let builder = getBuilder()
+  createMock(builder.getConnection()).expects('delete').once().withArgs('delete from "users" where "email" = ?', ['foo']).resolves(1)
+  let result = await builder.from('users').where('email', '=', 'foo').delete()
+  t.is(result, 1)
+
+  builder = getBuilder()
+  createMock(builder.getConnection()).expects('delete').once().withArgs('delete from "users" where "users"."id" = ?', [1]).resolves(1)
+  result = await builder.from('users').delete(1)
+  t.is(result, 1)
+
+  builder = getBuilder()
+  createMock(builder.getConnection()).expects('delete').once().withArgs('delete from "users" where "users"."id" = ?', [1]).resolves(1)
+  result = await builder.from('users').selectRaw('?', ['ignore']).delete(1)
+  t.is(result, 1)
+
+  builder = getSQLiteBuilder()
+  createMock(builder.getConnection()).expects('delete').once().withArgs('delete from "users" where "rowid" in (select "users"."rowid" from "users" where "email" = ? order by "id" asc limit 1)', ['foo']).resolves(1)
+  result = await builder.from('users').where('email', '=', 'foo').orderBy('id').take(1).delete()
+  t.is(result, 1)
+
+  builder = getMySqlBuilder()
+  createMock(builder.getConnection()).expects('delete').once().withArgs('delete from `users` where `email` = ? order by `id` asc limit 1', ['foo']).resolves(1)
+  result = await builder.from('users').where('email', '=', 'foo').orderBy('id').take(1).delete()
+  t.is(result, 1)
+
+  builder = getSqlServerBuilder()
+  createMock(builder.getConnection()).expects('delete').once().withArgs('delete from [users] where [email] = ?', ['foo']).resolves(1)
+  result = await builder.from('users').where('email', '=', 'foo').delete()
+  t.is(result, 1)
+
+  builder = getSqlServerBuilder()
+  createMock(builder.getConnection()).expects('delete').once().withArgs('delete top (1) from [users] where [email] = ?', ['foo']).resolves(1)
+  result = await builder.from('users').where('email', '=', 'foo').orderBy('id').take(1).delete()
+  t.is(result, 1)
+
+  verifyMock()
+})
 
 // test('testDeleteWithJoinMethod', async (t) => {
 //   const builder = getSqliteBuilder()

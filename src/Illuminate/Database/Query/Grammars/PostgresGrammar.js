@@ -270,7 +270,7 @@ export default class PostgresGrammar extends Grammar {
      * @return {string}
      */
   compileUpdateColumns (query, values) {
-    return collect(values).map(([value, key]) => {
+    return collect(values).map((value, key) => {
       const column = key.split('.').pop()
 
       if (this.isJsonSelector(key)) {
@@ -452,7 +452,7 @@ export default class PostgresGrammar extends Grammar {
      * @return {array}
      */
   prepareBindingsForUpdate (bindings, values) {
-    values = collect(values).map(([value, column]) => {
+    values = collect(values).map((value, column) => {
       return (Array.isArray(value) || isPlainObject(value)) || (this.isJsonSelector(column) && !this.isExpression(value))
         ? JSON.stringify(value)
         : value

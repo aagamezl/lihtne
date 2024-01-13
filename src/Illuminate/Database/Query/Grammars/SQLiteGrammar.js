@@ -42,7 +42,7 @@ export default class SQLiteGrammar extends Grammar {
    * @return {string}
    */
   compileDeleteWithJoinsOrLimit (query) {
-    const table = this.wrapTable(query.from)
+    const table = this.wrapTable(query.fromProperty)
 
     const alias = query.fromProperty.split(/\s+as\s+/i).pop()
 

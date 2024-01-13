@@ -180,6 +180,17 @@ export default class Connection {
   }
 
   /**
+   * Run a delete statement against the database.
+   *
+   * @param  {string}  query
+   * @param  {unknown[]}  bindings
+   * @return {number}
+   */
+  delete (query, bindings = []) {
+    return this.affectingStatement(query, bindings)
+  }
+
+  /**
    * Disconnect from the underlying PDO connection.
    *
    * @return {void}

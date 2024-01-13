@@ -26,7 +26,7 @@ import use from '../../Support/Traits/use.js'
 /**
  * @typedef {Object} Having
  * @property {string} type - The type of the condition.
- * @property {string} column - The column name involved in the condition.
+ * @property {string | import('./Expression.js').default} column - The column name involved in the condition.
  * @property {string} operator - The comparison operator used in the condition.
  * @property {string} value - The value to compare in the condition.
  * @property {string} boolean - The boolean operator connecting multiple conditions.
@@ -81,7 +81,7 @@ export default class Builder {
     /**
      * An aggregate function and column to be run.
      *
-     * @type {object}
+     * @type {Object.<string, unknown>}
      */
     this.aggregateProperty = undefined
 
@@ -137,21 +137,21 @@ export default class Builder {
     /**
      * The table which the query is targeting.
      *
-     * @var string
+     * @type {string}
      */
     this.fromProperty = ''
 
     /**
      * The groupings for the query.
      *
-     * @member {Array}
+     * @type {Array}
      */
     this.groups = []
 
     /**
      * The having constraints for the query.
      *
-     * @member {Array}
+     * @type {Having[]}
      */
     this.havings = []
 
@@ -242,8 +242,10 @@ export default class Builder {
     /** @type {import('./../Connection.js').default} */
     this.connection = connection
 
+    /** @type {import('./Grammars/Grammar.js').default} */
     this.grammar = grammar ?? connection.getQueryGrammar()
 
+    /** @type {import('./Processors/Processor.js').default} */
     this.processor = processor ?? connection.getPostProcessor()
     // return proxy
   }
@@ -421,6 +423,7 @@ export default class Builder {
     for (const queryCallback of this.beforeQueryCallbacks) {
       queryCallback(this)
     }
+
     this.beforeQueryCallbacks = []
   }
 
@@ -562,6 +565,29 @@ export default class Builder {
     this.joins.push(this.newJoinClause(this, 'cross', new Expression(expression)))
 
     return this
+  }
+
+  /**
+   * Delete records from the database.
+   *
+   * @param  {unknown}  [id]
+   * @return {number}
+   */
+  delete (id) {
+    // If an ID is passed to the method, we will set the where clause to check the
+    // ID to let developers to simply and quickly remove a single row from this
+    // database without manually specifying the "where" clauses on the query.
+    if (id !== undefined) {
+      this.where(this.fromProperty + '.id', '=', id)
+    }
+
+    this.applyBeforeQueryCallbacks()
+
+    return this.connection.delete(
+      this.grammar.compileDelete(this), this.cleanBindings(
+        this.grammar.prepareBindingsForDelete(this.bindings)
+      )
+    )
   }
 
   /**
@@ -1103,10 +1129,13 @@ export default class Builder {
     if (values.length === 0 || Object.keys(values).length === 0) {
       return 0
     }
+
     if (!Array.isArray(reset(values)) && !isPlainObject(values)) {
       values = [values]
     }
+
     this.applyBeforeQueryCallbacks()
+
     return await this.connection.affectingStatement(this.grammar.compileInsertOrIgnore(this, values), this.cleanBindings(Arr.flatten(values, 1)))
   }
 
@@ -1277,7 +1306,7 @@ export default class Builder {
     const property = this.unions.length > 0 ? 'unionLimit' : 'limitProperty'
 
     if (value >= 0) {
-      this[property] = value
+      this[property] = value !== undefined ? parseInt(value, 10) : undefined
     }
 
     return this
@@ -2141,6 +2170,47 @@ export default class Builder {
     return this.connection.update(sql, this.cleanBindings(
       this.grammar.prepareBindingsForUpdate(this.bindings, values)
     ))
+  }
+
+  /**
+   * Update records in a PostgreSQL database using the update from syntax.
+   *
+   * @param  {Object.<string, unknown>}  values
+   * @return {number}
+   */
+  updateFrom (values) {
+    if (this.grammar.compileUpdateFrom === undefined) {
+      throw new Error('LogicException: This database engine does not support the updateFrom method.')
+    }
+
+    this.applyBeforeQueryCallbacks()
+
+    const sql = this.grammar.compileUpdateFrom(this, values)
+
+    return this.connection.update(sql, this.cleanBindings(
+      this.grammar.prepareBindingsForUpdateFrom(this.bindings, values)
+    ))
+  }
+
+  /**
+   * Insert or update a record matching the attributes, and fill it with values.
+   *
+   * @param  {Object.<string, unknown>}  attributes
+   * @param  {Object.<string, unknown>}  values
+   * @return {boolean}
+   */
+  async updateOrInsert (attributes, values = []) {
+    const exists = await this.where(attributes).exists()
+
+    if (!(exists)) {
+      return this.insert(Object.assign({}, attributes, values))
+    }
+
+    if (Object.keys(values).length === 0) {
+      return true
+    }
+
+    return Boolean(this.limit(1).update(values))
   }
 
   /**

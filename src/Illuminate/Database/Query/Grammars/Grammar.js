@@ -8,15 +8,20 @@ import use from '../../../Support/Traits/use.js'
 import { collect, end, head, last, reset } from '../../../Collections/helpers.js'
 
 /**
+ * Array representing the select components for a query.
+ *
  * @typedef {Object} SelectComponent
  * @property {string} name - The name of the select component.
  * @property {string} property - The property associated with the select component.
  */
 
 /**
- * Array representing the select components for a query.
- * @typedef {SelectComponent[]} SelectComponents
+ * @typedef {Object} Aggregate
+ * @property {Array<string | import('./../Expression.js').default>} columns
+ * @property {string} function
  */
+
+/** @typedef {import('./../Builder.js').Having} Having */
 
 export default class Grammar extends BaseGrammar {
   constructor () {
@@ -41,12 +46,13 @@ export default class Grammar extends BaseGrammar {
     /**
      * The components that make up a select clause.
      *
-     * @type {SelectComponents}
+     * @type {SelectComponent[]}
      */
     this.selectComponents = [
       { name: 'aggregate', property: 'aggregateProperty' },
       { name: 'columns', property: 'columns' },
       { name: 'from', property: 'fromProperty' },
+      { name: 'indexHint', property: 'indexHint' },
       { name: 'joins', property: 'joins' },
       { name: 'wheres', property: 'wheres' },
       { name: 'groups', property: 'groups' },
@@ -61,8 +67,8 @@ export default class Grammar extends BaseGrammar {
   /**
    * Compile an aggregated select clause.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
-   * @param  {object}  aggregate
+   * @param  {import('./../Builder.js').default}  query
+   * @param  {Aggregate}  aggregate
    * @return {string}
    */
   compileAggregate (query, aggregate) {
@@ -88,6 +94,7 @@ export default class Grammar extends BaseGrammar {
    */
   compileBasicHaving (having) {
     const column = this.wrap(having.column)
+
     const parameter = this.parameter(having.value)
 
     return column + ' ' + having.operator + ' ' + parameter
@@ -96,8 +103,8 @@ export default class Grammar extends BaseGrammar {
   /**
    * Compile the "select *" portion of the query.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
-   * @param  {Array}  columns
+   * @param  {import('./../Builder.js').default}  query
+   * @param  {(string | import('./../Expression.js').default)[]}  columns
    * @return {string|undefined}
    */
   compileColumns (query, columns) {
@@ -116,8 +123,8 @@ export default class Grammar extends BaseGrammar {
   /**
    * Compile the components necessary for a select clause.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
-   * @return {Array}
+   * @param  {import('./../Builder.js').default}  query
+   * @return {Object.<string, string>}
    */
   compileComponents (query) {
     const sql = {}
@@ -134,20 +141,67 @@ export default class Grammar extends BaseGrammar {
   }
 
   /**
+   * Compile a delete statement into SQL.
+   *
+   * @param  {import('./../Builder.js').default}  query
+   * @return {string}
+   */
+  compileDelete (query) {
+    const table = this.wrapTable(query.fromProperty)
+
+    const where = this.compileWheres(query)
+
+    return (
+      query.joins.length > 0
+        ? this.compileDeleteWithJoins(query, table, where)
+        : this.compileDeleteWithoutJoins(query, table, where)
+    ).trim()
+  }
+
+  /**
+   * Compile a delete statement with joins into SQL.
+   *
+   * @param  {import('./../Builder.js').default}  query
+   * @param  {string}  table
+   * @param  {string}  where
+   * @return {string}
+   */
+  compileDeleteWithJoins (query, table, where) {
+    const alias = table.split(' as ').at(-1)
+
+    const joins = this.compileJoins(query, query.joins)
+
+    return `delete ${alias} from ${table} ${joins} ${where}`
+  }
+
+  /**
+   * Compile a delete statement without joins into SQL.
+   *
+   * @param  {import('./../Builder.js').default}  query
+   * @param  {string}  table
+   * @param  {string}  where
+   * @return {string}
+   */
+  compileDeleteWithoutJoins (query, table, where) {
+    return `delete from ${table} ${where}`
+  }
+
+  /**
    * Compile an exists statement into SQL.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
+   * @param  {import('./../Builder.js').default}  query
    * @return {string}
    */
   compileExists (query) {
     const select = this.compileSelect(query)
+
     return `select exists(${select}) as ${this.wrap('exists')}`
   }
 
   /**
    * Compile the "from" portion of the query.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
+   * @param  {import('./../Builder.js').default}  query
    * @param  {string}  table
    * @return {string}
    */
@@ -158,7 +212,7 @@ export default class Grammar extends BaseGrammar {
   /**
    * Compile the "group by" portions of the query.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
+   * @param  {import('./../Builder.js').default}  query
    * @param  {string[]}  groups
    * @return {string}
    */
@@ -169,7 +223,7 @@ export default class Grammar extends BaseGrammar {
   /**
    * Compile a single having clause.
    *
-   * @param  {import('./../Builder.js').Having}  having
+   * @param  {Having}  having
    * @return {string}
    */
   compileHaving (having) {
@@ -199,15 +253,19 @@ export default class Grammar extends BaseGrammar {
   /**
    * Compile a "between" having clause.
    *
-   * @param  {object}  having
+   * @param  {Having}  having
    * @return {string}
    */
   compileHavingBetween (having) {
     const between = having.not ? 'not between' : 'between'
+
     const column = this.wrap(having.column)
+
     const min = this.parameter(head(having.values))
+
     const max = this.parameter(last(having.values))
-    return having.boolean + ' ' + column + ' ' + between + ' ' + min + ' and ' + max
+
+    return column + ' ' + between + ' ' + min + ' and ' + max
   }
 
   /**
@@ -218,7 +276,9 @@ export default class Grammar extends BaseGrammar {
    */
   compileHavingBit (having) {
     const column = this.wrap(having.column)
+
     const parameter = this.parameter(having.value)
+
     return '(' + column + ' ' + having.operator + ' ' + parameter + ') != 0'
   }
 
@@ -240,6 +300,7 @@ export default class Grammar extends BaseGrammar {
    */
   compileHavingNotNull (having) {
     const column = this.wrap(having.column)
+
     return column + ' is not null'
   }
 
@@ -251,18 +312,18 @@ export default class Grammar extends BaseGrammar {
    */
   compileHavingNull (having) {
     const column = this.wrap(having.column)
+
     return column + ' is null'
   }
 
   /**
  * Compile the "having" portions of the query.
  *
- * @param  {\Illuminate\Database\Query\Builder}  query
- * @param  {Builder}  query
+ * @param  {import('./../Builder.js').default}  query
  * @return {string}
  */
   compileHavings (query) {
-    return 'having ' + this.removeLeadingBoolean(collect(query.havings).map((having) => {
+    return 'having ' + this.removeLeadingBoolean(collect(query.havings).map((/** @type {Having} */having) => {
       return having.boolean + ' ' + this.compileHaving(having)
     }).implode(' '))
   }
@@ -270,8 +331,8 @@ export default class Grammar extends BaseGrammar {
   /**
    * Compile an insert statement into SQL.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
-   * @param  {Array}  values
+   * @param  {import('./../Builder.js').default}  query
+   * @param  {unknown[]}  values //@TODO: verify this type
    * @return {string}
    */
   compileInsert (query, values) {
@@ -304,7 +365,7 @@ export default class Grammar extends BaseGrammar {
   /**
    * Compile an insert and get ID statement into SQL.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
+   * @param  {import('./../Builder.js').default}  query
    * @param  {Array}  values
    * @param  {string}  [sequence]
    * @return {string}
@@ -316,7 +377,7 @@ export default class Grammar extends BaseGrammar {
   /**
    * Compile an insert ignore statement into SQL.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
+   * @param  {import('./../Builder.js').default}  query
    * @param  {Record<string, any>}  values
    * @return {string}
    *
@@ -329,7 +390,7 @@ export default class Grammar extends BaseGrammar {
   /**
    * Compile an insert statement using a subquery into SQL.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
+   * @param  {import('./../Builder.js').default}  query
    * @param  {any[]}  columns
    * @param  {string}  sql
    * @return {string}
@@ -347,7 +408,7 @@ export default class Grammar extends BaseGrammar {
   /**
    * Compile the "join" portions of the query.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
+   * @param  {import('./../Builder.js').default}  query
    * @param  {Builder[]}  joins
    * @return {string}
    */
@@ -366,7 +427,7 @@ export default class Grammar extends BaseGrammar {
   /**
    * Compile the "limit" portions of the query.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
+   * @param  {import('./../Builder.js').default}  query
    * @param  {number}  limit
    * @return {string}
    */
@@ -387,7 +448,7 @@ export default class Grammar extends BaseGrammar {
   /**
    * Compile the "offset" portions of the query.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
+   * @param  {import('./../Builder.js').default}  query
    * @param  {number}  offset
    * @return {string}
    */
@@ -398,7 +459,7 @@ export default class Grammar extends BaseGrammar {
   /**
    * Compile the "order by" portions of the query.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
+   * @param  {import('./../Builder.js').default}  query
    * @param  {Array}  orders
    * @return {string}
    */
@@ -412,7 +473,7 @@ export default class Grammar extends BaseGrammar {
   /**
    * Compile the query orders to an array.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
+   * @param  {import('./../Builder.js').default}  query
    * @param  {Array}  orders
    * @return {Array}
    */
@@ -435,7 +496,7 @@ export default class Grammar extends BaseGrammar {
   /**
    * Compile a select query into SQL.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
+   * @param  {import('./../Builder.js').default}  query
    * @return {string}
    */
   compileSelect (query) {
@@ -557,7 +618,7 @@ export default class Grammar extends BaseGrammar {
   /**
    * Compile a union aggregate query into SQL.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
+   * @param  {import('./../Builder.js').default}  query
    * @return {string}
    */
   compileUnionAggregate (query) {
@@ -569,7 +630,7 @@ export default class Grammar extends BaseGrammar {
   /**
    * Compile the "union" queries attached to the main query.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
+   * @param  {import('./../Builder.js').default}  query
    * @return {string}
    */
   compileUnions (query) {
@@ -592,7 +653,7 @@ export default class Grammar extends BaseGrammar {
   /**
    * Compile the "where" portions of the query.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
+   * @param  {import('./../Builder.js').default}  query
    * @return {string}
    */
   compileWheres (query) {
@@ -618,7 +679,7 @@ export default class Grammar extends BaseGrammar {
   /**
    * Get an array of all the where clauses for the query.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
+   * @param  {import('./../Builder.js').default}  query
    * @return {Array}
    */
   compileWheresToArray (query) {
@@ -644,7 +705,7 @@ export default class Grammar extends BaseGrammar {
   /**
    * Format the where clause statements into one string.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
+   * @param  {import('./../Builder.js').default}  query
    * @param  {string[]}  sql
    * @return {string}
    */
@@ -658,8 +719,8 @@ export default class Grammar extends BaseGrammar {
    * Compile a date based where clause.
    *
    * @param  {string}  type
-   * @param  {\Illuminate\Database\Query\Builder}  query
-   * @param  {Record<string, string>}  where
+   * @param  {import('./../Builder.js').default}  query
+   * @param  {import('./../Builder.js').Where}  where
    * @return {string}
    */
   dateBasedWhere (type, query, where) {
@@ -700,6 +761,18 @@ export default class Grammar extends BaseGrammar {
   }
 
   /**
+   * Prepare the bindings for a delete statement.
+   *
+   * @param  {import('./../Builder.js').Bindings}  bindings
+   * @return {array}
+   */
+  prepareBindingsForDelete (bindings) {
+    return Arr.flatten(
+      Arr.except(bindings, 'select')
+    )
+  }
+
+  /**
    * Prepare the bindings for an update statement.
    *
    * @param  {array}  bindings
@@ -729,8 +802,8 @@ export default class Grammar extends BaseGrammar {
   /**
    * Compile a basic where clause.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
-   * @param  {Record<string, any>}  where
+   * @param  {import('./../Builder.js').default}  query
+   * @param  {Object.<string, any>}  where
    * @return {string}
    */
   whereBasic (query, where) {
@@ -742,7 +815,7 @@ export default class Grammar extends BaseGrammar {
   /**
    * Compile a "between" where clause.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
+   * @param  {import('./../Builder.js').default}  query
    * @param  {Where}  where
    * @return {string}
    */
@@ -756,7 +829,7 @@ export default class Grammar extends BaseGrammar {
   /**
    * Compile a "between" where clause.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
+   * @param  {import('./../Builder.js').default}  query
    * @param  {Where}  where
    * @return {string}
    */
@@ -770,7 +843,7 @@ export default class Grammar extends BaseGrammar {
   /**
    * Compile a where clause comparing two columns.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
+   * @param  {import('./../Builder.js').default}  query
    * @param  {Array}  where
    * @return {string}
    */
@@ -781,7 +854,7 @@ export default class Grammar extends BaseGrammar {
   /**
    * Compile a "where date" clause.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
+   * @param  {import('./../Builder.js').default}  query
    * @param  {Array}  where
    * @return {string}
    */
@@ -792,8 +865,8 @@ export default class Grammar extends BaseGrammar {
   /**
    * Compile a "where day" clause.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
-   * @param  {Array}  where
+   * @param  {import('./../Builder.js').default}  query
+   * @param  {import('./../Builder.js').Where}  where
    * @return {string}
    */
   whereDay (query, where) {
@@ -803,8 +876,8 @@ export default class Grammar extends BaseGrammar {
   /**
    * Compile a where exists clause.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
-   * @param  {Where}  where
+   * @param  {import('./../Builder.js').default}  query
+   * @param  {import('./../Builder.js').Where}  where
    * @return {string}
    */
   whereExists (query, where) {
@@ -814,7 +887,7 @@ export default class Grammar extends BaseGrammar {
   /**
    * Compile a "where fulltext" clause.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
+   * @param  {import('./../Builder.js').default}  query
    * @param  {Where}  where
    * @return {string}
    */
@@ -825,7 +898,7 @@ export default class Grammar extends BaseGrammar {
   /**
    * Compile a "where in" clause.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
+   * @param  {import('./../Builder.js').default}  query
    * @param  {Where}  where
    * @return {string}
    */
@@ -841,7 +914,7 @@ export default class Grammar extends BaseGrammar {
    *
    * For safety, whereIntegerInRaw ensures this method is only used with integer values.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
+   * @param  {import('./../Builder.js').default}  query
    * @param  {Where}  where
    * @return {string}
    */
@@ -855,7 +928,7 @@ export default class Grammar extends BaseGrammar {
   /**
    * Compile a "where month" clause.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
+   * @param  {import('./../Builder.js').default}  query
    * @param  {Record<string, string>}  where
    * @return {string}
    */
@@ -866,7 +939,7 @@ export default class Grammar extends BaseGrammar {
   /**
    * Compile a nested where clause.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
+   * @param  {import('./../Builder.js').default}  query
    * @param  {Where}  where
    * @return {string}
    */
@@ -881,7 +954,7 @@ export default class Grammar extends BaseGrammar {
   /**
    * Compile a where exists clause.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
+   * @param  {import('./../Builder.js').default}  query
    * @param  {Where}  where
    * @return {string}
    */
@@ -892,7 +965,7 @@ export default class Grammar extends BaseGrammar {
   /**
    * Compile a "where not in" clause.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
+   * @param  {import('./../Builder.js').default}  query
    * @param  {Where}  where
    * @return {string}
    */
@@ -908,7 +981,7 @@ export default class Grammar extends BaseGrammar {
    *
    * For safety, whereIntegerInRaw ensures this method is only used with integer values.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
+   * @param  {import('./../Builder.js').default}  query
    * @param  {Array}  Where
    * @return {string}
    */
@@ -922,7 +995,7 @@ export default class Grammar extends BaseGrammar {
   /**
    * Compile a "where not null" clause.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
+   * @param  {import('./../Builder.js').default}  query
    * @param  {Where}  where
    * @return {string}
    */
@@ -933,7 +1006,7 @@ export default class Grammar extends BaseGrammar {
   /**
    * Compile a "where null" clause.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
+   * @param  {import('./../Builder.js').default}  query
    * @param  {Where}  where
    * @return {string}
    */
@@ -944,7 +1017,7 @@ export default class Grammar extends BaseGrammar {
   /**
    * Compile a raw where clause.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
+   * @param  {import('./../Builder.js').default}  query
    * @param  {Where}  where
    * @return {string}
    */
@@ -955,7 +1028,7 @@ export default class Grammar extends BaseGrammar {
   /**
    * Compile a where condition with a sub-select.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
+   * @param  {import('./../Builder.js').default}  query
    * @param  {Where}  where
    * @return {string}
    */
@@ -967,7 +1040,7 @@ export default class Grammar extends BaseGrammar {
   /**
    * Compile a "where time" clause.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
+   * @param  {import('./../Builder.js').default}  query
    * @param  {Array}  where
    * @return {string}
    */
@@ -988,7 +1061,7 @@ export default class Grammar extends BaseGrammar {
   /**
    * Compile a "where year" clause.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
+   * @param  {import('./../Builder.js').default}  query
    * @param  {Record<string, string>}  where
    * @return {string}
    */

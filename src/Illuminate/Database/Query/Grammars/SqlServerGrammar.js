@@ -69,6 +69,22 @@ export default class SqlServerGrammar extends Grammar {
   }
 
   /**
+   * Compile a delete statement without joins into SQL.
+   *
+   * @param  {import('./../Builder.js').default}  query
+   * @param  {string}  table
+   * @param  {string}  where
+   * @return {string}
+   */
+  compileDeleteWithoutJoins (query, table, where) {
+    const sql = super.compileDeleteWithoutJoins(query, table, where)
+
+    return query.limitProperty !== undefined && query.limitProperty > 0 && (query.offsetProperty === undefined || query.offsetProperty <= 0)
+      ? Str.replaceFirst('delete', 'delete top (' + query.limitProperty + ')', sql)
+      : sql
+  }
+
+  /**
    * Compile an exists statement into SQL.
    *
    * @param  {import('./../Builder.js').default} query
