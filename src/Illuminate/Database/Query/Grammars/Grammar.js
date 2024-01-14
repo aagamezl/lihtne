@@ -6,6 +6,7 @@ import CompilesJsonPaths from '../../Concerns/CompilesJsonPaths.js'
 import JoinClause from './../JoinClause.js'
 import use from '../../../Support/Traits/use.js'
 import { collect, end, head, last, reset } from '../../../Collections/helpers.js'
+import Expression from './../Expression.js'
 
 /**
  * Array representing the select components for a query.
@@ -21,7 +22,11 @@ import { collect, end, head, last, reset } from '../../../Collections/helpers.js
  * @property {string} function
  */
 
+/** @typedef {import('./../Builder.js').default} Builder */
 /** @typedef {import('./../Builder.js').Having} Having */
+/** @typedef {import('./../Builder.js').Order} Order */
+/** @typedef {import('./../Builder.js').Union} Union */
+/** @typedef {import('./../Builder.js').Where} Where */
 
 export default class Grammar extends BaseGrammar {
   constructor () {
@@ -39,7 +44,7 @@ export default class Grammar extends BaseGrammar {
     /**
      * The grammar specific bitwise operators.
      *
-     * @type {array}
+     * @type {string[]}
      */
     this.bitwiseOperators = []
 
@@ -332,7 +337,7 @@ export default class Grammar extends BaseGrammar {
    * Compile an insert statement into SQL.
    *
    * @param  {import('./../Builder.js').default}  query
-   * @param  {unknown[]}  values //@TODO: verify this type
+   * @param  {Object.<string, unknown>|unknown[]}  values //@TODO: verify this type
    * @return {string}
    */
   compileInsert (query, values) {
@@ -366,7 +371,7 @@ export default class Grammar extends BaseGrammar {
    * Compile an insert and get ID statement into SQL.
    *
    * @param  {import('./../Builder.js').default}  query
-   * @param  {Array}  values
+   * @param  {Object.<string, unknown>|unknown[]}  values
    * @param  {string}  [sequence]
    * @return {string}
    */
@@ -378,7 +383,7 @@ export default class Grammar extends BaseGrammar {
    * Compile an insert ignore statement into SQL.
    *
    * @param  {import('./../Builder.js').default}  query
-   * @param  {Record<string, any>}  values
+   * @param  {Object.<string, unknown>}  values
    * @return {string}
    *
    * @throws{ \RuntimeException}
@@ -391,7 +396,7 @@ export default class Grammar extends BaseGrammar {
    * Compile an insert statement using a subquery into SQL.
    *
    * @param  {import('./../Builder.js').default}  query
-   * @param  {any[]}  columns
+   * @param  {unknown[]}  columns
    * @param  {string}  sql
    * @return {string}
    */
@@ -408,12 +413,12 @@ export default class Grammar extends BaseGrammar {
   /**
    * Compile the "join" portions of the query.
    *
-   * @param  {import('./../Builder.js').default}  query
-   * @param  {Builder[]}  joins
+   * @param  {Builder}  query
+   * @param  {Builder[]}  joins //TODO: verify this type
    * @return {string}
    */
   compileJoins (query, joins) {
-    return collect(joins).map((join) => {
+    return collect(joins).map((/** @type {Builder} */join) => {
       const table = this.wrapTable(join.table)
 
       const nestedJoins = join.joins.length === 0 ? '' : ' ' + this.compileJoins(query, join.joins)
@@ -425,6 +430,55 @@ export default class Grammar extends BaseGrammar {
   }
 
   /**
+   * Compile a "JSON contains" statement into SQL.
+   *
+   * @param  {string}  column
+   * @param  {string}  value
+   * @return {string}
+   *
+   * @throws \RuntimeException
+   */
+  compileJsonContains (column, value) {
+    throw new Error('RuntimeException: This database engine does not support JSON contains operations.')
+  }
+
+  /**
+   * Compile a "JSON contains key" statement into SQL.
+   *
+   * @param  {string}  column
+   * @return {string}
+   *
+   * @throws \RuntimeException
+   */
+  compileJsonContainsKey (column) {
+    throw new Error('RuntimeException: This database engine does not support JSON contains key operations.')
+  }
+
+  /**
+   * Compile a "JSON length" statement into SQL.
+   *
+   * @param  {string}  column
+   * @param  {string}  operator
+   * @param  {string}  value
+   * @return {string}
+   *
+   * @throws \RuntimeException
+   */
+  compileJsonLength (column, operator, value) {
+    throw new Error('RuntimeException: This database engine does not support JSON length operations.')
+  }
+
+  /**
+   * Compile a "JSON value cast" statement into SQL.
+   *
+   * @param  {string}  value
+   * @return {string}
+   */
+  compileJsonValueCast (value) {
+    return value
+  }
+
+  /**
    * Compile the "limit" portions of the query.
    *
    * @param  {import('./../Builder.js').default}  query
@@ -432,7 +486,18 @@ export default class Grammar extends BaseGrammar {
    * @return {string}
    */
   compileLimit (query, limit) {
-    return `limit ${limit}`
+    return `limit ${parseInt(limit, 10)}`
+  }
+
+  /**
+   * Compile the lock into SQL.
+   *
+   * @param  {Builder}  query
+   * @param  {boolean|string}  value
+   * @return {string}
+   */
+  compileLock (query, value) {
+    return typeof value === 'string' ? value : ''
   }
 
   /**
@@ -448,25 +513,26 @@ export default class Grammar extends BaseGrammar {
   /**
    * Compile the "offset" portions of the query.
    *
-   * @param  {import('./../Builder.js').default}  query
+   * @param  {Builder}  query
    * @param  {number}  offset
    * @return {string}
    */
   compileOffset (query, offset) {
-    return `offset ${offset}`
+    return `offset ${parseInt(offset, 10)}`
   }
 
   /**
    * Compile the "order by" portions of the query.
    *
    * @param  {import('./../Builder.js').default}  query
-   * @param  {Array}  orders
+   * @param  {unknown[]}  orders // TODO: Verify this type
    * @return {string}
    */
   compileOrders (query, orders) {
     if (orders.length > 0) {
       return 'order by ' + this.compileOrdersToArray(query, orders).join(', ')
     }
+
     return ''
   }
 
@@ -474,11 +540,11 @@ export default class Grammar extends BaseGrammar {
    * Compile the query orders to an array.
    *
    * @param  {import('./../Builder.js').default}  query
-   * @param  {Array}  orders
-   * @return {Array}
+   * @param  {Orders[]}  orders
+   * @return {unknown[]}
    */
   compileOrdersToArray (query, orders) {
-    return orders.map((order) => {
+    return orders.map((/** @type {Order} */order) => {
       return order.sql ?? this.wrap(order.column) + ' ' + String(order.direction)
     })
   }
@@ -491,6 +557,26 @@ export default class Grammar extends BaseGrammar {
    */
   compileRandom (seed) {
     return 'RANDOM()'
+  }
+
+  /**
+   * Compile the SQL statement to define a savepoint.
+   *
+   * @param  {string}  name
+   * @return {string}
+   */
+  compileSavepoint (name) {
+    return 'SAVEPOINT ' + name
+  }
+
+  /**
+   * Compile the SQL statement to execute a savepoint rollback.
+   *
+   * @param  {string}  name
+   * @return {string}
+   */
+  compileSavepointRollBack (name) {
+    return 'ROLLBACK TO SAVEPOINT ' + name
   }
 
   /**
@@ -528,11 +614,33 @@ export default class Grammar extends BaseGrammar {
   }
 
   /**
+   * Compile a truncate table statement into SQL.
+   *
+   * @param  {import('./../Builder.js').default}  query
+   * @return {array}
+   */
+  compileTruncate (query) {
+    return { ['truncate table ' + this.wrapTable(query.fromProperty)]: [] }
+  }
+
+  /**
+   * Compile a single union statement.
+   *
+   * @param  {Union}  union
+   * @return {string}
+   */
+  compileUnion (union) {
+    const conjunction = union.all ? ' union all ' : ' union '
+
+    return conjunction + this.wrapUnion(union.query.toSql())
+  }
+
+  /**
    * Compile an update statement into SQL.
    *
    * @param  {import('./../Builder.js').default}  query
-   * @param  array  values
-   * @return string
+   * @param  {array}  values
+   * @return {string}
    */
   compileUpdate (query, values) {
     const table = this.wrapTable(query.fromProperty)
@@ -605,17 +713,6 @@ export default class Grammar extends BaseGrammar {
   }
 
   /**
-   * Compile a single union statement.
-   *
-   * @param  {Array}  union
-   * @return {string}
-   */
-  compileUnion (union) {
-    const conjunction = union.all ? ' union all ' : ' union '
-    return conjunction + this.wrapUnion(union.query.toSql())
-  }
-
-  /**
    * Compile a union aggregate query into SQL.
    *
    * @param  {import('./../Builder.js').default}  query
@@ -623,37 +720,44 @@ export default class Grammar extends BaseGrammar {
    */
   compileUnionAggregate (query) {
     const sql = this.compileAggregate(query, query.aggregateProperty)
+
     query.aggregateProperty = undefined
+
     return sql + ' from (' + this.compileSelect(query) + ') as ' + this.wrapTable('temp_table')
   }
 
   /**
    * Compile the "union" queries attached to the main query.
    *
-   * @param  {import('./../Builder.js').default}  query
+   * @param  {Builder}  query
    * @return {string}
    */
   compileUnions (query) {
     let sql = ''
+
     for (const union of query.unions) {
       sql += this.compileUnion(union)
     }
+
     if (query.unionOrders.length > 0) {
       sql += ' ' + this.compileOrders(query, query.unionOrders)
     }
+
     if (query.unionLimit !== undefined) {
       sql += ' ' + this.compileLimit(query, query.unionLimit)
     }
+
     if (query.unionOffset !== undefined) {
       sql += ' ' + this.compileOffset(query, query.unionOffset)
     }
+
     return sql.trimStart()
   }
 
   /**
    * Compile the "where" portions of the query.
    *
-   * @param  {import('./../Builder.js').default}  query
+   * @param  {Builder}  query
    * @return {string}
    */
   compileWheres (query) {
@@ -680,13 +784,11 @@ export default class Grammar extends BaseGrammar {
    * Get an array of all the where clauses for the query.
    *
    * @param  {import('./../Builder.js').default}  query
-   * @return {Array}
+   * @return {string[]}
    */
   compileWheresToArray (query) {
     return collect(query.wheres).map((where) => {
-      const method = 'where' + where.type
-
-      return where.boolean + ' ' + this[method](query, where)
+      return where.boolean + ' ' + this['where' + where.type](query, where)
     }).all()
   }
 
@@ -720,12 +822,13 @@ export default class Grammar extends BaseGrammar {
    *
    * @param  {string}  type
    * @param  {import('./../Builder.js').default}  query
-   * @param  {import('./../Builder.js').Where}  where
+   * @param  {Where}  where
    * @return {string}
    */
   dateBasedWhere (type, query, where) {
     const value = this.parameter(where.value)
-    return type + '(' + this.wrap(where.column) + ') ' + String(where.operator) + ' ' + value
+
+    return type + '(' + this.wrap(where.column) + ') ' + where.operator + ' ' + value
   }
 
   /**
@@ -740,7 +843,7 @@ export default class Grammar extends BaseGrammar {
   /**
    * Get the grammar specific operators.
    *
-   * @return {Array}
+   * @return {string[]}
    */
   getOperators () {
     return this.operators
@@ -761,6 +864,16 @@ export default class Grammar extends BaseGrammar {
   }
 
   /**
+   * Prepare the binding for a "JSON contains" statement.
+   *
+   * @param  {unknown}  binding
+   * @return {string}
+   */
+  prepareBindingForJsonContains (binding) {
+    return JSON.stringify(binding)
+  }
+
+  /**
    * Prepare the bindings for a delete statement.
    *
    * @param  {import('./../Builder.js').Bindings}  bindings
@@ -775,9 +888,9 @@ export default class Grammar extends BaseGrammar {
   /**
    * Prepare the bindings for an update statement.
    *
-   * @param  {array}  bindings
-   * @param  {array}  values
-   * @return {array}
+   * @param  {import('./../Builder.js').Bindings}  bindings
+   * @param  {unknown[]}  values // TODO: verify this type
+   * @return {unknown[]} // TODO: verify this type
    */
   prepareBindingsForUpdate (bindings, values) {
     const cleanBindings = Arr.except(bindings, ['select', 'join'])
@@ -800,15 +913,63 @@ export default class Grammar extends BaseGrammar {
   }
 
   /**
+   * Substitute the given bindings into the given raw SQL query.
+   *
+   * @param  {string}  sql
+   * @param  {import('./../Builder.js').Bindings}  bindings
+   * @return {string}
+   */
+  substituteBindingsIntoRawSql (sql, bindings) {
+    bindings = bindings.map((value) => this.escape(value))
+
+    let query = ''
+
+    let isStringLiteral = false
+
+    for (let i = 0; i < sql.length; i++) {
+      const char = sql[i]
+      const nextChar = sql[i + 1] ?? null
+
+      // Single quotes can be escaped as '' according to the SQL standard while
+      // MySQL uses \'. Postgres has operators like ?| that must get encoded
+      // in PHP like ??|. We should skip over the escaped characters here.
+      if (["'", "''", '??'].includes(char + nextChar)) {
+        query += char + nextChar
+        i += 1
+      } else if (char === "'") { // Starting / leaving string literal...
+        query += char
+        isStringLiteral = !isStringLiteral
+      } else if (char === '?' && !isStringLiteral) { // Substitutable binding...
+        query += bindings.shift() ?? '?'
+      } else { // Normal character...
+        query += char
+      }
+    }
+
+    return query
+  }
+
+  /**
+   * Determine if the grammar supports savepoints.
+   *
+   * @return {boolean}
+   */
+  supportsSavepoints () {
+    return true
+  }
+
+  /**
    * Compile a basic where clause.
    *
    * @param  {import('./../Builder.js').default}  query
-   * @param  {Object.<string, any>}  where
+   * @param  {Where}  where
    * @return {string}
    */
   whereBasic (query, where) {
     const value = this.parameter(where.value)
+
     const operator = where.operator.replace('?', '??')
+
     return this.wrap(where.column) + ' ' + operator + ' ' + value
   }
 
@@ -820,9 +981,12 @@ export default class Grammar extends BaseGrammar {
    * @return {string}
    */
   whereBetween (query, where) {
-    const between = isTruthy(where.not) ? 'not between' : 'between'
-    const min = this.parameter(reset(where.values))
-    const max = this.parameter(end(where.values))
+    const between = where.not ? 'not between' : 'between'
+
+    const min = this.parameter(Array.isArray(where.values) ? reset(where.values) : where.values[0])
+
+    const max = this.parameter(Array.isArray(where.values) ? end(where.values) : where.values[1])
+
     return this.wrap(where.column) + ' ' + between + ' ' + min + ' and ' + max
   }
 
@@ -834,28 +998,42 @@ export default class Grammar extends BaseGrammar {
    * @return {string}
    */
   whereBetweenColumns (query, where) {
-    const between = isTruthy(where.not) ? 'not between' : 'between'
-    const min = this.wrap(reset(where.values))
-    const max = this.wrap(end(where.values))
+    const between = where.not ? 'not between' : 'between'
+
+    const min = this.wrap(Array.isArray(where.values) ? reset(where.values) : where.values[0])
+
+    const max = this.wrap(Array.isArray(where.values) ? end(where.values) : where.values[1])
+
     return this.wrap(where.column) + ' ' + between + ' ' + min + ' and ' + max
+  }
+
+  /**
+   * Compile a bitwise operator where clause.
+   *
+   * @param  {Builder}  query
+   * @param  {Where}  where
+   * @return {string}
+   */
+  whereBitwise (query, where) {
+    return this.whereBasic(query, where)
   }
 
   /**
    * Compile a where clause comparing two columns.
    *
-   * @param  {import('./../Builder.js').default}  query
-   * @param  {Array}  where
+   * @param  {Builder}  query
+   * @param  {Where}  where
    * @return {string}
    */
   whereColumn (query, where) {
-    return this.wrap(where.first) + ' ' + String(where.operator) + ' ' + this.wrap(where.second)
+    return this.wrap(where.first) + ' ' + where.operator + ' ' + this.wrap(where.second)
   }
 
   /**
    * Compile a "where date" clause.
    *
    * @param  {import('./../Builder.js').default}  query
-   * @param  {Array}  where
+   * @param  {Where}  where
    * @return {string}
    */
   whereDate (query, where) {
@@ -866,7 +1044,7 @@ export default class Grammar extends BaseGrammar {
    * Compile a "where day" clause.
    *
    * @param  {import('./../Builder.js').default}  query
-   * @param  {import('./../Builder.js').Where}  where
+   * @param  {Where}  where
    * @return {string}
    */
   whereDay (query, where) {
@@ -877,11 +1055,22 @@ export default class Grammar extends BaseGrammar {
    * Compile a where exists clause.
    *
    * @param  {import('./../Builder.js').default}  query
-   * @param  {import('./../Builder.js').Where}  where
+   * @param  {Where}  where
    * @return {string}
    */
   whereExists (query, where) {
     return 'exists (' + this.compileSelect(where.query) + ')'
+  }
+
+  /**
+   * Compile a clause based on an expression.
+   *
+   * @param  {Builder}  query
+   * @param  {Where}  where
+   * @return {string}
+   */
+  whereExpression (query, where) {
+    return where.column.getValue(this)
   }
 
   /**
@@ -906,6 +1095,7 @@ export default class Grammar extends BaseGrammar {
     if (where.values?.length > 0) {
       return this.wrap(where.column) + ' in (' + this.parameterize(where.values) + ')'
     }
+
     return '0 = 1'
   }
 
@@ -920,16 +1110,80 @@ export default class Grammar extends BaseGrammar {
    */
   whereInRaw (query, where) {
     if (where.values?.length > 0) {
-      return String(this.wrap(where.column)) + ' in (' + String(where.values.join(', ')) + ')'
+      return this.wrap(where.column) + ' in (' + where.values.join(', ') + ')'
     }
+
     return '0 = 1'
+  }
+
+  /**
+   * Compile a "where JSON boolean" clause.
+   *
+   * @param  {Builder}  query
+   * @param  {Where}  where
+   * @return {string}
+   */
+  whereJsonBoolean (query, where) {
+    const column = this.wrapJsonBooleanSelector(where.column)
+
+    const value = this.wrapJsonBooleanValue(
+      this.parameter(where.value)
+    )
+
+    return column + ' ' + where.operator + ' ' + value
+  }
+
+  /**
+   * Compile a "where JSON contains" clause.
+   *
+   * @param  {Builder}  query
+   * @param  {Where}  where
+   * @return {string}
+   */
+  whereJsonContains (query, where) {
+    const not = where.not ? 'not ' : ''
+
+    return not + this.compileJsonContains(
+      where.column,
+      this.parameter(where.value)
+    )
+  }
+
+  /**
+   * Compile a "where JSON contains key" clause.
+   *
+   * @param  {Builder}  query
+   * @param  {import('./../Builder.js').Where}  where
+   * @return {string}
+   */
+  whereJsonContainsKey (query, where) {
+    const not = where.not ? 'not ' : ''
+
+    return not + this.compileJsonContainsKey(
+      where.column
+    )
+  }
+
+  /**
+   * Compile a "where JSON length" clause.
+   *
+   * @param  {Builder}  query
+   * @param  {Where}  where
+   * @return {string}
+   */
+  whereJsonLength (query, where) {
+    return this.compileJsonLength(
+      where.column,
+      where.operator,
+      this.parameter(where.value)
+    )
   }
 
   /**
    * Compile a "where month" clause.
    *
    * @param  {import('./../Builder.js').default}  query
-   * @param  {Record<string, string>}  where
+   * @param  {Where}  where
    * @return {string}
    */
   whereMonth (query, where) {
@@ -948,6 +1202,7 @@ export default class Grammar extends BaseGrammar {
     // is a join clause query, we need to remove the "on" portion of the SQL and
     // if it is a normal query we need to take the leading "where" of queries.
     const offset = where.query instanceof JoinClause ? 3 : 6
+
     return '(' + this.compileWheres(where.query).substring(offset) + ')'
   }
 
@@ -973,6 +1228,7 @@ export default class Grammar extends BaseGrammar {
     if (where.values.length > 0) {
       return this.wrap(where.column) + ' not in (' + this.parameterize(where.values) + ')'
     }
+
     return '1 = 1'
   }
 
@@ -982,13 +1238,14 @@ export default class Grammar extends BaseGrammar {
    * For safety, whereIntegerInRaw ensures this method is only used with integer values.
    *
    * @param  {import('./../Builder.js').default}  query
-   * @param  {Array}  Where
+   * @param  {Where}  Where
    * @return {string}
    */
   whereNotInRaw (query, where) {
     if (where.values?.length > 0) {
-      return this.wrap(where.column) + ' not in (' + String(where.values.join(', ')) + ')'
+      return this.wrap(where.column) + ' not in (' + where.values.join(', ') + ')'
     }
+
     return '1 = 1'
   }
 
@@ -1022,7 +1279,22 @@ export default class Grammar extends BaseGrammar {
    * @return {string}
    */
   whereRaw (query, where) {
-    return where.sql
+    return where.sql instanceof Expression ? where.sql.getValue(this) : where.sql
+  }
+
+  /**
+   * Compile a where row values condition.
+   *
+   * @param  {Builder}  query
+   * @param  {Where}  where
+   * @return {string}
+   */
+  whereRowValues (query, where) {
+    const columns = this.columnize(where.columns)
+
+    const values = this.parameterize(where.values)
+
+    return '(' + columns + ') ' + where.operator + ' (' + values + ')'
   }
 
   /**
@@ -1034,6 +1306,7 @@ export default class Grammar extends BaseGrammar {
    */
   whereSub (query, where) {
     const select = this.compileSelect(where.query)
+
     return this.wrap(where.column) + ' ' + where.operator + ` (${select})`
   }
 
@@ -1041,11 +1314,42 @@ export default class Grammar extends BaseGrammar {
    * Compile a "where time" clause.
    *
    * @param  {import('./../Builder.js').default}  query
-   * @param  {Array}  where
+   * @param  {Where}  where
    * @return {string}
    */
   whereTime (query, where) {
     return this.dateBasedWhere('time', query, where)
+  }
+
+  /**
+   * Compile a "where year" clause.
+   *
+   * @param  {import('./../Builder.js').default}  query
+   * @param  {Where}  where
+   * @return {string}
+   */
+  whereYear (query, where) {
+    return this.dateBasedWhere('year', query, where)
+  }
+
+  /**
+   * Wrap the given JSON selector for boolean values.
+   *
+   * @param  {string}  value
+   * @return {string}
+   */
+  wrapJsonBooleanSelector (value) {
+    return this.wrapJsonSelector(value)
+  }
+
+  /**
+   * Wrap the given JSON boolean value.
+   *
+   * @param  {string}  value
+   * @return {string}
+   */
+  wrapJsonBooleanValue (value) {
+    return value
   }
 
   /**
@@ -1056,16 +1360,5 @@ export default class Grammar extends BaseGrammar {
    */
   wrapUnion (sql) {
     return `(${sql})`
-  }
-
-  /**
-   * Compile a "where year" clause.
-   *
-   * @param  {import('./../Builder.js').default}  query
-   * @param  {Record<string, string>}  where
-   * @return {string}
-   */
-  whereYear (query, where) {
-    return this.dateBasedWhere('year', query, where)
   }
 }

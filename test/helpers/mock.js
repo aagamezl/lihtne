@@ -19,6 +19,9 @@ const mock = () => {
     createStub: (target, method) => {
       return sinon.stub(target, method)
     },
+    createStubInstance: (Constructor, overrides) => {
+      return sinon.createStubInstance(Constructor, overrides)
+    },
     restoreStub: (target, method) => {
       target[method].restore()
     },

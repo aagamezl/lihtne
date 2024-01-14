@@ -1,5 +1,3 @@
-import { isPlainObject } from '@devnetic/utils'
-
 import { collect } from '../Collections/helpers.js'
 import Expression from './Query/Expression.js'
 
@@ -80,14 +78,11 @@ export default class Grammar {
   /**
    * Create query parameter place-holders for an array.
    *
-   * @param  {Array}  values
+   * @param  {unknown[]}  values
    * @return {string}
    */
   parameterize (values) {
-    // return (Array.isArray(values) ? values : Object.values(values))
-    // return (Array.isArray(values) ? values : [values])
-    // TODO: clean up commented code
-    return (Array.isArray(values) && isPlainObject(values) ? values : Object.values(values))
+    return (Array.isArray(values) ? values : Object.values(values))
       .map((value) => this.parameter(value)).join(', ')
   }
 

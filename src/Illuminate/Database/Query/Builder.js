@@ -45,11 +45,16 @@ import use from '../../Support/Traits/use.js'
 /**
  * @typedef {Object} Where
  * @property {string} type - The type of the date-based where clause.
- * @property {string} column - The column name for the where condition.
+ * @property {string|Expression} column - The column name for the where condition.
+ * @property {boolean} not - Define if a where have a not condition.
  * @property {string} operator - The comparison operator for the where condition.
  * @property {unknown} value - The value to compare with in the where condition.
  * @property {string} boolean - The boolean operator to combine multiple where conditions.
+ * @property {string} sql - The raw sql for where conditions.
  * @property {Options} options - The options for where conditions.
+ * @property {Builder} query - The query associated to the where conditions.
+ * @property {unknown[]|Record<string, unknown>} values - The values to compare with in the where condition.
+ * @property {(string | Expression)[]} columns - The columns names for the where condition.
  */
 
 /**
@@ -63,6 +68,20 @@ import use from '../../Support/Traits/use.js'
  * @property {unknown[]} order - Bindings for the ORDER BY statement.
  * @property {unknown[]} union - Bindings for the UNION statement.
  * @property {unknown[]} unionOrder - Bindings for the ORDER BY statement in UNION.
+ */
+
+/**
+ * @typedef {Object} Order
+ * @property {string} sql - The raw SQL expression for ordering.
+ * @property {string} type - The type of ordering (e.g., 'basic', 'raw').
+ * @property {string} column - The column name for ordering.
+ * @property {string} direction - The order direction ('asc' for ascending, 'desc' for descending).
+ */
+
+/**
+ * @typedef {Object} Union
+ * @property {Builder|Function} query - The query or builder object for the UNION operation.
+ * @property {boolean} all - A boolean indicating whether to use UNION ALL (true) or UNION (false).
  */
 
 export default class Builder {
@@ -200,7 +219,7 @@ export default class Builder {
     /**
      * The orderings for the query.
      *
-     * @type {string[]}
+     * @type {Order[]}
      */
     this.orders = []
 
@@ -221,14 +240,14 @@ export default class Builder {
     /**
      * The orderings for the union query.
      *
-     * @type {Array}
+     * @type {Union[]}
      */
     this.unionOrders = []
 
     /**
      * The query union statements.
      *
-     * @type {Array}
+     * @type {Union[]}
      */
     this.unions = []
 
@@ -425,6 +444,18 @@ export default class Builder {
     }
 
     this.beforeQueryCallbacks = []
+  }
+
+  /**
+   * Register a closure to be invoked before the query is executed.
+   *
+   * @param  {Function}  callback
+   * @return {this}
+   */
+  beforeQuery (callback) {
+    this.beforeQueryCallbacks.push(callback)
+
+    return this
   }
 
   /**
@@ -638,7 +669,7 @@ export default class Builder {
     // If the results has rows, we will get the row and see if the exists column is a
     // boolean true. If there is no results for this query we will return false as
     // there are no rows for this query at all and we can return that info here.
-    if (results[0] !== undefined) {
+    if (results !== undefined && results[0] !== undefined) {
       results = results[0]
 
       return Boolean(results.exists)
@@ -1501,8 +1532,11 @@ export default class Builder {
    */
   orderByRaw (sql, bindings = []) {
     const type = 'Raw'
+
     this[this.unions.length > 0 ? 'unionOrders' : 'orders'].push({ type, sql })
+
     this.addBinding(bindings, this.unions.length > 0 ? 'unionOrder' : 'order')
+
     return this
   }
 
@@ -1948,12 +1982,17 @@ export default class Builder {
    */
   reorder (column = '', direction = 'asc') {
     this.orders = []
+
     this.unionOrders = []
+
     this.bindings.order = []
+
     this.bindings.unionOrder = []
+
     if (isTruthy(column)) {
       return this.orderBy(column, direction)
     }
+
     return this
   }
 
@@ -2154,6 +2193,19 @@ export default class Builder {
     this.applyBeforeQueryCallbacks()
 
     return this.grammar.compileSelect(this)
+  }
+
+  /**
+   * Run a truncate statement on the table.
+   *
+   * @return void
+   */
+  truncate () {
+    this.applyBeforeQueryCallbacks()
+
+    for (const [sql, bindings] of Object.entries(this.grammar.compileTruncate(this))) {
+      this.connection.statement(sql, bindings)
+    }
   }
 
   /**

@@ -4,11 +4,15 @@ import Processor from '../../../src/Illuminate/Database/Query/Processors/Process
 
 import getConnection from './getConnection.js'
 
-const getBuilder = () => {
-  const grammar = new Grammar()
-  const processor = new Processor()
+const getBuilder = (connection, grammar, processor) => {
+  // const grammar = new Grammar()
+  // const processor = new Processor()
 
-  return new Builder(getConnection(), grammar, processor)
+  return new Builder(
+    connection ?? getConnection(),
+    grammar ?? new Grammar(),
+    processor ?? new Processor()
+  )
 }
 
 export default getBuilder
