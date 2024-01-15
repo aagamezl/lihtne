@@ -2211,7 +2211,7 @@ export default class Builder {
   /**
    * Update records in the database.
    *
-   * @param  {unknown[]}  values
+   * @param  {Record<string, unknown>}  values
    * @return {number}
    */
   update (values) {

@@ -10,6 +10,9 @@ import getPostgresBuilder from './helpers/getPostgresBuilder.js'
 import getPostgresBuilderWithProcessor from './helpers/getPostgresBuilderWithProcessor.js'
 import getSQLiteBuilder from './helpers/getSQLiteBuilder.js'
 import getSqlServerBuilder from './helpers/getSqlServerBuilder.js'
+import MySqlGrammar from '../../src/Illuminate/Database/Query/Grammars/MySqlGrammar.js'
+import Connection from '../../src/Illuminate/Database/Connection.js'
+import Processor from '../../src/Illuminate/Database/Query/Processors/Processor.js'
 import { collect } from '../../src/Illuminate/Collections/helpers.js'
 
 import mock from '../helpers/mock.js'
@@ -3472,152 +3475,187 @@ test('testMySqlWrapping', async (t) => {
   t.is(builder.toSql(), 'select * from `users`')
 })
 
-// test('testMySqlUpdateWrappingJson', async (t) => {
-//   const { createStubInstance, verifyMock } = mock()
+test('testMySqlUpdateWrappingJson', async (t) => {
+  const { createStubInstance, verifyMock } = mock()
 
-//   const grammar = new MySqlGrammar()
-//   const processor = m.mock(Processor.class)
+  const grammar = new MySqlGrammar()
+  const processor = createStubInstance(Processor)
+  const connection = createStubInstance(Connection)
 
-//   const connection = createStubInstance(Connection)
-//   connection.expects(once())
-//     .method('update')
-//     .with(
-//       'update `users` set `name` = json_set(`name`, \'."first_name"\', ?), `name` = json_set(`name`, \'."last_name"\', ?) where `active` = ?',
-//       ['John', 'Doe', 1]
-//     )
+  connection.update
+    .withArgs(
+      'update `users` set `name` = json_set(`name`, \'."first_name"\', ?), `name` = json_set(`name`, \'."last_name"\', ?) where `active` = ?',
+      ['John', 'Doe', 1]
+    )
 
-//   const builder = getBuilder(connection, grammar, processor)
+  const builder = getBuilder(connection, grammar, processor)
 
-//   builder.from('users').where('active', '=', 1).update({'name.first_name': 'John', 'name.last_name': 'Doe'})
+  builder.from('users').where('active', '=', 1).update({ 'name->first_name': 'John', 'name->last_name': 'Doe' })
 
-//   verifyMock()
-// })
+  t.true(connection.update.calledOnce)
 
-// test('testMySqlUpdateWrappingNestedJson', async (t) => {
-//   const grammar = new MySqlGrammar
-//   processor = m.mock(Processor.class)
+  verifyMock()
+})
 
-//   const connection = createMock(ConnectionInterface.class)
-//   connection.expects(once())
-//     .method('update')
-//     .with(
-//       'update `users` set `meta` = json_set(`meta`, \'."name"."first_name"\', ?), `meta` = json_set(`meta`, \'."name"."last_name"\', ?) where `active` = ?',
-//       ['John', 'Doe', 1]
-//     )
+test('testMySqlUpdateWrappingNestedJson', async (t) => {
+  const { createStubInstance, verifyMock } = mock()
 
-//   const builder = new Builder(connection, grammar, processor)
+  const grammar = new MySqlGrammar()
+  const processor = createStubInstance(Processor)
 
-//   builder.from('users').where('active', '=', 1).update(['meta.name.first_name' => 'John', 'meta.name.last_name' => 'Doe'])
-// })
+  const connection = createStubInstance(Connection)
+  connection.update
+    .withArgs(
+      'update `users` set `meta` = json_set(`meta`, \'."name"."first_name"\', ?), `meta` = json_set(`meta`, \'."name"."last_name"\', ?) where `active` = ?',
+      ['John', 'Doe', 1]
+    )
 
-// test('testMySqlUpdateWrappingJsonArray', async (t) => {
-//   const grammar = new MySqlGrammar
-//   processor = m.mock(Processor.class)
+  const builder = getBuilder(connection, grammar, processor)
 
-//   const connection = createMock(ConnectionInterface.class)
-//   connection.expects(once())
-//     .method('update')
-//     .with(
-//       'update `users` set `options` = ?, `meta` = json_set(`meta`, \'."tags"\', cast(? as json)), `group_id` = 45, `created_at` = ? where `active` = ?',
-//       [
-//         json_encode(['2fa' => false, 'presets' => ['lihtne', 'vue']]),
-//         json_encode(['white', 'large']),
-//         new DateTime('2019-08-06'),
-//         1,
-//       ]
-//     )
+  await builder.from('users').where('active', '=', 1).update({ 'meta.name.first_name': 'John', 'meta.name.last_name': 'Doe' })
 
-//   const builder = new Builder(connection, grammar, processor)
-//   builder.from('users').where('active', 1).update([
-//     'options' => ['2fa' => false, 'presets' => ['lihtne', 'vue']],
-//     'meta.tags' => ['white', 'large'],
-//     'group_id' => new Raw('45'),
-//     'created_at' => new DateTime('2019-08-06'),
-//   ])
-// })
+  t.true(connection.update.calledOnce)
 
-// test('testMySqlUpdateWrappingJsonPathArrayIndex', async (t) => {
-//   const grammar = new MySqlGrammar
-//   processor = m.mock(Processor.class)
+  verifyMock()
+})
 
-//   const connection = createMock(ConnectionInterface.class)
-//   connection.expects(once())
-//     .method('update')
-//     .with(
-//       'update `users` set `options` = json_set(`options`, \'[1]."2fa"\', false), `meta` = json_set(`meta`, \'."tags"[0][2]\', ?) where `active` = ?',
-//       [
-//         'large',
-//         1,
-//       ]
-//     )
+test('testMySqlUpdateWrappingJsonArray', async (t) => {
+  const { createStubInstance, verifyMock } = mock()
 
-//   const builder = new Builder(connection, grammar, processor)
-//   builder.from('users').where('active', 1).update([
-//     'options.[1].2fa' => false,
-//     'meta.tags[0][2]' => 'large',
-//   ])
-// })
+  const grammar = new MySqlGrammar()
+  const processor = createStubInstance(Processor)
 
-// test('testMySqlUpdateWithJsonPreparesBindingsCorrectly', async (t) => {
-//   const grammar = new MySqlGrammar
-//   processor = m.mock(Processor.class)
+  const connection = createStubInstance(Connection)
+  connection.update
+    .withArgs(
+      'update `users` set `options` = ?, `meta` = json_set(`meta`, \'."tags"\', cast(? as json)), `group_id` = 45, `created_at` = ? where `active` = ?',
+      [
+        JSON.stringify({ '2fa': false, presets: ['lihtne', 'vue'] }),
+        JSON.stringify(['white', 'large']),
+        new Date('2019-08-06'),
+        1
+      ]
+    )
 
-//   const connection = m.mock(ConnectionInterface.class)
-//   connection.shouldReceive('update')
-//     .once()
-//     .with(
-//       'update `users` set `options` = json_set(`options`, \'."enable"\', false), `updated_at` = ? where `id` = ?',
-//       ['2015-05-26 22:02:06', 0]
-//     )
-//   const builder = new Builder(connection, grammar, processor)
-//   builder.from('users').where('id', '=', 0).update(['options.enable' => false, 'updated_at' => '2015-05-26 22:02:06'])
+  const builder = getBuilder(connection, grammar, processor)
+  builder.from('users').where('active', 1).update({
+    options: { '2fa': false, presets: ['lihtne', 'vue'] },
+    'meta.tags': ['white', 'large'],
+    group_id: new Raw('45'),
+    created_at: new Date('2019-08-06')
+  })
 
-//   connection.shouldReceive('update')
-//     .once()
-//     .with(
-//       'update `users` set `options` = json_set(`options`, \'."size"\', ?), `updated_at` = ? where `id` = ?',
-//       [45, '2015-05-26 22:02:06', 0]
-//     )
-//   const builder = new Builder(connection, grammar, processor)
-//   builder.from('users').where('id', '=', 0).update(['options.size' => 45, 'updated_at' => '2015-05-26 22:02:06'])
+  t.true(connection.update.calledOnce)
 
-//   const builder = getMySqlBuilder()
-//   builder.getConnection().shouldReceive('update').once().with('update `users` set `options` = json_set(`options`, \'."size"\', ?)', [null])
-//   builder.from('users').update(['options.size' => null])
+  verifyMock()
+})
 
-//   const builder = getMySqlBuilder()
-//   builder.getConnection().shouldReceive('update').once().with('update `users` set `options` = json_set(`options`, \'."size"\', 45)', [])
-//   builder.from('users').update(['options.size' => new Raw('45')])
-// })
+test('testMySqlUpdateWrappingJsonPathArrayIndex', async (t) => {
+  const { createStubInstance, verifyMock } = mock()
 
-// test('testPostgresUpdateWrappingJson', async (t) => {
-//   const builder = getPostgresBuilder()
-//   builder.getConnection().shouldReceive('update')
-//     .with('update "users" set "options" = jsonb_set("options".jsonb, \'{"name","first_name"}\', ?)', ['"John"'])
-//   builder.from('users').update(['users.options.name.first_name' => 'John'])
+  const grammar = new MySqlGrammar()
+  const processor = createStubInstance(Processor)
 
-//   const builder = getPostgresBuilder()
-//   builder.getConnection().shouldReceive('update')
-//     .with('update "users" set "options" = jsonb_set("options".jsonb, \'{"language"}\', \'null\')', [])
-//   builder.from('users').update(['options.language' => new Raw("'null'")])
-// })
+  const connection = createStubInstance(Connection)
+  connection.update
+    .withArgs(
+      'update `users` set `options` = json_set(`options`, \'[1]."2fa"\', false), `meta` = json_set(`meta`, \'."tags"[0][2]\', ?) where `active` = ?',
+      [
+        'large',
+        1
+      ]
+    )
 
-// test('testPostgresUpdateWrappingJsonArray', async (t) => {
-//   const builder = getPostgresBuilder()
-//   builder.getConnection().shouldReceive('update')
-//     .with('update "users" set "options" = ?, "meta" = jsonb_set("meta".jsonb, \'{"tags"}\', ?), "group_id" = 45, "created_at" = ?', [
-//       json_encode(['2fa' => false, 'presets' => ['lihtne', 'vue']]),
-//       json_encode(['white', 'large']),
-//       new DateTime('2019-08-06'),
-//     ])
+  const builder = getBuilder(connection, grammar, processor)
+  await builder.from('users').where('active', 1).update({
+    'options.[1].2fa': false,
+    'meta.tags[0][2]': 'large'
+  })
 
-//   builder.from('users').update([
-//     'options' => ['2fa' => false, 'presets' => ['lihtne', 'vue']],
-//     'meta.tags' => ['white', 'large'],
-//     'group_id' => new Raw('45'),
-//     'created_at' => new DateTime('2019-08-06'),
-//   ])
-// })
+  t.true(connection.update.calledOnce)
+
+  verifyMock()
+})
+
+test('testMySqlUpdateWithJsonPreparesBindingsCorrectly', async (t) => {
+  const { createMock, createStubInstance, verifyMock } = mock()
+
+  const grammar = new MySqlGrammar()
+  const processor = createStubInstance(Processor)
+
+  let connection = createStubInstance(Connection)
+  createStubInstance(Connection).update
+    .withArgs(
+      'update `users` set `options` = json_set(`options`, \'."enable"\', false), `updated_at` = ? where `id` = ?',
+      ['2015-05-26 22:02:06', 0]
+    )
+  let builder = getBuilder(connection, grammar, processor)
+  await builder.from('users').where('id', '=', 0).update({ 'options->enable': false, updated_at: '2015-05-26 22:02:06' })
+
+  t.true(connection.update.calledOnce)
+
+  connection = createStubInstance(Connection)
+  connection.update
+    .withArgs(
+      'update `users` set `options` = json_set(`options`, \'$."size"\', ?), `updated_at` = ? where `id` = ?',
+      [45, '2015-05-26 22:02:06', 0]
+    )
+  builder = getBuilder(connection, grammar, processor)
+  await builder.from('users').where('id', '=', 0).update({ 'options->size': 45, updated_at: '2015-05-26 22:02:06' })
+
+  t.true(connection.update.calledOnce)
+
+  builder = getMySqlBuilder()
+  createMock(builder.getConnection()).expects('update').once().withArgs('update `users` set `options` = json_set(`options`, \'$."size"\', ?)', [null])
+  await builder.from('users').update({ 'options->size': null })
+
+  builder = getMySqlBuilder()
+  createMock(builder.getConnection()).expects('update').once().withArgs('update `users` set `options` = json_set(`options`, \'$."size"\', 45)', [])
+  await builder.from('users').update({ 'options->size': new Raw('45') })
+
+  verifyMock()
+})
+
+test('testPostgresUpdateWrappingJson', async (t) => {
+  const { createMock, verifyMock } = mock()
+
+  let builder = getPostgresBuilder()
+  createMock(builder.getConnection()).expects('update')
+    .withArgs('update "users" set "options" = jsonb_set("options"::jsonb, \'{"name","first_name"}\', ?)', ['"John"'])
+  builder.from('users').update({ 'users.options->name->first_name': 'John' })
+
+  builder = getPostgresBuilder()
+  createMock(builder.getConnection()).expects('update')
+    .withArgs('update "users" set "options" = jsonb_set("options"::jsonb, \'{"language"}\', \'null\')', [])
+  builder.from('users').update({ 'options->language': new Raw("'null'") })
+
+  verifyMock()
+
+  t.pass()
+})
+
+test('testPostgresUpdateWrappingJsonArray', async (t) => {
+  const { createMock, verifyMock } = mock()
+
+  const builder = getPostgresBuilder()
+  createMock(builder.getConnection()).expects('update')
+    .withArgs('update "users" set "options" = ?, "meta" = jsonb_set("meta"::jsonb, \'{"tags"}\', ?), "group_id" = 45, "created_at" = ?', [
+      JSON.stringify({ '2fa': false, presets: ['lihtne', 'vue'] }),
+      JSON.stringify(['white', 'large']),
+      new Date('2019-08-06')
+    ])
+
+  builder.from('users').update({
+    options: { '2fa': false, presets: ['lihtne', 'vue'] },
+    'meta->tags': ['white', 'large'],
+    group_id: new Raw('45'),
+    created_at: new Date('2019-08-06')
+  })
+
+  verifyMock()
+
+  t.pass()
+})
 
 // test('testPostgresUpdateWrappingJsonPathArrayIndex', async (t) => {
 //   const builder = getPostgresBuilder()
@@ -4513,7 +4551,7 @@ test('testMySqlWrapping', async (t) => {
 //   const builder = getMockQueryBuilder()
 //   builder.from('foobar').orderBy('test')
 //   builder.shouldReceive('newQuery').andReturnUsing(function () use(builder) {
-//     return new Builder(builder.connection, builder.grammar, builder.processor)
+//     return getBuilder(builder.connection, builder.grammar, builder.processor)
 //   })
 
 //   path = 'http://foo.bar?cursor='.cursor.encode()

@@ -1,4 +1,4 @@
-import { isFalsy, isObject, isPlainObject } from '@devnetic/utils'
+import { isAlphanumeric, isFalsy, isObject, isPlainObject } from '@devnetic/utils'
 
 import Collection from './Collection.js'
 import { dataGet, value as getValue } from './helpers.js'
@@ -22,14 +22,17 @@ export default class Arr {
    */
   static collapse (array) {
     const results = []
+
     for (let values of Object.values(array)) {
       if (values instanceof Collection) {
         values = values.all()
       } else if (!Array.isArray(values)) {
         continue
       }
+
       results.push(values)
     }
+
     return [...[], ...results]
   }
 
@@ -222,6 +225,34 @@ export default class Arr {
       return array.length === 0 ? getValue(defaultValue) : array[array.length - 1]
     }
     return this.first(array.reverse(), callback, defaultValue)
+  }
+
+  /**
+   * Run a map over each of the items in the array.
+   *
+   * @param  {unknown[]}  array
+   * @param  {Function}  callback
+   * @return {unknown[]}
+   */
+  static map (array, callback) {
+    const keys = Object.keys(array)
+
+    let items
+
+    try {
+      items = keys.map(key => {
+        return callback(array[key], isAlphanumeric(key) ? Number(key) : key)
+      })
+    } catch (error) {
+      if (error instanceof TypeError) {
+        items = Object.values(array).map(callback)
+      } else {
+        throw error
+      }
+    }
+
+    // return Object.fromEntries(keys.map((key, index) => [key, items[index]]))
+    return keys.map((key, index) => [key, items[index]])
   }
 
   /**

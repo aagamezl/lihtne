@@ -156,15 +156,21 @@ export default class Collection {
     if (finalGlue === '') {
       return this.implode(glue)
     }
+
     const count = this.count()
+
     if (count === 0) {
       return ''
     }
+
     if (count === 1) {
       return this.last()
     }
+
     const collection = new Collection(this.items)
+
     const finalItem = collection.pop()
+
     return collection.implode(glue) + finalGlue + finalItem
   }
 
@@ -198,9 +204,11 @@ export default class Collection {
   map (callback) {
     return new Collection(this.items.map((item, key) => {
       if (isFunction(callback)) {
-        [key, item] = Array.isArray(item) && item.length > 0 ? item : [key, item]
+        [key, item] = Array.isArray(item) && item.length > 1 ? item : [key, item]
+
         return callback(item, key)
       }
+
       return item
     }))
   }
