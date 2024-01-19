@@ -16,15 +16,19 @@ const mock = () => {
 
       return newMock
     },
+    createSpy: (target, method) => {
+      return sinon.spy(target, method)
+    },
     createStub: (target, method) => {
       return sinon.stub(target, method)
-    },
-    createStubInstance: (Constructor, overrides) => {
-      return sinon.createStubInstance(Constructor, overrides)
     },
     restoreStub: (target, method) => {
       target[method].restore()
     },
+    createStubInstance: (Constructor, overrides) => {
+      return sinon.createStubInstance(Constructor, overrides)
+    },
+    sinon,
     verifyMock: () => {
       mocks.forEach((mock) => {
         mock.verify()

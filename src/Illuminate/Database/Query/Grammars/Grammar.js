@@ -800,7 +800,7 @@ export default class Grammar extends BaseGrammar {
    */
   concatenate (segments) {
     return Object.values(segments).filter((value) => {
-      return String(value) !== ''
+      return value !== ''
     }).join(' ')
   }
 

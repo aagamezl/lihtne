@@ -9,7 +9,8 @@ import {
   isPlainObject,
   isString,
   isTruthy,
-  merge
+  merge,
+  snakeCase
 } from '@devnetic/utils'
 
 import Arr from '../../Collections/Arr.js'
@@ -101,7 +102,7 @@ export default class Builder {
     /**
      * An aggregate function and column to be run.
      *
-     * @type {Object.<string, unknown>}
+     * @type {Record<string, unknown>}
      */
     this.aggregateProperty = undefined
 
@@ -331,6 +332,25 @@ export default class Builder {
     }
 
     return this
+  }
+
+  /**
+   * Add a single dynamic where clause statement to the query.
+   *
+   * @protected
+   * @param  {string}  segment
+   * @param  {string}  connector
+   * @param  {unknown[]}  parameters
+   * @param  {number}  index
+   * @return {void}
+   */
+  addDynamic (segment, connector, parameters, index) {
+    // Once we have parsed out the columns and formatted the boolean operators we
+    // are ready to add it to this query as a where clause just like any other
+    // clause on the query. Then we'll increment the parameter index values.
+    const bool = connector.toLowerCase()
+
+    this.where(snakeCase(segment), '=', parameters[index], bool)
   }
 
   /**
@@ -655,6 +675,58 @@ export default class Builder {
    */
   async doesntExistOr (callback) {
     return await this.doesntExist() ? true : callback()
+  }
+
+  /**
+   * Handles dynamic "where" clauses to the query.
+   *
+   * @param  {string}  method
+   * @param  {unknown[]}  parameters
+   * @return {this}
+   */
+  dynamicWhere (method, parameters) {
+    const finder = method.substring(5)
+
+    const segments = finder.split(/(And|Or)(?=[A-Z])/)
+
+    // The connector variable will determine which connector will be used for the
+    // query condition. We will change it as we come across new boolean values
+    // in the dynamic method strings, which could contain a number of these.
+    let connector = 'and'
+
+    let index = 0
+
+    for (const segment of segments) {
+      // If the segment is not a boolean connector, we can assume it is a column's name
+      // and we will add it to the query as a new constraint as a where clause, then
+      // we can keep iterating through the dynamic method string's segments again.
+      if (segment !== 'And' && segment !== 'Or') {
+        this.addDynamic(segment, connector, parameters, index)
+
+        index++
+      } else {
+        // Otherwise, we will store the connector so we know how the next where clause we
+        // find in the query should be connected to the previous ones, meaning we will
+        // have the proper boolean connector to connect the next where clause found.
+        connector = segment
+      }
+    }
+
+    return this
+  }
+
+  /**
+   * Throw an exception if the query doesn't have an orderBy clause.
+   *
+   * @protected
+   * @return {void}
+   *
+   * @throws RuntimeException
+   */
+  enforceOrderBy () {
+    if (this.orders.length === 0 && this.unionOrders.length === 0) {
+      throw new Error('RuntimeException: You must specify an orderBy clause when using this function.')
+    }
   }
 
   /**
@@ -1385,6 +1457,22 @@ export default class Builder {
   }
 
   /**
+   * Lock the selected rows in the table.
+   *
+   * @param  {string|boolean}  value
+   * @return {this}
+   */
+  lock (value = true) {
+    this.lockProperty = value
+
+    // if (!isNil(this.lockProperty)) {
+    //   this.useWritePdo()
+    // }
+
+    return this
+  }
+
+  /**
    * Retrieve the maximum value of a given column.
    *
    * @param  {string}  column
@@ -2070,11 +2158,14 @@ export default class Builder {
    * @return {this}
    * @memberof Builder
    */
-  select (...columns) {
-    columns = columns.length === 0 ? ['*'] : columns
+  // select (...columns) {
+  select (columns = ['*']) {
+    // columns = columns.length === 0 ? ['*'] : columns
 
     this.columns = []
     this.bindings.select = []
+
+    columns = Array.isArray(columns) ? columns : Array.from(arguments)
 
     for (const [as, column] of Arr.iterable(columns)) {
       if (isString(as) && this.isQueryable(column)) {
@@ -2107,7 +2198,7 @@ export default class Builder {
   /**
    * Add a subselect expression to the query.
    *
-   * @param {Function|Builder|\Illuminate\Database\Eloquent\Builder|string}  query
+   * @param {Function|Builder|import('./../Eloquent/Builder.js').default|string}  query
    * @param {string}  as
    * @return {this}
    *
