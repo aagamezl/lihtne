@@ -174,7 +174,8 @@ export default class SQLiteGrammar extends Grammar {
   compileUpdateColumns (query, values) {
     const jsonGroups = this.groupJsonColumnsForUpdate(values)
 
-    return collect(values).reject(([key, value]) => {
+    // return collect(values).reject(([key, value]) => {
+    return collect(values).reject((value, key) => {
       return this.isJsonSelector(key)
     }).merge(jsonGroups).map((value, key) => {
       const column = key.split('.').pop()
@@ -248,11 +249,14 @@ export default class SQLiteGrammar extends Grammar {
    * @return {Object.<string, unknown>}
    */
   groupJsonColumnsForUpdate (values) {
-    const groups = []
+    // const groups = []
+    const groups = {}
 
     for (const [key, value] of Object.entries(values)) {
       if (this.isJsonSelector(key)) {
-        Arr.set(groups, Str.after(key, '.').replace('->', '.'), value)
+        // Arr.set(groups, Str.after(key, '.').replace('->', '.'), value)
+        Arr.set(groups, Str.after(key, '.').replaceAll('->', '.'), value)
+        // groups = setValue(groups, Str.after(key, '.').replaceAll('->', '.'), value)
       }
     }
 
@@ -279,7 +283,8 @@ export default class SQLiteGrammar extends Grammar {
   prepareBindingsForUpdate (bindings, values) {
     const groups = this.groupJsonColumnsForUpdate(values)
 
-    values = collect(values).reject(([value, key]) => {
+    // values = collect(values).reject(([value, key]) => {
+    values = collect(values).reject((value, key) => {
       return this.isJsonSelector(key)
     }).merge(groups).map((value) => {
       return (Array.isArray(value) || isPlainObject(value)) ? JSON.stringify(value) : value

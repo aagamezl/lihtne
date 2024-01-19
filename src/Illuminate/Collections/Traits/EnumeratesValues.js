@@ -36,6 +36,8 @@ export class EnumeratesValues {
     const useAsCallable = this.useAsCallable(callback)
 
     return this.filter((value, key) => {
+      [key, value] = Array.isArray(value) && value.length > 1 ? value : [key, value]
+
       return useAsCallable
         ? !callback(value, key)
         : value !== callback

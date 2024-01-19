@@ -1,7 +1,6 @@
-import { isNil } from '@devnetic/utils'
-
-import { collect } from '../../Collections/helpers.js'
 import Str from './../../Support/Str.js'
+import { collect } from '../../Collections/helpers.js'
+import { explode } from '../../Support/helpers.js'
 
 // export const CompilesJsonPaths = {
 export default class CompilesJsonPaths {
@@ -12,7 +11,8 @@ export default class CompilesJsonPaths {
    * @return {array}
    */
   wrapJsonFieldAndPath (column) {
-    const parts = column.split('->', 2)
+    // const parts = column.split('->', 2)
+    const parts = explode('->', column, 2)
 
     /**
      * The wrap method exists on the trait target prototype
@@ -36,7 +36,7 @@ export default class CompilesJsonPaths {
     value = value.replace(/([\\]+)?'/g, '\'\'')
 
     const jsonPath = collect(value.split(delimiter))
-      .map((segment) => this.wrapJsonPathSegment(String(segment)))
+      .map((segment) => this.wrapJsonPathSegment(segment))
       .join('.')
 
     return "'$" + (jsonPath.startsWith('[') ? '' : '.') + jsonPath + "'"
@@ -50,13 +50,17 @@ export default class CompilesJsonPaths {
    */
   wrapJsonPathSegment (segment) {
     const parts = segment.match(/(\[[^\]]+\])+/)
+
     if (parts !== null) {
       const key = Str.beforeLast(segment, parts[0])
-      if (!isNil(key)) {
+
+      if (!key.length === 0) {
         return '"' + key + '"' + parts[0]
       }
+
       return parts[0]
     }
+
     return '"' + segment + '"'
   }
 }

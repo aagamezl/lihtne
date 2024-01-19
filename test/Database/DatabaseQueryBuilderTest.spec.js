@@ -1,7 +1,7 @@
 import test from 'ava'
 
 import EloquentBuilder from '../../src/Illuminate/Database/Eloquent/Builder.js'
-import Expression from './../../src/Illuminate/Database/Query/Expression.js'
+import Raw from './../../src/Illuminate/Database/Query/Expression.js'
 import SQLiteGrammar from '../../src/Illuminate/Database/Query/Grammars/SQLiteGrammar.js'
 import getBuilder from './helpers/getBuilder.js'
 import getMySqlBuilder from './helpers/getMySqlBuilder.js'
@@ -13,11 +13,12 @@ import getSqlServerBuilder from './helpers/getSqlServerBuilder.js'
 import MySqlGrammar from '../../src/Illuminate/Database/Query/Grammars/MySqlGrammar.js'
 import Connection from '../../src/Illuminate/Database/Connection.js'
 import Processor from '../../src/Illuminate/Database/Query/Processors/Processor.js'
+import ConditionExpression from '../../src/Illuminate/Database/Query/ConditionExpression.js'
 import { collect } from '../../src/Illuminate/Collections/helpers.js'
 
 import mock from '../helpers/mock.js'
 
-const Raw = Expression
+// const Raw = Expression
 
 test('testBasicSelect', (t) => {
   const builder = getBuilder()
@@ -1727,13 +1728,13 @@ test('testHavingNotNull', t => {
 })
 
 test('testHavingExpression', async (t) => {
-  const newExpression = new Expression()
-  newExpression.getValue = (grammar) => {
+  const conditionExpression = new ConditionExpression()
+  conditionExpression.getValue = (grammar) => {
     return '1 = 1'
   }
 
   const builder = getBuilder()
-  builder.select('*').from('users').having(newExpression)
+  builder.select('*').from('users').having(conditionExpression)
 
   t.is(builder.toSql(), 'select * from "users" having 1 = 1')
   t.deepEqual([], builder.getBindings())
@@ -2366,7 +2367,7 @@ test('testFindReturnsFirstResultByID', async (t) => {
 test('testFindOrReturnsFirstResultByID', async (t) => {
   const { createStub, restoreStub } = mock()
 
-  const data = class {}
+  const data = class { }
   const builder = getBuilder()
   const stub = createStub(builder, 'first')
 
@@ -3540,7 +3541,7 @@ test('testMySqlUpdateWrappingJsonArray', async (t) => {
   const builder = getBuilder(connection, grammar, processor)
   builder.from('users').where('active', 1).update({
     options: { '2fa': false, presets: ['lihtne', 'vue'] },
-    'meta.tags': ['white', 'large'],
+    'meta->tags': ['white', 'large'],
     group_id: new Raw('45'),
     created_at: new Date('2019-08-06')
   })
@@ -3657,305 +3658,327 @@ test('testPostgresUpdateWrappingJsonArray', async (t) => {
   t.pass()
 })
 
-// test('testPostgresUpdateWrappingJsonPathArrayIndex', async (t) => {
-//   const builder = getPostgresBuilder()
-//   builder.getConnection().shouldReceive('update')
-//     .with('update "users" set "options" = jsonb_set("options".jsonb, \'{1,"2fa"}\', ?), "meta" = jsonb_set("meta".jsonb, \'{"tags",0,2}\', ?) where ("options".1.\'2fa\').jsonb = \'true\'.jsonb', [
-//       'false',
-//       '"large"',
-//     ])
+test('testPostgresUpdateWrappingJsonPathArrayIndex', async (t) => {
+  const { createMock, verifyMock } = mock()
 
-//   builder.from('users').where('options.[1].2fa', true).update([
-//     'options.[1].2fa' => false,
-//     'meta.tags[0][2]' => 'large',
-//   ])
-// })
+  const builder = getPostgresBuilder()
+  createMock(builder.getConnection()).expects('update')
+    .withArgs('update "users" set "options" = jsonb_set("options"::jsonb, \'{1,"2fa"}\', ?), "meta" = jsonb_set("meta"::jsonb, \'{"tags",0,2}\', ?) where ("options"->1->\'2fa\')::jsonb = \'true\'::jsonb', [
+      'false',
+      '"large"'
+    ])
 
-// test('testSQLiteUpdateWrappingJsonArray', async (t) => {
-//   const builder = getSQLiteBuilder()
+  builder.from('users').where('options->[1]->2fa', true).update({
+    'options->[1]->2fa': false,
+    'meta->tags[0][2]': 'large'
+  })
 
-//   builder.getConnection().shouldReceive('update')
-//     .with('update "users" set "options" = ?, "group_id" = 45, "created_at" = ?', [
-//       json_encode(['2fa' => false, 'presets' => ['lihtne', 'vue']]),
-//       new DateTime('2019-08-06'),
-//     ])
+  verifyMock()
 
-//   builder.from('users').update([
-//     'options' => ['2fa' => false, 'presets' => ['lihtne', 'vue']],
-//     'group_id' => new Raw('45'),
-//     'created_at' => new DateTime('2019-08-06'),
-//   ])
-// })
+  t.pass()
+})
 
-// test('testSQLiteUpdateWrappingNestedJsonArray', async (t) => {
-//   const builder = getSQLiteBuilder()
-//   builder.getConnection().shouldReceive('update')
-//     .with('update "users" set "group_id" = 45, "created_at" = ?, "options" = json_patch(ifnull("options", json(\'{}\')), json(?))', [
-//       new DateTime('2019-08-06'),
-//       json_encode(['name' => 'Taylor', 'security' => ['2fa' => false, 'presets' => ['lihtne', 'vue']], 'sharing' => ['twitter' => 'username']]),
-//     ])
+test('testSQLiteUpdateWrappingJsonArray', async (t) => {
+  const { createMock, verifyMock } = mock()
 
-//   builder.from('users').update([
-//     'options.name' => 'Taylor',
-//     'group_id' => new Raw('45'),
-//     'options.security' => ['2fa' => false, 'presets' => ['lihtne', 'vue']],
-//     'options.sharing.twitter' => 'username',
-//     'created_at' => new DateTime('2019-08-06'),
-//   ])
-// })
+  const builder = getSQLiteBuilder()
 
-// test('testSQLiteUpdateWrappingJsonPathArrayIndex', async (t) => {
-//   const builder = getSQLiteBuilder()
-//   builder.getConnection().shouldReceive('update')
-//     .with('update "users" set "options" = json_patch(ifnull("options", json(\'{}\')), json(?)), "meta" = json_patch(ifnull("meta", json(\'{}\')), json(?)) where json_extract("options", \'[1]."2fa"\') = true', [
-//       '{"[1]":{"2fa":false}}',
-//       '{"tags[0][2]":"large"}',
-//     ])
+  createMock(builder.getConnection()).expects('update')
+    .withArgs('update "users" set "options" = ?, "group_id" = 45, "created_at" = ?', [
+      JSON.stringify({ '2fa': false, presets: ['lihtne', 'vue'] }),
+      new Date('2019-08-06')
+    ])
 
-//   builder.from('users').where('options.[1].2fa', true).update([
-//     'options.[1].2fa' => false,
-//     'meta.tags[0][2]' => 'large',
-//   ])
-// })
+  builder.from('users').update({
+    options: { '2fa': false, presets: ['lihtne', 'vue'] },
+    group_id: new Raw('45'),
+    created_at: new Date('2019-08-06')
+  })
 
-// test('testMySqlWrappingJsonWithString', async (t) => {
-//   const builder = getMySqlBuilder()
-//   builder.select('*').from('users').where('items.sku', '=', 'foo-bar')
-//   t.is('select * from `users` where json_unquote(json_extract(`items`, \'."sku"\')) = ?', builder.toSql())
-//   assertCount(1, builder.getRawBindings()['where'])
-//   t.is('foo-bar', builder.getRawBindings()['where'][0])
-// })
+  verifyMock()
 
-// test('testMySqlWrappingJsonWithInteger', async (t) => {
-//   const builder = getMySqlBuilder()
-//   builder.select('*').from('users').where('items.price', '=', 1)
-//   t.is('select * from `users` where json_unquote(json_extract(`items`, \'."price"\')) = ?', builder.toSql())
-// })
+  t.pass()
+})
 
-// test('testMySqlWrappingJsonWithDouble', async (t) => {
-//   const builder = getMySqlBuilder()
-//   builder.select('*').from('users').where('items.price', '=', 1.5)
-//   t.is('select * from `users` where json_unquote(json_extract(`items`, \'."price"\')) = ?', builder.toSql())
-// })
+test('testSQLiteUpdateWrappingNestedJsonArray', async (t) => {
+  const { createMock, verifyMock } = mock()
 
-// test('testMySqlWrappingJsonWithBoolean', async (t) => {
-//   const builder = getMySqlBuilder()
-//   builder.select('*').from('users').where('items.available', '=', true)
-//   t.is('select * from `users` where json_extract(`items`, \'."available"\') = true', builder.toSql())
+  const builder = getSQLiteBuilder()
+  createMock(builder.getConnection()).expects('update')
+    .withArgs('update "users" set "group_id" = 45, "created_at" = ?, "options" = json_patch(ifnull("options", json(\'{}\')), json(?))', [
+      new Date('2019-08-06'),
+      JSON.stringify({ name: 'Taylor', security: { '2fa': false, presets: ['lihtne', 'vue'] }, sharing: { twitter: 'username' } })
+    ])
 
-//   const builder = getMySqlBuilder()
-//   builder.select('*').from('users').where(new Raw("items.'.available'"), '=', true)
-//   t.is("select * from `users` where items.'.available' = true", builder.toSql())
-// })
+  builder.from('users').update({
+    'options->name': 'Taylor',
+    group_id: new Raw('45'),
+    'options->security': { '2fa': false, presets: ['lihtne', 'vue'] },
+    'options->sharing->twitter': 'username',
+    created_at: new Date('2019-08-06')
+  })
 
-// test('testMySqlWrappingJsonWithBooleanAndIntegerThatLooksLikeOne', async (t) => {
-//   const builder = getMySqlBuilder()
-//   builder.select('*').from('users').where('items.available', '=', true).where('items.active', '=', false).where('items.number_available', '=', 0)
-//   t.is('select * from `users` where json_extract(`items`, \'."available"\') = true and json_extract(`items`, \'."active"\') = false and json_unquote(json_extract(`items`, \'."number_available"\')) = ?', builder.toSql())
-// })
+  verifyMock()
 
-// test('testJsonPathEscaping', async (t) => {
-//   expectedWithJsonEscaped = <<< 'SQL'
-// select json_unquote(json_extract(`json`, '."''))#"'))
-//   SQL
+  t.pass()
+})
 
-//   const builder = getMySqlBuilder()
-//   builder.select("json.'))#")
-//   t.deepEqual(expectedWithJsonEscaped, builder.toSql())
+test('testSQLiteUpdateWrappingJsonPathArrayIndex', async (t) => {
+  const { createMock, verifyMock } = mock()
 
-//   const builder = getMySqlBuilder()
-//   builder.select("json.\'))#")
-//   t.deepEqual(expectedWithJsonEscaped, builder.toSql())
+  const builder = getSQLiteBuilder()
+  createMock(builder.getConnection()).expects('update')
+    .withArgs('update "users" set "options" = json_patch(ifnull("options", json(\'{}\')), json(?)), "meta" = json_patch(ifnull("meta", json(\'{}\')), json(?)) where json_extract("options", \'$[1]."2fa"\') = true', [
+      '{"[1]":{"2fa":false}}',
+      '{"tags[0][2]":"large"}'
+    ])
 
-//   const builder = getMySqlBuilder()
-//   builder.select("json.\\'))#")
-//   t.deepEqual(expectedWithJsonEscaped, builder.toSql())
+  builder.from('users').where('options->[1]->2fa', true).update({
+    'options->[1]->2fa': false,
+    'meta->tags[0][2]': 'large'
+  })
 
-//   const builder = getMySqlBuilder()
-//   builder.select("json.\\\'))#")
-//   t.deepEqual(expectedWithJsonEscaped, builder.toSql())
-// })
+  verifyMock()
 
-// test('testMySqlWrappingJson', async (t) => {
-//   const builder = getMySqlBuilder()
-//   builder.select('*').from('users').whereRaw('items.\'."price"\' = 1')
-//   t.is('select * from `users` where items.\'."price"\' = 1', builder.toSql())
+  t.pass()
+})
 
-//   const builder = getMySqlBuilder()
-//   builder.select('items.price').from('users').where('users.items.price', '=', 1).orderBy('items.price')
-//   t.is('select json_unquote(json_extract(`items`, \'."price"\')) from `users` where json_unquote(json_extract(`users`.`items`, \'."price"\')) = ? order by json_unquote(json_extract(`items`, \'."price"\')) asc', builder.toSql())
+test('testMySqlWrappingJsonWithString', async (t) => {
+  const builder = getMySqlBuilder()
+  builder.select('*').from('users').where('items->sku', '=', 'foo-bar')
+  t.is('select * from `users` where json_unquote(json_extract(`items`, \'$."sku"\')) = ?', builder.toSql())
+  t.is(builder.getRawBindings().where.length, 1)
+  t.is('foo-bar', builder.getRawBindings().where[0])
+})
 
-//   const builder = getMySqlBuilder()
-//   builder.select('*').from('users').where('items.price.in_usd', '=', 1)
-//   t.is('select * from `users` where json_unquote(json_extract(`items`, \'."price"."in_usd"\')) = ?', builder.toSql())
+test('testMySqlWrappingJsonWithInteger', async (t) => {
+  const builder = getMySqlBuilder()
+  builder.select('*').from('users').where('items->price', '=', 1)
+  t.is('select * from `users` where json_unquote(json_extract(`items`, \'$."price"\')) = ?', builder.toSql())
+})
 
-//   const builder = getMySqlBuilder()
-//   builder.select('*').from('users').where('items.price.in_usd', '=', 1).where('items.age', '=', 2)
-//   t.is('select * from `users` where json_unquote(json_extract(`items`, \'."price"."in_usd"\')) = ? and json_unquote(json_extract(`items`, \'."age"\')) = ?', builder.toSql())
-// })
+test('testMySqlWrappingJsonWithDouble', async (t) => {
+  const builder = getMySqlBuilder()
+  builder.select('*').from('users').where('items->price', '=', 1.5)
+  t.is('select * from `users` where json_unquote(json_extract(`items`, \'$."price"\')) = ?', builder.toSql())
+})
 
-// test('testPostgresWrappingJson', async (t) => {
-//   const builder = getPostgresBuilder()
-//   builder.select('items.price').from('users').where('users.items.price', '=', 1).orderBy('items.price')
-//   t.is('select "items".>\'price\' from "users" where "users"."items".>\'price\' = ? order by "items".>\'price\' asc', builder.toSql())
+test('testMySqlWrappingJsonWithBoolean', async (t) => {
+  let builder = getMySqlBuilder()
+  builder.select('*').from('users').where('items->available', '=', true)
+  t.is('select * from `users` where json_extract(`items`, \'$."available"\') = true', builder.toSql())
 
-//   const builder = getPostgresBuilder()
-//   builder.select('*').from('users').where('items.price.in_usd', '=', 1)
-//   t.is('select * from "users" where "items".\'price\'.>\'in_usd\' = ?', builder.toSql())
+  builder = getMySqlBuilder()
+  builder.select('*').from('users').where(new Raw("items->'$.available'"), '=', true)
+  t.is("select * from `users` where items->'$.available' = true", builder.toSql())
+})
 
-//   const builder = getPostgresBuilder()
-//   builder.select('*').from('users').where('items.price.in_usd', '=', 1).where('items.age', '=', 2)
-//   t.is('select * from "users" where "items".\'price\'.>\'in_usd\' = ? and "items".>\'age\' = ?', builder.toSql())
+test('testMySqlWrappingJsonWithBooleanAndIntegerThatLooksLikeOne', async (t) => {
+  const builder = getMySqlBuilder()
+  builder.select('*').from('users').where('items->available', '=', true).where('items->active', '=', false).where('items->number_available', '=', 0)
+  t.is(builder.toSql(), 'select * from `users` where json_extract(`items`, \'$."available"\') = true and json_extract(`items`, \'$."active"\') = false and json_unquote(json_extract(`items`, \'$."number_available"\')) = ?')
+})
 
-//   const builder = getPostgresBuilder()
-//   builder.select('*').from('users').where('items.prices.0', '=', 1).where('items.age', '=', 2)
-//   t.is('select * from "users" where "items".\'prices\'.>0 = ? and "items".>\'age\' = ?', builder.toSql())
+test('testJsonPathEscaping', async (t) => {
+  const expectedWithJsonEscaped = 'select json_unquote(json_extract(`json`, \'$."\'\'))#"\'))'
 
-//   const builder = getPostgresBuilder()
-//   builder.select('*').from('users').where('items.available', '=', true)
-//   t.is('select * from "users" where ("items".\'available\').jsonb = \'true\'.jsonb', builder.toSql())
-// })
+  let builder = getMySqlBuilder()
+  builder.select("json->'))#")
+  t.is(builder.toSql(), expectedWithJsonEscaped)
 
-// test('testSqlServerWrappingJson', async (t) => {
-//   const builder = getSqlServerBuilder()
-//   builder.select('items.price').from('users').where('users.items.price', '=', 1).orderBy('items.price')
-//   t.is('select json_value([items], \'."price"\') from [users] where json_value([users].[items], \'."price"\') = ? order by json_value([items], \'."price"\') asc', builder.toSql())
+  builder = getMySqlBuilder()
+  builder.select("json->'))#")
+  t.is(builder.toSql(), expectedWithJsonEscaped)
 
-//   const builder = getSqlServerBuilder()
-//   builder.select('*').from('users').where('items.price.in_usd', '=', 1)
-//   t.is('select * from [users] where json_value([items], \'."price"."in_usd"\') = ?', builder.toSql())
+  builder = getMySqlBuilder()
+  builder.select("json->\\'))#")
+  t.is(builder.toSql(), expectedWithJsonEscaped)
 
-//   const builder = getSqlServerBuilder()
-//   builder.select('*').from('users').where('items.price.in_usd', '=', 1).where('items.age', '=', 2)
-//   t.is('select * from [users] where json_value([items], \'."price"."in_usd"\') = ? and json_value([items], \'."age"\') = ?', builder.toSql())
+  builder = getMySqlBuilder()
+  builder.select("json->\\'))#")
+  t.is(builder.toSql(), expectedWithJsonEscaped)
+})
 
-//   const builder = getSqlServerBuilder()
-//   builder.select('*').from('users').where('items.available', '=', true)
-//   t.is('select * from [users] where json_value([items], \'."available"\') = \'true\'', builder.toSql())
-// })
+test('testMySqlWrappingJson', async (t) => {
+  let builder = getMySqlBuilder()
+  builder.select('*').from('users').whereRaw('items->\'$."price"\' = 1')
+  t.is(builder.toSql(), 'select * from `users` where items->\'$."price"\' = 1')
 
-// test('testSqliteWrappingJson', async (t) => {
-//   const builder = getSQLiteBuilder()
-//   builder.select('items.price').from('users').where('users.items.price', '=', 1).orderBy('items.price')
-//   t.is('select json_extract("items", \'."price"\') from "users" where json_extract("users"."items", \'."price"\') = ? order by json_extract("items", \'."price"\') asc', builder.toSql())
+  builder = getMySqlBuilder()
+  builder.select('items->price').from('users').where('users.items->price', '=', 1).orderBy('items->price')
+  t.is(builder.toSql(), 'select json_unquote(json_extract(`items`, \'$."price"\')) from `users` where json_unquote(json_extract(`users`.`items`, \'$."price"\')) = ? order by json_unquote(json_extract(`items`, \'$."price"\')) asc')
 
-//   const builder = getSQLiteBuilder()
-//   builder.select('*').from('users').where('items.price.in_usd', '=', 1)
-//   t.is('select * from "users" where json_extract("items", \'."price"."in_usd"\') = ?', builder.toSql())
+  builder = getMySqlBuilder()
+  builder.select('*').from('users').where('items->price->in_usd', '=', 1)
+  t.is(builder.toSql(), 'select * from `users` where json_unquote(json_extract(`items`, \'$."price"."in_usd"\')) = ?')
 
-//   const builder = getSQLiteBuilder()
-//   builder.select('*').from('users').where('items.price.in_usd', '=', 1).where('items.age', '=', 2)
-//   t.is('select * from "users" where json_extract("items", \'."price"."in_usd"\') = ? and json_extract("items", \'."age"\') = ?', builder.toSql())
+  builder = getMySqlBuilder()
+  builder.select('*').from('users').where('items->price->in_usd', '=', 1).where('items->age', '=', 2)
+  t.is(builder.toSql(), 'select * from `users` where json_unquote(json_extract(`items`, \'$."price"."in_usd"\')) = ? and json_unquote(json_extract(`items`, \'$."age"\')) = ?')
+})
 
-//   const builder = getSQLiteBuilder()
-//   builder.select('*').from('users').where('items.available', '=', true)
-//   t.is('select * from "users" where json_extract("items", \'."available"\') = true', builder.toSql())
-// })
+test('testPostgresWrappingJson', async (t) => {
+  let builder = getPostgresBuilder()
+  builder.select('items->price').from('users').where('users.items->price', '=', 1).orderBy('items->price')
+  t.is(builder.toSql(), 'select "items"->>\'price\' from "users" where "users"."items"->>\'price\' = ? order by "items"->>\'price\' asc')
 
-// test('testSQLiteOrderBy', async (t) => {
-//   const builder = getSQLiteBuilder()
-//   builder.select('*').from('users').orderBy('email', 'desc')
-//   t.is('select * from "users" order by "email" desc', builder.toSql())
-// })
+  builder = getPostgresBuilder()
+  builder.select('*').from('users').where('items->price->in_usd', '=', 1)
+  t.is(builder.toSql(), 'select * from "users" where "items"->\'price\'->>\'in_usd\' = ?')
 
-// test('testSqlServerLimitsAndOffsets', async (t) => {
-//   const builder = getSqlServerBuilder()
-//   builder.select('*').from('users').take(10)
-//   t.is('select top 10 * from [users]', builder.toSql())
+  builder = getPostgresBuilder()
+  builder.select('*').from('users').where('items->price->in_usd', '=', 1).where('items->age', '=', 2)
+  t.is(builder.toSql(), 'select * from "users" where "items"->\'price\'->>\'in_usd\' = ? and "items"->>\'age\' = ?')
 
-//   const builder = getSqlServerBuilder()
-//   builder.select('*').from('users').skip(10).orderBy('email', 'desc')
-//   t.is('select * from [users] order by [email] desc offset 10 rows', builder.toSql())
+  builder = getPostgresBuilder()
+  builder.select('*').from('users').where('items->prices->0', '=', 1).where('items->age', '=', 2)
+  t.is(builder.toSql(), 'select * from "users" where "items"->\'prices\'->>0 = ? and "items"->>\'age\' = ?')
 
-//   const builder = getSqlServerBuilder()
-//   builder.select('*').from('users').skip(10).take(10)
-//   t.is('select * from [users] order by (SELECT 0) offset 10 rows fetch next 10 rows only', builder.toSql())
+  builder = getPostgresBuilder()
+  builder.select('*').from('users').where('items->available', '=', true)
+  t.is(builder.toSql(), 'select * from "users" where ("items"->\'available\')::jsonb = \'true\'::jsonb')
+})
 
-//   const builder = getSqlServerBuilder()
-//   builder.select('*').from('users').skip(11).take(10).orderBy('email', 'desc')
-//   t.is('select * from [users] order by [email] desc offset 11 rows fetch next 10 rows only', builder.toSql())
+test('testSqlServerWrappingJson', async (t) => {
+  let builder = getSqlServerBuilder()
+  builder.select('items->price').from('users').where('users.items->price', '=', 1).orderBy('items->price')
+  t.is(builder.toSql(), 'select json_value([items], \'$."price"\') from [users] where json_value([users].[items], \'$."price"\') = ? order by json_value([items], \'$."price"\') asc')
 
-//   const builder = getSqlServerBuilder()
-//   subQuery = function (query) {
-//     return query.select('created_at').from('logins').where('users.name', 'nameBinding').whereColumn('user_id', 'users.id').limit(1)
-//   }
-//   builder.select('*').from('users').where('email', 'emailBinding').orderBy(subQuery).skip(10).take(10)
-//   t.is('select * from [users] where [email] = ? order by (select top 1 [created_at] from [logins] where [users].[name] = ? and [user_id] = [users].[id]) asc offset 10 rows fetch next 10 rows only', builder.toSql())
-//   t.deepEqual(['emailBinding', 'nameBinding'], builder.getBindings())
+  builder = getSqlServerBuilder()
+  builder.select('*').from('users').where('items->price->in_usd', '=', 1)
+  t.is(builder.toSql(), 'select * from [users] where json_value([items], \'$."price"."in_usd"\') = ?')
 
-//   const builder = getSqlServerBuilder()
-//   builder.select('*').from('users').take('foo')
-//   t.is('select * from [users]', builder.toSql())
+  builder = getSqlServerBuilder()
+  builder.select('*').from('users').where('items->price->in_usd', '=', 1).where('items->age', '=', 2)
+  t.is(builder.toSql(), 'select * from [users] where json_value([items], \'$."price"."in_usd"\') = ? and json_value([items], \'$."age"\') = ?')
 
-//   const builder = getSqlServerBuilder()
-//   builder.select('*').from('users').take('foo').offset('bar')
-//   t.is('select * from [users]', builder.toSql())
+  builder = getSqlServerBuilder()
+  builder.select('*').from('users').where('items->available', '=', true)
+  t.is(builder.toSql(), 'select * from [users] where json_value([items], \'$."available"\') = \'true\'')
+})
 
-//   const builder = getSqlServerBuilder()
-//   builder.select('*').from('users').offset('bar')
-//   t.is('select * from [users]', builder.toSql())
-// })
+test('testSqliteWrappingJson', async (t) => {
+  let builder = getSQLiteBuilder()
+  builder.select('items->price').from('users').where('users.items->price', '=', 1).orderBy('items->price')
+  t.is(builder.toSql(), 'select json_extract("items", \'$."price"\') from "users" where json_extract("users"."items", \'$."price"\') = ? order by json_extract("items", \'$."price"\') asc')
 
-// test('testMySqlSoundsLikeOperator', async (t) => {
-//   const builder = getMySqlBuilder()
-//   builder.select('*').from('users').where('name', 'sounds like', 'John Doe')
-//   t.is('select * from `users` where `name` sounds like ?', builder.toSql())
-//   t.deepEqual(['John Doe'], builder.getBindings())
-// })
+  builder = getSQLiteBuilder()
+  builder.select('*').from('users').where('items->price->in_usd', '=', 1)
+  t.is(builder.toSql(), 'select * from "users" where json_extract("items", \'$."price"."in_usd"\') = ?')
 
-// test('testBitwiseOperators', async (t) => {
-//   const builder = getBuilder()
-//   builder.select('*').from('users').where('bar', '&', 1)
-//   t.is('select * from "users" where "bar" & ?', builder.toSql())
+  builder = getSQLiteBuilder()
+  builder.select('*').from('users').where('items->price->in_usd', '=', 1).where('items->age', '=', 2)
+  t.is(builder.toSql(), 'select * from "users" where json_extract("items", \'$."price"."in_usd"\') = ? and json_extract("items", \'$."age"\') = ?')
 
-//   const builder = getPostgresBuilder()
-//   builder.select('*').from('users').where('bar', '#', 1)
-//   t.is('select * from "users" where ("bar" # ?).bool', builder.toSql())
+  builder = getSQLiteBuilder()
+  builder.select('*').from('users').where('items->available', '=', true)
+  t.is(builder.toSql(), 'select * from "users" where json_extract("items", \'$."available"\') = true')
+})
 
-//   const builder = getPostgresBuilder()
-//   builder.select('*').from('users').where('range', '>>', '[2022-01-08 00:00:00,2022-01-09 00:00:00)')
-//   t.is('select * from "users" where ("range" >> ?).bool', builder.toSql())
+test('testSQLiteOrderBy', async (t) => {
+  const builder = getSQLiteBuilder()
+  builder.select('*').from('users').orderBy('email', 'desc')
+  t.is(builder.toSql(), 'select * from "users" order by "email" desc')
+})
 
-//   const builder = getSqlServerBuilder()
-//   builder.select('*').from('users').where('bar', '&', 1)
-//   t.is('select * from [users] where ([bar] & ?) != 0', builder.toSql())
+test('testSqlServerLimitsAndOffsets', async (t) => {
+  let builder = getSqlServerBuilder()
+  builder.select('*').from('users').take(10)
+  t.is(builder.toSql(), 'select top 10 * from [users]')
 
-//   const builder = getBuilder()
-//   builder.select('*').from('users').having('bar', '&', 1)
-//   t.is('select * from "users" having "bar" & ?', builder.toSql())
+  builder = getSqlServerBuilder()
+  builder.select('*').from('users').skip(10).orderBy('email', 'desc')
+  t.is(builder.toSql(), 'select * from [users] order by [email] desc offset 10 rows')
 
-//   const builder = getPostgresBuilder()
-//   builder.select('*').from('users').having('bar', '#', 1)
-//   t.is('select * from "users" having ("bar" # ?).bool', builder.toSql())
+  builder = getSqlServerBuilder()
+  builder.select('*').from('users').skip(10).take(10)
+  t.is(builder.toSql(), 'select * from [users] order by (SELECT 0) offset 10 rows fetch next 10 rows only')
 
-//   const builder = getPostgresBuilder()
-//   builder.select('*').from('users').having('range', '>>', '[2022-01-08 00:00:00,2022-01-09 00:00:00)')
-//   t.is('select * from "users" having ("range" >> ?).bool', builder.toSql())
+  builder = getSqlServerBuilder()
+  builder.select('*').from('users').skip(11).take(10).orderBy('email', 'desc')
+  t.is(builder.toSql(), 'select * from [users] order by [email] desc offset 11 rows fetch next 10 rows only')
 
-//   const builder = getSqlServerBuilder()
-//   builder.select('*').from('users').having('bar', '&', 1)
-//   t.is('select * from [users] having ([bar] & ?) != 0', builder.toSql())
-// })
+  builder = getSqlServerBuilder()
+  const subQuery = (query) => {
+    return query.select('created_at').from('logins').where('users.name', 'nameBinding').whereColumn('user_id', 'users.id').limit(1)
+  }
+  builder.select('*').from('users').where('email', 'emailBinding').orderBy(subQuery).skip(10).take(10)
+  t.is(builder.toSql(), 'select * from [users] where [email] = ? order by (select top 1 [created_at] from [logins] where [users].[name] = ? and [user_id] = [users].[id]) asc offset 10 rows fetch next 10 rows only')
+  t.deepEqual(['emailBinding', 'nameBinding'], builder.getBindings())
 
-// test('testMergeWheresCanMergeWheresAndBindings', async (t) => {
-//   const builder = getBuilder()
-//   builder.wheres = ['foo']
-//   builder.mergeWheres(['wheres'], [12 => 'foo', 13 => 'bar'])
-//   t.deepEqual(['foo', 'wheres'], builder.wheres)
-//   t.deepEqual(['foo', 'bar'], builder.getBindings())
-// })
+  builder = getSqlServerBuilder()
+  builder.select('*').from('users').take('foo')
+  t.is(builder.toSql(), 'select * from [users]')
 
-// test('testPrepareValueAndOperator', async (t) => {
-//   const builder = getBuilder()
-//   [value, operator] = builder.prepareValueAndOperator('>', '20')
-//   t.is('>', value)
-//   t.is('20', operator)
+  builder = getSqlServerBuilder()
+  builder.select('*').from('users').take('foo').offset('bar')
+  t.is(builder.toSql(), 'select * from [users]')
 
-//   const builder = getBuilder()
-//   [value, operator] = builder.prepareValueAndOperator('>', '20', true)
-//   t.is('20', value)
-//   t.is('=', operator)
-// })
+  builder = getSqlServerBuilder()
+  builder.select('*').from('users').offset('bar')
+  t.is(builder.toSql(), 'select * from [users]')
+})
+
+test('testMySqlSoundsLikeOperator', async (t) => {
+  const builder = getMySqlBuilder()
+  builder.select('*').from('users').where('name', 'sounds like', 'John Doe')
+  t.is(builder.toSql(), 'select * from `users` where `name` sounds like ?')
+  t.deepEqual(builder.getBindings(), ['John Doe'])
+})
+
+test('testBitwiseOperators', async (t) => {
+  let builder = getBuilder()
+  builder.select('*').from('users').where('bar', '&', 1)
+  t.is(builder.toSql(), 'select * from "users" where "bar" & ?')
+
+  builder = getPostgresBuilder()
+  builder.select('*').from('users').where('bar', '#', 1)
+  t.is(builder.toSql(), 'select * from "users" where ("bar" # ?)::bool')
+
+  builder = getPostgresBuilder()
+  builder.select('*').from('users').where('range', '>>', '[2022-01-08 00:00:00,2022-01-09 00:00:00)')
+  t.is(builder.toSql(), 'select * from "users" where ("range" >> ?)::bool')
+
+  builder = getSqlServerBuilder()
+  builder.select('*').from('users').where('bar', '&', 1)
+  t.is(builder.toSql(), 'select * from [users] where ([bar] & ?) != 0')
+
+  builder = getBuilder()
+  builder.select('*').from('users').having('bar', '&', 1)
+  t.is(builder.toSql(), 'select * from "users" having "bar" & ?')
+
+  builder = getPostgresBuilder()
+  builder.select('*').from('users').having('bar', '#', 1)
+  t.is(builder.toSql(), 'select * from "users" having ("bar" # ?)::bool')
+
+  builder = getPostgresBuilder()
+  builder.select('*').from('users').having('range', '>>', '[2022-01-08 00:00:00,2022-01-09 00:00:00)')
+  t.is(builder.toSql(), 'select * from "users" having ("range" >> ?)::bool')
+
+  builder = getSqlServerBuilder()
+  builder.select('*').from('users').having('bar', '&', 1)
+  t.is(builder.toSql(), 'select * from [users] having ([bar] & ?) != 0')
+})
+
+test('testMergeWheresCanMergeWheresAndBindings', async (t) => {
+  const builder = getBuilder()
+  builder.wheres = ['foo']
+  builder.mergeWheres(['wheres'], { 12: 'foo', 13: 'bar' })
+  t.deepEqual(builder.wheres, ['foo', 'wheres'])
+  t.deepEqual(builder.getBindings(), ['foo', 'bar'])
+})
+
+test('testPrepareValueAndOperator', async (t) => {
+  let builder = getBuilder()
+  const [value1, operator1] = builder.prepareValueAndOperator('>', '20')
+  t.is(value1, '>')
+  t.is(operator1, '20')
+
+  builder = getBuilder()
+  const [value2, operator2] = builder.prepareValueAndOperator('>', '20', true)
+  t.is(value2, '20')
+  t.is(operator2, '=')
+})
 
 // test('testPrepareValueAndOperatorExpectException', async (t) => {
 //   expectException(InvalidArgumentException.class)

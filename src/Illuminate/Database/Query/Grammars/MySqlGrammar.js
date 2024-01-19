@@ -262,7 +262,8 @@ export default class MySqlGrammar extends Grammar {
    * @return {unknown[]} //TODO: verify this type
    */
   prepareBindingsForUpdate (bindings, values) {
-    values = collect(values).reject(([column, value]) => {
+    // values = collect(values).reject(([column, value]) => {
+    values = collect(values).reject((value, column) => {
       return this.isJsonSelector(column) && isBoolean(value)
     }).map((value) => {
       return (Array.isArray(value) || isPlainObject(value)) ? JSON.stringify(value) : value

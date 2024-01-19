@@ -1,11 +1,11 @@
-import { getType, isFunction, isPlainObject, isString, merge, range } from '@devnetic/utils'
+import { getType, isFunction, isPlainObject, isString, range } from '@devnetic/utils'
 
 import use from '../Support/Traits/use.js'
 import Arr from './Arr.js'
 import { EnumeratesValues } from './Traits/EnumeratesValues.js'
 import Macroable from '../Macroable/Traits/Macroable.js'
 import { dataGet } from './helpers.js'
-import { objectDiffKey, spaceship } from '../Support/index.js'
+import { arrayDiff, mergeArrays, spaceship } from '../Support/index.js'
 
 export default class Collection {
   /**
@@ -91,7 +91,8 @@ export default class Collection {
      * @return {Collection}
      */
   diff (items) {
-    return new Collection(objectDiffKey(this.items, this.getArrayableItems(items)))
+    // return new Collection(objectDiffKey(this.items, this.getArrayableItems(items)))
+    return new Collection(arrayDiff(this.items, this.getArrayableItems(items)))
   }
 
   /**
@@ -220,8 +221,7 @@ export default class Collection {
    * @return {Collection}
    */
   merge (items) {
-    return new this.constructor(merge(this.items, this.getArrayableItems(items)))
-    // return new this.constructor([...this.items, ...this.getArrayableItems(Object.entries(items))])
+    return new this.constructor(mergeArrays(this.items, this.getArrayableItems(items)))
   }
 
   /**

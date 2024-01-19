@@ -33,7 +33,7 @@ export default class Arr {
       results.push(values)
     }
 
-    return [...[], ...results]
+    return [...[], ...results].flat()
   }
 
   /**
@@ -304,35 +304,37 @@ export default class Arr {
    * @param  {unknown}  value
    * @return {unknown[]}
    */
-  static set (array, key, value) {
+  static set (array, key, value, separator = '.') {
+    let current = array
+
     if (key === undefined) {
       array = value
 
       return array
     }
 
-    const keys = key.split('.')
+    const keys = key.split(separator)
 
-    keys.forEach((k, i) => {
-      if (keys.length === 1) {
-        return
-      }
+    for (let i = 0; i < keys.length - 1; i++) {
+      const key = keys[i]
 
-      keys.splice(i, 1)
+      // if (i === keys.length) {
+      //   break
+      // }
 
       // If the key doesn't exist at this depth, we will just create an empty array
       // to hold the next value, allowing us to create the arrays to hold final
       // values at the correct depth. Then we'll keep digging into the array.
-      if (array[key] === undefined || typeof array[k] !== 'object') {
-        array[k] = {}
+      if (current[key] === undefined || typeof current[key] !== 'object') {
+        current[key] = {}
       }
 
-      array = array[k]
-    })
+      current = current[key]
+    }
 
-    array[keys.shift()] = value
+    current[keys.pop()] = value
 
-    return array
+    return current
   }
 
   /**

@@ -4,6 +4,52 @@ import { getValue, isFalsy, isNil, isObject, isTruthy } from '@devnetic/utils'
 
 import HigherOrderTapProxy from './HigherOrderTapProxy.js'
 
+export const arrayDiff = (array1, array2) => {
+  return array1.filter(value => !array2.includes(value))
+}
+
+export const mergeArrays = (array1, array2) => {
+  const result = []
+
+  for (const element of array1) {
+    if (typeof element === 'object' && element !== null && !Array.isArray(element)) {
+      // Check if an object with the same key already exists in the result array
+      const existingObject = result.find(obj => typeof obj === 'object' && obj !== null && Object.keys(obj).some(key => element[key] !== undefined))
+
+      // If an existing object is found, override its properties
+      if (existingObject) {
+        Object.assign(existingObject, element)
+      } else {
+        // Otherwise, add the object to the result array
+        result.push({ ...element })
+      }
+    } else {
+      // For non-object elements, add them directly to the result array
+      result.push(element)
+    }
+  }
+
+  for (const element of array2) {
+    if (typeof element === 'object' && element !== null && !Array.isArray(element)) {
+      // Check if an object with the same key already exists in the result array
+      const existingObject = result.find(obj => typeof obj === 'object' && obj !== null && Object.keys(obj).some(key => element[key] !== undefined))
+
+      // If an existing object is found, override its properties
+      if (existingObject) {
+        Object.assign(existingObject, element)
+      } else {
+        // Otherwise, add the object to the result array
+        result.push({ ...element })
+      }
+    } else {
+      // For non-object elements, add them directly to the result array
+      result.push(element)
+    }
+  }
+
+  return result
+}
+
 export const castArray = (value) => {
   if (value === undefined) {
     return []
@@ -11,6 +57,7 @@ export const castArray = (value) => {
 
   return Array.isArray(value) ? value : [value]
 }
+
 /**
  * Returns an array with all keys from array lowercased or uppercased.
  *
@@ -38,6 +85,38 @@ export const clone = (target) => {
   return Object.create(Object.getPrototypeOf(target), Object.getOwnPropertyDescriptors(target))
 }
 
+export const explode = (delimiter, string, limit = 0) => {
+  if (delimiter === '' || typeof delimiter !== 'string') {
+    throw new Error('Invalid delimiter')
+  }
+
+  if (typeof string !== 'string') {
+    throw new Error('Invalid input string')
+  }
+
+  if (limit === 0) {
+    return string.split(delimiter)
+  }
+
+  const result = []
+  let currentIndex = 0
+
+  while (result.length < limit - 1) {
+    const nextIndex = string.indexOf(delimiter, currentIndex)
+
+    if (nextIndex === -1) {
+      break
+    }
+
+    result.push(string.slice(currentIndex, nextIndex))
+    currentIndex = nextIndex + delimiter.length
+  }
+
+  result.push(string.slice(currentIndex))
+
+  return result
+}
+
 export const isDirectory = (path) => {
   try {
     return lstatSync(path).isDirectory()
@@ -54,6 +133,14 @@ export const ksort = (value) => {
 
       return result
     }, {})
+}
+
+export const pregMatchAll = (subject, regex) => {
+  const matches = Array.from(subject.matchAll(regex), match => match[0])
+
+  const keys = matches.map(match => match[1])
+
+  return [[...matches], [...keys]]
 }
 
 export const objectDiffKey = (target, ...from) => {

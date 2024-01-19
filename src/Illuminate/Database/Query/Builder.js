@@ -13,15 +13,16 @@ import {
 } from '@devnetic/utils'
 
 import Arr from '../../Collections/Arr.js'
-import EloquentBuilder from '../Eloquent/Builder.js'
 import BuildsQueries from '../Concerns/BuildsQueries.js'
+import ConditionExpression from './ConditionExpression.js'
+import EloquentBuilder from '../Eloquent/Builder.js'
 import Expression from './Expression.js'
 import JoinClause from './JoinClause.js'
 import Macroable from '../../Macroable/Traits/Macroable.js'
 import Relation from '../Eloquent/Relations/Relation.js'
-import { collect, head, last, reset } from '../../Collections/helpers.js'
-import { castArray, changeKeyCase, ksort, tap } from '../../Support/index.js'
 import use from '../../Support/Traits/use.js'
+import { castArray, changeKeyCase, ksort, tap } from '../../Support/index.js'
+import { collect, head, last, reset } from '../../Collections/helpers.js'
 
 /**
  * @typedef {Object} Having
@@ -2364,7 +2365,7 @@ export default class Builder {
   where (column, operator, value, boolean = 'and') {
     let type
 
-    if (column instanceof Expression) {
+    if (column instanceof ConditionExpression) {
       type = 'Expression'
 
       this.wheres.push({ type, column, boolean })
@@ -2660,6 +2661,23 @@ export default class Builder {
    */
   whereIntegerNotInRaw (column, values, boolean = 'and') {
     return this.whereIntegerInRaw(column, values, boolean, true)
+  }
+
+  /**
+   * Merge an array of where clauses and bindings.
+   *
+   * @param  {unknown[]|Record<string, unknown>}  wheres
+   * @param  {Bindings}  bindings
+   * @return {this}
+   */
+  mergeWheres (wheres, bindings) {
+    this.wheres = [...this.wheres, ...wheres]
+
+    this.bindings.where = Object.values(
+      [...this.bindings.where, ...Object.values(bindings)]
+    )
+
+    return this
   }
 
   /**

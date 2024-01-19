@@ -4,6 +4,7 @@ import Arr from '../../../Collections/Arr.js'
 import Grammar from './Grammar.js'
 import Str from '../../../Support/Str.js'
 import { collect } from '../../../Collections/helpers.js'
+import { pregMatchAll } from '../../../Support/helpers.js'
 
 export default class PostgresGrammar extends Grammar {
   constructor () {
@@ -432,7 +433,9 @@ export default class PostgresGrammar extends Grammar {
     if (parts) {
       const key = Str.beforeLast(attribute, parts[0])
 
-      const keys = parts[0].matchAll(/\[([^\]]+)\]/g)
+      // const keys = Array.from(parts[0].matchAll(/\[([^\]]+)\]/g))
+      // const keys = parts[0].match(/\[([^\]]+)\]/)
+      const keys = pregMatchAll(parts[0], /\[([^\]]+)\]/g)
 
       return collect([key])
         .merge(keys[1])
@@ -572,7 +575,7 @@ export default class PostgresGrammar extends Grammar {
 
     const operator = where.operator.replace('?', '??')
 
-    return '('.this.wrap(where.column) + ' ' + operator + ' ' + value + ')::bool'
+    return '(' + this.wrap(where.column) + ' ' + operator + ' ' + value + ')::bool'
   }
 
   /**
@@ -666,8 +669,8 @@ export default class PostgresGrammar extends Grammar {
     return collect(path).map((attribute) => {
       return this.parseJsonPathArrayKeys(attribute)
     }).collapse().map((attribute) => {
-      return Number.isInteger(attribute)
-        ? attribute | 0
+      return isNumeric(attribute)
+        ? parseInt(attribute, 10)
         : quote + attribute + quote
     }).all()
   }
