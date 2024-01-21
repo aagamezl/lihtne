@@ -190,7 +190,7 @@ export default class Collection {
    * Create a new collection instance if the value isn't one already.
    *
    * @param  {*}  items
-   * @return {static}
+   * @return {Collection}
    */
   static make (items = []) {
     return new this(items)

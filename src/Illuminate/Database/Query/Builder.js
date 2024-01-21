@@ -15,6 +15,7 @@ import {
 
 import Arr from '../../Collections/Arr.js'
 import BuildsQueries from '../Concerns/BuildsQueries.js'
+import Collection from './../../Collections/Collection.js'
 import ConditionExpression from './ConditionExpression.js'
 import EloquentBuilder from '../Eloquent/Builder.js'
 import Expression from './Expression.js'
@@ -23,7 +24,7 @@ import Macroable from '../../Macroable/Traits/Macroable.js'
 import Relation from '../Eloquent/Relations/Relation.js'
 import use from '../../Support/Traits/use.js'
 import { castArray, changeKeyCase, ksort, tap } from '../../Support/index.js'
-import { collect, head, last, reset } from '../../Collections/helpers.js'
+import { collect, head, last, reset, value } from '../../Collections/helpers.js'
 
 /**
  * @typedef {Object} Having
@@ -84,6 +85,16 @@ import { collect, head, last, reset } from '../../Collections/helpers.js'
  * @typedef {Object} Union
  * @property {Builder|Function} query - The query or builder object for the UNION operation.
  * @property {boolean} all - A boolean indicating whether to use UNION ALL (true) or UNION (false).
+ */
+
+/** @typedef {import('./../../Collections/Collection.js').default} Collection */
+
+/**
+ * @typedef {Object} Pagination
+ * @property {Collection} items - The collection of items for the current page.
+ * @property {number} total - The total number of items across all pages.
+ * @property {number} perPage - The number of items per page.
+ * @property {number} currentPage - The current page number.
  */
 
 export default class Builder {
@@ -620,6 +631,16 @@ export default class Builder {
   }
 
   /**
+   * Get the default key name of the table.
+   *
+   * @protected
+   * @return {string}
+   */
+  defaultKeyName () {
+    return 'id'
+  }
+
+  /**
    * Delete records from the database.
    *
    * @param  {unknown}  [id]
@@ -826,6 +847,44 @@ export default class Builder {
   }
 
   /**
+   * Constrain the query to the next "page" of results after a given ID.
+   *
+   * @param  {number}  [perPage=15]
+   * @param  {number}  [lastId=0]
+   * @param  {string}  [column='id']
+   * @return {this}
+   */
+  forPageAfterId (perPage = 15, lastId = 0, column = 'id') {
+    this.orders = this.removeExistingOrdersFor(column)
+
+    if (!isNil(lastId)) {
+      this.where(column, '>', lastId)
+    }
+
+    return this.orderBy(column, 'asc')
+      .limit(perPage)
+  }
+
+  /**
+   * Constrain the query to the previous "page" of results before a given ID.
+   *
+   * @param  {number}  [perPage=15]
+   * @param  {number}  [lastId=0]
+   * @param  {string}  [column='id']
+   * @return {this}
+   */
+  forPageBeforeId (perPage = 15, lastId = 0, column = 'id') {
+    this.orders = this.removeExistingOrdersFor(column)
+
+    if (!isNil(lastId)) {
+      this.where(column, '<', lastId)
+    }
+
+    return this.orderBy(column, 'desc')
+      .limit(perPage)
+  }
+
+  /**
    * Create a new query instance for a sub-query.
    *
    * @return {Builder}
@@ -884,7 +943,7 @@ export default class Builder {
    * Execute the query as a "select" statement.
    *
    * @param  {unknown[]|string}  columns
-   * @return {import('./../../Collections/Collection.js').default}
+   * @return {Collection}
    */
   async get (columns = ['*']) {
     return collect(await this.onceWithColumns(Arr.wrap(columns), () => {
@@ -918,6 +977,7 @@ export default class Builder {
    */
   async getCountForPagination (columns = ['*']) {
     const results = await this.runPaginationCountQuery(columns)
+
     // Once we have run the pagination count query, we will get the resulting count and
     // take into account what type of query it was. When there is a group by we will
     // just return the count of the entire results set since that will be correct.
@@ -926,6 +986,7 @@ export default class Builder {
     } else if (isPlainObject(results[0])) {
       return Number(results[0]?.aggregate)
     }
+
     return Number(changeKeyCase(results[0]).aggregate)
   }
 
@@ -1925,6 +1986,39 @@ export default class Builder {
   }
 
   /**
+   * Paginate the given query into a simple paginator.
+   *
+   * @param  {number|Function}  perPage
+   * @param  {string[]|string}  columns
+   * @param  {number}  [page=1]
+   * @param  {Function|number}  [total]
+   * @return {Pagination}
+   */
+  async paginate (perPage = 15, columns = ['*'], page = 1, total = undefined) {
+    total = total !== undefined ? value(total) : await this.getCountForPagination()
+
+    perPage = perPage instanceof Function ? perPage(total) : perPage
+
+    const results = total ? await this.forPage(page, perPage).get(columns) : collect()
+
+    return this.paginator(results, total, perPage, page)
+  }
+
+  /**
+ * Create a new length-aware paginator instance.
+ *
+ * @protected
+ * @param  {Collection}  items
+ * @param  {number}  total
+ * @param  {number}  perPage
+ * @param  {number}  currentPage
+ * @return {Pagination}
+ */
+  paginator (items, total, perPage, currentPage) {
+    return { items, total, perPage, currentPage }
+  }
+
+  /**
    * Parse the subquery into SQL and bindings.
    *
    * @param  {any}  query
@@ -1951,7 +2045,7 @@ export default class Builder {
    *
    * @param  {string}  column
    * @param  {string|undefined}  key
-   * @return {import('./../../Collections/Collection.js').default}
+   * @return {Collection}
    */
   async pluck (column, key) {
     // First, we will need to select the results of the query accounting for the
@@ -2060,6 +2154,22 @@ export default class Builder {
     const result = await this.selectRaw(expression, bindings).first()
 
     return !isNil(result) > 0 ? reset(result) : null
+  }
+
+  /**
+   * Get an array with all orders with a given column removed.
+   *
+   * @protected
+   * @param  {string}  column
+   * @return {unknown[]}
+   */
+  removeExistingOrdersFor (column) {
+    return Collection.make(this.orders)
+      .reject((order) => {
+        return order.column !== undefined
+          ? order.column === column
+          : false
+      }).values().all()
   }
 
   /**

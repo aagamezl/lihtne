@@ -3475,59 +3475,46 @@ test('testMySqlWrapping', async (t) => {
 })
 
 test('testMySqlUpdateWrappingJson', async (t) => {
-  const { createStubInstance, verifyMock } = mock()
+  const { createMock, verifyMock } = mock()
 
-  const grammar = new MySqlGrammar()
-  const processor = createStubInstance(Processor)
-  const connection = createStubInstance(Connection)
-
-  connection.update
+  const builder = getMySqlBuilder()
+  createMock(builder.getConnection()).expects('update').once()
     .withArgs(
-      'update `users` set `name` = json_set(`name`, \'."first_name"\', ?), `name` = json_set(`name`, \'."last_name"\', ?) where `active` = ?',
+      'update `users` set `name` = json_set(`name`, \'$."first_name"\', ?), `name` = json_set(`name`, \'$."last_name"\', ?) where `active` = ?',
       ['John', 'Doe', 1]
     )
 
-  const builder = getBuilder(connection, grammar, processor)
-
-  builder.from('users').where('active', '=', 1).update({ 'name->first_name': 'John', 'name->last_name': 'Doe' })
-
-  t.true(connection.update.calledOnce)
+  await builder.from('users').where('active', '=', 1).update({ 'name->first_name': 'John', 'name->last_name': 'Doe' })
 
   verifyMock()
+
+  t.pass()
 })
 
 test('testMySqlUpdateWrappingNestedJson', async (t) => {
-  const { createStubInstance, verifyMock } = mock()
+  const { createMock, verifyMock } = mock()
 
-  const grammar = new MySqlGrammar()
-  const processor = createStubInstance(Processor)
-
-  const connection = createStubInstance(Connection)
-  connection.update
+  const builder = getMySqlBuilder()
+  createMock(builder.getConnection()).expects('update').once()
     .withArgs(
-      'update `users` set `meta` = json_set(`meta`, \'."name"."first_name"\', ?), `meta` = json_set(`meta`, \'."name"."last_name"\', ?) where `active` = ?',
+      'update `users` set `meta` = json_set(`meta`, \'$."name"."first_name"\', ?), `meta` = json_set(`meta`, \'$."name"."last_name"\', ?) where `active` = ?',
       ['John', 'Doe', 1]
     )
 
-  const builder = getBuilder(connection, grammar, processor)
-
-  await builder.from('users').where('active', '=', 1).update({ 'meta.name.first_name': 'John', 'meta.name.last_name': 'Doe' })
-
-  t.true(connection.update.calledOnce)
+  await builder.from('users').where('active', '=', 1).update({ 'meta->name->first_name': 'John', 'meta->name->last_name': 'Doe' })
 
   verifyMock()
+
+  t.pass()
 })
 
 test('testMySqlUpdateWrappingJsonArray', async (t) => {
-  const { createStubInstance, verifyMock } = mock()
+  const { createMock, verifyMock } = mock()
 
-  const grammar = new MySqlGrammar()
-  const processor = createStubInstance(Processor)
-
-  const connection = createStubInstance(Connection)
-  connection.update
+  const builder = getMySqlBuilder()
+  createMock(builder.getConnection()).expects('update').once()
     .withArgs(
-      'update `users` set `options` = ?, `meta` = json_set(`meta`, \'."tags"\', cast(? as json)), `group_id` = 45, `created_at` = ? where `active` = ?',
+      'update `users` set `options` = ?, `meta` = json_set(`meta`, \'$."tags"\', cast(? as json)), `group_id` = 45, `created_at` = ? where `active` = ?',
       [
         JSON.stringify({ '2fa': false, presets: ['lihtne', 'vue'] }),
         JSON.stringify(['white', 'large']),
@@ -3536,17 +3523,16 @@ test('testMySqlUpdateWrappingJsonArray', async (t) => {
       ]
     )
 
-  const builder = getBuilder(connection, grammar, processor)
-  builder.from('users').where('active', 1).update({
+  await builder.from('users').where('active', 1).update({
     options: { '2fa': false, presets: ['lihtne', 'vue'] },
     'meta->tags': ['white', 'large'],
     group_id: new Raw('45'),
     created_at: new Date('2019-08-06')
   })
 
-  t.true(connection.update.calledOnce)
-
   verifyMock()
+
+  t.pass()
 })
 
 test('testMySqlUpdateWrappingJsonPathArrayIndex', async (t) => {
@@ -3577,32 +3563,26 @@ test('testMySqlUpdateWrappingJsonPathArrayIndex', async (t) => {
 })
 
 test('testMySqlUpdateWithJsonPreparesBindingsCorrectly', async (t) => {
-  const { createMock, createStubInstance, verifyMock } = mock()
+  const { createMock, verifyMock } = mock()
 
-  const grammar = new MySqlGrammar()
-  const processor = createStubInstance(Processor)
+  let builder = getMySqlBuilder()
 
-  let connection = createStubInstance(Connection)
-  createStubInstance(Connection).update
+  createMock(builder.getConnection()).expects('update')
+    .once()
     .withArgs(
-      'update `users` set `options` = json_set(`options`, \'."enable"\', false), `updated_at` = ? where `id` = ?',
+      'update `users` set `options` = json_set(`options`, \'$."enable"\', false), `updated_at` = ? where `id` = ?',
       ['2015-05-26 22:02:06', 0]
     )
-  let builder = getBuilder(connection, grammar, processor)
   await builder.from('users').where('id', '=', 0).update({ 'options->enable': false, updated_at: '2015-05-26 22:02:06' })
 
-  t.true(connection.update.calledOnce)
-
-  connection = createStubInstance(Connection)
-  connection.update
+  builder = getMySqlBuilder()
+  createMock(builder.getConnection()).expects('update')
+    .once()
     .withArgs(
       'update `users` set `options` = json_set(`options`, \'$."size"\', ?), `updated_at` = ? where `id` = ?',
       [45, '2015-05-26 22:02:06', 0]
     )
-  builder = getBuilder(connection, grammar, processor)
   await builder.from('users').where('id', '=', 0).update({ 'options->size': 45, updated_at: '2015-05-26 22:02:06' })
-
-  t.true(connection.update.calledOnce)
 
   builder = getMySqlBuilder()
   createMock(builder.getConnection()).expects('update').once().withArgs('update `users` set `options` = json_set(`options`, \'$."size"\', ?)', [null])
@@ -3613,6 +3593,8 @@ test('testMySqlUpdateWithJsonPreparesBindingsCorrectly', async (t) => {
   await builder.from('users').update({ 'options->size': new Raw('45') })
 
   verifyMock()
+
+  t.pass()
 })
 
 test('testPostgresUpdateWrappingJson', async (t) => {
@@ -4007,18 +3989,20 @@ test('testProvidingNullWithOperatorsBuildsCorrectly', async (t) => {
 })
 
 test('testDynamicWhere', async (t) => {
-  const { createSpy } = mock()
+  const { createMock, verifyMock } = mock()
 
   const method = 'whereFooBarAndBazOrQux'
   const parameters = ['corge', 'waldo', 'fred']
   const builder = getBuilder()
-  const builderSpy = createSpy(builder, 'where')
 
-  t.deepEqual(builder.dynamicWhere(method, parameters), builder)
+  const mockBuilder = createMock(builder)
+  mockBuilder.expects('where').withArgs('foo_bar', '=', parameters[0], 'and').once().returnsThis()
+  mockBuilder.expects('where').withArgs('baz', '=', parameters[1], 'and').once().returnsThis()
+  mockBuilder.expects('where').withArgs('qux', '=', parameters[2], 'or').once().returnsThis()
 
-  t.true(builderSpy.withArgs('foo_bar', '=', parameters[0], 'and').calledOnce)
-  t.true(builderSpy.withArgs('baz', '=', parameters[1], 'and').calledOnce)
-  t.true(builderSpy.withArgs('qux', '=', parameters[2], 'or').calledOnce)
+  t.deepEqual(builder, builder.dynamicWhere(method, parameters))
+
+  verifyMock()
 })
 
 test('testDynamicWhereIsNotGreedy', async (t) => {
@@ -4260,317 +4244,382 @@ test('testTableValuedFunctionAsTableInSqlServer', async (t) => {
   t.is(builder.toSql(), 'select * from [users](1,2)')
 })
 
-test.skip('testChunkWithLastChunkComplete', async (t) => {
+test('testChunkWithLastChunkComplete', async (t) => {
   const { createMock, verifyMock } = mock()
+
   const builder = getBuilder()
-  const mockBuilder = createMock(builder)
   builder.orders.push({ column: 'foobar', direction: 'asc' })
 
   const chunk1 = collect(['foo1', 'foo2'])
   const chunk2 = collect(['foo3', 'foo4'])
   const chunk3 = collect([])
-  mockBuilder.expects('forPage').once().withArgs(1, 2).returnsThis()
-  mockBuilder.expects('forPage').once().withArgs(2, 2).returnsThis()
-  mockBuilder.expects('forPage').once().withArgs(3, 2).returnsThis()
-  mockBuilder.expects('get').resolves(chunk1, chunk2, chunk3)
+  const builderMock = createMock(builder)
+  builderMock.expects('forPage').once().withArgs(1, 2).returnsThis()
+  builderMock.expects('forPage').once().withArgs(2, 2).returnsThis()
+  builderMock.expects('forPage').once().withArgs(3, 2).returnsThis()
+  builderMock.expects('get').once().resolves(chunk1)
+  builderMock.expects('get').once().resolves(chunk2)
+  builderMock.expects('get').once().resolves(chunk3)
 
-  // t.is(mockBuilder.get.callCount, 3)
+  const callbackAssertor = { doSomething () { } }
+  const callbackAssertorMock = createMock(callbackAssertor)
+  callbackAssertorMock.expects('doSomething').once().withArgs(chunk1)
+  callbackAssertorMock.expects('doSomething').once().withArgs(chunk2)
+  callbackAssertorMock.expects('doSomething').never().withArgs(chunk3)
 
-  const callbackAssertor = () => {}
-  // callbackAssertor = m.mock(stdClass.class)
-  // callbackAssertor.shouldReceive('doSomething').once().with(chunk1)
-  // callbackAssertor.shouldReceive('doSomething').once().with(chunk2)
-  // callbackAssertor.shouldReceive('doSomething').never().with(chunk3)
-
-  builder.chunk(2, (results) => {
+  await builder.chunk(2, (results) => {
     callbackAssertor.doSomething(results)
   })
 
   verifyMock()
+
+  t.pass()
 })
 
-// test('testChunkWithLastChunkPartial', async (t) => {
-//   const builder = getMockQueryBuilder()
-//   builder.orders[] = ['column' => 'foobar', 'direction' => 'asc']
+test('testChunkWithLastChunkPartial', async (t) => {
+  const { createMock, verifyMock } = mock()
 
-//   chunk1 = collect(['foo1', 'foo2'])
-//   chunk2 = collect(['foo3'])
-//   builder.shouldReceive('forPage').once().with(1, 2).andReturnSelf()
-//   builder.shouldReceive('forPage').once().with(2, 2).andReturnSelf()
-//   builder.shouldReceive('get').times(2).andReturn(chunk1, chunk2)
+  const builder = getBuilder()
+  builder.orders.push({ column: 'foobar', direction: 'asc' })
 
-//   callbackAssertor = m.mock(stdClass.class)
-//   callbackAssertor.shouldReceive('doSomething').once().with(chunk1)
-//   callbackAssertor.shouldReceive('doSomething').once().with(chunk2)
+  const chunk1 = collect(['foo1', 'foo2'])
+  const chunk2 = collect(['foo3'])
+  const builderMock = createMock(builder)
+  builderMock.expects('forPage').once().withArgs(1, 2).returnsThis()
+  builderMock.expects('forPage').once().withArgs(2, 2).returnsThis()
+  builderMock.expects('get').once().resolves(chunk1)
+  builderMock.expects('get').once().resolves(chunk2)
 
-//   builder.chunk(2, function (results) use(callbackAssertor) {
-//     callbackAssertor.doSomething(results)
-//   })
-// })
+  const callbackAssertor = { doSomething () { } }
+  const callbackAssertorMock = createMock(callbackAssertor)
+  callbackAssertorMock.expects('doSomething').once().withArgs(chunk1)
+  callbackAssertorMock.expects('doSomething').once().withArgs(chunk2)
 
-// test('testChunkCanBeStoppedByReturningFalse', async (t) => {
-//   const builder = getMockQueryBuilder()
-//   builder.orders[] = ['column' => 'foobar', 'direction' => 'asc']
+  await builder.chunk(2, (results) => {
+    callbackAssertor.doSomething(results)
+  })
 
-//   chunk1 = collect(['foo1', 'foo2'])
-//   chunk2 = collect(['foo3'])
-//   builder.shouldReceive('forPage').once().with(1, 2).andReturnSelf()
-//   builder.shouldReceive('forPage').never().with(2, 2)
-//   builder.shouldReceive('get').times(1).andReturn(chunk1)
+  verifyMock()
 
-//   callbackAssertor = m.mock(stdClass.class)
-//   callbackAssertor.shouldReceive('doSomething').once().with(chunk1)
-//   callbackAssertor.shouldReceive('doSomething').never().with(chunk2)
+  t.pass()
+})
 
-//   builder.chunk(2, function (results) use(callbackAssertor) {
-//     callbackAssertor.doSomething(results)
+test('testChunkCanBeStoppedByReturningFalse', async (t) => {
+  const { createMock, verifyMock } = mock()
 
-//             return false
-//   })
-// })
+  const builder = getBuilder()
+  builder.orders.push({ column: 'foobar', direction: 'asc' })
 
-// test('testChunkWithCountZero', async (t) => {
-//   const builder = getMockQueryBuilder()
-//   builder.orders[] = ['column' => 'foobar', 'direction' => 'asc']
+  const chunk1 = collect(['foo1', 'foo2'])
+  const chunk2 = collect(['foo3'])
+  const builderMock = createMock(builder)
+  builderMock.expects('forPage').once().withArgs(1, 2).returnsThis()
+  builderMock.expects('forPage').never().withArgs(2, 2)
+  builderMock.expects('get').once().resolves(chunk1)
 
-//   chunk = collect([])
-//   builder.shouldReceive('forPage').once().with(1, 0).andReturnSelf()
-//   builder.shouldReceive('get').times(1).andReturn(chunk)
+  const callbackAssertor = { doSomething () { } }
+  const callbackAssertorMock = createMock(callbackAssertor)
+  callbackAssertorMock.expects('doSomething').once().withArgs(chunk1)
+  callbackAssertorMock.expects('doSomething').never().withArgs(chunk2)
 
-//   callbackAssertor = m.mock(stdClass.class)
-//   callbackAssertor.shouldReceive('doSomething').never()
+  await builder.chunk(2, (results) => {
+    callbackAssertor.doSomething(results)
 
-//   builder.chunk(0, function (results) use(callbackAssertor) {
-//     callbackAssertor.doSomething(results)
-//   })
-// })
+    return false
+  })
 
-// test('testChunkByIdOnArrays', async (t) => {
-//   const builder = getMockQueryBuilder()
-//   builder.orders[] = ['column' => 'foobar', 'direction' => 'asc']
+  verifyMock()
 
-//   chunk1 = collect([['someIdField' => 1], ['someIdField' => 2]])
-//   chunk2 = collect([['someIdField' => 10], ['someIdField' => 11]])
-//   chunk3 = collect([])
-//   builder.shouldReceive('forPageAfterId').once().with(2, 0, 'someIdField').andReturnSelf()
-//   builder.shouldReceive('forPageAfterId').once().with(2, 2, 'someIdField').andReturnSelf()
-//   builder.shouldReceive('forPageAfterId').once().with(2, 11, 'someIdField').andReturnSelf()
-//   builder.shouldReceive('get').times(3).andReturn(chunk1, chunk2, chunk3)
+  t.pass()
+})
 
-//   callbackAssertor = m.mock(stdClass.class)
-//   callbackAssertor.shouldReceive('doSomething').once().with(chunk1)
-//   callbackAssertor.shouldReceive('doSomething').once().with(chunk2)
-//   callbackAssertor.shouldReceive('doSomething').never().with(chunk3)
+test('testChunkWithCountZero', async (t) => {
+  const { createMock, verifyMock } = mock()
 
-//   builder.chunkById(2, function (results) use(callbackAssertor) {
-//     callbackAssertor.doSomething(results)
-//   }, 'someIdField')
-// })
+  const builder = getBuilder()
+  builder.orders.push({ column: 'foobar', direction: 'asc' })
 
-// test('testChunkPaginatesUsingIdWithLastChunkComplete', async (t) => {
-//   const builder = getMockQueryBuilder()
-//   builder.orders[] = ['column' => 'foobar', 'direction' => 'asc']
+  const chunk = collect([])
+  const builderMock = createMock(builder)
+  builderMock.expects('forPage').once().withArgs(1, 0).returnsThis()
+  builderMock.expects('get').once().resolves(chunk)
 
-//   chunk1 = collect([(object)['someIdField' => 1], (object)['someIdField' => 2]])
-//   chunk2 = collect([(object)['someIdField' => 10], (object)['someIdField' => 11]])
-//   chunk3 = collect([])
-//   builder.shouldReceive('forPageAfterId').once().with(2, 0, 'someIdField').andReturnSelf()
-//   builder.shouldReceive('forPageAfterId').once().with(2, 2, 'someIdField').andReturnSelf()
-//   builder.shouldReceive('forPageAfterId').once().with(2, 11, 'someIdField').andReturnSelf()
-//   builder.shouldReceive('get').times(3).andReturn(chunk1, chunk2, chunk3)
+  const callbackAssertor = { doSomething () { } }
+  const callbackAssertorMock = createMock(callbackAssertor)
+  callbackAssertorMock.expects('doSomething').never()
 
-//   callbackAssertor = m.mock(stdClass.class)
-//   callbackAssertor.shouldReceive('doSomething').once().with(chunk1)
-//   callbackAssertor.shouldReceive('doSomething').once().with(chunk2)
-//   callbackAssertor.shouldReceive('doSomething').never().with(chunk3)
+  await builder.chunk(0, (results) => {
+    callbackAssertor.doSomething(results)
+  })
 
-//   builder.chunkById(2, function (results) use(callbackAssertor) {
-//     callbackAssertor.doSomething(results)
-//   }, 'someIdField')
-// })
+  verifyMock()
 
-// test('testChunkPaginatesUsingIdWithLastChunkPartial', async (t) => {
-//   const builder = getMockQueryBuilder()
-//   builder.orders[] = ['column' => 'foobar', 'direction' => 'asc']
+  t.pass()
+})
 
-//   chunk1 = collect([(object)['someIdField' => 1], (object)['someIdField' => 2]])
-//   chunk2 = collect([(object)['someIdField' => 10]])
-//   builder.shouldReceive('forPageAfterId').once().with(2, 0, 'someIdField').andReturnSelf()
-//   builder.shouldReceive('forPageAfterId').once().with(2, 2, 'someIdField').andReturnSelf()
-//   builder.shouldReceive('get').times(2).andReturn(chunk1, chunk2)
+test('testChunkByIdOnArrays', async (t) => {
+  const { createMock, verifyMock } = mock()
 
-//   callbackAssertor = m.mock(stdClass.class)
-//   callbackAssertor.shouldReceive('doSomething').once().with(chunk1)
-//   callbackAssertor.shouldReceive('doSomething').once().with(chunk2)
+  const builder = getBuilder()
+  builder.orders.push({ column: 'foobar', direction: 'asc' })
 
-//   builder.chunkById(2, function (results) use(callbackAssertor) {
-//     callbackAssertor.doSomething(results)
-//   }, 'someIdField')
-// })
+  const chunk1 = collect([{ someIdField: 1 }, { someIdField: 2 }])
+  const chunk2 = collect([{ someIdField: 10 }, { someIdField: 11 }])
+  const chunk3 = collect([])
+  const builderMock = createMock(builder)
 
-// test('testChunkPaginatesUsingIdWithCountZero', async (t) => {
-//   const builder = getMockQueryBuilder()
-//   builder.orders[] = ['column' => 'foobar', 'direction' => 'asc']
+  builderMock.expects('forPageAfterId').once().withArgs(2, undefined, 'someIdField').returnsThis()
+  builderMock.expects('forPageAfterId').once().withArgs(2, 2, 'someIdField').returnsThis()
+  builderMock.expects('forPageAfterId').once().withArgs(2, 11, 'someIdField').returnsThis()
+  builderMock.expects('get').once().resolves(chunk1)
+  builderMock.expects('get').once().resolves(chunk2)
+  builderMock.expects('get').once().resolves(chunk3)
 
-//   chunk = collect([])
-//   builder.shouldReceive('forPageAfterId').once().with(0, 0, 'someIdField').andReturnSelf()
-//   builder.shouldReceive('get').times(1).andReturn(chunk)
+  const callbackAssertor = { doSomething () { } }
+  const callbackAssertorMock = createMock(callbackAssertor)
+  callbackAssertorMock.expects('doSomething').once().withArgs(chunk1)
+  callbackAssertorMock.expects('doSomething').once().withArgs(chunk2)
+  callbackAssertorMock.expects('doSomething').never().withArgs(chunk3)
 
-//   callbackAssertor = m.mock(stdClass.class)
-//   callbackAssertor.shouldReceive('doSomething').never()
+  await builder.chunkById(2, (results) => {
+    callbackAssertor.doSomething(results)
+  }, 'someIdField')
 
-//   builder.chunkById(0, function (results) use(callbackAssertor) {
-//     callbackAssertor.doSomething(results)
-//   }, 'someIdField')
-// })
+  verifyMock()
 
-// test('testChunkPaginatesUsingIdWithAlias', async (t) => {
-//   const builder = getMockQueryBuilder()
-//   builder.orders[] = ['column' => 'foobar', 'direction' => 'asc']
+  t.pass()
+})
 
-//   chunk1 = collect([(object)['table_id' => 1], (object)['table_id' => 10]])
-//   chunk2 = collect([])
-//   builder.shouldReceive('forPageAfterId').once().with(2, 0, 'table.id').andReturnSelf()
-//   builder.shouldReceive('forPageAfterId').once().with(2, 10, 'table.id').andReturnSelf()
-//   builder.shouldReceive('get').times(2).andReturn(chunk1, chunk2)
+test('testChunkPaginatesUsingIdWithLastChunkComplete', async (t) => {
+  const { createMock, verifyMock } = mock()
 
-//   callbackAssertor = m.mock(stdClass.class)
-//   callbackAssertor.shouldReceive('doSomething').once().with(chunk1)
-//   callbackAssertor.shouldReceive('doSomething').never().with(chunk2)
+  const builder = getBuilder()
+  builder.orders.push({ column: 'foobar', direction: 'asc' })
 
-//   builder.chunkById(2, function (results) use(callbackAssertor) {
-//     callbackAssertor.doSomething(results)
-//   }, 'table.id', 'table_id')
-// })
+  const chunk1 = collect([{ someIdField: 1 }, { someIdField: 2 }])
+  const chunk2 = collect([{ someIdField: 10 }, { someIdField: 11 }])
+  const chunk3 = collect([])
+  const builderMock = createMock(builder)
 
-// test('testChunkPaginatesUsingIdDesc', async (t) => {
-//   const builder = getMockQueryBuilder()
-//   builder.orders[] = ['column' => 'foobar', 'direction' => 'desc']
+  builderMock.expects('forPageAfterId').once().withArgs(2, undefined, 'someIdField').returnsThis()
+  builderMock.expects('forPageAfterId').once().withArgs(2, 2, 'someIdField').returnsThis()
+  builderMock.expects('forPageAfterId').once().withArgs(2, 11, 'someIdField').returnsThis()
+  builderMock.expects('get').once().resolves(chunk1)
+  builderMock.expects('get').once().resolves(chunk2)
+  builderMock.expects('get').once().resolves(chunk3)
 
-//   chunk1 = collect([(object)['someIdField' => 10], (object)['someIdField' => 1]])
-//   chunk2 = collect([])
-//   builder.shouldReceive('forPageBeforeId').once().with(2, 0, 'someIdField').andReturnSelf()
-//   builder.shouldReceive('forPageBeforeId').once().with(2, 1, 'someIdField').andReturnSelf()
-//   builder.shouldReceive('get').times(2).andReturn(chunk1, chunk2)
+  const callbackAssertor = { doSomething () { } }
+  const callbackAssertorMock = createMock(callbackAssertor)
+  callbackAssertorMock.expects('doSomething').once().withArgs(chunk1)
+  callbackAssertorMock.expects('doSomething').once().withArgs(chunk2)
+  callbackAssertorMock.expects('doSomething').never().withArgs(chunk3)
 
-//   callbackAssertor = m.mock(stdClass.class)
-//   callbackAssertor.shouldReceive('doSomething').once().with(chunk1)
-//   callbackAssertor.shouldReceive('doSomething').never().with(chunk2)
+  await builder.chunkById(2, (results) => {
+    callbackAssertor.doSomething(results)
+  }, 'someIdField')
 
-//   builder.chunkByIdDesc(2, function (results) use(callbackAssertor) {
-//     callbackAssertor.doSomething(results)
-//   }, 'someIdField')
-// })
+  verifyMock()
 
-// test('testPaginate', async (t) => {
-//   perPage = 16
-//   columns = ['test']
-//   pageName = 'page-name'
-//   page = 1
-//   const builder = getMockQueryBuilder()
-//   path = 'http://foo.bar?page=3'
+  t.pass()
+})
 
-//   results = collect([['test' => 'foo'], ['test' => 'bar']])
+test('testChunkPaginatesUsingIdWithLastChunkPartial', async (t) => {
+  const { createMock, verifyMock } = mock()
 
-//   builder.shouldReceive('getCountForPagination').once().andReturn(2)
-//   builder.shouldReceive('forPage').once().with(page, perPage).andReturnSelf()
-//   builder.shouldReceive('get').once().andReturn(results)
+  const builder = getBuilder()
+  builder.orders.push({ column: 'foobar', direction: 'asc' })
 
-//   Paginator.currentPathResolver(function () use(path) {
-//     return path
-//   })
+  const chunk1 = collect([{ someIdField: 1 }, { someIdField: 2 }])
+  const chunk2 = collect([{ someIdField: 10 }])
+  const builderMock = createMock(builder)
 
-//   result = builder.paginate(perPage, columns, pageName, page)
+  builderMock.expects('forPageAfterId').once().withArgs(2, undefined, 'someIdField').returnsThis()
+  builderMock.expects('forPageAfterId').once().withArgs(2, 2, 'someIdField').returnsThis()
+  builderMock.expects('get').once().resolves(chunk1)
+  builderMock.expects('get').once().resolves(chunk2)
 
-//   t.deepEqual(new LengthAwarePaginator(results, 2, perPage, page, [
-//     'path' => path,
-//     'pageName' => pageName,
-//   ]), result)
-// })
+  const callbackAssertor = { doSomething () { } }
+  const callbackAssertorMock = createMock(callbackAssertor)
+  callbackAssertorMock.expects('doSomething').once().withArgs(chunk1)
+  callbackAssertorMock.expects('doSomething').once().withArgs(chunk2)
 
-// test('testPaginateWithDefaultArguments', async (t) => {
-//   perPage = 15
-//   pageName = 'page'
-//   page = 1
-//   const builder = getMockQueryBuilder()
-//   path = 'http://foo.bar?page=3'
+  await builder.chunkById(2, (results) => {
+    callbackAssertor.doSomething(results)
+  }, 'someIdField')
 
-//   results = collect([['test' => 'foo'], ['test' => 'bar']])
+  verifyMock()
 
-//   builder.shouldReceive('getCountForPagination').once().andReturn(2)
-//   builder.shouldReceive('forPage').once().with(page, perPage).andReturnSelf()
-//   builder.shouldReceive('get').once().andReturn(results)
+  t.pass()
+})
 
-//   Paginator.currentPageResolver(function () {
-//     return 1
-//   })
+test('testChunkPaginatesUsingIdWithCountZero', async (t) => {
+  const { createMock, verifyMock } = mock()
 
-//   Paginator.currentPathResolver(function () use(path) {
-//     return path
-//   })
+  const builder = getBuilder()
+  builder.orders.push({ column: 'foobar', direction: 'asc' })
 
-//   result = builder.paginate()
+  const chunk = collect([])
+  const builderMock = createMock(builder)
 
-//   t.deepEqual(new LengthAwarePaginator(results, 2, perPage, page, [
-//     'path' => path,
-//     'pageName' => pageName,
-//   ]), result)
-// })
+  builderMock.expects('forPageAfterId').once().withArgs(0, undefined, 'someIdField').returnsThis()
+  builderMock.expects('get').once(1).resolves(chunk)
 
-// test('testPaginateWhenNoResults', async (t) => {
-//   perPage = 15
-//   pageName = 'page'
-//   page = 1
-//   const builder = getMockQueryBuilder()
-//   path = 'http://foo.bar?page=3'
+  const callbackAssertor = { doSomething () { } }
+  const callbackAssertorMock = createMock(callbackAssertor)
+  callbackAssertorMock.expects('doSomething').never()
 
-//   results = []
+  await builder.chunkById(0, (results) => {
+    callbackAssertor.doSomething(results)
+  }, 'someIdField')
 
-//   builder.shouldReceive('getCountForPagination').once().andReturn(0)
-//   builder.shouldNotReceive('forPage')
-//   builder.shouldNotReceive('get')
+  verifyMock()
 
-//   Paginator.currentPageResolver(function () {
-//     return 1
-//   })
+  t.pass()
+})
 
-//   Paginator.currentPathResolver(function () use(path) {
-//     return path
-//   })
+test('testChunkPaginatesUsingIdWithAlias', async (t) => {
+  const { createMock, verifyMock } = mock()
 
-//   result = builder.paginate()
+  const builder = getBuilder()
+  builder.orders.push({ column: 'foobar', direction: 'asc' })
 
-//   t.deepEqual(new LengthAwarePaginator(results, 0, perPage, page, [
-//     'path' => path,
-//     'pageName' => pageName,
-//   ]), result)
-// })
+  const chunk1 = collect([{ table_id: 1 }, { table_id: 10 }])
+  const chunk2 = collect([])
+  const builderMock = createMock(builder)
 
-// test('testPaginateWithSpecificColumns', async (t) => {
-//   perPage = 16
-//   columns = ['id', 'name']
-//   pageName = 'page-name'
-//   page = 1
-//   const builder = getMockQueryBuilder()
-//   path = 'http://foo.bar?page=3'
+  builderMock.expects('forPageAfterId').once().withArgs(2, undefined, 'table.id').returnsThis()
+  builderMock.expects('forPageAfterId').once().withArgs(2, 10, 'table.id').returnsThis()
+  builderMock.expects('get').once().resolves(chunk1)
+  builderMock.expects('get').once().resolves(chunk2)
 
-//   results = collect([['id' => 3, 'name' => 'Taylor'], ['id' => 5, 'name' => 'Mohamed']])
+  const callbackAssertor = { doSomething () { } }
+  const callbackAssertorMock = createMock(callbackAssertor)
+  callbackAssertorMock.expects('doSomething').once().withArgs(chunk1)
+  callbackAssertorMock.expects('doSomething').never().withArgs(chunk2)
 
-//   builder.shouldReceive('getCountForPagination').once().andReturn(2)
-//   builder.shouldReceive('forPage').once().with(page, perPage).andReturnSelf()
-//   builder.shouldReceive('get').once().andReturn(results)
+  await builder.chunkById(2, (results) => {
+    callbackAssertor.doSomething(results)
+  }, 'table.id', 'table_id')
 
-//   Paginator.currentPathResolver(function () use(path) {
-//     return path
-//   })
+  verifyMock()
 
-//   result = builder.paginate(perPage, columns, pageName, page)
+  t.pass()
+})
 
-//   t.deepEqual(new LengthAwarePaginator(results, 2, perPage, page, [
-//     'path' => path,
-//     'pageName' => pageName,
-//   ]), result)
-// })
+test('testChunkPaginatesUsingIdDesc', async (t) => {
+  const { createMock, verifyMock } = mock()
+
+  const builder = getBuilder()
+  builder.orders.push({ column: 'foobar', direction: 'desc' })
+
+  const chunk1 = collect([{ someIdField: 10 }, { someIdField: 1 }])
+  const chunk2 = collect([])
+  const builderMock = createMock(builder)
+
+  builderMock.expects('forPageBeforeId').once().withArgs(2, undefined, 'someIdField').returnsThis()
+  builderMock.expects('forPageBeforeId').once().withArgs(2, 1, 'someIdField').returnsThis()
+  builderMock.expects('get').once().resolves(chunk1)
+  builderMock.expects('get').once().resolves(chunk2)
+
+  const callbackAssertor = { doSomething () { } }
+  const callbackAssertorMock = createMock(callbackAssertor)
+  callbackAssertorMock.expects('doSomething').once().withArgs(chunk1)
+  callbackAssertorMock.expects('doSomething').never().withArgs(chunk2)
+
+  await builder.chunkByIdDesc(2, (results) => {
+    callbackAssertor.doSomething(results)
+  }, 'someIdField')
+
+  verifyMock()
+
+  t.pass()
+})
+
+test('testPaginate', async (t) => {
+  const { createMock, verifyMock } = mock()
+
+  const perPage = 16
+  const columns = ['test']
+  const page = 1
+  const builder = getBuilder()
+
+  const results = collect([{ test: 'foo' }, { test: 'bar' }])
+  const builderMock = createMock(builder)
+
+  builderMock.expects('getCountForPagination').once().resolves(2)
+  builderMock.expects('forPage').once().withArgs(page, perPage).returnsThis()
+  builderMock.expects('get').once().resolves(results)
+
+  const result = await builder.paginate(perPage, columns, page)
+
+  t.deepEqual(result, { items: results, total: 2, perPage, currentPage: page })
+
+  verifyMock()
+})
+
+test('testPaginateWithDefaultArguments', async (t) => {
+  const { createMock, verifyMock } = mock()
+
+  const perPage = 15
+  const page = 1
+  const builder = getBuilder()
+
+  const results = collect([{ test: 'foo' }, { test: 'bar' }])
+  const builderMock = createMock(builder)
+
+  builderMock.expects('getCountForPagination').once().resolves(2)
+  builderMock.expects('forPage').once().withArgs(page, perPage).returnsThis()
+  builderMock.expects('get').once().resolves(results)
+
+  const result = await builder.paginate()
+
+  t.deepEqual(result, { items: results, total: 2, perPage, currentPage: page })
+
+  verifyMock()
+})
+
+test('testPaginateWhenNoResults', async (t) => {
+  const { createMock, verifyMock } = mock()
+
+  const perPage = 15
+  const page = 1
+  const builder = getBuilder()
+
+  const results = collect([])
+  const builderMock = createMock(builder)
+
+  builderMock.expects('getCountForPagination').once().resolves(0)
+  builderMock.expects('forPage').never()
+  builderMock.expects('get').never()
+
+  const result = await builder.paginate()
+
+  t.deepEqual(result, { items: results, total: 0, perPage, currentPage: page })
+
+  verifyMock()
+})
+
+test('testPaginateWithSpecificColumns', async (t) => {
+  const { createMock, verifyMock } = mock()
+
+  const perPage = 16
+  const columns = ['id', 'name']
+  const page = 1
+  const builder = getBuilder()
+
+  const results = collect([{ id: 3, name: 'Taylor' }, { id: 5, name: 'Mohamed' }])
+  const builderMock = createMock(builder)
+
+  builderMock.expects('getCountForPagination').once().resolves(2)
+  builderMock.expects('forPage').once().withArgs(page, perPage).returnsThis()
+  builderMock.expects('get').once().resolves(results)
+
+  const result = await builder.paginate(perPage, columns, page)
+
+  t.deepEqual(result, { items: results, total: 2, perPage, currentPage: page })
+
+  verifyMock()
+})
 
 // test('testPaginateWithTotalOverride', async (t) => {
 //   perPage = 16
