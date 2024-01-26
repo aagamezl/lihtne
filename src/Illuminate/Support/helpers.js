@@ -1,6 +1,6 @@
 import { lstatSync } from 'fs'
 
-import { getValue, isFalsy, isNil, isObject, isTruthy } from '@devnetic/utils'
+import { getValue, isFalsy, isTruthy } from '@devnetic/utils'
 
 import HigherOrderTapProxy from './HigherOrderTapProxy.js'
 
@@ -77,12 +77,48 @@ export const changeKeyCase = (value, changeCase = 'CASE_LOWER') => {
   return value
 }
 
-export const clone = (target) => {
-  if (isNil(target) || !isObject(target)) {
-    return target
+export const clone = (obj, hash = new WeakMap()) => {
+  // if (isNil(target) || !isObject(target)) {
+  //   return target
+  // }
+
+  // return Object.create(Object.getPrototypeOf(target), Object.getOwnPropertyDescriptors(target))
+
+  if (Object(obj) !== obj || obj instanceof Function) {
+    // Primitives and functions
+    return obj
   }
 
-  return Object.create(Object.getPrototypeOf(target), Object.getOwnPropertyDescriptors(target))
+  if (hash.has(obj)) {
+    // Cyclic reference
+    return hash.get(obj)
+  }
+
+  let result
+
+  if (obj instanceof Set) {
+    result = new Set([...obj].map(item => clone(item, hash)))
+  } else if (obj instanceof Map) {
+    result = new Map([...obj].map(([key, val]) => [clone(key, hash), clone(val, hash)]))
+  } else if (obj instanceof Date) {
+    result = new Date(obj)
+  } else if (obj instanceof RegExp) {
+    result = new RegExp(obj.source, obj.flags)
+  } else if (Array.isArray(obj)) {
+    result = obj.map(item => clone(item, hash))
+  } else if (typeof obj === 'object') {
+    // Objects with prototype
+    result = Object.create(Object.getPrototypeOf(obj))
+    hash.set(obj, result)
+
+    for (const key in obj) {
+      if (Object.hasOwn(obj, key)) {
+        result[key] = clone(obj[key], hash)
+      }
+    }
+  }
+
+  return result
 }
 
 export const explode = (delimiter, string, limit = 0) => {
@@ -187,6 +223,58 @@ export const spaceship = (a, b) => {
   }
 
   throw new Error(`Spaceship failed on ${a} and ${b}`)
+}
+
+export const strReplace = (search, replace, subject, countObj) => {
+  let i = 0
+  let j = 0
+  let temp = ''
+  let repl = ''
+  let sl = 0
+  let fl = 0
+  const f = [].concat(search)
+  let r = [].concat(replace)
+  let s = subject
+  let ra = Object.prototype.toString.call(r) === '[object Array]'
+  const sa = Object.prototype.toString.call(s) === '[object Array]'
+  s = [].concat(s)
+
+  if (typeof (search) === 'object' && typeof (replace) === 'string') {
+    temp = replace
+    replace = []
+    for (i = 0; i < search.length; i += 1) {
+      replace[i] = temp
+    }
+    temp = ''
+    r = [].concat(replace)
+    ra = Object.prototype.toString.call(r) === '[object Array]'
+  }
+
+  if (typeof countObj !== 'undefined') {
+    countObj.value = 0
+  }
+
+  for (i = 0, sl = s.length; i < sl; i++) {
+    if (s[i] === '') {
+      continue
+    }
+
+    for (j = 0, fl = f.length; j < fl; j++) {
+      if (f[j] === '') {
+        continue
+      }
+
+      temp = s[i] + ''
+      repl = ra ? (r[j] !== undefined ? r[j] : '') : r[0]
+      s[i] = (temp).split(f[j]).join(repl)
+
+      if (typeof countObj !== 'undefined') {
+        countObj.value += ((temp.split(f[j])).length - 1)
+      }
+    }
+  }
+
+  return sa ? s : s[0]
 }
 
 /**

@@ -1,5 +1,4 @@
 import {
-  clone,
   dateFormat,
   isBoolean,
   isFalsy,
@@ -19,11 +18,13 @@ import Collection from './../../Collections/Collection.js'
 import ConditionExpression from './ConditionExpression.js'
 import EloquentBuilder from '../Eloquent/Builder.js'
 import Expression from './Expression.js'
+import IndexHint from './IndexHint.js'
 import JoinClause from './JoinClause.js'
+import LengthAwarePaginator from '../../Pagination/LengthAwarePaginator.js'
 import Macroable from '../../Macroable/Traits/Macroable.js'
 import Relation from '../Eloquent/Relations/Relation.js'
 import use from '../../Support/Traits/use.js'
-import { castArray, changeKeyCase, ksort, tap } from '../../Support/index.js'
+import { castArray, changeKeyCase, clone, ksort, tap } from '../../Support/index.js'
 import { collect, head, last, reset, value } from '../../Collections/helpers.js'
 
 /**
@@ -508,16 +509,23 @@ export default class Builder {
    * @return {Builder}
    */
   clone () {
+    // const cloned = clone(this)
     const cloned = Object.assign({}, this)
+
     Object.setPrototypeOf(cloned, Object.getPrototypeOf(this))
+
     // The cloning process needs to run through Arrays and Maps to ensure that
     // these structured are cloned correctly like new values and not references.
     for (const propertyName of Object.getOwnPropertyNames(cloned)) {
       const property = Reflect.get(cloned, propertyName)
-      if (Array.isArray(property) || property instanceof Map) {
+      // const property = cloned[propertyName]
+
+      if (Array.isArray(property) || property instanceof Map || isPlainObject(property)) {
         Reflect.set(cloned, propertyName, clone(property))
+        // cloned[propertyName] = clone(property)
       }
     }
+
     return cloned
   }
 
@@ -824,6 +832,18 @@ export default class Builder {
    */
   flattenValue (value) {
     return Array.isArray(value) ? head(Arr.flatten(value)) : value
+  }
+
+  /**
+   * Add an index hint to force a query index.
+   *
+   * @param  {string}  index
+   * @return {this}
+   */
+  forceIndex (index) {
+    this.indexHint = new IndexHint('force', index)
+
+    return this
   }
 
   /**
@@ -1201,6 +1221,18 @@ export default class Builder {
   }
 
   /**
+   * Add an index hint to ignore a query index.
+   *
+   * @param  {string}  index
+   * @return {this}
+   */
+  ignoreIndex (index) {
+    this.indexHint = new IndexHint('ignore', index)
+
+    return this
+  }
+
+  /**
    * Concatenate values of a given column as a string.
    *
    * @param  {string}  column
@@ -1558,6 +1590,23 @@ export default class Builder {
   }
 
   /**
+   * Merge an array of where clauses and bindings.
+   *
+   * @param  {unknown[]|Record<string, unknown>}  wheres
+   * @param  {Bindings}  bindings
+   * @return {this}
+   */
+  mergeWheres (wheres, bindings) {
+    this.wheres = [...this.wheres, ...wheres]
+
+    this.bindings.where = Object.values(
+      [...this.bindings.where, ...Object.values(bindings)]
+    )
+
+    return this
+  }
+
+  /**
    * Retrieve the minimum value of a given column.
    *
    * @param  {string}  column
@@ -1858,6 +1907,64 @@ export default class Builder {
   }
 
   /**
+   * Add an "or where JSON contains" clause to the query.
+   *
+   * @param  {string}  column
+   * @param  {string[]|Expression|unknown}  value
+   * @return {this}
+   */
+  orWhereJsonContains (column, value) {
+    return this.whereJsonContains(column, value, 'or')
+  }
+
+  /**
+   * Add an "or" clause that determines if a JSON path exists to the query.
+   *
+   * @param  {string}  column
+   * @return {this}
+   */
+  orWhereJsonContainsKey (column) {
+    return this.whereJsonContainsKey(column, 'or')
+  }
+
+  /**
+   * Add an "or where JSON not contains" clause to the query.
+   *
+   * @param  {string}  column
+   * @param  {string[]|Expression}  value
+   * @return {this}
+   */
+  orWhereJsonDoesntContain (column, value) {
+    return this.whereJsonDoesntContain(column, value, 'or')
+  }
+
+  /**
+   * Add an "or" clause that determines if a JSON path does not exist to the query.
+   *
+   * @param  {string}  column
+   * @return {this}
+   */
+  orWhereJsonDoesntContainKey (column) {
+    return this.whereJsonDoesntContainKey(column, 'or')
+  }
+
+  /**
+   * Add an "or where JSON length" clause to the query.
+   *
+   * @param  {string}  column
+   * @param  {unknown}  operator
+   * @param  {unknown}  [value]
+   * @return {this}
+   */
+  orWhereJsonLength (column, operator, value = undefined) {
+    [value, operator] = this.prepareValueAndOperator(
+      value, operator, value === undefined
+    )
+
+    return this.whereJsonLength(column, operator, value, 'or')
+  }
+
+  /**
    * Add an "or where month" statement to the query.
    *
    * @param  {string}  column
@@ -1957,6 +2064,18 @@ export default class Builder {
   }
 
   /**
+   * Adds an or where condition using row values.
+   *
+   * @param  {string[]}  columns
+   * @param  {string}  operator
+   * @param  {unknown[]}  values
+   * @return {this}
+   */
+  orWhereRowValues (columns, operator, values) {
+    return this.whereRowValues(columns, operator, values, 'or')
+  }
+
+  /**
    * Add an "or where time" statement to the query.
    *
    * @param  {\Illuminate\Contracts\Database\Query\Expression|string}  column
@@ -2005,17 +2124,17 @@ export default class Builder {
   }
 
   /**
- * Create a new length-aware paginator instance.
- *
- * @protected
- * @param  {Collection}  items
- * @param  {number}  total
- * @param  {number}  perPage
- * @param  {number}  currentPage
- * @return {Pagination}
- */
+   * Create a new length-aware paginator instance.
+   *
+   * @protected
+   * @param  {Collection}  items
+   * @param  {number}  total
+   * @param  {number}  perPage
+   * @param  {number}  currentPage
+   * @return {Pagination}
+   */
   paginator (items, total, perPage, currentPage) {
-    return { items, total, perPage, currentPage }
+    return new LengthAwarePaginator(items, total, perPage, currentPage)
   }
 
   /**
@@ -2387,6 +2506,17 @@ export default class Builder {
   }
 
   /**
+   * Get the raw SQL representation of the query with embedded bindings.
+   *
+   * @return {string}
+   */
+  toRawSql () {
+    return this.grammar.substituteBindingsIntoRawSql(
+      this.toSql(), this.connection.prepareBindings(this.getBindings())
+    )
+  }
+
+  /**
    * Get the SQL representation of the query.
    *
    * @return {string}
@@ -2408,6 +2538,38 @@ export default class Builder {
     for (const [sql, bindings] of Object.entries(this.grammar.compileTruncate(this))) {
       this.connection.statement(sql, bindings)
     }
+  }
+
+  /**
+   * Add a union statement to the query.
+   *
+   * @param  {Builder|Function}  query
+   * @param  {boolean}  [all=false]
+   * @return {this}
+   */
+  union (query, all = false) {
+    if (query instanceof Function) {
+      const callback = query
+
+      query = this.newQuery()
+
+      callback(query)
+    }
+
+    this.unions.push({ query, all })
+    this.addBinding(query.getBindings(), 'union')
+
+    return this
+  }
+
+  /**
+   * Add a union all statement to the query.
+   *
+   * @param  {Builder|Function}  query
+   * @return {this}
+   */
+  unionAll (query) {
+    return this.union(query, true)
   }
 
   /**
@@ -2468,38 +2630,6 @@ export default class Builder {
   }
 
   /**
-   * Add a union statement to the query.
-   *
-   * @param  {Builder|Function}  query
-   * @param  {boolean}  [all=false]
-   * @return {this}
-   */
-  union (query, all = false) {
-    if (query instanceof Function) {
-      const callback = query
-
-      query = this.newQuery()
-
-      callback(query)
-    }
-
-    this.unions.push({ query, all })
-    this.addBinding(query.getBindings(), 'union')
-
-    return this
-  }
-
-  /**
-   * Add a union all statement to the query.
-   *
-   * @param  {Builder|Function}  query
-   * @return {this}
-   */
-  unionAll (query) {
-    return this.union(query, true)
-  }
-
-  /**
    * Insert new records or update the existing ones.
    *
    * @param  {array}  values
@@ -2541,6 +2671,18 @@ export default class Builder {
       this.grammar.compileUpsert(this, values, [uniqueBy], update),
       bindings
     )
+  }
+
+  /**
+   * Add an index hint to suggest a query index.
+   *
+   * @param  {string}  index
+   * @return {this}
+   */
+  useIndex (index) {
+    this.indexHint = new IndexHint('hint', index)
+
+    return this
   }
 
   /**
@@ -2865,18 +3007,86 @@ export default class Builder {
   }
 
   /**
-   * Merge an array of where clauses and bindings.
+   * Add a "where JSON contains" clause to the query.
    *
-   * @param  {unknown[]|Record<string, unknown>}  wheres
-   * @param  {Bindings}  bindings
+   * @param  {string}  column
+   * @param  {string[]|Expression|unknown}  value
+   * @param  {string}  [boolean='and']
+   * @param  {boolean}  [not=false]
    * @return {this}
    */
-  mergeWheres (wheres, bindings) {
-    this.wheres = [...this.wheres, ...wheres]
+  whereJsonContains (column, value, boolean = 'and', not = false) {
+    const type = 'JsonContains'
 
-    this.bindings.where = Object.values(
-      [...this.bindings.where, ...Object.values(bindings)]
+    this.wheres.push({ type, column, value, boolean, not })
+
+    if (!(value instanceof Expression)) {
+      this.addBinding(this.grammar.prepareBindingForJsonContains(value))
+    }
+
+    return this
+  }
+
+  /**
+   * Add a clause that determines if a JSON path exists to the query.
+   *
+   * @param  {string}  column
+   * @param  {string}  [boolean='and']
+   * @param  {boolean}  [not=false]
+   * @return {this}
+   */
+  whereJsonContainsKey (column, boolean = 'and', not = false) {
+    const type = 'JsonContainsKey'
+
+    this.wheres.push({ type, column, boolean, not })
+
+    return this
+  }
+
+  /**
+   * Add a "where JSON not contains" clause to the query.
+   *
+   * @param  {string}  column
+   * @param  {string[]|Expression}  value
+   * @param  {string}  [boolean='and']
+   * @return {this}
+   */
+  whereJsonDoesntContain (column, value, boolean = 'and') {
+    return this.whereJsonContains(column, value, boolean, true)
+  }
+
+  /**
+   * Add a clause that determines if a JSON path does not exist to the query.
+   *
+   * @param  {string}  column
+   * @param  {string}  boolean
+   * @return {this}
+   */
+  whereJsonDoesntContainKey (column, boolean = 'and') {
+    return this.whereJsonContainsKey(column, boolean, true)
+  }
+
+  /**
+   * Add a "where JSON length" clause to the query.
+   *
+   * @param  {string}  column
+   * @param  {unknown}  operator
+   * @param  {unknown}  [value]
+   * @param  {string}  [boolean='and']
+   * @return {this}
+   */
+  whereJsonLength (column, operator, value = undefined, boolean = 'and') {
+    const type = 'JsonLength';
+
+    [value, operator] = this.prepareValueAndOperator(
+      value, operator, value === undefined
     )
+
+    this.wheres.push({ type, column, operator, value, boolean })
+
+    if (!(value instanceof Expression)) {
+      this.addBinding(parseInt(this.flattenValue(value), 10))
+    }
 
     return this
   }
@@ -3028,6 +3238,31 @@ export default class Builder {
   whereRaw (sql, bindings = [], boolean = 'and') {
     this.wheres.push({ type: 'Raw', sql, boolean })
     this.addBinding(bindings, 'where')
+    return this
+  }
+
+  /**
+   * Adds a where condition using row values.
+   *
+   * @param  {string[]}  columns
+   * @param  {string}  operator
+   * @param  {unknown[]}  values
+   * @param  {string}  [boolean='and']
+   * @return {this}
+   *
+   * @throws \InvalidArgumentException
+   */
+  whereRowValues (columns, operator, values, boolean = 'and') {
+    if (columns.length !== values.length) {
+      throw new Error('InvalidArgumentException: The number of columns must match the number of values')
+    }
+
+    const type = 'RowValues'
+
+    this.wheres.push({ type, columns, operator, values, boolean })
+
+    this.addBinding(this.cleanBindings(values))
+
     return this
   }
 

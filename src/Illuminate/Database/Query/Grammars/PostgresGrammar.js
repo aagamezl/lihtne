@@ -168,7 +168,6 @@ export default class PostgresGrammar extends Grammar {
 
     let i
 
-    // if (filter_var(lastSegment, FILTER_VALIDATE_INT) !== false) {
     if (Number.isInteger(parseInt(lastSegment))) {
       i = lastSegment
     } else {
@@ -180,11 +179,11 @@ export default class PostgresGrammar extends Grammar {
       }
     }
 
-    column = this.wrap(segments.join('->').replace('->>', '->'))
+    column = this.wrap(segments.join('->')).replace('->>', '->')
 
     if (i !== undefined) {
-      return `case when jsonb_typeof(${column}::jsonb) = 'array'` +
-        ` then jsonb_array_length(${column}::jsonb) >= ${i < 0 ? Math.abs(i) : i + 1} else false end`
+      return `case when jsonb_typeof((${column})::jsonb) = 'array'` +
+        ` then jsonb_array_length((${column})::jsonb) >= ${i < 0 ? Math.abs(i) : i + 1} else false end`
     }
 
     const key = "'" + lastSegment.replace("'", "''") + "'"

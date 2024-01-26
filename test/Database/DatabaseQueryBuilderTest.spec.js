@@ -10,6 +10,7 @@ import getPostgresBuilder from './helpers/getPostgresBuilder.js'
 import getPostgresBuilderWithProcessor from './helpers/getPostgresBuilderWithProcessor.js'
 import getSQLiteBuilder from './helpers/getSQLiteBuilder.js'
 import getSqlServerBuilder from './helpers/getSqlServerBuilder.js'
+import LengthAwarePaginator from '../../src/Illuminate/Pagination/LengthAwarePaginator.js'
 import MySqlGrammar from '../../src/Illuminate/Database/Query/Grammars/MySqlGrammar.js'
 import Connection from '../../src/Illuminate/Database/Connection.js'
 import Processor from '../../src/Illuminate/Database/Query/Processors/Processor.js'
@@ -4552,7 +4553,7 @@ test('testPaginate', async (t) => {
 
   const result = await builder.paginate(perPage, columns, page)
 
-  t.deepEqual(result, { items: results, total: 2, perPage, currentPage: page })
+  t.deepEqual(result, new LengthAwarePaginator(results, 2, perPage, page))
 
   verifyMock()
 })
@@ -4573,7 +4574,7 @@ test('testPaginateWithDefaultArguments', async (t) => {
 
   const result = await builder.paginate()
 
-  t.deepEqual(result, { items: results, total: 2, perPage, currentPage: page })
+  t.deepEqual(result, new LengthAwarePaginator(results, 2, perPage, page))
 
   verifyMock()
 })
@@ -4594,7 +4595,7 @@ test('testPaginateWhenNoResults', async (t) => {
 
   const result = await builder.paginate()
 
-  t.deepEqual(result, { items: results, total: 0, perPage, currentPage: page })
+  t.deepEqual(result, new LengthAwarePaginator(results, 0, perPage, page))
 
   verifyMock()
 })
@@ -4616,69 +4617,70 @@ test('testPaginateWithSpecificColumns', async (t) => {
 
   const result = await builder.paginate(perPage, columns, page)
 
-  t.deepEqual(result, { items: results, total: 2, perPage, currentPage: page })
+  t.deepEqual(result, new LengthAwarePaginator(results, 2, perPage, page))
 
   verifyMock()
 })
 
-// test('testPaginateWithTotalOverride', async (t) => {
-//   perPage = 16
-//   columns = ['id', 'name']
-//   pageName = 'page-name'
-//   page = 1
-//   const builder = getMockQueryBuilder()
-//   path = 'http://foo.bar?page=3'
+test('testPaginateWithTotalOverride', async (t) => {
+  const { createMock, verifyMock } = mock()
 
-//   results = collect([['id' => 3, 'name' => 'Taylor'], ['id' => 5, 'name' => 'Mohamed']])
+  const perPage = 16
+  const columns = ['id', 'name']
+  const page = 1
+  const builder = getBuilder()
+  const builderMock = createMock(builder)
 
-//   builder.shouldReceive('getCountForPagination').never()
-//   builder.shouldReceive('forPage').once().with(page, perPage).andReturnSelf()
-//   builder.shouldReceive('get').once().andReturn(results)
+  const results = collect([{ id: 3, name: 'Taylor' }, { id: 5, name: 'Mohamed' }])
 
-//   Paginator.currentPathResolver(function () use(path) {
-//     return path
-//   })
+  builderMock.expects('getCountForPagination').never()
+  builderMock.expects('forPage').once().withArgs(page, perPage).returnsThis()
+  builderMock.expects('get').once().resolves(results)
 
-//   result = builder.paginate(perPage, columns, pageName, page, 10)
+  const result = await builder.paginate(perPage, columns, page, 10)
 
-//   t.deepEqual(10, result.total())
-// })
+  t.is(result.total(), 10)
 
-// test('testCursorPaginate', async (t) => {
-//   perPage = 16
-//   columns = ['test']
-//   cursorName = 'cursor-name'
-//   cursor = new Cursor(['test' => 'bar'])
-//   const builder = getMockQueryBuilder()
+  verifyMock()
+})
+
+// test.only('testCursorPaginate', async (t) => {
+//   const { createMock, verifyMock } = mock()
+
+//   const perPage = 16
+//   const columns = ['test']
+//   const cursorName = 'cursor-name'
+//   const cursor = new Cursor({ test: 'bar' })
+//   const builder = getBuilder()
+//   const builderMock = createMock(builder)
+
 //   builder.from('foobar').orderBy('test')
-//   builder.shouldReceive('newQuery').andReturnUsing(function () use(builder) {
+//   builderMock.expects('newQuery').callsFake(() => {
 //     return getBuilder(builder.connection, builder.grammar, builder.processor)
 //   })
 
-//   path = 'http://foo.bar?cursor='.cursor.encode()
+//   const results = collect([{ test: 'foo' }, { test: 'bar' }])
 
-//   results = collect([['test' => 'foo'], ['test' => 'bar']])
-
-//   builder.shouldReceive('get').once().andReturnUsing(function () use(builder, results) {
-//     t.deepEqual(
+//   builder.shouldReceive('get').once().callsFake(() => {
+//     t.is(
 //       'select * from "foobar" where ("test" > ?) order by "test" asc limit 17',
-//       builder.toSql())
-//             t.deepEqual(['bar'], builder.bindings['where'])
+//       builder.toSql()
+//     )
 
-//             return results
+//     t.deepEqual(builder.bindings.where, ['bar'])
+
+//     return results
 //   })
 
-//   Paginator.currentPathResolver(function () use(path) {
-//     return path
-//   })
+//   const result = await builder.cursorPaginate(perPage, columns, cursorName, cursor)
 
-//   result = builder.cursorPaginate(perPage, columns, cursorName, cursor)
+//   t.deepEqual(result, new CursorPaginator(results, perPage, cursor, {
+//     path,
+//     cursorName,
+//     parameters: ['test']
+//   }))
 
-//   t.deepEqual(new CursorPaginator(results, perPage, cursor, [
-//     'path' => path,
-//     'cursorName' => cursorName,
-//     'parameters' => ['test'],
-//   ]), result)
+//   verifyMock()
 // })
 
 // test('testCursorPaginateMultipleOrderColumns', async (t) => {
@@ -5165,556 +5167,559 @@ test('testPaginateWithSpecificColumns', async (t) => {
 //   ]), result)
 // })
 
-// test('testWhereExpression', async (t) => {
-//   const builder = getBuilder()
-//   builder.select('*').from('orders').where(
-//     new class() implements ConditionExpression
-//             {
-//       public function getValue(\Illuminate\Database\Grammar grammar)
-//                 {
-//       return '1 = 1'
-
-//     }
-//   )
-//   t.is('select * from "orders" where 1 = 1', builder.toSql())
-//   t.is([], builder.getBindings())
-
-// })
-
-// test('testWhereRowValues', async (t) => {
-//   const builder = getBuilder()
-//   builder.select('*').from('orders').whereRowValues(['last_update', 'order_number'], '<', [1, 2])
-//   t.is('select * from "orders" where ("last_update", "order_number") < (?, ?)', builder.toSql())
-
-//   const builder = getBuilder()
-//   builder.select('*').from('orders').where('company_id', 1).orWhereRowValues(['last_update', 'order_number'], '<', [1, 2])
-//   t.is('select * from "orders" where "company_id" = ? or ("last_update", "order_number") < (?, ?)', builder.toSql())
-
-//   const builder = getBuilder()
-//   builder.select('*').from('orders').whereRowValues(['last_update', 'order_number'], '<', [1, new Raw('2')])
-//   t.is('select * from "orders" where ("last_update", "order_number") < (?, 2)', builder.toSql())
-//   t.deepEqual([1], builder.getBindings())
-// })
-
-// test('testWhereRowValuesArityMismatch', async (t) => {
-//   expectException(InvalidArgumentException.class)
-//   expectExceptionMessage('The number of columns must match the number of values')
-
-//   const builder = getBuilder()
-//   builder.select('*').from('orders').whereRowValues(['last_update'], '<', [1, 2])
-// })
-
-// test('testWhereJsonContainsMySql', async (t) => {
-//   const builder = getMySqlBuilder()
-//   builder.select('*').from('users').whereJsonContains('options', ['en'])
-//   t.is('select * from `users` where json_contains(`options`, ?)', builder.toSql())
-//   t.deepEqual(['["en"]'], builder.getBindings())
-
-//   const builder = getMySqlBuilder()
-//   builder.select('*').from('users').whereJsonContains('users.options.languages', ['en'])
-//   t.is('select * from `users` where json_contains(`users`.`options`, ?, \'."languages"\')', builder.toSql())
-//   t.deepEqual(['["en"]'], builder.getBindings())
-
-//   const builder = getMySqlBuilder()
-//   builder.select('*').from('users').where('id', '=', 1).orWhereJsonContains('options.languages', new Raw("'[\"en\"]'"))
-//   t.is('select * from `users` where `id` = ? or json_contains(`options`, \'["en"]\', \'."languages"\')', builder.toSql())
-//   t.deepEqual([1], builder.getBindings())
-// })
-
-// test('testWhereJsonContainsPostgres', async (t) => {
-//   const builder = getPostgresBuilder()
-//   builder.select('*').from('users').whereJsonContains('options', ['en'])
-//   t.is('select * from "users" where ("options").jsonb @> ?', builder.toSql())
-//   t.deepEqual(['["en"]'], builder.getBindings())
-
-//   const builder = getPostgresBuilder()
-//   builder.select('*').from('users').whereJsonContains('users.options.languages', ['en'])
-//   t.is('select * from "users" where ("users"."options".\'languages\').jsonb @> ?', builder.toSql())
-//   t.deepEqual(['["en"]'], builder.getBindings())
-
-//   const builder = getPostgresBuilder()
-//   builder.select('*').from('users').where('id', '=', 1).orWhereJsonContains('options.languages', new Raw("'[\"en\"]'"))
-//   t.is('select * from "users" where "id" = ? or ("options".\'languages\').jsonb @> \'["en"]\'', builder.toSql())
-//   t.deepEqual([1], builder.getBindings())
-// })
-
-// test('testWhereJsonContainsSqlite', async (t) => {
-//   const builder = getSQLiteBuilder()
-//   builder.select('*').from('users').whereJsonContains('options', 'en').toSql()
-//   t.is('select * from "users" where exists (select 1 from json_each("options") where "json_each"."value" is ?)', builder.toSql())
-//   t.deepEqual(['en'], builder.getBindings())
-
-//   const builder = getSQLiteBuilder()
-//   builder.select('*').from('users').whereJsonContains('users.options.language', 'en').toSql()
-//   t.is('select * from "users" where exists (select 1 from json_each("users"."options", \'."language"\') where "json_each"."value" is ?)', builder.toSql())
-//   t.deepEqual(['en'], builder.getBindings())
-// })
-
-// test('testWhereJsonContainsSqlServer', async (t) => {
-//   const builder = getSqlServerBuilder()
-//   builder.select('*').from('users').whereJsonContains('options', true)
-//   t.is('select * from [users] where ? in (select [value] from openjson([options]))', builder.toSql())
-//   t.deepEqual(['true'], builder.getBindings())
-
-//   const builder = getSqlServerBuilder()
-//   builder.select('*').from('users').whereJsonContains('users.options.languages', 'en')
-//   t.is('select * from [users] where ? in (select [value] from openjson([users].[options], \'."languages"\'))', builder.toSql())
-//   t.deepEqual(['en'], builder.getBindings())
-
-//   const builder = getSqlServerBuilder()
-//   builder.select('*').from('users').where('id', '=', 1).orWhereJsonContains('options.languages', new Raw("'en'"))
-//   t.is('select * from [users] where [id] = ? or \'en\' in (select [value] from openjson([options], \'."languages"\'))', builder.toSql())
-//   t.deepEqual([1], builder.getBindings())
-// })
-
-// test('testWhereJsonDoesntContainMySql', async (t) => {
-//   const builder = getMySqlBuilder()
-//   builder.select('*').from('users').whereJsonDoesntContain('options.languages', ['en'])
-//   t.is('select * from `users` where not json_contains(`options`, ?, \'."languages"\')', builder.toSql())
-//   t.deepEqual(['["en"]'], builder.getBindings())
-
-//   const builder = getMySqlBuilder()
-//   builder.select('*').from('users').where('id', '=', 1).orWhereJsonDoesntContain('options.languages', new Raw("'[\"en\"]'"))
-//   t.is('select * from `users` where `id` = ? or not json_contains(`options`, \'["en"]\', \'."languages"\')', builder.toSql())
-//   t.deepEqual([1], builder.getBindings())
-// })
-
-// test('testWhereJsonDoesntContainPostgres', async (t) => {
-//   const builder = getPostgresBuilder()
-//   builder.select('*').from('users').whereJsonDoesntContain('options.languages', ['en'])
-//   t.is('select * from "users" where not ("options".\'languages\').jsonb @> ?', builder.toSql())
-//   t.deepEqual(['["en"]'], builder.getBindings())
-
-//   const builder = getPostgresBuilder()
-//   builder.select('*').from('users').where('id', '=', 1).orWhereJsonDoesntContain('options.languages', new Raw("'[\"en\"]'"))
-//   t.is('select * from "users" where "id" = ? or not ("options".\'languages\').jsonb @> \'["en"]\'', builder.toSql())
-//   t.deepEqual([1], builder.getBindings())
-// })
-
-// test('testWhereJsonDoesntContainSqlite', async (t) => {
-//   const builder = getSQLiteBuilder()
-//   builder.select('*').from('users').whereJsonDoesntContain('options', 'en').toSql()
-//   t.is('select * from "users" where not exists (select 1 from json_each("options") where "json_each"."value" is ?)', builder.toSql())
-//   t.deepEqual(['en'], builder.getBindings())
-
-//   const builder = getSQLiteBuilder()
-//   builder.select('*').from('users').whereJsonDoesntContain('users.options.language', 'en').toSql()
-//   t.is('select * from "users" where not exists (select 1 from json_each("users"."options", \'."language"\') where "json_each"."value" is ?)', builder.toSql())
-//   t.deepEqual(['en'], builder.getBindings())
-// })
-
-// test('testWhereJsonDoesntContainSqlServer', async (t) => {
-//   const builder = getSqlServerBuilder()
-//   builder.select('*').from('users').whereJsonDoesntContain('options.languages', 'en')
-//   t.is('select * from [users] where not ? in (select [value] from openjson([options], \'."languages"\'))', builder.toSql())
-//   t.deepEqual(['en'], builder.getBindings())
-
-//   const builder = getSqlServerBuilder()
-//   builder.select('*').from('users').where('id', '=', 1).orWhereJsonDoesntContain('options.languages', new Raw("'en'"))
-//   t.is('select * from [users] where [id] = ? or not \'en\' in (select [value] from openjson([options], \'."languages"\'))', builder.toSql())
-//   t.deepEqual([1], builder.getBindings())
-// })
-
-// test('testWhereJsonContainsKeyMySql', async (t) => {
-//   const builder = getMySqlBuilder()
-//   builder.select('*').from('users').whereJsonContainsKey('users.options.languages')
-//   t.is('select * from `users` where ifnull(json_contains_path(`users`.`options`, \'one\', \'."languages"\'), 0)', builder.toSql())
-
-//   const builder = getMySqlBuilder()
-//   builder.select('*').from('users').whereJsonContainsKey('options.language.primary')
-//   t.is('select * from `users` where ifnull(json_contains_path(`options`, \'one\', \'."language"."primary"\'), 0)', builder.toSql())
-
-//   const builder = getMySqlBuilder()
-//   builder.select('*').from('users').where('id', '=', 1).orWhereJsonContainsKey('options.languages')
-//   t.is('select * from `users` where `id` = ? or ifnull(json_contains_path(`options`, \'one\', \'."languages"\'), 0)', builder.toSql())
-
-//   const builder = getMySqlBuilder()
-//   builder.select('*').from('users').whereJsonContainsKey('options.languages[0][1]')
-//   t.is('select * from `users` where ifnull(json_contains_path(`options`, \'one\', \'."languages"[0][1]\'), 0)', builder.toSql())
-// })
-
-// test('testWhereJsonContainsKeyPostgres', async (t) => {
-//   const builder = getPostgresBuilder()
-//   builder.select('*').from('users').whereJsonContainsKey('users.options.languages')
-//   t.is('select * from "users" where coalesce(("users"."options").jsonb ?? \'languages\', false)', builder.toSql())
-
-//   const builder = getPostgresBuilder()
-//   builder.select('*').from('users').whereJsonContainsKey('options.language.primary')
-//   t.is('select * from "users" where coalesce(("options".\'language\').jsonb ?? \'primary\', false)', builder.toSql())
-
-//   const builder = getPostgresBuilder()
-//   builder.select('*').from('users').where('id', '=', 1).orWhereJsonContainsKey('options.languages')
-//   t.is('select * from "users" where "id" = ? or coalesce(("options").jsonb ?? \'languages\', false)', builder.toSql())
-
-//   const builder = getPostgresBuilder()
-//   builder.select('*').from('users').whereJsonContainsKey('options.languages[0][1]')
-//   t.is('select * from "users" where case when jsonb_typeof(("options".\'languages\'.0).jsonb) = \'array\' then jsonb_array_length(("options".\'languages\'.0).jsonb) >= 2 else false end', builder.toSql())
-
-//   const builder = getPostgresBuilder()
-//   builder.select('*').from('users').whereJsonContainsKey('options.languages[-1]')
-//   t.is('select * from "users" where case when jsonb_typeof(("options".\'languages\').jsonb) = \'array\' then jsonb_array_length(("options".\'languages\').jsonb) >= 1 else false end', builder.toSql())
-// })
-
-// test('testWhereJsonContainsKeySqlite', async (t) => {
-//   const builder = getSQLiteBuilder()
-//   builder.select('*').from('users').whereJsonContainsKey('users.options.languages')
-//   t.is('select * from "users" where json_type("users"."options", \'."languages"\') is not null', builder.toSql())
-
-//   const builder = getSQLiteBuilder()
-//   builder.select('*').from('users').whereJsonContainsKey('options.language.primary')
-//   t.is('select * from "users" where json_type("options", \'."language"."primary"\') is not null', builder.toSql())
-
-//   const builder = getSQLiteBuilder()
-//   builder.select('*').from('users').where('id', '=', 1).orWhereJsonContainsKey('options.languages')
-//   t.is('select * from "users" where "id" = ? or json_type("options", \'."languages"\') is not null', builder.toSql())
-
-//   const builder = getSQLiteBuilder()
-//   builder.select('*').from('users').whereJsonContainsKey('options.languages[0][1]')
-//   t.is('select * from "users" where json_type("options", \'."languages"[0][1]\') is not null', builder.toSql())
-// })
-
-// test('testWhereJsonContainsKeySqlServer', async (t) => {
-//   const builder = getSqlServerBuilder()
-//   builder.select('*').from('users').whereJsonContainsKey('users.options.languages')
-//   t.is('select * from [users] where \'languages\' in (select [key] from openjson([users].[options]))', builder.toSql())
-
-//   const builder = getSqlServerBuilder()
-//   builder.select('*').from('users').whereJsonContainsKey('options.language.primary')
-//   t.is('select * from [users] where \'primary\' in (select [key] from openjson([options], \'."language"\'))', builder.toSql())
-
-//   const builder = getSqlServerBuilder()
-//   builder.select('*').from('users').where('id', '=', 1).orWhereJsonContainsKey('options.languages')
-//   t.is('select * from [users] where [id] = ? or \'languages\' in (select [key] from openjson([options]))', builder.toSql())
-
-//   const builder = getSqlServerBuilder()
-//   builder.select('*').from('users').whereJsonContainsKey('options.languages[0][1]')
-//   t.is('select * from [users] where 1 in (select [key] from openjson([options], \'."languages"[0]\'))', builder.toSql())
-// })
-
-// test('testWhereJsonDoesntContainKeyMySql', async (t) => {
-//   const builder = getMySqlBuilder()
-//   builder.select('*').from('users').whereJsonDoesntContainKey('options.languages')
-//   t.is('select * from `users` where not ifnull(json_contains_path(`options`, \'one\', \'."languages"\'), 0)', builder.toSql())
-
-//   const builder = getMySqlBuilder()
-//   builder.select('*').from('users').where('id', '=', 1).orWhereJsonDoesntContainKey('options.languages')
-//   t.is('select * from `users` where `id` = ? or not ifnull(json_contains_path(`options`, \'one\', \'."languages"\'), 0)', builder.toSql())
-
-//   const builder = getMySqlBuilder()
-//   builder.select('*').from('users').whereJsonDoesntContainKey('options.languages[0][1]')
-//   t.is('select * from `users` where not ifnull(json_contains_path(`options`, \'one\', \'."languages"[0][1]\'), 0)', builder.toSql())
-// })
-
-// test('testWhereJsonDoesntContainKeyPostgres', async (t) => {
-//   const builder = getPostgresBuilder()
-//   builder.select('*').from('users').whereJsonDoesntContainKey('options.languages')
-//   t.is('select * from "users" where not coalesce(("options").jsonb ?? \'languages\', false)', builder.toSql())
-
-//   const builder = getPostgresBuilder()
-//   builder.select('*').from('users').where('id', '=', 1).orWhereJsonDoesntContainKey('options.languages')
-//   t.is('select * from "users" where "id" = ? or not coalesce(("options").jsonb ?? \'languages\', false)', builder.toSql())
-
-//   const builder = getPostgresBuilder()
-//   builder.select('*').from('users').whereJsonDoesntContainKey('options.languages[0][1]')
-//   t.is('select * from "users" where not case when jsonb_typeof(("options".\'languages\'.0).jsonb) = \'array\' then jsonb_array_length(("options".\'languages\'.0).jsonb) >= 2 else false end', builder.toSql())
-
-//   const builder = getPostgresBuilder()
-//   builder.select('*').from('users').whereJsonDoesntContainKey('options.languages[-1]')
-//   t.is('select * from "users" where not case when jsonb_typeof(("options".\'languages\').jsonb) = \'array\' then jsonb_array_length(("options".\'languages\').jsonb) >= 1 else false end', builder.toSql())
-// })
-
-// test('testWhereJsonDoesntContainKeySqlite', async (t) => {
-//   const builder = getSQLiteBuilder()
-//   builder.select('*').from('users').whereJsonDoesntContainKey('options.languages')
-//   t.is('select * from "users" where not json_type("options", \'."languages"\') is not null', builder.toSql())
-
-//   const builder = getSQLiteBuilder()
-//   builder.select('*').from('users').where('id', '=', 1).orWhereJsonDoesntContainKey('options.languages')
-//   t.is('select * from "users" where "id" = ? or not json_type("options", \'."languages"\') is not null', builder.toSql())
-
-//   const builder = getSQLiteBuilder()
-//   builder.select('*').from('users').where('id', '=', 1).orWhereJsonDoesntContainKey('options.languages[0][1]')
-//   t.is('select * from "users" where "id" = ? or not json_type("options", \'."languages"[0][1]\') is not null', builder.toSql())
-// })
-
-// test('testWhereJsonDoesntContainKeySqlServer', async (t) => {
-//   const builder = getSqlServerBuilder()
-//   builder.select('*').from('users').whereJsonDoesntContainKey('options.languages')
-//   t.is('select * from [users] where not \'languages\' in (select [key] from openjson([options]))', builder.toSql())
-
-//   const builder = getSqlServerBuilder()
-//   builder.select('*').from('users').where('id', '=', 1).orWhereJsonDoesntContainKey('options.languages')
-//   t.is('select * from [users] where [id] = ? or not \'languages\' in (select [key] from openjson([options]))', builder.toSql())
-
-//   const builder = getSqlServerBuilder()
-//   builder.select('*').from('users').where('id', '=', 1).orWhereJsonDoesntContainKey('options.languages[0][1]')
-//   t.is('select * from [users] where [id] = ? or not 1 in (select [key] from openjson([options], \'."languages"[0]\'))', builder.toSql())
-// })
-
-// test('testWhereJsonLengthMySql', async (t) => {
-//   const builder = getMySqlBuilder()
-//   builder.select('*').from('users').whereJsonLength('options', 0)
-//   t.is('select * from `users` where json_length(`options`) = ?', builder.toSql())
-//   t.deepEqual([0], builder.getBindings())
-
-//   const builder = getMySqlBuilder()
-//   builder.select('*').from('users').whereJsonLength('users.options.languages', '>', 0)
-//   t.is('select * from `users` where json_length(`users`.`options`, \'."languages"\') > ?', builder.toSql())
-//   t.deepEqual([0], builder.getBindings())
-
-//   const builder = getMySqlBuilder()
-//   builder.select('*').from('users').where('id', '=', 1).orWhereJsonLength('options.languages', new Raw('0'))
-//   t.is('select * from `users` where `id` = ? or json_length(`options`, \'."languages"\') = 0', builder.toSql())
-//   t.deepEqual([1], builder.getBindings())
-
-//   const builder = getMySqlBuilder()
-//   builder.select('*').from('users').where('id', '=', 1).orWhereJsonLength('options.languages', '>', new Raw('0'))
-//   t.is('select * from `users` where `id` = ? or json_length(`options`, \'."languages"\') > 0', builder.toSql())
-//   t.deepEqual([1], builder.getBindings())
-// })
-
-// test('testWhereJsonLengthPostgres', async (t) => {
-//   const builder = getPostgresBuilder()
-//   builder.select('*').from('users').whereJsonLength('options', 0)
-//   t.is('select * from "users" where jsonb_array_length(("options").jsonb) = ?', builder.toSql())
-//   t.deepEqual([0], builder.getBindings())
-
-//   const builder = getPostgresBuilder()
-//   builder.select('*').from('users').whereJsonLength('users.options.languages', '>', 0)
-//   t.is('select * from "users" where jsonb_array_length(("users"."options".\'languages\').jsonb) > ?', builder.toSql())
-//   t.deepEqual([0], builder.getBindings())
-
-//   const builder = getPostgresBuilder()
-//   builder.select('*').from('users').where('id', '=', 1).orWhereJsonLength('options.languages', new Raw('0'))
-//   t.is('select * from "users" where "id" = ? or jsonb_array_length(("options".\'languages\').jsonb) = 0', builder.toSql())
-//   t.deepEqual([1], builder.getBindings())
-
-//   const builder = getPostgresBuilder()
-//   builder.select('*').from('users').where('id', '=', 1).orWhereJsonLength('options.languages', '>', new Raw('0'))
-//   t.is('select * from "users" where "id" = ? or jsonb_array_length(("options".\'languages\').jsonb) > 0', builder.toSql())
-//   t.deepEqual([1], builder.getBindings())
-// })
-
-// test('testWhereJsonLengthSqlite', async (t) => {
-//   const builder = getSQLiteBuilder()
-//   builder.select('*').from('users').whereJsonLength('options', 0)
-//   t.is('select * from "users" where json_array_length("options") = ?', builder.toSql())
-//   t.deepEqual([0], builder.getBindings())
-
-//   const builder = getSQLiteBuilder()
-//   builder.select('*').from('users').whereJsonLength('users.options.languages', '>', 0)
-//   t.is('select * from "users" where json_array_length("users"."options", \'."languages"\') > ?', builder.toSql())
-//   t.deepEqual([0], builder.getBindings())
-
-//   const builder = getSQLiteBuilder()
-//   builder.select('*').from('users').where('id', '=', 1).orWhereJsonLength('options.languages', new Raw('0'))
-//   t.is('select * from "users" where "id" = ? or json_array_length("options", \'."languages"\') = 0', builder.toSql())
-//   t.deepEqual([1], builder.getBindings())
-
-//   const builder = getSQLiteBuilder()
-//   builder.select('*').from('users').where('id', '=', 1).orWhereJsonLength('options.languages', '>', new Raw('0'))
-//   t.is('select * from "users" where "id" = ? or json_array_length("options", \'."languages"\') > 0', builder.toSql())
-//   t.deepEqual([1], builder.getBindings())
-// })
-
-// test('testWhereJsonLengthSqlServer', async (t) => {
-//   const builder = getSqlServerBuilder()
-//   builder.select('*').from('users').whereJsonLength('options', 0)
-//   t.is('select * from [users] where (select count(*) from openjson([options])) = ?', builder.toSql())
-//   t.deepEqual([0], builder.getBindings())
-
-//   const builder = getSqlServerBuilder()
-//   builder.select('*').from('users').whereJsonLength('users.options.languages', '>', 0)
-//   t.is('select * from [users] where (select count(*) from openjson([users].[options], \'."languages"\')) > ?', builder.toSql())
-//   t.deepEqual([0], builder.getBindings())
-
-//   const builder = getSqlServerBuilder()
-//   builder.select('*').from('users').where('id', '=', 1).orWhereJsonLength('options.languages', new Raw('0'))
-//   t.is('select * from [users] where [id] = ? or (select count(*) from openjson([options], \'."languages"\')) = 0', builder.toSql())
-//   t.deepEqual([1], builder.getBindings())
-
-//   const builder = getSqlServerBuilder()
-//   builder.select('*').from('users').where('id', '=', 1).orWhereJsonLength('options.languages', '>', new Raw('0'))
-//   t.is('select * from [users] where [id] = ? or (select count(*) from openjson([options], \'."languages"\')) > 0', builder.toSql())
-//   t.deepEqual([1], builder.getBindings())
-// })
-
-// test('testFrom', async (t) => {
-//   const builder = getBuilder()
-//   builder.from(getBuilder().from('users'), 'u')
-//   t.is('select * from (select * from "users") as "u"', builder.toSql())
-
-//   const builder = getBuilder()
-//   const eloquentBuilder = new EloquentBuilder(getBuilder())
-//   builder.from(eloquentBuilder.from('users'), 'u')
-//   t.is('select * from (select * from "users") as "u"', builder.toSql())
-// })
-
-// test('testFromSub', async (t) => {
-//   const builder = getBuilder()
-//   builder.fromSub(function (query) {
-//     query.select(new Raw('max(last_seen_at) as last_seen_at')).from('user_sessions').where('foo', '=', '1')
-//   }, 'sessions').where('bar', '<', '10')
-//   t.is('select * from (select max(last_seen_at) as last_seen_at from "user_sessions" where "foo" = ?) as "sessions" where "bar" < ?', builder.toSql())
-//   t.deepEqual(['1', '10'], builder.getBindings())
-
-//   expectException(InvalidArgumentException.class)
-//   const builder = getBuilder()
-//   builder.fromSub(['invalid'], 'sessions').where('bar', '<', '10')
-// })
-
-// test('testFromSubWithPrefix', async (t) => {
-//   const builder = getBuilder()
-//   builder.getGrammar().setTablePrefix('prefix_')
-//   builder.fromSub(function (query) {
-//     query.select(new Raw('max(last_seen_at) as last_seen_at')).from('user_sessions').where('foo', '=', '1')
-//   }, 'sessions').where('bar', '<', '10')
-//   t.is('select * from (select max(last_seen_at) as last_seen_at from "prefix_user_sessions" where "foo" = ?) as "prefix_sessions" where "bar" < ?', builder.toSql())
-//   t.deepEqual(['1', '10'], builder.getBindings())
-// })
-
-// test('testFromSubWithoutBindings', async (t) => {
-//   const builder = getBuilder()
-//   builder.fromSub(function (query) {
-//     query.select(new Raw('max(last_seen_at) as last_seen_at')).from('user_sessions')
-//   }, 'sessions')
-//   t.is('select * from (select max(last_seen_at) as last_seen_at from "user_sessions") as "sessions"', builder.toSql())
-
-//   expectException(InvalidArgumentException.class)
-//   const builder = getBuilder()
-//   builder.fromSub(['invalid'], 'sessions')
-// })
-
-// test('testFromRaw', async (t) => {
-//   const builder = getBuilder()
-//   builder.fromRaw(new Raw('(select max(last_seen_at) as last_seen_at from "user_sessions") as "sessions"'))
-//   t.is('select * from (select max(last_seen_at) as last_seen_at from "user_sessions") as "sessions"', builder.toSql())
-// })
-
-// test('testFromRawOnSqlServer', async (t) => {
-//   const builder = getSqlServerBuilder()
-//   builder.fromRaw('dbo.[SomeNameWithRoundBrackets (test)]')
-//   t.is('select * from dbo.[SomeNameWithRoundBrackets (test)]', builder.toSql())
-// })
-
-// test('testFromRawWithWhereOnTheMainQuery', async (t) => {
-//   const builder = getBuilder()
-//   builder.fromRaw(new Raw('(select max(last_seen_at) as last_seen_at from "sessions") as "last_seen_at"')).where('last_seen_at', '>', '1520652582')
-//   t.is('select * from (select max(last_seen_at) as last_seen_at from "sessions") as "last_seen_at" where "last_seen_at" > ?', builder.toSql())
-//   t.deepEqual(['1520652582'], builder.getBindings())
-// })
-
-// test('testFromQuestionMarkOperatorOnPostgres', async (t) => {
-//   const builder = getPostgresBuilder()
-//   builder.select('*').from('users').where('roles', '?', 'superuser')
-//   t.is('select * from "users" where "roles" ?? ?', builder.toSql())
-
-//   const builder = getPostgresBuilder()
-//   builder.select('*').from('users').where('roles', '?|', 'superuser')
-//   t.is('select * from "users" where "roles" ??| ?', builder.toSql())
-
-//   const builder = getPostgresBuilder()
-//   builder.select('*').from('users').where('roles', '?&', 'superuser')
-//   t.is('select * from "users" where "roles" ??& ?', builder.toSql())
-// })
-
-// test('testUseIndexMySql', async (t) => {
-//   const builder = getMySqlBuilder()
-//   builder.select('foo').from('users').useIndex('test_index')
-//   t.is('select `foo` from `users` use index (test_index)', builder.toSql())
-// })
-
-// test('testForceIndexMySql', async (t) => {
-//   const builder = getMySqlBuilder()
-//   builder.select('foo').from('users').forceIndex('test_index')
-//   t.is('select `foo` from `users` force index (test_index)', builder.toSql())
-// })
-
-// test('testIgnoreIndexMySql', async (t) => {
-//   const builder = getMySqlBuilder()
-//   builder.select('foo').from('users').ignoreIndex('test_index')
-//   t.is('select `foo` from `users` ignore index (test_index)', builder.toSql())
-// })
-
-// test('testUseIndexSqlite', async (t) => {
-//   const builder = getSQLiteBuilder()
-//   builder.select('foo').from('users').useIndex('test_index')
-//   t.is('select "foo" from "users"', builder.toSql())
-// })
-
-// test('testForceIndexSqlite', async (t) => {
-//   const builder = getSQLiteBuilder()
-//   builder.select('foo').from('users').forceIndex('test_index')
-//   t.is('select "foo" from "users" indexed by test_index', builder.toSql())
-// })
-
-// test('testIgnoreIndexSqlite', async (t) => {
-//   const builder = getSQLiteBuilder()
-//   builder.select('foo').from('users').ignoreIndex('test_index')
-//   t.is('select "foo" from "users"', builder.toSql())
-// })
-
-// test('testUseIndexSqlServer', async (t) => {
-//   const builder = getSqlServerBuilder()
-//   builder.select('foo').from('users').useIndex('test_index')
-//   t.is('select [foo] from [users]', builder.toSql())
-// })
-
-// test('testForceIndexSqlServer', async (t) => {
-//   const builder = getSqlServerBuilder()
-//   builder.select('foo').from('users').forceIndex('test_index')
-//   t.is('select [foo] from [users] with (index(test_index))', builder.toSql())
-// })
-
-// test('testIgnoreIndexSqlServer', async (t) => {
-//   const builder = getSqlServerBuilder()
-//   builder.select('foo').from('users').ignoreIndex('test_index')
-//   t.is('select [foo] from [users]', builder.toSql())
-// })
-
-// test('testClone', async (t) => {
-//   const builder = getBuilder()
-//   builder.select('*').from('users')
-//   clone = builder.clone().where('email', 'foo')
-
-//   assertNotSame(builder, clone)
-//   t.is('select * from "users"', builder.toSql())
-//   t.is('select * from "users" where "email" = ?', clone.toSql())
-// })
-
-// test('testCloneWithout', async (t) => {
-//   const builder = getBuilder()
-//   builder.select('*').from('users').where('email', 'foo').orderBy('email')
-//   clone = builder.cloneWithout(['orders'])
-
-//   t.is('select * from "users" where "email" = ? order by "email" asc', builder.toSql())
-//   t.is('select * from "users" where "email" = ?', clone.toSql())
-// })
-
-// test('testCloneWithoutBindings', async (t) => {
-//   const builder = getBuilder()
-//   builder.select('*').from('users').where('email', 'foo').orderBy('email')
-//   clone = builder.cloneWithout(['wheres']).cloneWithoutBindings(['where'])
-
-//   t.is('select * from "users" where "email" = ? order by "email" asc', builder.toSql())
-//   t.deepEqual([0 => 'foo'], builder.getBindings())
-
-//   t.is('select * from "users" order by "email" asc', clone.toSql())
-//   t.deepEqual([], clone.getBindings())
-// })
-
-// test('testToRawSql', async (t) => {
-//   const connection = m.mock(ConnectionInterface.class)
-//   connection.shouldReceive('prepareBindings')
-//     .with(['foo'])
-//     .andReturn(['foo'])
-
-//   const grammar = m.mock(Grammar.class).makePartial()
-//   grammar.shouldReceive('substituteBindingsIntoRawSql')
-//     .with('select * from "users" where "email" = ?', ['foo'])
-//     .andReturn('select * from "users" where "email" = \'foo\'')
-//   const builder = new Builder(connection, grammar, m.mock(Processor.class))
-//   builder.select('*').from('users').where('email', 'foo')
-
-//   t.is('select * from "users" where "email" = \'foo\'', builder.toRawSql())
-// })
+test('testWhereExpression', async (t) => {
+  const builder = getBuilder()
+  builder.select('*').from('orders').where(new ConditionExpression('1 = 1'))
+  t.is(builder.toSql(), 'select * from "orders" where 1 = 1')
+  t.deepEqual(builder.getBindings(), [])
+})
+
+test('testWhereRowValues', async (t) => {
+  let builder = getBuilder()
+  builder.select('*').from('orders').whereRowValues(['last_update', 'order_number'], '<', [1, 2])
+  t.is('select * from "orders" where ("last_update", "order_number") < (?, ?)', builder.toSql())
+
+  builder = getBuilder()
+  builder.select('*').from('orders').where('company_id', 1).orWhereRowValues(['last_update', 'order_number'], '<', [1, 2])
+  t.is('select * from "orders" where "company_id" = ? or ("last_update", "order_number") < (?, ?)', builder.toSql())
+
+  builder = getBuilder()
+  builder.select('*').from('orders').whereRowValues(['last_update', 'order_number'], '<', [1, new Raw('2')])
+  t.is('select * from "orders" where ("last_update", "order_number") < (?, 2)', builder.toSql())
+  t.deepEqual([1], builder.getBindings())
+})
+
+test('testWhereRowValuesArityMismatch', async (t) => {
+  const error = t.throws(() => {
+    const builder = getBuilder()
+    builder.select('*').from('orders').whereRowValues(['last_update'], '<', [1, 2])
+  }, { instanceOf: Error })
+
+  t.true(error.message.includes('InvalidArgumentException'))
+  t.true(error.message.includes('The number of columns must match the number of values'))
+})
+
+test('testWhereJsonContainsMySql', async (t) => {
+  let builder = getMySqlBuilder()
+  builder.select('*').from('users').whereJsonContains('options', ['en'])
+  t.is('select * from `users` where json_contains(`options`, ?)', builder.toSql())
+  t.deepEqual(builder.getBindings(), ['["en"]'])
+
+  builder = getMySqlBuilder()
+  builder.select('*').from('users').whereJsonContains('users.options->languages', ['en'])
+  t.is(builder.toSql(), 'select * from `users` where json_contains(`users`.`options`, ?, \'$."languages"\')')
+  t.deepEqual(builder.getBindings(), ['["en"]'])
+
+  builder = getMySqlBuilder()
+  builder.select('*').from('users').where('id', '=', 1).orWhereJsonContains('options->languages', new Raw("'[\"en\"]'"))
+  t.is(builder.toSql(), 'select * from `users` where `id` = ? or json_contains(`options`, \'["en"]\', \'$."languages"\')')
+  t.deepEqual(builder.getBindings(), [1])
+})
+
+test('testWhereJsonContainsPostgres', async (t) => {
+  let builder = getPostgresBuilder()
+  builder.select('*').from('users').whereJsonContains('options', ['en'])
+  t.is(builder.toSql(), 'select * from "users" where ("options")::jsonb @> ?')
+  t.deepEqual(builder.getBindings(), ['["en"]'])
+
+  builder = getPostgresBuilder()
+  builder.select('*').from('users').whereJsonContains('users.options->languages', ['en'])
+  t.is(builder.toSql(), 'select * from "users" where ("users"."options"->\'languages\')::jsonb @> ?')
+  t.deepEqual(builder.getBindings(), ['["en"]'])
+
+  builder = getPostgresBuilder()
+  builder.select('*').from('users').where('id', '=', 1).orWhereJsonContains('options->languages', new Raw("'[\"en\"]'"))
+  t.is(builder.toSql(), 'select * from "users" where "id" = ? or ("options"->\'languages\')::jsonb @> \'["en"]\'')
+  t.deepEqual(builder.getBindings(), [1])
+})
+
+test('testWhereJsonContainsSqlite', async (t) => {
+  let builder = getSQLiteBuilder()
+  builder.select('*').from('users').whereJsonContains('options', 'en').toSql()
+  t.is(builder.toSql(), 'select * from "users" where exists (select 1 from json_each("options") where "json_each"."value" is ?)')
+  t.deepEqual(builder.getBindings(), ['en'])
+
+  builder = getSQLiteBuilder()
+  builder.select('*').from('users').whereJsonContains('users.options->language', 'en').toSql()
+  t.is(builder.toSql(), 'select * from "users" where exists (select 1 from json_each("users"."options", \'$."language"\') where "json_each"."value" is ?)')
+  t.deepEqual(builder.getBindings(), ['en'])
+})
+
+test('testWhereJsonContainsSqlServer', async (t) => {
+  let builder = getSqlServerBuilder()
+  builder.select('*').from('users').whereJsonContains('options', true)
+  t.is(builder.toSql(), 'select * from [users] where ? in (select [value] from openjson([options]))')
+  t.deepEqual(builder.getBindings(), ['true'])
+
+  builder = getSqlServerBuilder()
+  builder.select('*').from('users').whereJsonContains('users.options->languages', 'en')
+  t.is(builder.toSql(), 'select * from [users] where ? in (select [value] from openjson([users].[options], \'$."languages"\'))')
+  t.deepEqual(builder.getBindings(), ['en'])
+
+  builder = getSqlServerBuilder()
+  builder.select('*').from('users').where('id', '=', 1).orWhereJsonContains('options->languages', new Raw("'en'"))
+  t.is(builder.toSql(), 'select * from [users] where [id] = ? or \'en\' in (select [value] from openjson([options], \'$."languages"\'))')
+  t.deepEqual(builder.getBindings(), [1])
+})
+
+test('testWhereJsonDoesntContainMySql', async (t) => {
+  let builder = getMySqlBuilder()
+  builder.select('*').from('users').whereJsonDoesntContain('options->languages', ['en'])
+  t.is(builder.toSql(), 'select * from `users` where not json_contains(`options`, ?, \'$."languages"\')')
+  t.deepEqual(builder.getBindings(), ['["en"]'])
+
+  builder = getMySqlBuilder()
+  builder.select('*').from('users').where('id', '=', 1).orWhereJsonDoesntContain('options->languages', new Raw("'[\"en\"]'"))
+  t.is(builder.toSql(), 'select * from `users` where `id` = ? or not json_contains(`options`, \'["en"]\', \'$."languages"\')')
+  t.deepEqual(builder.getBindings(), [1])
+})
+
+test('testWhereJsonDoesntContainPostgres', async (t) => {
+  let builder = getPostgresBuilder()
+  builder.select('*').from('users').whereJsonDoesntContain('options->languages', ['en'])
+  t.is(builder.toSql(), 'select * from "users" where not ("options"->\'languages\')::jsonb @> ?')
+  t.deepEqual(builder.getBindings(), ['["en"]'])
+
+  builder = getPostgresBuilder()
+  builder.select('*').from('users').where('id', '=', 1).orWhereJsonDoesntContain('options->languages', new Raw("'[\"en\"]'"))
+  t.is(builder.toSql(), 'select * from "users" where "id" = ? or not ("options"->\'languages\')::jsonb @> \'["en"]\'')
+  t.deepEqual(builder.getBindings(), [1])
+})
+
+test('testWhereJsonDoesntContainSqlite', async (t) => {
+  let builder = getSQLiteBuilder()
+  builder.select('*').from('users').whereJsonDoesntContain('options', 'en').toSql()
+  t.is(builder.toSql(), 'select * from "users" where not exists (select 1 from json_each("options") where "json_each"."value" is ?)')
+  t.deepEqual(builder.getBindings(), ['en'])
+
+  builder = getSQLiteBuilder()
+  builder.select('*').from('users').whereJsonDoesntContain('users.options->language', 'en').toSql()
+  t.is(builder.toSql(), 'select * from "users" where not exists (select 1 from json_each("users"."options", \'$."language"\') where "json_each"."value" is ?)')
+  t.deepEqual(builder.getBindings(), ['en'])
+})
+
+test('testWhereJsonDoesntContainSqlServer', async (t) => {
+  let builder = getSqlServerBuilder()
+  builder.select('*').from('users').whereJsonDoesntContain('options->languages', 'en')
+  t.is(builder.toSql(), 'select * from [users] where not ? in (select [value] from openjson([options], \'$."languages"\'))')
+  t.deepEqual(builder.getBindings(), ['en'])
+
+  builder = getSqlServerBuilder()
+  builder.select('*').from('users').where('id', '=', 1).orWhereJsonDoesntContain('options->languages', new Raw("'en'"))
+  t.is(builder.toSql(), 'select * from [users] where [id] = ? or not \'en\' in (select [value] from openjson([options], \'$."languages"\'))')
+  t.deepEqual(builder.getBindings(), [1])
+})
+
+test('testWhereJsonContainsKeyMySql', async (t) => {
+  let builder = getMySqlBuilder()
+  builder.select('*').from('users').whereJsonContainsKey('users.options->languages')
+  t.is(builder.toSql(), 'select * from `users` where ifnull(json_contains_path(`users`.`options`, \'one\', \'$."languages"\'), 0)')
+
+  builder = getMySqlBuilder()
+  builder.select('*').from('users').whereJsonContainsKey('options->language->primary')
+  t.is(builder.toSql(), 'select * from `users` where ifnull(json_contains_path(`options`, \'one\', \'$."language"."primary"\'), 0)')
+
+  builder = getMySqlBuilder()
+  builder.select('*').from('users').where('id', '=', 1).orWhereJsonContainsKey('options->languages')
+  t.is(builder.toSql(), 'select * from `users` where `id` = ? or ifnull(json_contains_path(`options`, \'one\', \'$."languages"\'), 0)')
+
+  builder = getMySqlBuilder()
+  builder.select('*').from('users').whereJsonContainsKey('options->languages[0][1]')
+  t.is(builder.toSql(), 'select * from `users` where ifnull(json_contains_path(`options`, \'one\', \'$."languages"[0][1]\'), 0)')
+})
+
+test('testWhereJsonContainsKeyPostgres', async (t) => {
+  let builder = getPostgresBuilder()
+  builder.select('*').from('users').whereJsonContainsKey('users.options->languages')
+  t.is(builder.toSql(), 'select * from "users" where coalesce(("users"."options")::jsonb ?? \'languages\', false)')
+
+  builder = getPostgresBuilder()
+  builder.select('*').from('users').whereJsonContainsKey('options->language->primary')
+  t.is(builder.toSql(), 'select * from "users" where coalesce(("options"->\'language\')::jsonb ?? \'primary\', false)')
+
+  builder = getPostgresBuilder()
+  builder.select('*').from('users').where('id', '=', 1).orWhereJsonContainsKey('options->languages')
+  t.is(builder.toSql(), 'select * from "users" where "id" = ? or coalesce(("options")::jsonb ?? \'languages\', false)')
+
+  builder = getPostgresBuilder()
+  builder.select('*').from('users').whereJsonContainsKey('options->languages[0][1]')
+  t.is(builder.toSql(), 'select * from "users" where case when jsonb_typeof(("options"->\'languages\'->0)::jsonb) = \'array\' then jsonb_array_length(("options"->\'languages\'->0)::jsonb) >= 2 else false end')
+
+  builder = getPostgresBuilder()
+  builder.select('*').from('users').whereJsonContainsKey('options->languages[-1]')
+  t.is(builder.toSql(), 'select * from "users" where case when jsonb_typeof(("options"->\'languages\')::jsonb) = \'array\' then jsonb_array_length(("options"->\'languages\')::jsonb) >= 1 else false end')
+})
+
+test('testWhereJsonContainsKeySqlite', async (t) => {
+  let builder = getSQLiteBuilder()
+  builder.select('*').from('users').whereJsonContainsKey('users.options->languages')
+  t.is(builder.toSql(), 'select * from "users" where json_type("users"."options", \'$."languages"\') is not null')
+
+  builder = getSQLiteBuilder()
+  builder.select('*').from('users').whereJsonContainsKey('options->language->primary')
+  t.is(builder.toSql(), 'select * from "users" where json_type("options", \'$."language"."primary"\') is not null')
+
+  builder = getSQLiteBuilder()
+  builder.select('*').from('users').where('id', '=', 1).orWhereJsonContainsKey('options->languages')
+  t.is(builder.toSql(), 'select * from "users" where "id" = ? or json_type("options", \'$."languages"\') is not null')
+
+  builder = getSQLiteBuilder()
+  builder.select('*').from('users').whereJsonContainsKey('options->languages[0][1]')
+  t.is(builder.toSql(), 'select * from "users" where json_type("options", \'$."languages"[0][1]\') is not null')
+})
+
+test('testWhereJsonContainsKeySqlServer', async (t) => {
+  let builder = getSqlServerBuilder()
+  builder.select('*').from('users').whereJsonContainsKey('users.options->languages')
+  t.is(builder.toSql(), 'select * from [users] where \'languages\' in (select [key] from openjson([users].[options]))')
+
+  builder = getSqlServerBuilder()
+  builder.select('*').from('users').whereJsonContainsKey('options->language->primary')
+  t.is(builder.toSql(), 'select * from [users] where \'primary\' in (select [key] from openjson([options], \'$."language"\'))')
+
+  builder = getSqlServerBuilder()
+  builder.select('*').from('users').where('id', '=', 1).orWhereJsonContainsKey('options->languages')
+  t.is(builder.toSql(), 'select * from [users] where [id] = ? or \'languages\' in (select [key] from openjson([options]))')
+
+  builder = getSqlServerBuilder()
+  builder.select('*').from('users').whereJsonContainsKey('options->languages[0][1]')
+  t.is(builder.toSql(), 'select * from [users] where 1 in (select [key] from openjson([options], \'$."languages"[0]\'))')
+})
+
+test('testWhereJsonDoesntContainKeyMySql', async (t) => {
+  let builder = getMySqlBuilder()
+  builder.select('*').from('users').whereJsonDoesntContainKey('options->languages')
+  t.is(builder.toSql(), 'select * from `users` where not ifnull(json_contains_path(`options`, \'one\', \'$."languages"\'), 0)')
+
+  builder = getMySqlBuilder()
+  builder.select('*').from('users').where('id', '=', 1).orWhereJsonDoesntContainKey('options->languages')
+  t.is(builder.toSql(), 'select * from `users` where `id` = ? or not ifnull(json_contains_path(`options`, \'one\', \'$."languages"\'), 0)')
+
+  builder = getMySqlBuilder()
+  builder.select('*').from('users').whereJsonDoesntContainKey('options->languages[0][1]')
+  t.is(builder.toSql(), 'select * from `users` where not ifnull(json_contains_path(`options`, \'one\', \'$."languages"[0][1]\'), 0)')
+})
+
+test('testWhereJsonDoesntContainKeyPostgres', async (t) => {
+  let builder = getPostgresBuilder()
+  builder.select('*').from('users').whereJsonDoesntContainKey('options->languages')
+  t.is(builder.toSql(), 'select * from "users" where not coalesce(("options")::jsonb ?? \'languages\', false)')
+
+  builder = getPostgresBuilder()
+  builder.select('*').from('users').where('id', '=', 1).orWhereJsonDoesntContainKey('options->languages')
+  t.is(builder.toSql(), 'select * from "users" where "id" = ? or not coalesce(("options")::jsonb ?? \'languages\', false)')
+
+  builder = getPostgresBuilder()
+  builder.select('*').from('users').whereJsonDoesntContainKey('options->languages[0][1]')
+  t.is(builder.toSql(), 'select * from "users" where not case when jsonb_typeof(("options"->\'languages\'->0)::jsonb) = \'array\' then jsonb_array_length(("options"->\'languages\'->0)::jsonb) >= 2 else false end')
+
+  builder = getPostgresBuilder()
+  builder.select('*').from('users').whereJsonDoesntContainKey('options->languages[-1]')
+  t.is(builder.toSql(), 'select * from "users" where not case when jsonb_typeof(("options"->\'languages\')::jsonb) = \'array\' then jsonb_array_length(("options"->\'languages\')::jsonb) >= 1 else false end')
+})
+
+test('testWhereJsonDoesntContainKeySqlite', async (t) => {
+  let builder = getSQLiteBuilder()
+  builder.select('*').from('users').whereJsonDoesntContainKey('options->languages')
+  t.is(builder.toSql(), 'select * from "users" where not json_type("options", \'$."languages"\') is not null')
+
+  builder = getSQLiteBuilder()
+  builder.select('*').from('users').where('id', '=', 1).orWhereJsonDoesntContainKey('options->languages')
+  t.is(builder.toSql(), 'select * from "users" where "id" = ? or not json_type("options", \'$."languages"\') is not null')
+
+  builder = getSQLiteBuilder()
+  builder.select('*').from('users').where('id', '=', 1).orWhereJsonDoesntContainKey('options->languages[0][1]')
+  t.is(builder.toSql(), 'select * from "users" where "id" = ? or not json_type("options", \'$."languages"[0][1]\') is not null')
+})
+
+test('testWhereJsonDoesntContainKeySqlServer', async (t) => {
+  let builder = getSqlServerBuilder()
+  builder.select('*').from('users').whereJsonDoesntContainKey('options->languages')
+  t.is(builder.toSql(), 'select * from [users] where not \'languages\' in (select [key] from openjson([options]))')
+
+  builder = getSqlServerBuilder()
+  builder.select('*').from('users').where('id', '=', 1).orWhereJsonDoesntContainKey('options->languages')
+  t.is(builder.toSql(), 'select * from [users] where [id] = ? or not \'languages\' in (select [key] from openjson([options]))')
+
+  builder = getSqlServerBuilder()
+  builder.select('*').from('users').where('id', '=', 1).orWhereJsonDoesntContainKey('options->languages[0][1]')
+  t.is(builder.toSql(), 'select * from [users] where [id] = ? or not 1 in (select [key] from openjson([options], \'$."languages"[0]\'))')
+})
+
+test('testWhereJsonLengthMySql', async (t) => {
+  let builder = getMySqlBuilder()
+  builder.select('*').from('users').whereJsonLength('options', 0)
+  t.is(builder.toSql(), 'select * from `users` where json_length(`options`) = ?')
+  t.deepEqual(builder.getBindings(), [0])
+
+  builder = getMySqlBuilder()
+  builder.select('*').from('users').whereJsonLength('users.options->languages', '>', 0)
+  t.is(builder.toSql(), 'select * from `users` where json_length(`users`.`options`, \'$."languages"\') > ?')
+  t.deepEqual(builder.getBindings(), [0])
+
+  builder = getMySqlBuilder()
+  builder.select('*').from('users').where('id', '=', 1).orWhereJsonLength('options->languages', new Raw('0'))
+  t.is(builder.toSql(), 'select * from `users` where `id` = ? or json_length(`options`, \'$."languages"\') = 0')
+  t.deepEqual(builder.getBindings(), [1])
+
+  builder = getMySqlBuilder()
+  builder.select('*').from('users').where('id', '=', 1).orWhereJsonLength('options->languages', '>', new Raw('0'))
+  t.is(builder.toSql(), 'select * from `users` where `id` = ? or json_length(`options`, \'$."languages"\') > 0')
+  t.deepEqual(builder.getBindings(), [1])
+})
+
+test('testWhereJsonLengthPostgres', async (t) => {
+  let builder = getPostgresBuilder()
+  builder.select('*').from('users').whereJsonLength('options', 0)
+  t.is(builder.toSql(), 'select * from "users" where jsonb_array_length(("options")::jsonb) = ?')
+  t.deepEqual(builder.getBindings(), [0])
+
+  builder = getPostgresBuilder()
+  builder.select('*').from('users').whereJsonLength('users.options->languages', '>', 0)
+  t.is(builder.toSql(), 'select * from "users" where jsonb_array_length(("users"."options"->\'languages\')::jsonb) > ?')
+  t.deepEqual(builder.getBindings(), [0])
+
+  builder = getPostgresBuilder()
+  builder.select('*').from('users').where('id', '=', 1).orWhereJsonLength('options->languages', new Raw('0'))
+  t.is(builder.toSql(), 'select * from "users" where "id" = ? or jsonb_array_length(("options"->\'languages\')::jsonb) = 0')
+  t.deepEqual(builder.getBindings(), [1])
+
+  builder = getPostgresBuilder()
+  builder.select('*').from('users').where('id', '=', 1).orWhereJsonLength('options->languages', '>', new Raw('0'))
+  t.is(builder.toSql(), 'select * from "users" where "id" = ? or jsonb_array_length(("options"->\'languages\')::jsonb) > 0')
+  t.deepEqual(builder.getBindings(), [1])
+})
+
+test('testWhereJsonLengthSqlite', async (t) => {
+  let builder = getSQLiteBuilder()
+  builder.select('*').from('users').whereJsonLength('options', 0)
+  t.is(builder.toSql(), 'select * from "users" where json_array_length("options") = ?')
+  t.deepEqual(builder.getBindings(), [0])
+
+  builder = getSQLiteBuilder()
+  builder.select('*').from('users').whereJsonLength('users.options->languages', '>', 0)
+  t.is(builder.toSql(), 'select * from "users" where json_array_length("users"."options", \'$."languages"\') > ?')
+  t.deepEqual(builder.getBindings(), [0])
+
+  builder = getSQLiteBuilder()
+  builder.select('*').from('users').where('id', '=', 1).orWhereJsonLength('options->languages', new Raw('0'))
+  t.is(builder.toSql(), 'select * from "users" where "id" = ? or json_array_length("options", \'$."languages"\') = 0')
+  t.deepEqual(builder.getBindings(), [1])
+
+  builder = getSQLiteBuilder()
+  builder.select('*').from('users').where('id', '=', 1).orWhereJsonLength('options->languages', '>', new Raw('0'))
+  t.is(builder.toSql(), 'select * from "users" where "id" = ? or json_array_length("options", \'$."languages"\') > 0')
+  t.deepEqual(builder.getBindings(), [1])
+})
+
+test('testWhereJsonLengthSqlServer', async (t) => {
+  let builder = getSqlServerBuilder()
+  builder.select('*').from('users').whereJsonLength('options', 0)
+  t.is(builder.toSql(), 'select * from [users] where (select count(*) from openjson([options])) = ?')
+  t.deepEqual(builder.getBindings(), [0])
+
+  builder = getSqlServerBuilder()
+  builder.select('*').from('users').whereJsonLength('users.options->languages', '>', 0)
+  t.is(builder.toSql(), 'select * from [users] where (select count(*) from openjson([users].[options], \'$."languages"\')) > ?')
+  t.deepEqual(builder.getBindings(), [0])
+
+  builder = getSqlServerBuilder()
+  builder.select('*').from('users').where('id', '=', 1).orWhereJsonLength('options->languages', new Raw('0'))
+  t.is(builder.toSql(), 'select * from [users] where [id] = ? or (select count(*) from openjson([options], \'$."languages"\')) = 0')
+  t.deepEqual(builder.getBindings(), [1])
+
+  builder = getSqlServerBuilder()
+  builder.select('*').from('users').where('id', '=', 1).orWhereJsonLength('options->languages', '>', new Raw('0'))
+  t.is(builder.toSql(), 'select * from [users] where [id] = ? or (select count(*) from openjson([options], \'$."languages"\')) > 0')
+  t.deepEqual(builder.getBindings(), [1])
+})
+
+test('testFrom', async (t) => {
+  let builder = getBuilder()
+  builder.from(getBuilder().from('users'), 'u')
+  t.is(builder.toSql(), 'select * from (select * from "users") as "u"')
+
+  builder = getBuilder()
+  const eloquentBuilder = new EloquentBuilder(getBuilder())
+  builder.from(eloquentBuilder.from('users'), 'u')
+  t.is(builder.toSql(), 'select * from (select * from "users") as "u"')
+})
+
+test('testFromSub', async (t) => {
+  let builder = getBuilder()
+  builder.fromSub((query) => {
+    query.select(new Raw('max(last_seen_at) as last_seen_at')).from('user_sessions').where('foo', '=', '1')
+  }, 'sessions').where('bar', '<', '10')
+
+  t.is(builder.toSql(), 'select * from (select max(last_seen_at) as last_seen_at from "user_sessions" where "foo" = ?) as "sessions" where "bar" < ?')
+  t.deepEqual(builder.getBindings(), ['1', '10'])
+
+  const error = t.throws(() => {
+    builder = getBuilder()
+    builder.fromSub(['invalid'], 'sessions').where('bar', '<', '10')
+  }, { instanceOf: Error })
+
+  t.true(error.message.includes('InvalidArgumentException'))
+})
+
+test('testFromSubWithPrefix', async (t) => {
+  const builder = getBuilder()
+  builder.getGrammar().setTablePrefix('prefix_')
+  builder.fromSub((query) => {
+    query.select(new Raw('max(last_seen_at) as last_seen_at')).from('user_sessions').where('foo', '=', '1')
+  }, 'sessions').where('bar', '<', '10')
+  t.is(builder.toSql(), 'select * from (select max(last_seen_at) as last_seen_at from "prefix_user_sessions" where "foo" = ?) as "prefix_sessions" where "bar" < ?')
+  t.deepEqual(builder.getBindings(), ['1', '10'])
+})
+
+test('testFromSubWithoutBindings', async (t) => {
+  let builder = getBuilder()
+  builder.fromSub(function (query) {
+    query.select(new Raw('max(last_seen_at) as last_seen_at')).from('user_sessions')
+  }, 'sessions')
+  t.is(builder.toSql(), 'select * from (select max(last_seen_at) as last_seen_at from "user_sessions") as "sessions"')
+
+  const error = t.throws(() => {
+    builder = getBuilder()
+    builder.fromSub(['invalid'], 'sessions')
+  })
+
+  t.true(error.message.includes('InvalidArgumentException'))
+})
+
+test('testFromRaw', async (t) => {
+  const builder = getBuilder()
+  builder.fromRaw(new Raw('(select max(last_seen_at) as last_seen_at from "user_sessions") as "sessions"'))
+  t.is(builder.toSql(), 'select * from (select max(last_seen_at) as last_seen_at from "user_sessions") as "sessions"')
+})
+
+test('testFromRawOnSqlServer', async (t) => {
+  const builder = getSqlServerBuilder()
+  builder.fromRaw('dbo.[SomeNameWithRoundBrackets (test)]')
+  t.is(builder.toSql(), 'select * from dbo.[SomeNameWithRoundBrackets (test)]')
+})
+
+test('testFromRawWithWhereOnTheMainQuery', async (t) => {
+  const builder = getBuilder()
+  builder.fromRaw(new Raw('(select max(last_seen_at) as last_seen_at from "sessions") as "last_seen_at"')).where('last_seen_at', '>', '1520652582')
+  t.is(builder.toSql(), 'select * from (select max(last_seen_at) as last_seen_at from "sessions") as "last_seen_at" where "last_seen_at" > ?')
+  t.deepEqual(['1520652582'], builder.getBindings())
+})
+
+test('testFromQuestionMarkOperatorOnPostgres', async (t) => {
+  let builder = getPostgresBuilder()
+  builder.select('*').from('users').where('roles', '?', 'superuser')
+  t.is(builder.toSql(), 'select * from "users" where "roles" ?? ?')
+
+  builder = getPostgresBuilder()
+  builder.select('*').from('users').where('roles', '?|', 'superuser')
+  t.is(builder.toSql(), 'select * from "users" where "roles" ??| ?')
+
+  builder = getPostgresBuilder()
+  builder.select('*').from('users').where('roles', '?&', 'superuser')
+  t.is(builder.toSql(), 'select * from "users" where "roles" ??& ?')
+})
+
+test('testUseIndexMySql', async (t) => {
+  const builder = getMySqlBuilder()
+  builder.select('foo').from('users').useIndex('test_index')
+  t.is(builder.toSql(), 'select `foo` from `users` use index (test_index)')
+})
+
+test('testForceIndexMySql', async (t) => {
+  const builder = getMySqlBuilder()
+  builder.select('foo').from('users').forceIndex('test_index')
+  t.is(builder.toSql(), 'select `foo` from `users` force index (test_index)')
+})
+
+test('testIgnoreIndexMySql', async (t) => {
+  const builder = getMySqlBuilder()
+  builder.select('foo').from('users').ignoreIndex('test_index')
+  t.is(builder.toSql(), 'select `foo` from `users` ignore index (test_index)')
+})
+
+test('testUseIndexSqlite', async (t) => {
+  const builder = getSQLiteBuilder()
+  builder.select('foo').from('users').useIndex('test_index')
+  t.is(builder.toSql(), 'select "foo" from "users"')
+})
+
+test('testForceIndexSqlite', async (t) => {
+  const builder = getSQLiteBuilder()
+  builder.select('foo').from('users').forceIndex('test_index')
+  t.is(builder.toSql(), 'select "foo" from "users" indexed by test_index')
+})
+
+test('testIgnoreIndexSqlite', async (t) => {
+  const builder = getSQLiteBuilder()
+  builder.select('foo').from('users').ignoreIndex('test_index')
+  t.is(builder.toSql(), 'select "foo" from "users"')
+})
+
+test('testUseIndexSqlServer', async (t) => {
+  const builder = getSqlServerBuilder()
+  builder.select('foo').from('users').useIndex('test_index')
+  t.is(builder.toSql(), 'select [foo] from [users]')
+})
+
+test('testForceIndexSqlServer', async (t) => {
+  const builder = getSqlServerBuilder()
+  builder.select('foo').from('users').forceIndex('test_index')
+  t.is(builder.toSql(), 'select [foo] from [users] with (index(test_index))')
+})
+
+test('testIgnoreIndexSqlServer', async (t) => {
+  const builder = getSqlServerBuilder()
+  builder.select('foo').from('users').ignoreIndex('test_index')
+  t.is(builder.toSql(), 'select [foo] from [users]')
+})
+
+test('testClone', async (t) => {
+  const builder = getBuilder()
+  builder.select('*').from('users')
+  const clone = builder.clone().where('email', 'foo')
+
+  t.not(builder, clone)
+  t.is(builder.toSql(), 'select * from "users"')
+  t.is(clone.toSql(), 'select * from "users" where "email" = ?')
+})
+
+test('testCloneWithout', async (t) => {
+  const builder = getBuilder()
+  builder.select('*').from('users').where('email', 'foo').orderBy('email')
+  const clone = builder.cloneWithout(['orders'])
+
+  t.is(builder.toSql(), 'select * from "users" where "email" = ? order by "email" asc')
+  t.is(clone.toSql(), 'select * from "users" where "email" = ?')
+})
+
+test('testCloneWithoutBindings', async (t) => {
+  const builder = getBuilder()
+  builder.select('*').from('users').where('email', 'foo').orderBy('email')
+  const clone = builder.cloneWithout(['wheres']).cloneWithoutBindings(['where'])
+
+  t.is(builder.toSql(), 'select * from "users" where "email" = ? order by "email" asc')
+  t.deepEqual(['foo'], builder.getBindings())
+
+  t.is(clone.toSql(), 'select * from "users" order by "email" asc')
+  t.deepEqual([], clone.getBindings())
+})
+
+test('testToRawSql', async (t) => {
+  const { createMock, verifyMock } = mock()
+
+  const builder = getBuilder()
+  createMock(builder.getConnection()).expects('prepareBindings')
+    .withArgs(['foo'])
+    .returns(['foo'])
+
+  createMock(builder.grammar).expects('substituteBindingsIntoRawSql')
+    .withArgs('select * from "users" where "email" = ?', ['foo'])
+    .returns('select * from "users" where "email" = \'foo\'')
+
+  builder.select('*').from('users').where('email', 'foo')
+
+  t.is(builder.toRawSql(), 'select * from "users" where "email" = \'foo\'')
+
+  verifyMock()
+})

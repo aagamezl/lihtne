@@ -2,7 +2,6 @@ import { getValue } from '@devnetic/utils'
 
 import Conditionable from '../../Conditionable/Traits/Conditionable.js'
 import use from '../../Support/Traits/use.js'
-import { clone } from '../../Support/helpers.js'
 
 export default class BuildsQueries {
   /**
@@ -104,7 +103,8 @@ export default class BuildsQueries {
     let countResults
 
     do {
-      const cloned = clone(this)
+      // const cloned = clone(this)
+      const cloned = this
       let results
 
       // We'll execute the query for the given page and get the results. If there are

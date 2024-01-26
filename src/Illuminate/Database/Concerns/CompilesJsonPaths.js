@@ -45,6 +45,7 @@ export default class CompilesJsonPaths {
   /**
    * Wrap the given JSON path segment.
    *
+   * @protected
    * @param  {string}  segment
    * @return {string}
    */
@@ -54,7 +55,7 @@ export default class CompilesJsonPaths {
     if (parts !== null) {
       const key = Str.beforeLast(segment, parts[0])
 
-      if (!key.length === 0) {
+      if (key.length !== 0) {
         return '"' + key + '"' + parts[0]
       }
 
