@@ -3,11 +3,18 @@ import { dateFormat, getValue, isFunction, isNumeric } from '@devnetic/utils'
 import DetectsLostConnections from './DetectsLostConnections.js'
 import Expression from './Query/Expression.js'
 import Processor from './Query/Processors/Processor.js'
-import QueryBuilder from './Query/Builder.js'
+import { Builder as QueryBuilder } from './Query/internal.js'
 import QueryExecuted from './Events/QueryExecuted.js'
 import QueryGrammar from './Query/Grammars/Grammar.js'
 import StatementPrepared from './Events/StatementPrepared.js'
 import use from '../Support/Traits/use.js'
+
+/**
+ * @typedef {Object} QueryLogEntry
+ * @property {string} query - The query string.
+ * @property {Record<string, unknown>} bindings - Bindings for the query parameters.
+ * @property {number} time - The time parameter.
+ */
 
 export default class Connection {
   /**
@@ -16,6 +23,104 @@ export default class Connection {
    * @var Record<string, unknown>
    */
   static { this.resolvers = {} }
+
+  /**
+   * The database connection configuration options.
+   *
+   * @type {object}
+   */
+  config = {}
+
+  /**
+   * The name of the connected database.
+   *
+   * @type {string}
+   */
+  database = ''
+
+  /**
+   * The event dispatcher instance.
+   *
+   * @type {import('../Contracts/Events/Dispatcher.js').default}
+   */
+  events = undefined
+
+  /**
+   * The default fetch mode of the connection.
+   *
+   * @type {string}
+   */
+  fetchMode = 'obj' // assoc, obj
+
+  /**
+   * Indicates whether queries are being logged.
+   *
+   * @type {boolean}
+   */
+  loggingQueries = false
+
+  /**
+   * The active NDO connection.
+   *
+   * @member {object|Function}
+   */
+  ndo
+
+  /**
+   * The query post processor implementation.
+   *
+   * @type {import('./Query/Processors/Processor.js').default}
+   */
+  postProcessor
+
+  /**
+   * Indicates if the connection is in a "dry run".
+   *
+   * @type {boolean}
+   */
+  pretendingConnection = false
+
+  /**
+   * The query grammar implementation.
+   *
+   * @type {import('./Query/Grammars/Grammar.js').default}
+   */
+  queryGrammar = undefined
+
+  /**
+   * All of the queries run against the connection.
+   *
+   * @type {QueryLogEntry[]}
+   */
+  queryLog = []
+
+  /**
+   * The reconnector instance for the connection.
+   *
+   * @type {Function}
+   */
+  reconnector = () => { }
+
+  /**
+   * Indicates if changes have been made to the database.
+   *
+   * @type {boolean}
+   */
+  recordsModified = false
+
+  /**
+   * The table prefix for the connection.
+   *
+   * @type {string}
+   */
+  tablePrefix = ''
+
+  /**
+   * The number of active transactions.
+   *
+   * @type {number}
+   */
+  transactions = 0
 
   /**
    * Create a new database connection instance.
@@ -27,99 +132,9 @@ export default class Connection {
    * @return {void}
    */
   constructor (ndo, // TODO: verify the real type and remove the any
-    database = '', tablePrefix = '', config = {}) {
+    database = '', tablePrefix = '', config = {}
+  ) {
     use(this.constructor, [DetectsLostConnections])
-
-    /**
-     * The database connection configuration options.
-     *
-     * @type {object}
-     */
-    this.config = {}
-
-    /**
-     * The name of the connected database.
-     *
-     * @type {string}
-     */
-    this.database = ''
-
-    /**
-     * The event dispatcher instance.
-     *
-     * @type {\Illuminate\Contracts\Events\Dispatcher}
-     */
-    this.events = undefined
-
-    /**
-     * The default fetch mode of the connection.
-     *
-     * @type {string}
-     */
-    this.fetchMode = 'obj' // assoc, obj
-
-    /**
-     * Indicates whether queries are being logged.
-     *
-     * @type {boolean}
-     */
-    this.loggingQueries = false
-
-    /**
-     * The query post processor implementation.
-     *
-     * @type {\Illuminate\Database\Query\Processors\Processor}
-     */
-    this.postProcessor = undefined
-
-    /**
-     * Indicates if the connection is in a "dry run".
-     *
-     * @type {boolean}
-     */
-    this.pretendingConnection = false
-
-    /**
-     * The query grammar implementation.
-     *
-     * @type {\Illuminate\Database\Query\Grammars\Grammar}
-     */
-    this.queryGrammar = undefined
-
-    /**
-     * All of the queries run against the connection.
-     *
-     * @type {QueryLog[]}
-     */
-    this.queryLog = []
-
-    /**
-     * The reconnector instance for the connection.
-     *
-     * @type {Function}
-     */
-    this.reconnector = () => { }
-
-    /**
-     * Indicates if changes have been made to the database.
-     *
-     * @type {boolean}
-     */
-    this.recordsModified = false
-
-    /**
-     * The table prefix for the connection.
-     *
-     * @type {string}
-     */
-    this.tablePrefix = ''
-
-    /**
-     * The number of active transactions.
-     *
-     * @type {number}
-     */
-    this.transactions = 0
 
     this.ndo = ndo
 
@@ -127,13 +142,16 @@ export default class Connection {
     // name we are connected to since it is needed when some reflective
     // type commands are run such as checking whether a table exists.
     this.database = database
+
     this.tablePrefix = tablePrefix
+
     this.config = config
 
     // We need to initialize a query grammar and the query post processors
     // which are both very importa parts of the database abstractions
     // so we initialize these to their default values while starting.
     this.useDefaultQueryGrammar()
+
     this.useDefaultPostProcessor()
   }
 
@@ -197,7 +215,6 @@ export default class Connection {
    */
   disconnect () {
     this.setNdo(undefined)
-    // this.doctrineConnection = null
   }
 
   /**
@@ -269,15 +286,26 @@ export default class Connection {
   }
 
   /**
+   * Get the database connection full name.
+   *
+   * @return {string|undefined}
+   */
+  getNameWithReadWriteType () {
+    return this.getName()
+  }
+
+  /**
    * Get the current PDO connection.
    *
-   * @return {Statement}
+   * @return {import('./Statements/Statement.js').default}
    */
   getNdo () {
     if (isFunction(this.ndo)) {
       this.ndo = this.ndo()
+
       return this.ndo
     }
+
     return this.ndo
   }
 
@@ -287,9 +315,9 @@ export default class Connection {
    * @param  {boolean}  [useReadNdo=true]
    * @return {Statement}
    */
-  getNdoForSelect () {
-    return this.getNdo()
-  }
+  // getNdoForSelect () {
+  //   return this.getNdo()
+  // }
 
   /**
    * Get the query post processor used by the connection.
@@ -343,6 +371,7 @@ export default class Connection {
     if (this.transactions >= 1) {
       throw error
     }
+
     return this.tryAgainIfCausedByLostConnection(error, query, bindings, callback)
   }
 
@@ -367,6 +396,7 @@ export default class Connection {
    */
   logQuery (query, bindings, time) {
     this.event(new QueryExecuted(query, bindings, time, this))
+
     if (this.loggingQueries) {
       this.queryLog.push({ query, bindings, time })
     }
@@ -380,6 +410,7 @@ export default class Connection {
    */
   prepareBindings (bindings) {
     const grammar = this.getQueryGrammar()
+
     for (const [key, value] of Object.entries(bindings)) {
       // We need to transform all instances of DateTimeInterface into the actual
       // date string. Each query grammar maintains its own date string format
@@ -390,6 +421,7 @@ export default class Connection {
         bindings[key] = Number(value)
       }
     }
+
     return bindings
   }
 
@@ -401,7 +433,9 @@ export default class Connection {
    */
   prepared (statement) {
     statement.setFetchMode(this.fetchMode)
+
     this.event(new StatementPrepared(this, statement))
+
     return statement
   }
 
@@ -417,7 +451,7 @@ export default class Connection {
   /**
    * Get a new query builder instance.
    *
-   * @return {\Illuminate\Database\Query\Builder}
+   * @return {import('./Query/Builder.js').default}
    */
   query () {
     return new QueryBuilder(this, this.getQueryGrammar(), this.getPostProcessor())
@@ -444,6 +478,7 @@ export default class Connection {
     if (isFunction(this.reconnector)) {
       return this.reconnector(this)
     }
+
     throw new Error('LogicException: Lost connection and no reconnector available.')
   }
 
@@ -482,20 +517,25 @@ export default class Connection {
    */
   async run (query, bindings, callback) {
     this.reconnectIfMissingConnection()
+
     const start = Date.now()
+
     let result
+
     // Here we will run this query. If an exception occurs we'll determine if it was
     // caused by a connection that has been lost. If that is the cause, we'll try
     // to re-establish connection and re-run the query with a fresh connection.
     try {
       result = await this.runQueryCallback(query, bindings, callback)
-    } catch (error) {
+    } catch (/** @type {any} */error) {
       result = this.handleQueryException(error, query, bindings, callback)
     }
+
     // Once we have run the query we will calculate the time that it took to run and
     // then log the query, bindings, and execution time so we will report them on
     // the event that the developer needs them. We'll log time in milliseconds.
     this.logQuery(query, bindings, this.getElapsedTime(start))
+
     return result
   }
 
@@ -515,12 +555,15 @@ export default class Connection {
     // took to execute and log the query SQL, bindings and time in our memory.
     try {
       const result = await callback(query, bindings)
+
       return result
     } catch (error) {
       // If an exception occurs when attempting to run a query, we'll format the error
       // message to include the bindings with SQL, which will make this exception a
       // lot more helpful to the developer instead of just the database's errors.
-      throw new Error(`QueryException: ${query} - ${JSON.stringify(this.prepareBindings(bindings))}`)
+      throw new Error(
+        `QueryException: ${query} - ${JSON.stringify(this.prepareBindings(bindings))}`
+      )
     }
   }
 
@@ -536,14 +579,19 @@ export default class Connection {
       if (this.pretending()) {
         return []
       }
+
       // For select statements, we'll simply execute the query and return an array
       // of the database result set. Each element in the array will be a single
       // row from the database table, and will either be an array or objects.
       const statement = this.prepared(
         // this.connection, query
-        this.getNdoForSelect().prepare(query))
+        this.getNdo().prepare(query)
+      )
+
       this.bindValues(statement, this.prepareBindings(bindings))
+
       await statement.execute()
+
       return statement.fetchAll()
     })
   }
@@ -567,6 +615,7 @@ export default class Connection {
    */
   setEventDispatcher (events) {
     this.events = events
+
     return this
   }
 
@@ -578,7 +627,9 @@ export default class Connection {
    */
   setNdo (ndo) {
     this.transactions = 0
+
     this.ndo = ndo
+
     return this
   }
 
@@ -590,6 +641,7 @@ export default class Connection {
    */
   setReconnector (reconnector) {
     this.reconnector = reconnector
+
     return this
   }
 
@@ -605,10 +657,15 @@ export default class Connection {
       if (this.pretending()) {
         return true
       }
+
       const statement = this.getNdo().prepare(query)
+
       this.bindValues(statement, this.prepareBindings(bindings))
+
       this.recordsHaveBeenModified()
+
       const result = await statement.execute()
+
       return result
     })
   }

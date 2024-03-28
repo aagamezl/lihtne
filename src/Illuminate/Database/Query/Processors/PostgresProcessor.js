@@ -10,14 +10,14 @@ export default class PostgresProcessor extends Processor {
    * @param  {string}  sql
    * @param  {array}  values
    * @param  {string}  [sequence]
-   * @return {number}
+   * @return {number|string}
    */
   async processInsertGetId (query, sql, values, sequence) {
     const connection = query.getConnection()
 
     connection.recordsHaveBeenModified()
 
-    const result = connection.selectFromWriteConnection(sql, values)
+    const result = await connection.selectFromWriteConnection(sql, values)
 
     sequence = sequence ?? 'id'
 

@@ -1,4 +1,4 @@
-export const instanceProxy = (instance, handler) => {
+const InstanceProxy = (instance, handler) => {
   const proxyHandler = handler ?? {
     get (target, property, receiver) {
       if (Reflect.has(target, property)) {
@@ -6,7 +6,7 @@ export const instanceProxy = (instance, handler) => {
       }
 
       return (...args) => {
-        return receiver.__call(property, ...args)
+        return receiver.call(property, ...args)
       }
     },
     getPrototypeOf (target) {
@@ -16,3 +16,5 @@ export const instanceProxy = (instance, handler) => {
 
   return new Proxy(instance, proxyHandler)
 }
+
+export default InstanceProxy

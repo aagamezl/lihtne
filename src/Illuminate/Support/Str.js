@@ -1,3 +1,5 @@
+import { castArray } from '@devnetic/utils'
+
 export default class Str {
   /**
    * Return the remainder of a string after the first occurrence of a given value.
@@ -27,6 +29,23 @@ export default class Str {
 
     for (const needle of needles) {
       if (haystack.includes(needle)) {
+        return true
+      }
+    }
+
+    return false
+  }
+
+  /**
+   * Determine if a given string ends with a given substring.
+   *
+   * @param  {string}  haystack
+   * @param  {string|string[]}  needles
+   * @return {boolean}
+   */
+  static endsWith (haystack, needles) {
+    for (const needle of castArray(needles)) {
+      if (needle !== '' && needle !== undefined && haystack.endsWith(needle)) {
         return true
       }
     }

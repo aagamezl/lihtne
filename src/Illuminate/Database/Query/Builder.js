@@ -19,7 +19,7 @@ import ConditionExpression from './ConditionExpression.js'
 import EloquentBuilder from '../Eloquent/Builder.js'
 import Expression from './Expression.js'
 import IndexHint from './IndexHint.js'
-import JoinClause from './JoinClause.js'
+import { JoinClause } from './internal.js'
 import LengthAwarePaginator from '../../Pagination/LengthAwarePaginator.js'
 import Macroable from '../../Macroable/Traits/Macroable.js'
 import Relation from '../Eloquent/Relations/Relation.js'
@@ -926,7 +926,7 @@ export default class Builder {
       return this.fromSub(table, as)
     }
 
-    this.fromProperty = as !== undefined ? `${String(table)} as ${as}` : String(table)
+    this.fromProperty = as !== undefined ? `${table} as ${as}` : table
 
     return this
   }
@@ -1413,7 +1413,7 @@ export default class Builder {
   /**
    * Add a join clause to the query.
    *
-   * @param  {string}  table
+   * @param  {Expression|string}  table
    * @param  {Function|string}  first
    * @param  {string|undefined}  [operator]
    * @param  {string|undefined}  [second]
@@ -1450,7 +1450,7 @@ export default class Builder {
   /**
    * Add a subquery join clause to the query.
    *
-   * @param  {Function|Builder|\Illuminate\Database\Eloquent\Builder|string}  query
+   * @param  {Function|Builder|EloquentBuilder|string}  query
    * @param  {string}  as
    * @param  {Function|string}  first
    * @param  {string|undefined}  operator
@@ -1463,9 +1463,13 @@ export default class Builder {
    */
   joinSub (query, as, first, operator, second, type = 'inner', where = false) {
     let bindings;
+
     [query, bindings] = this.createSub(query)
-    const expression = '(' + String(query) + ') as ' + this.grammar.wrapTable(as)
+
+    const expression = '(' + query + ') as ' + this.grammar.wrapTable(as)
+
     this.addBinding(bindings, 'join')
+
     return this.join(new Expression(expression), first, operator, second, type, where)
   }
 
@@ -1622,7 +1626,7 @@ export default class Builder {
    * @param  {Builder}  parentQuery
    * @param  {string}  type
    * @param  {string}  table
-   * @return {\Illuminate\Database\Query\JoinClause}
+   * @return {JoinClause}
    */
   newJoinClause (parentQuery, type, table) {
     return new JoinClause(parentQuery, type, table)
@@ -2151,6 +2155,7 @@ export default class Builder {
       query instanceof EloquentBuilder ||
       query instanceof Relation) {
       query = this.prependDatabaseNameIfCrossDatabaseQuery(query)
+
       return [query.toSql(), query.getBindings()]
     } else if (typeof query === 'string') {
       return [query, []]
@@ -2245,10 +2250,12 @@ export default class Builder {
   prependDatabaseNameIfCrossDatabaseQuery (query) {
     if (query.getConnection().getDatabaseName() !== this.getConnection().getDatabaseName()) {
       const databaseName = query.getConnection().getDatabaseName()
+
       if (query.fromProperty.startsWith(databaseName) === false && query.fromProperty.includes('.') === false) {
         query.from(databaseName + '.' + query.fromProperty)
       }
     }
+
     return query
   }
 

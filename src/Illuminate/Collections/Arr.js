@@ -376,6 +376,7 @@ export default class Arr {
     if (isFalsy(value)) {
       return []
     }
+
     return Array.isArray(value) ? value : [value]
   }
 }

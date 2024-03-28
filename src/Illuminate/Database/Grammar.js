@@ -87,6 +87,18 @@ export default class Grammar {
   }
 
   /**
+   * Set the grammar's database connection.
+   *
+   * @param  {import('./Connection.js').default}  connection
+   * @return {this}
+   */
+  setConnection (connection) {
+    this.connection = connection
+
+    return this
+  }
+
+  /**
    * Set the grammar's table prefix.
    *
    * @param  {string}  prefix

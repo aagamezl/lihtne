@@ -1,7 +1,7 @@
 import { clone, isFalsy, isNil, isTruthy, merge } from '@devnetic/utils'
 
 import { collect } from '../../Collections/helpers.js'
-import { instanceProxy } from '../../Support/Proxies/InstanceProxy.js'
+import InstanceProxy from '../../Support/Proxies/InstanceProxy.js'
 import ForwardsCalls from '../../Support/Traits/ForwardsCalls.js'
 import use from '../../Support/Traits/use.js'
 import BuildsQueries from '../Concerns/BuildsQueries.js'
@@ -18,8 +18,7 @@ export default class Builder {
   /**
    * Create a new Eloquent query builder instance.
    *
-   * @param  {\Illuminate\Database\Query\Builder}  query
-   * @return {void}
+   * @param  {import('../Query/Builder.js').default}  query
    */
   constructor (query) {
     use(this.constructor, [BuildsQueries, ForwardsCalls])
@@ -77,7 +76,7 @@ export default class Builder {
 
     this.query = query
 
-    return instanceProxy(this)
+    return InstanceProxy(this)
   }
 
   /**
@@ -87,7 +86,7 @@ export default class Builder {
    * @param  {any[]}  parameters
    * @return {any}
    */
-  __call (method, ...parameters) {
+  call (method, ...parameters) {
     if (method === 'macro') {
       this.localMacros[parameters[0]] = parameters[1]
       return

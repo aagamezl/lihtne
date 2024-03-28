@@ -8,46 +8,23 @@ export const arrayDiff = (array1, array2) => {
   return array1.filter(value => !array2.includes(value))
 }
 
-export const mergeArrays = (array1, array2) => {
-  const result = []
+/**
+ *
+ * @param {string} str
+ * @returns {string}
+ */
+export const bin2hex = (str) => {
+  return str.split('').reduce((result, char) => {
+    const hexCode = char.charCodeAt().toString(16)
 
-  for (const element of array1) {
-    if (typeof element === 'object' && element !== null && !Array.isArray(element)) {
-      // Check if an object with the same key already exists in the result array
-      const existingObject = result.find(obj => typeof obj === 'object' && obj !== null && Object.keys(obj).some(key => element[key] !== undefined))
-
-      // If an existing object is found, override its properties
-      if (existingObject) {
-        Object.assign(existingObject, element)
-      } else {
-        // Otherwise, add the object to the result array
-        result.push({ ...element })
-      }
+    if (hexCode.length < 2) {
+      result += '0' + hexCode
     } else {
-      // For non-object elements, add them directly to the result array
-      result.push(element)
+      result += hexCode
     }
-  }
 
-  for (const element of array2) {
-    if (typeof element === 'object' && element !== null && !Array.isArray(element)) {
-      // Check if an object with the same key already exists in the result array
-      const existingObject = result.find(obj => typeof obj === 'object' && obj !== null && Object.keys(obj).some(key => element[key] !== undefined))
-
-      // If an existing object is found, override its properties
-      if (existingObject) {
-        Object.assign(existingObject, element)
-      } else {
-        // Otherwise, add the object to the result array
-        result.push({ ...element })
-      }
-    } else {
-      // For non-object elements, add them directly to the result array
-      result.push(element)
-    }
-  }
-
-  return result
+    return result
+  }, '')
 }
 
 export const castArray = (value) => {
@@ -153,6 +130,16 @@ export const explode = (delimiter, string, limit = 0) => {
   return result
 }
 
+export const hex2bin = str => {
+  return str.match(/.{1,2}/g).reduce((result, hex) => {
+    const charCode = parseInt(hex, 16)
+
+    result += String.fromCharCode(charCode)
+
+    return result
+  }, '')
+}
+
 export const isDirectory = (path) => {
   try {
     return lstatSync(path).isDirectory()
@@ -171,12 +158,46 @@ export const ksort = (value) => {
     }, {})
 }
 
-export const pregMatchAll = (subject, regex) => {
-  const matches = Array.from(subject.matchAll(regex), match => match[0])
+export const mergeArrays = (array1, array2) => {
+  const result = []
 
-  const keys = matches.map(match => match[1])
+  for (const element of array1) {
+    if (typeof element === 'object' && element !== null && !Array.isArray(element)) {
+      // Check if an object with the same key already exists in the result array
+      const existingObject = result.find(obj => typeof obj === 'object' && obj !== null && Object.keys(obj).some(key => element[key] !== undefined))
 
-  return [[...matches], [...keys]]
+      // If an existing object is found, override its properties
+      if (existingObject) {
+        Object.assign(existingObject, element)
+      } else {
+        // Otherwise, add the object to the result array
+        result.push({ ...element })
+      }
+    } else {
+      // For non-object elements, add them directly to the result array
+      result.push(element)
+    }
+  }
+
+  for (const element of array2) {
+    if (typeof element === 'object' && element !== null && !Array.isArray(element)) {
+      // Check if an object with the same key already exists in the result array
+      const existingObject = result.find(obj => typeof obj === 'object' && obj !== null && Object.keys(obj).some(key => element[key] !== undefined))
+
+      // If an existing object is found, override its properties
+      if (existingObject) {
+        Object.assign(existingObject, element)
+      } else {
+        // Otherwise, add the object to the result array
+        result.push({ ...element })
+      }
+    } else {
+      // For non-object elements, add them directly to the result array
+      result.push(element)
+    }
+  }
+
+  return result
 }
 
 export const objectDiffKey = (target, ...from) => {
@@ -191,6 +212,14 @@ export const objectDiffKey = (target, ...from) => {
 
     return result
   }, {})
+}
+
+export const pregMatchAll = (subject, regex) => {
+  const matches = Array.from(subject.matchAll(regex), match => match[0])
+
+  const keys = matches.map(match => match[1])
+
+  return [[...matches], [...keys]]
 }
 
 /**
@@ -292,4 +321,20 @@ export const tap = (value, callback) => {
   callback(value)
 
   return value
+}
+
+/**
+ *
+ * @param {string} type
+ * @param {string} [message]
+ * @throws {RuntimeException}
+ */
+export const throwException = (type, message = undefined) => {
+  switch (type) {
+    case 'abstract':
+      throw new Error('RuntimeException: Cannot create an instance of an abstract class.')
+
+    case 'concrete-method':
+      throw new Error(`RuntimeException: Implement ${message} method on concrete class.`)
+  }
 }
