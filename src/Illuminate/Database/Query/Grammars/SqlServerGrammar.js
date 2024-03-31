@@ -24,7 +24,7 @@ export default class SqlServerGrammar extends Grammar {
     /**
      * The components that make up a select clause.
      *
-     * @type {import('./Grammar.js').SelectComponents}
+     * @type {import('./Grammar.js').SelectComponent[]}
      */
     this.selectComponents = [
       { name: 'aggregate', property: 'aggregateProperty' },
@@ -55,8 +55,8 @@ export default class SqlServerGrammar extends Grammar {
     }
 
     let select = isTruthy(query.distinctProperty) ? 'select distinct ' : 'select '
-    const limit = (query.limitProperty ?? 0) | 0
-    const offset = (query.offsetProperty ?? 0) | 0
+    const limit = (query.limitProperty || 0) | 0
+    const offset = (query.offsetProperty || 0) | 0
 
     // If there is a limit on the query, but not an offset, we will add the top
     // clause to the query, which serves as a "limit" type clause within the
@@ -79,7 +79,7 @@ export default class SqlServerGrammar extends Grammar {
   compileDeleteWithoutJoins (query, table, where) {
     const sql = super.compileDeleteWithoutJoins(query, table, where)
 
-    return query.limitProperty !== undefined && query.limitProperty > 0 && (query.offsetProperty === undefined || query.offsetProperty <= 0)
+    return query.limitProperty !== undefined && query.limitProperty > 0 && (!query.offsetProperty || query.offsetProperty <= 0)
       ? Str.replaceFirst('delete', 'delete top (' + query.limitProperty + ')', sql)
       : sql
   }

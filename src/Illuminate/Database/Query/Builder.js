@@ -30,13 +30,14 @@ import { collect, head, last, reset, value } from '../../Collections/helpers.js'
 /**
  * @typedef {Object} Having
  * @property {string} type - The type of the condition.
- * @property {string | import('./Expression.js').default} column - The column name involved in the condition.
- * @property {string} operator - The comparison operator used in the condition.
- * @property {string} value - The value to compare in the condition.
+ * @property {string | import('./Expression.js').default} [column] - The column name involved in the condition.
+ * @property {string} [operator] - The comparison operator used in the condition.
+ * @property {string} [value] - The value to compare in the condition.
  * @property {string} boolean - The boolean operator connecting multiple conditions.
- * @property {string} sql - The raw SQL expression for complex having conditions.
- * @property {string[]} values - An array of values for conditions that involve multiple values.
- * @property {boolean} not - A boolean indicating whether the condition is negated.
+ * @property {string} [sql] - The raw SQL expression for complex having conditions.
+ * @property {string[]} [values] - An array of values for conditions that involve multiple values.
+ * @property {boolean} [not] - A boolean indicating whether the condition is negated.
+ * @property {Builder} query - A boolean indicating whether the condition is negated.
  */
 
 /**
@@ -48,17 +49,17 @@ import { collect, head, last, reset, value } from '../../Collections/helpers.js'
 
 /**
  * @typedef {Object} Where
+ * @property {string|Expression} [column] - The column name for the where condition.
  * @property {string} type - The type of the date-based where clause.
- * @property {string|Expression} column - The column name for the where condition.
- * @property {boolean} not - Define if a where have a not condition.
- * @property {string} operator - The comparison operator for the where condition.
- * @property {unknown} value - The value to compare with in the where condition.
+ * @property {boolean} [not] - Define if a where have a not condition.
+ * @property {string} [operator] - The comparison operator for the where condition.
+ * @property {unknown} [value] - The value to compare with in the where condition.
  * @property {string} boolean - The boolean operator to combine multiple where conditions.
- * @property {string} sql - The raw sql for where conditions.
- * @property {Options} options - The options for where conditions.
- * @property {Builder} query - The query associated to the where conditions.
- * @property {unknown[]|Record<string, unknown>} values - The values to compare with in the where condition.
- * @property {(string | Expression)[]} columns - The columns names for the where condition.
+ * @property {string} [sql] - The raw sql for where conditions.
+ * @property {Options} [options] - The options for where conditions.
+ * @property {Builder} [query] - The query associated to the where conditions.
+ * @property {unknown[]|Record<string, unknown>} [values] - The values to compare with in the where condition.
+ * @property {(string | Expression)[]} [columns] - The columns names for the where condition.
  */
 
 /**
@@ -88,8 +89,6 @@ import { collect, head, last, reset, value } from '../../Collections/helpers.js'
  * @property {boolean} all - A boolean indicating whether to use UNION ALL (true) or UNION (false).
  */
 
-/** @typedef {import('./../../Collections/Collection.js').default} Collection */
-
 /**
  * @typedef {Object} Pagination
  * @property {Collection} items - The collection of items for the current page.
@@ -100,187 +99,191 @@ import { collect, head, last, reset, value } from '../../Collections/helpers.js'
 
 export default class Builder {
   /**
+   * An aggregate function and column to be run.
+   *
+   * @type {Record<string, unknown>|undefined}
+   */
+  aggregateProperty = undefined
+
+  /**
+   * The current query value bindings.
+   *
+   * @type {Bindings}
+   */
+  bindings = {
+    select: [],
+    from: [],
+    join: [],
+    where: [],
+    groupBy: [],
+    having: [],
+    order: [],
+    union: [],
+    unionOrder: []
+  }
+
+  /**
+   * All of the available bitwise operators.
+   *
+   * @type {string[]}
+   */
+  bitwiseOperators = [
+    '&', '|', '^', '<<', '>>', '&~'
+  ]
+
+  /**
+   * The callbacks that should be invoked before the query is executed.
+   *
+   * @type {Array}
+   */
+  beforeQueryCallbacks = []
+
+  /**
+   * The columns that should be returned.
+   *
+   * @type {unknown[]}
+   */
+  columns = []
+
+  /** @type {import('./../Connection.js').default} */
+  connection
+
+  /**
+   * Indicates if the query returns distinct results.
+   *
+   * Occasionally contains the columns that should be distinct.
+   *
+   * @type {boolean|Array}
+   */
+  distinctProperty = false
+
+  /**
+   * The table which the query is targeting.
+   *
+   * @type {string}
+   */
+  fromProperty = ''
+
+  /** @type {import('./Grammars/Grammar.js').default} */
+  grammar
+
+  /**
+   * The groupings for the query.
+   *
+   * @type {Array}
+   */
+  groups = []
+
+  /**
+   * The having constraints for the query.
+   *
+   * @type {Having[]}
+   */
+  havings = []
+
+  /**
+   * The table joins for the query.
+   *
+   * @type {Builder[]}
+   */
+  joins = []
+
+  /**
+   * The maximum number of records to return.
+   *
+   * @type {number|undefined}
+   */
+  limitProperty = undefined
+
+  /**
+   * Indicates whether row locking is being used.
+   *
+   * @type {string|boolean|undefined}
+   */
+  lockProperty = undefined
+
+  /**
+   * The number of records to skip.
+   *
+   * @type {number|undefined}
+   */
+  offsetProperty = undefined
+
+  /**
+   * All of the available clause operators.
+   *
+   * @type {string[]}
+   */
+  operators = [
+    '=', '<', '>', '<=', '>=', '<>', '!=', '<=>',
+    'like', 'like binary', 'not like', 'ilike',
+    '&', '|', '^', '<<', '>>',
+    'rlike', 'not rlike', 'regexp', 'not regexp',
+    '~', '~*', '!~', '!~*', 'similar to',
+    'not similar to', 'not ilike', '~~*', '!~~*'
+  ]
+
+  /**
+   * The orderings for the query.
+   *
+   * @type {Order[]}
+   */
+  orders = []
+
+  /** @type {import('./Processors/Processor.js').default} */
+  processor
+
+  /**
+   * The maximum number of union records to return.
+   *
+   * @type {number|undefined}
+   */
+  unionLimit = undefined
+
+  /**
+   * The number of union records to skip.
+   *
+   * @type {number|undefined}
+   */
+  unionOffset = undefined
+
+  /**
+   * The orderings for the union query.
+   *
+   * @type {Union[]}
+   */
+  unionOrders = []
+
+  /**
+   * The query union statements.
+   *
+   * @type {Union[]}
+   */
+  unions = []
+
+  /**
+   * The where constraints for the query.
+   *
+   * @type {Where[]}
+   */
+  wheres = [] // TODO: verify the correct type
+
+  /**
    * Create a new query builder instance.
    *
    * @constructor
    * @param  {import('./../Connection.js').default}  connection
    * @param  {import('./Grammars/Grammar.js').default}  [grammar]
    * @param  {import('./Processors/Processor.js').default}  [processor]
-   * @return {void}
    */
   constructor (connection, grammar, processor) {
     use(Builder, [Macroable, BuildsQueries])
 
-    /**
-     * An aggregate function and column to be run.
-     *
-     * @type {Record<string, unknown>}
-     */
-    this.aggregateProperty = undefined
-
-    /**
-     * The current query value bindings.
-     *
-     * @type {Bindings}
-     */
-    this.bindings = {
-      select: [],
-      from: [],
-      join: [],
-      where: [],
-      groupBy: [],
-      having: [],
-      order: [],
-      union: [],
-      unionOrder: []
-    }
-
-    /**
-     * All of the available bitwise operators.
-     *
-     * @type {string[]}
-     */
-    this.bitwiseOperators = [
-      '&', '|', '^', '<<', '>>', '&~'
-    ]
-
-    /**
-     * The callbacks that should be invoked before the query is executed.
-     *
-     * @type {Array}
-     */
-    this.beforeQueryCallbacks = []
-
-    /**
-     * The columns that should be returned.
-     *
-     * @type {unknown[]}
-     */
-    this.columns = []
-
-    /**
-     * Indicates if the query returns distinct results.
-     *
-     * Occasionally contains the columns that should be distinct.
-     *
-     * @type {boolean|Array}
-     */
-    this.distinctProperty = false
-
-    /**
-     * The table which the query is targeting.
-     *
-     * @type {string}
-     */
-    this.fromProperty = ''
-
-    /**
-     * The groupings for the query.
-     *
-     * @type {Array}
-     */
-    this.groups = []
-
-    /**
-     * The having constraints for the query.
-     *
-     * @type {Having[]}
-     */
-    this.havings = []
-
-    /**
-     * The table joins for the query.
-     *
-     * @type {Builder[]}
-     */
-    this.joins = []
-
-    /**
-     * The maximum number of records to return.
-     *
-     * @type {number}
-     */
-    this.limitProperty = undefined
-
-    /**
-     * Indicates whether row locking is being used.
-     *
-     * @type {string|boolean}
-     */
-    this.lockProperty = undefined
-
-    /**
-     * The number of records to skip.
-     *
-     * @type {number}
-     */
-    this.offsetProperty = undefined
-
-    /**
-     * All of the available clause operators.
-     *
-     * @type {string[]}
-     */
-    this.operators = [
-      '=', '<', '>', '<=', '>=', '<>', '!=', '<=>',
-      'like', 'like binary', 'not like', 'ilike',
-      '&', '|', '^', '<<', '>>',
-      'rlike', 'not rlike', 'regexp', 'not regexp',
-      '~', '~*', '!~', '!~*', 'similar to',
-      'not similar to', 'not ilike', '~~*', '!~~*'
-    ]
-
-    /**
-     * The orderings for the query.
-     *
-     * @type {Order[]}
-     */
-    this.orders = []
-
-    /**
-     * The maximum number of union records to return.
-     *
-     * @type {number}
-     */
-    this.unionLimit = undefined
-
-    /**
-     * The number of union records to skip.
-     *
-     * @type {number}
-     */
-    this.unionOffset = undefined
-
-    /**
-     * The orderings for the union query.
-     *
-     * @type {Union[]}
-     */
-    this.unionOrders = []
-
-    /**
-     * The query union statements.
-     *
-     * @type {Union[]}
-     */
-    this.unions = []
-
-    /**
-     * The where constraints for the query.
-     *
-     * @type {Where[]}
-     */
-    this.wheres = [] // TODO: verify the correct type
-
-    /** @type {import('./../Connection.js').default} */
     this.connection = connection
 
-    /** @type {import('./Grammars/Grammar.js').default} */
     this.grammar = grammar ?? connection.getQueryGrammar()
 
-    /** @type {import('./Processors/Processor.js').default} */
     this.processor = processor ?? connection.getPostProcessor()
-    // return proxy
   }
 
   /**
@@ -310,7 +313,7 @@ export default class Builder {
    * @param  {string}  type
    * @return {this}
    *
-   * @throws {\InvalidArgumentException}
+   * @throws {Error}
    */
   addBinding (value, type = 'where') {
     if (this.bindings[type] === undefined) {
@@ -447,7 +450,7 @@ export default class Builder {
    *
    * @param  {string}  functionName
    * @param  {any[]}  columns
-   * @return {*}
+   * @return {Promise<unknown>}
    */
   async aggregate (functionName, columns = ['*']) {
     // We need to save the original bindings, because the cloneWithoutBindings
@@ -517,12 +520,10 @@ export default class Builder {
     // The cloning process needs to run through Arrays and Maps to ensure that
     // these structured are cloned correctly like new values and not references.
     for (const propertyName of Object.getOwnPropertyNames(cloned)) {
-      const property = Reflect.get(cloned, propertyName)
-      // const property = cloned[propertyName]
+      const property = cloned[propertyName]
 
       if (Array.isArray(property) || property instanceof Map || isPlainObject(property)) {
-        Reflect.set(cloned, propertyName, clone(property))
-        // cloned[propertyName] = clone(property)
+        cloned[propertyName] = clone(property)
       }
     }
 
@@ -561,7 +562,7 @@ export default class Builder {
    * Clone the query without the given bindings.
    *
    * @param  {Array}  except
-   * @return {Builder}
+   * @return {this}
    */
   cloneWithoutBindings (except) {
     return tap(this.clone(), (clone) => {
@@ -574,8 +575,8 @@ export default class Builder {
   /**
    * Retrieve the "count" result of the query.
    *
-   * @param  {string}  [columns=*]
-   * @return {number}
+   * @param  {string}  [columns='*']
+   * @return {Promise<unknown>}
    */
   async count (columns = '*') {
     return await this.aggregate('count', Arr.wrap(columns))
@@ -606,9 +607,9 @@ export default class Builder {
    * Add a "cross join" clause to the query.
    *
    * @param  {string}  table
-   * @param  {Function|string}  {first}
-   * @param  {string}  [operator=undefined]
-   * @param  {string}  [second=undefined]
+   * @param  {Function|string} first
+   * @param  {string}  [operator]
+   * @param  {string}  [second]
    * @return {this}
    */
   crossJoin (table, first, operator, second) {
@@ -1116,34 +1117,34 @@ export default class Builder {
 
     return this
 
-  /*   // Here we will make some assumptions about the operator. If only 2 values are
-    // passed to the method, we will assume that the operator is an equals sign
-    // and keep going. Otherwise, we'll require the operator to be passed in.
-    [value, operator] = this.prepareValueAndOperator(value, operator, arguments.length === 2)
+    /*   // Here we will make some assumptions about the operator. If only 2 values are
+      // passed to the method, we will assume that the operator is an equals sign
+      // and keep going. Otherwise, we'll require the operator to be passed in.
+      [value, operator] = this.prepareValueAndOperator(value, operator, arguments.length === 2)
 
-    let type = 'Basic'
-    if (column instanceof Function && operator === undefined) {
-      return this.havingNested(column, boolean)
-    }
+      let type = 'Basic'
+      if (column instanceof Function && operator === undefined) {
+        return this.havingNested(column, boolean)
+      }
 
-    // If the given operator is not found in the list of valid operators we will
-    // assume that the developer is just short-cutting the '=' operators and
-    // we will set the operators to '=' and set the values appropriately.
-    if (this.invalidOperator(operator)) {
-      [value, operator] = [operator, '=']
-    }
+      // If the given operator is not found in the list of valid operators we will
+      // assume that the developer is just short-cutting the '=' operators and
+      // we will set the operators to '=' and set the values appropriately.
+      if (this.invalidOperator(operator)) {
+        [value, operator] = [operator, '=']
+      }
 
-    if (this.isBitwiseOperator(operator)) {
-      type = 'Bitwise'
-    }
+      if (this.isBitwiseOperator(operator)) {
+        type = 'Bitwise'
+      }
 
-    this.havings.push({ type, column, operator, value, boolean })
+      this.havings.push({ type, column, operator, value, boolean })
 
-    if (!(value instanceof Expression)) {
-      this.addBinding(this.flattenValue(value), 'having')
-    }
+      if (!(value instanceof Expression)) {
+        this.addBinding(this.flattenValue(value), 'having')
+      }
 
-    return this */
+      return this */
   }
 
   /**
@@ -1257,7 +1258,7 @@ export default class Builder {
     for (const [column, amount] of Object.entries(columns)) {
       if (!isNumeric(amount)) {
         throw new Error(`InvalidArgumentException: Non-numeric value passed as increment amount for column: '${column}'.`)
-      // } else if (typeof column !== 'string') {
+        // } else if (typeof column !== 'string') {
       } else if (isNumeric(column)) {
         throw new Error('InvalidArgumentException: Non-associative array passed to incrementEach method.')
       }
@@ -3150,7 +3151,7 @@ export default class Builder {
   whereNot (column, operator, value, boolean = 'and') {
     // return this.where(column, operator, value, boolean + ' not')
     if (Array.isArray(column) || isPlainObject(column)) {
-      return this.whereNested(/** @type {Builder} */ (query) => {
+      return this.whereNested(/** @type {Builder} */(query) => {
         query.where(column, operator, value, boolean)
       }, boolean + ' not')
     }

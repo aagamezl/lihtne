@@ -850,7 +850,7 @@ export default class Grammar extends BaseGrammar {
   }
 
   isExecutable (query, property) {
-    const subject = Reflect.get(query, property)
+    const subject = query[property]
 
     if (subject === undefined || subject === '') {
       return false

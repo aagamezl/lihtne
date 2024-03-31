@@ -2,7 +2,7 @@
 
 import Connection from './Connection.js'
 // import PostgresBuilder from './Schema/PostgresBuilder.js'
-import PostgresDriver from './../Database/PDO/PostgresDriver.js'
+// import PostgresDriver from './../Database/PDO/PostgresDriver.js'
 import QueryGrammar from '../Database/Query/Grammars/PostgresGrammar.js'
 import PostgresProcessor from './../Database/Query/Processors/PostgresProcessor.js'
 import PostgresStatement from './../Database/Statements/PostgresStatement.js'
@@ -11,7 +11,7 @@ export default class PostgresConnection extends Connection {
   /**
    * Get the default query grammar instance.
    *
-   * @return {\Illuminate\Database\Query\Grammars\MySqlGrammar}
+   * @return {import('./Query/Grammars/PostgresGrammar.js').default}
    */
   getDefaultQueryGrammar () {
     const grammar = new QueryGrammar()
@@ -43,19 +43,20 @@ export default class PostgresConnection extends Connection {
    *
    * @return {\Illuminate\Database\PDO\PostgresDriver}
    */
-  getDoctrineDriver () {
-    return new PostgresDriver()
-  }
+  // getDoctrineDriver () {
+  //   return new PostgresDriver()
+  // }
 
   /**
    *
    *
-   * @param {string} query
-   * @return {object}
+   * @param {string} dsn
+   * @param {string} options
+   * @return {import('./Statements/Statement.js').default}
    * @memberof {PostgresConnection}
    */
-  getPrepareStatement (connection, query) {
-    return new PostgresStatement(connection, query)
+  getPrepareStatement (dsn, options) {
+    return new PostgresStatement(dsn, options)
   }
 
   /**

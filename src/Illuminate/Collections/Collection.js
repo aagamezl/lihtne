@@ -27,7 +27,7 @@ export default class Collection {
     /**
    * The items contained in the collection.
    *
-   * @type {unknown[]}
+   * @type {any[]}
    */
     this.items = this.getArrayableItems(items)
   }
@@ -35,7 +35,7 @@ export default class Collection {
   /**
    * Get all of the items in the collection.
    *
-   * @return {unknown[]}
+   * @return {any}
    */
   all () {
     return this.entries === true ? Object.fromEntries(this.items) : this.items

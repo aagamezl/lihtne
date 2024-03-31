@@ -310,8 +310,8 @@ export const strReplace = (search, replace, subject, countObj) => {
  * Call the given Closure with the given value then return the value.
  *
  * @param  {unknown}  value
- * @param  {callable}  [callback=undefined]
- * @return {unknown}
+ * @param  {Function}  [callback]
+ * @return {any}
  */
 export const tap = (value, callback) => {
   if (callback === undefined) {

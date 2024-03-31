@@ -8,14 +8,27 @@ export default class PostgresStatement extends Statement {
     super(dsn, options)
 
     this.pool = new pg.Pool({
-      connectionString: this.dsn
+      connectionString: this.dsn,
+      max: 50,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 2000
+
     })
   }
 
-  async execute () {
-    const values = Object.values(this.bindings)
+  async close () {
+    await this.pool.end()
+  }
 
-    if (values.length > 0) {
+  /**
+   *
+   * @param {unknown[]} values
+   * @returns {Promise<any[]>}
+   */
+  async execute (values) {
+    values = values ?? Object.values(this.bindings)
+
+    if (Object.values(values).length > 0) {
       this.statement.values = values
     }
 
@@ -26,8 +39,9 @@ export default class PostgresStatement extends Statement {
 
       this.result = await client.query(this.statement)
 
-      return this.result
+      return this.result.rows
     } finally {
+      // await client.end()
       client.end()
     }
   }

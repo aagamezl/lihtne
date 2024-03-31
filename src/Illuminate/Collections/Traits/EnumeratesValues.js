@@ -8,8 +8,8 @@ export class EnumeratesValues {
   /**
    * Results array of items from Collection or Arrayable.
    *
-   * @param  {unknown}  items
-   * @return {object[]}
+   * @param  {any}  items
+   * @return {any}
    */
   getArrayableItems (items) {
     if (Array.isArray(items) || items instanceof Map) {
@@ -29,7 +29,7 @@ export class EnumeratesValues {
   /**
    * Create a collection of all elements that do not pass a given truth test.
    *
-   * @param  {((value: TValue, key: TKey) => boolean)|boolean|TValue}  [callback=true]
+   * @param  {((value: unknown, key: unknown) => boolean) | boolean}  [callback=true]
    * @return {Collection}
    */
   reject (callback = true) {

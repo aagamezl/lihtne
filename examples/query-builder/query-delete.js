@@ -1,6 +1,6 @@
 import DB from '../../src/Illuminate/Support/Facades/DB.js'
 
-const main = async () => {
+(async () => {
   try {
     const userId = await DB().query().from('users').insertGetId({
       firstname: 'Robert',
@@ -18,6 +18,4 @@ const main = async () => {
   } catch (error) {
     console.error(error)
   }
-}
-
-main()
+})()

@@ -1,6 +1,6 @@
 import DB from '../../src/Illuminate/Support/Facades/DB.js'
 
-const main = async () => {
+(async () => {
   try {
     let result = await DB().query().from('users').insert(
       {
@@ -39,6 +39,4 @@ const main = async () => {
   } catch (error) {
     console.error(error)
   }
-}
-
-main()
+})()

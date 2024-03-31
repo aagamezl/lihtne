@@ -428,12 +428,10 @@ export default class Connection {
   /**
    * Configure the prepare statement.
    *
-   * @param  {Statement}  statement
-   * @return {\Illuminate\Database\Statements\Statement}
+   * @param  {import('./Statements/Statement.js').default}  statement
+   * @return {import('./Statements/Statement.js').default}
    */
   prepared (statement) {
-    statement.setFetchMode(this.fetchMode)
-
     this.event(new StatementPrepared(this, statement))
 
     return statement

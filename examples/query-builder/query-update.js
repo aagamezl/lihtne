@@ -1,6 +1,6 @@
 import DB from '../../src/Illuminate/Support/Facades/DB.js'
 
-const main = async () => {
+(async () => {
   try {
     const users = await DB().query().from('users').where('email', 'jane.doe@email.com').get()
     const userId = users.all()[0].id
@@ -15,6 +15,4 @@ const main = async () => {
   } catch (error) {
     console.error(error)
   }
-}
-
-main()
+})()

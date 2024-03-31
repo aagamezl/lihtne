@@ -1,9 +1,10 @@
 import DB from '../../src/Illuminate/Support/Facades/DB.js'
 
-const main = async () => {
+(async () => {
   try {
-    // let users = await DB.query().from('users').where('name', 'John Doe').get()
-    console.log(DB().query().from('users').where('firstname', 'John').toSql())
+    console.log('SQL: %s', DB().query().from('users').where('firstname', 'John').toSql())
+    console.log('Bindings: %o', DB().query().from('users').where('firstname', 'John').getBindings())
+
     let users = await DB().query().from('users').where('firstname', 'John').get()
     console.log(JSON.stringify(users.all(), null, 2))
 
@@ -13,6 +14,4 @@ const main = async () => {
   } catch (error) {
     console.error(error)
   }
-}
-
-main()
+})()
