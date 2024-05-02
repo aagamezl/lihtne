@@ -1,17 +1,16 @@
 const use = (target, traits) => {
-  traits.forEach((trait) => {
-    const [baseCtor, alias] = typeof trait === 'function' ? [trait, {}] : trait
+  for (let i = 0; i < traits.length; i++) {
+    const traitPrototype = traits[i].prototype
+    const propertyNames = Object.getOwnPropertyNames(traitPrototype)
 
-    Object.getOwnPropertyNames(baseCtor.prototype)
-      .filter(name => name !== 'constructor')
-      .forEach((name) => {
-        Object.defineProperty(
-          (target).prototype,
-          alias[name] ?? name,
-          Object.getOwnPropertyDescriptor(baseCtor.prototype, name) ?? Object.create(null)
-        )
-      })
-  })
+    for (let j = 0, length = propertyNames.length; j < length; j++) {
+      const name = propertyNames[j]
+
+      if (name !== 'constructor') {
+        target.prototype[name] = traitPrototype[name]
+      }
+    }
+  }
 }
 
 export default use

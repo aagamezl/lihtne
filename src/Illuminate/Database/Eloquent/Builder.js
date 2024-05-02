@@ -21,7 +21,8 @@ export default class Builder {
    * @param  {import('../Query/Builder.js').default}  query
    */
   constructor (query) {
-    use(this.constructor, [BuildsQueries, ForwardsCalls])
+    // use(this.constructor, [BuildsQueries, ForwardsCalls])
+    use(Builder, [BuildsQueries, ForwardsCalls])
 
     /**
      * All of the locally registered builder macros.

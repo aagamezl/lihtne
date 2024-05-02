@@ -6,7 +6,8 @@ export default class MySqlDriver extends AbstractMySQLDriver {
   constructor () {
     super()
 
-    use(this.constructor, ConnectsToDatabase)
+    // use(this.constructor, ConnectsToDatabase)
+    use(MySqlDriver, ConnectsToDatabase)
   }
 
   /**

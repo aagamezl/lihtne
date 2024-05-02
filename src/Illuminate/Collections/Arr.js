@@ -1,4 +1,9 @@
-import { isAlphanumeric, isFalsy, isObject, isPlainObject } from '@devnetic/utils'
+import {
+  isFalsy,
+  isNumeric,
+  isObject,
+  isPlainObject
+} from '@devnetic/utils'
 
 import Collection from './Collection.js'
 import { dataGet, value as getValue } from './helpers.js'
@@ -17,7 +22,7 @@ export default class Arr {
   /**
    * Collapse an array of arrays into a single array.
    *
-   * @param  {iterable}  array
+   * @param  {Iterable}  array
    * @return [array]
    */
   static collapse (array) {
@@ -39,9 +44,9 @@ export default class Arr {
   /**
    * Get all of the given array except for a specified array of keys.
    *
-   * @param  {array}  array
-   * @param  {array|string|number}  keys
-   * @return {array}
+   * @param  {Record<string, any>}  array
+   * @param  {string|number|string[]}  keys
+   * @return {Record<string, any>}
    */
   static except (array, keys) {
     const cloned = structuredClone(array)
@@ -54,7 +59,7 @@ export default class Arr {
   /**
    * Determine if the given key exists in the provided array.
    *
-   * @param  {ArrayAccess|array}  array
+   * @param  {Record<string, any>}  array
    * @param  {string|number}  key
    * @return {boolean}
    */
@@ -71,38 +76,48 @@ export default class Arr {
    */
   static explodePluckParameters (value, key) {
     value = Array.isArray(value) ? value : String(key).split('.')
+
     key = (key === undefined || Array.isArray(key)) ? key : String(key).split('.')
+
     return [value, key]
   }
 
   /**
    * Return the first element in an array passing a given truth test.
    *
-   * @param  {Array}  array
+   * @param  {any[]}  array
    * @param  {Function}  [callback]
    * @param  {unknown}  [defaultValue]
    * @return {unknown}
    */
   static first (array, callback, defaultValue) {
     if (callback === undefined) {
+      if (isPlainObject(array)) {
+        return array[Object.keys(array)[0]]
+      }
+
       if (array.length === 0) {
         return getValue(defaultValue)
       }
+
       return array[0]
     }
+
     for (const [key, value] of array.entries()) {
       const isTruthy = Boolean(callback(value, key))
+
       if (isTruthy) {
         return value
       }
     }
+
     return getValue(defaultValue)
   }
 
   /**
    * Flatten a multi-dimensional array into a single level.
    *
-   * @param  {Array}  array
+   * @param  {Record<string, any>}  array
    * @param  {number}  depth
    * @return {Array}
    */
@@ -131,7 +146,7 @@ export default class Arr {
   /**
      * Remove one or many array items from a given array using "dot" notation.
      *
-     * @param  {Object} array
+     * @param  {Record<string, any>} array
      * @param  {Array|string|number} keys
      * @return {void}
      */
@@ -173,9 +188,9 @@ export default class Arr {
   /**
    * Get an item from an array using "dot" notation.
    *
-   * @param  {object|Array}  array
+   * @param  {Record<string, any>|any[]}  array
    * @param  {string|number|undefined}  key
-   * @param  {any}  default
+   * @param  {any}  defaultValue
    * @return {any}
    */
   static get (array, key, defaultValue) {
@@ -192,12 +207,13 @@ export default class Arr {
    *
    *
    * @public static
-   * @param {Array | object} value
-   * @returns {Array}
+   * @param {any[] | Record<string, any>} value
+   * @returns {any[]}
    * @memberof Arr
    */
   static iterable (value) {
     value = Array.isArray(value) ? value : [value]
+
     return value.reduce((result, column, index) => {
       if (isPlainObject(column)) {
         result.push(...Object.entries(column))
@@ -208,6 +224,7 @@ export default class Arr {
           result.push([index, column])
         }
       }
+
       return result
     }, [])
   }
@@ -215,7 +232,7 @@ export default class Arr {
   /**
    * Return the last element in an array passing a given truth test.
    *
-   * @param  {Array}  array
+   * @param  {any[]}  array
    * @param  {Function|undefined}  callback
    * @param  {*}  defaultValue
    * @return {*}
@@ -232,16 +249,16 @@ export default class Arr {
    *
    * @param  {unknown[]}  array
    * @param  {Function}  callback
-   * @return {unknown[]}
+   * @return {unknown[] | Record<string, unknown>}
    */
-  static map (array, callback) {
+  static map (array, callback) { // TODO: use a generic to infer the correct result between array or object
     const keys = Object.keys(array)
 
     let items
 
     try {
       items = keys.map(key => {
-        return callback(array[key], isAlphanumeric(key) ? Number(key) : key)
+        return callback(array[key], isNumeric(key) ? Number(key) : key, keys)
       })
     } catch (error) {
       if (error instanceof TypeError) {
@@ -252,20 +269,22 @@ export default class Arr {
     }
 
     // return Object.fromEntries(keys.map((key, index) => [key, items[index]]))
-    return keys.map((key, index) => [key, items[index]])
+    return Array.isArray(array) ? items : Object.fromEntries(keys.map((key, index) => [key, items[index]]))
+    // return keys.map((key, index) => [key, items[index]])
   }
 
   /**
    * Pluck an array of values from an array.
    *
-   * @param  {Array}   array
-   * @param  {string|Array|number|undefined}  [value]
-   * @param  {string|Array|undefined}  [key]
-   * @return {Array}
+   * @param  {any[]}   array
+   * @param  {string|any[]|number|undefined}  [value]
+   * @param  {string|any[]|undefined}  [key]
+   * @return {any[]}
    */
   static pluck (array, value, key) {
     const results = []
     const [pluckValue, pluckKey] = this.explodePluckParameters(value, key)
+
     for (const item of array) {
       const itemValue = dataGet(item, pluckValue)
       // If the key is "null", we will just append the value to the array and keep
@@ -275,10 +294,12 @@ export default class Arr {
         results.push(itemValue)
       } else {
         let itemKey = dataGet(item, pluckKey)
+
         if (isObject(itemKey) && itemKey.toString !== undefined) {
           itemKey = itemKey.toString()
         }
-        Reflect.set(results, itemKey, itemValue)
+
+        results[itemKey] = itemValue
       }
     }
     return results
@@ -340,7 +361,7 @@ export default class Arr {
   /**
    * Sort the array using the given callback or "dot" notation.
    *
-   * @param  {Record<string, any>}  array
+   * @param  {Record<string, any>}  target
    * @param  {Function|Array|string}  callback
    * @return {any[]}
    */
@@ -358,19 +379,25 @@ export default class Arr {
   /**
    * Filter the array using the given callback.
    *
-   * @param  {unknown[]}  array
+   * @param  {any[]}  array
    * @param  {Function}  callback
-   * @return {unknown[]}
+   * @return {any[]}
    */
   static where (array, callback) {
-    return array.filter(callback)
+    if (Array.isArray(array)) {
+      return array.filter(callback)
+    }
+
+    return Object.fromEntries(Object.entries(array).filter(([key, value]) => {
+      return callback(value, key)
+    }))
   }
 
   /**
    * If the given value is not an array and not null, wrap it in one.
    *
    * @param  {unknown}  value
-   * @return {Array}
+   * @return {any[]}
    */
   static wrap (value) {
     if (isFalsy(value)) {

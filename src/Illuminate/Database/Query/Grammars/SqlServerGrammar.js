@@ -161,6 +161,19 @@ export default class SqlServerGrammar extends Grammar {
   }
 
   /**
+   * Compile a "lateral join" clause.
+   *
+   * @param  {import('../../Query/JoinLateralClause.js').default}  join
+   * @param  {string}  expression
+   * @return {string}
+   */
+  compileJoinLateral (join, expression) {
+    const type = join.type === 'left' ? 'outer' : 'cross'
+
+    return `${type} apply ${expression}`.trim()
+  }
+
+  /**
    * Compile a "JSON contains" statement into SQL.
    *
    * @param  {string}  column

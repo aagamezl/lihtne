@@ -3,7 +3,6 @@ export default class Expression {
    * Create a new raw query expression.
    *
    * @param  {unknown}  value
-   * @returns {void}
    */
   constructor (value) {
     this.value = value

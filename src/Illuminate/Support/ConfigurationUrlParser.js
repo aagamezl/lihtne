@@ -154,7 +154,7 @@ export default class ConfigurationUrlParser {
    * @param  {string}  url
    * @return {Record<string, unknown>}
    *
-   * @throws {\InvalidArgumentException}
+   * @throws {Error}
    */
   parseUrl (url) {
     url = url.replace(/#^(sqlite3?):\/\/\/#/gm, '1://null/')

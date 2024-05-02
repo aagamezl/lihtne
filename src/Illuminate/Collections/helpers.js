@@ -4,9 +4,12 @@ import Arr from './Arr.js'
 import Collection from './Collection.js'
 
 /**
+ * Create a collection from the given value.
  *
- * @param {unknown} value
- * @returns {Collection}
+ * @template TKey
+ * @template TValue
+ *
+ * @returns {import('./Collection.js').CollectionWithTraits}
  */
 export const collect = (value) => {
   return new Collection(value)

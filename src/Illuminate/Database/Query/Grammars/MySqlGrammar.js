@@ -85,6 +85,29 @@ export default class MySqlGrammar extends Grammar {
   }
 
   /**
+ * Compile an insert ignore statement using a subquery into SQL.
+ *
+ * @param  {import('../Builder.js').default}  query
+ * @param  {array}  columns
+ * @param  {string}  sql
+ * @return {string}
+ */
+  compileInsertOrIgnoreUsing (query, columns, sql) {
+    return (this.compileInsertUsing(query, columns, sql)).replace('insert', 'insert ignore')
+  }
+
+  /**
+   * Compile a "lateral join" clause.
+   *
+   * @param  {import('../../Query/JoinLateralClause.js').default}  join
+   * @param  {string}  expression
+   * @return {string}
+   */
+  compileJoinLateral (join, expression) {
+    return `${join.type} join lateral ${expression} on true`.trim()
+  }
+
+  /**
    * Compile a "JSON contains" statement into SQL.
    *
    * @param  {string}  column
@@ -257,12 +280,11 @@ export default class MySqlGrammar extends Grammar {
    *
    * Booleans, integers, and doubles are inserted into JSON updates as raw values.
    *
-   * @param  {unknown[]}  bindings //TODO: verify this type
-   * @param  {unknown[]}  values //TODO: verify this type
-   * @return {unknown[]} //TODO: verify this type
+   * @param  {any[]}  bindings //TODO: verify this type
+   * @param  {any[]}  values //TODO: verify this type
+   * @return {any[]} //TODO: verify this type
    */
   prepareBindingsForUpdate (bindings, values) {
-    // values = collect(values).reject(([column, value]) => {
     values = collect(values).reject((value, column) => {
       return this.isJsonSelector(column) && isBoolean(value)
     }).map((value) => {

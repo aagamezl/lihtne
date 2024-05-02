@@ -76,6 +76,18 @@ export default class SQLiteGrammar extends Grammar {
   }
 
   /**
+   * Compile an insert ignore statement using a subquery into SQL.
+   *
+   * @param  {import('../../Query/Builder.js').default}  query
+   * @param  {any[]}  columns
+   * @param  {string}  sql
+   * @return {string}
+   */
+  compileInsertOrIgnoreUsing (query, columns, sql) {
+    return (this.compileInsertUsing(query, columns, sql)).replace('insert', 'insert or ignore')
+  }
+
+  /**
    * Compile a "JSON contains" statement into SQL.
    *
    * @param  {string}  column

@@ -22,6 +22,19 @@ export default class Grammar {
   }
 
   /**
+ * Compile an update from statement into SQL.
+ *
+ * @param  {import('./Query/Builder.js').default}  query
+ * @param  {Record<string, unknown>}  values
+ * @return {string}
+ *
+ * @throws{ RuntimeException}
+ */
+  compileUpdateFrom (query, values) {
+    throw new Error('RuntimeException: This database engine does not support update from.')
+  }
+
+  /**
    * Get the format for database stored dates.
    *
    * @return {string}
@@ -33,8 +46,8 @@ export default class Grammar {
   /**
    * Get the value of a raw expression.
    *
-   * @param  {\Illuminate\Database\Query\Expression}  expression
-   * @return {unknown}
+   * @param  {Expression}  expression
+   * @return {any}
    */
   getValue (expression) {
     // return expression.getValue()
@@ -49,7 +62,7 @@ export default class Grammar {
    * Determine if the given value is a raw expression.
    *
    * @param  {unknown}  value
-   * @return {bool}
+   * @return {boolean}
    */
   isExpression (value) {
     return value instanceof Expression
@@ -68,7 +81,7 @@ export default class Grammar {
   /**
    * Get the appropriate query parameter place-holder for a value.
    *
-   * @param  {unknown}  value
+   * @param  {any}  value
    * @return {string}
    */
   parameter (value) {
@@ -78,7 +91,7 @@ export default class Grammar {
   /**
    * Create query parameter place-holders for an array.
    *
-   * @param  {unknown[]}  values
+   * @param  {any[]}  values
    * @return {string}
    */
   parameterize (values) {
@@ -112,7 +125,7 @@ export default class Grammar {
   /**
    * Wrap a value in keyword identifiers.
    *
-   * @param  {\Illuminate\Database\Query\Expression|string}  value
+   * @param  {Expression|string}  value
    * @param  {boolean}  prefixAlias
    * @return {string}
    */
@@ -136,6 +149,19 @@ export default class Grammar {
     }
 
     return this.wrapSegments(value.split('.'))
+  }
+
+  /**
+   * Wrap a table that has an alias.
+   *
+   * @protected
+   * @param {string} value The table value with alias
+   * @returns {string} The wrapped table with alias
+   */
+  wrapAliasedTable (value) {
+    const segments = value.split(/\s+as\s+/i)
+
+    return this.wrapTable(segments[0]) + ' as ' + this.wrapValue(this.tablePrefix + segments[1])
   }
 
   /**
@@ -185,15 +211,42 @@ export default class Grammar {
   /**
    * Wrap a table in keyword identifiers.
    *
-   * @param  {\Illuminate\Database\Query\Expression|string}  table
+   * @param  {Expression|string}  table
    * @return {string}
    */
   wrapTable (table) {
-    if (!this.isExpression(table)) {
-      return this.wrap(this.tablePrefix + table, true)
+    // if (!this.isExpression(table)) {
+    //   return this.wrap(this.tablePrefix + table, true)
+    // }
+
+    // return this.getValue(table)
+
+    if (this.isExpression(table)) {
+      return this.getValue(table)
     }
 
-    return this.getValue(table)
+    // If the table being wrapped has an alias we'll need to separate the pieces
+    // so we can prefix the table and then wrap each of the segments on their
+    // own and then join these both back together using the "as" connector.
+    if (table.toLowerCase().includes(' as ')) {
+      return this.wrapAliasedTable(table)
+    }
+
+    // If the table being wrapped has a custom schema name specified, we need to
+    // prefix the last segment as the table name then wrap each segment alone
+    // and eventually join them both back together using the dot connector.
+    if (table.includes('.')) {
+      const lastDotIndex = table.lastIndexOf('.')
+
+      table = table.substring(0, lastDotIndex) + '.' + this.tablePrefix + table.substring(lastDotIndex + 1)
+
+      // return collect(table.split('.'))
+      return collect(table.split('.'))
+        .map(this.wrapValue)
+        .implode('.')
+    }
+
+    return this.wrapValue(this.tablePrefix + table)
   }
 
   /**
@@ -206,6 +259,7 @@ export default class Grammar {
     if (value !== '*') {
       return '"' + value.replace('"', '""') + '"'
     }
+
     return value
   }
 }

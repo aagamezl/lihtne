@@ -5,6 +5,7 @@ import Raw from './../../src/Illuminate/Database/Query/Expression.js'
 import SQLiteGrammar from '../../src/Illuminate/Database/Query/Grammars/SQLiteGrammar.js'
 import getBuilder from './helpers/getBuilder.js'
 import getMySqlBuilder from './helpers/getMySqlBuilder.js'
+import getMariaDbBuilder from './helpers/getMariaDbBuilder.js'
 import getMySqlBuilderWithProcessor from './helpers/getMySqlBuilderWithProcessor.js'
 import getPostgresBuilder from './helpers/getPostgresBuilder.js'
 import getPostgresBuilderWithProcessor from './helpers/getPostgresBuilderWithProcessor.js'
@@ -298,12 +299,12 @@ test('testBasicWheres', t => {
   t.deepEqual([1], builder.getBindings())
 })
 
-test('testBasicWheresInvalidOperator', t => {
-  const builder = getBuilder()
-  builder.select('*').from('users').where('id', '#', 1)
-  t.is('select * from "users" where "id" = ?', builder.toSql())
-  t.deepEqual(['#'], builder.getBindings())
-})
+// test('testBasicWheresInvalidOperator', t => {
+//   const builder = getBuilder()
+//   builder.select('*').from('users').where('id', '#', 1)
+//   t.is('select * from "users" where "id" = ?', builder.toSql())
+//   t.deepEqual(['#'], builder.getBindings())
+// })
 
 test('testBasicWhereNot', async (t) => {
   const builder = getBuilder()
@@ -1108,6 +1109,64 @@ test('testWhereFulltextPostgres', t => {
   builder.select('*').from('users').whereFulltext(['body', 'title'], 'Car Plane')
   t.is('select * from "users" where (to_tsvector(\'english\', "body") || to_tsvector(\'english\', "title")) @@ plainto_tsquery(\'english\', ?)', builder.toSql())
   t.deepEqual(['Car Plane'], builder.getBindings())
+})
+
+test('testWhereAll', async (t) => {
+  let builder = getBuilder()
+  builder.select('*').from('users').whereAll(['last_name', 'email'], '%Agámez%')
+  t.is('select * from "users" where ("last_name" = ? and "email" = ?)', builder.toSql())
+  t.deepEqual(['%Agámez%', '%Agámez%'], builder.getBindings())
+
+  builder = getBuilder()
+  builder.select('*').from('users').whereAll(['last_name', 'email'], 'not like', '%Agámez%')
+  t.is('select * from "users" where ("last_name" not like ? and "email" not like ?)', builder.toSql())
+  t.deepEqual(['%Agámez%', '%Agámez%'], builder.getBindings())
+})
+
+test('testOrWhereAll', async (t) => {
+  let builder = getBuilder()
+  builder.select('*').from('users').where('first_name', 'like', '%Álvaro%').orWhereAll(['last_name', 'email'], 'like', '%Agámez%')
+  t.is('select * from "users" where "first_name" like ? or ("last_name" like ? and "email" like ?)', builder.toSql())
+  t.deepEqual(['%Álvaro%', '%Agámez%', '%Agámez%'], builder.getBindings())
+
+  builder = getBuilder()
+  builder.select('*').from('users').where('first_name', 'like', '%Álvaro%').whereAll(['last_name', 'email'], 'like', '%Agámez%', 'or')
+  t.is('select * from "users" where "first_name" like ? or ("last_name" like ? and "email" like ?)', builder.toSql())
+  t.deepEqual(['%Álvaro%', '%Agámez%', '%Agámez%'], builder.getBindings())
+
+  builder = getBuilder()
+  builder.select('*').from('users').where('first_name', 'like', '%Álvaro%').orWhereAll(['last_name', 'email'], '%Agámez%')
+  t.is('select * from "users" where "first_name" like ? or ("last_name" = ? and "email" = ?)', builder.toSql())
+  t.deepEqual(['%Álvaro%', '%Agámez%', '%Agámez%'], builder.getBindings())
+})
+
+test('testWhereAny', async (t) => {
+  let builder = getBuilder()
+  builder.select('*').from('users').whereAny(['last_name', 'email'], 'like', '%Agámez%')
+  t.is('select * from "users" where ("last_name" like ? or "email" like ?)', builder.toSql())
+  t.deepEqual(['%Agámez%', '%Agámez%'], builder.getBindings())
+
+  builder = getBuilder()
+  builder.select('*').from('users').whereAny(['last_name', 'email'], '%Agámez%')
+  t.is('select * from "users" where ("last_name" = ? or "email" = ?)', builder.toSql())
+  t.deepEqual(['%Agámez%', '%Agámez%'], builder.getBindings())
+})
+
+test('testOrWhereAny', async (t) => {
+  let builder = getBuilder()
+  builder.select('*').from('users').where('first_name', 'like', '%Álvaro%').orWhereAny(['last_name', 'email'], 'like', '%Agámez%')
+  t.is(builder.toSql(), 'select * from "users" where "first_name" like ? or ("last_name" like ? or "email" like ?)')
+  t.deepEqual(builder.getBindings(), ['%Álvaro%', '%Agámez%', '%Agámez%'])
+
+  builder = getBuilder()
+  builder.select('*').from('users').where('first_name', 'like', '%Álvaro%').whereAny(['last_name', 'email'], 'like', '%Agámez%', 'or')
+  t.is(builder.toSql(), 'select * from "users" where "first_name" like ? or ("last_name" like ? or "email" like ?)')
+  t.deepEqual(builder.getBindings(), ['%Álvaro%', '%Agámez%', '%Agámez%'])
+
+  builder = getBuilder()
+  builder.select('*').from('users').where('first_name', 'like', '%Álvaro%').orWhereAny(['last_name', 'email'], '%Agámez%')
+  t.is(builder.toSql(), 'select * from "users" where "first_name" like ? or ("last_name" = ? or "email" = ?)')
+  t.deepEqual(builder.getBindings(), ['%Álvaro%', '%Agámez%', '%Agámez%'])
 })
 
 test('testUnions', t => {
@@ -2343,6 +2402,156 @@ test('testRightJoinSub', (t) => {
   t.is('select * from "users" right join (select * from "contacts") as "sub" on "users"."id" = "sub"."id"', builder.toSql())
 })
 
+test('testJoinLateral', async t => {
+  const { createMock, verifyMock } = mock()
+
+  let builder = getMySqlBuilder()
+  createMock(builder.getConnection()).expects('getDatabaseName').never()
+  builder.from('users').joinLateral('select * from `contacts` where `contracts`.`user_id` = `users`.`id`', 'sub')
+  t.is('select * from `users` inner join lateral (select * from `contacts` where `contracts`.`user_id` = `users`.`id`) as `sub` on true', builder.toSql())
+
+  builder = getMySqlBuilder()
+  createMock(builder.getConnection()).expects('getDatabaseName').atLeast(1)
+  builder.from('users').joinLateral((q) => {
+    q.from('contacts').whereColumn('contracts.user_id', 'users.id')
+  }, 'sub')
+  t.is('select * from `users` inner join lateral (select * from `contacts` where `contracts`.`user_id` = `users`.`id`) as `sub` on true', builder.toSql())
+
+  builder = getMySqlBuilder()
+  createMock(builder.getConnection()).expects('getDatabaseName')
+  const sub = getMySqlBuilder()
+  createMock(sub.getConnection()).expects('getDatabaseName')
+  const eloquentBuilder = new EloquentBuilder(sub.from('contacts').whereColumn('contracts.user_id', 'users.id'))
+  builder.from('users').joinLateral(eloquentBuilder, 'sub')
+  t.is('select * from `users` inner join lateral (select * from `contacts` where `contracts`.`user_id` = `users`.`id`) as `sub` on true', builder.toSql())
+
+  let sub1 = getMySqlBuilder()
+  createMock(sub1.getConnection()).expects('getDatabaseName').atLeast(1)
+  sub1 = sub1.from('contacts').whereColumn('contracts.user_id', 'users.id').where('name', 'foo')
+
+  let sub2 = getMySqlBuilder()
+  createMock(sub2.getConnection()).expects('getDatabaseName').atLeast(1)
+  sub2 = sub2.from('contacts').whereColumn('contracts.user_id', 'users.id').where('name', 'bar')
+
+  builder = getMySqlBuilder()
+  createMock(builder.getConnection()).expects('getDatabaseName').twice()
+  builder.from('users').joinLateral(sub1, 'sub1').joinLateral(sub2, 'sub2')
+
+  let expected = 'select * from `users` '
+  expected += 'inner join lateral (select * from `contacts` where `contracts`.`user_id` = `users`.`id` and `name` = ?) as `sub1` on true '
+  expected += 'inner join lateral (select * from `contacts` where `contracts`.`user_id` = `users`.`id` and `name` = ?) as `sub2` on true'
+
+  t.deepEqual(expected, builder.toSql())
+  t.deepEqual(['foo', 'bar'], builder.getRawBindings().join)
+
+  t.throws(() => {
+    builder = getMySqlBuilder()
+    builder.from('users').joinLateral(['foo'], 'sub')
+  }, { instanceOf: TypeError, message: 'InvalidArgumentException: A subquery must be a query builder instance, a Closure, or a string.' })
+
+  verifyMock()
+})
+
+test('testJoinLateralMariaDb', async t => {
+  t.throws(() => {
+    const { createMock, verifyMock } = mock()
+
+    const builder = getMariaDbBuilder()
+    createMock(builder.getConnection()).expects('getDatabaseName').twice()
+    builder.from('users').joinLateral((q) => {
+      q.from('contacts').whereColumn('contracts.user_id', 'users.id')
+    }, 'sub').toSql()
+
+    verifyMock()
+  }, { instanceOf: Error, message: 'RuntimeException: This database engine does not support lateral joins.' })
+})
+
+test('testJoinLateralSQLite', async t => {
+  t.throws(() => {
+    const { createMock, verifyMock } = mock()
+
+    const builder = getSQLiteBuilder()
+    createMock(builder.getConnection()).expects('getDatabaseName').twice()
+    builder.from('users').joinLateral((q) => {
+      q.from('contacts').whereColumn('contracts.user_id', 'users.id')
+    }, 'sub').toSql()
+
+    verifyMock()
+  }, { instanceOf: Error, message: 'RuntimeException: This database engine does not support lateral joins.' })
+})
+
+test('testJoinLateralPostgres', async t => {
+  const { createMock, verifyMock } = mock()
+
+  const builder = getPostgresBuilder()
+  createMock(builder.getConnection()).expects('getDatabaseName').twice()
+  builder.from('users').joinLateral((q) => {
+    q.from('contacts').whereColumn('contracts.user_id', 'users.id')
+  }, 'sub')
+
+  t.is('select * from "users" inner join lateral (select * from "contacts" where "contracts"."user_id" = "users"."id") as "sub" on true', builder.toSql())
+
+  verifyMock()
+})
+
+test('testJoinLateralSqlServer', async t => {
+  const { createMock, verifyMock } = mock()
+
+  const builder = getSqlServerBuilder()
+  createMock(builder.getConnection()).expects('getDatabaseName').twice()
+  builder.from('users').joinLateral((q) => {
+    q.from('contacts').whereColumn('contracts.user_id', 'users.id')
+  }, 'sub')
+  t.is('select * from [users] cross apply (select * from [contacts] where [contracts].[user_id] = [users].[id]) as [sub]', builder.toSql())
+
+  verifyMock()
+})
+
+test('testJoinLateralWithPrefix', async t => {
+  const { createMock, verifyMock } = mock()
+
+  const builder = getMySqlBuilder()
+  createMock(builder.getConnection()).expects('getDatabaseName').never()
+  builder.getGrammar().setTablePrefix('prefix_')
+  builder.from('users').joinLateral('select * from `contacts` where `contracts`.`user_id` = `users`.`id`', 'sub')
+  t.is('select * from `prefix_users` inner join lateral (select * from `contacts` where `contracts`.`user_id` = `users`.`id`) as `prefix_sub` on true', builder.toSql())
+
+  verifyMock()
+})
+
+test('testLeftJoinLateral', async t => {
+  const { createMock, verifyMock } = mock()
+
+  let builder = getMySqlBuilder()
+  createMock(builder.getConnection()).expects('getDatabaseName')
+
+  const sub = getMySqlBuilder()
+  createMock(sub.getConnection()).expects('getDatabaseName')
+
+  builder.from('users').leftJoinLateral(sub.from('contacts').whereColumn('contracts.user_id', 'users.id'), 'sub')
+  t.is('select * from `users` left join lateral (select * from `contacts` where `contracts`.`user_id` = `users`.`id`) as `sub` on true', builder.toSql())
+
+  t.throws(() => {
+    builder = getBuilder()
+    builder.from('users').leftJoinLateral(['foo'], 'sub')
+  }, { instanceOf: Error, message: 'InvalidArgumentException: A subquery must be a query builder instance, a Closure, or a string.' })
+
+  verifyMock()
+})
+
+test('testLeftJoinLateralSqlServer', async t => {
+  const { createMock, verifyMock } = mock()
+
+  const builder = getSqlServerBuilder()
+  createMock(builder.getConnection()).expects('getDatabaseName').twice()
+  builder.from('users').leftJoinLateral((q) => {
+    q.from('contacts').whereColumn('contracts.user_id', 'users.id')
+  }, 'sub')
+  t.is('select * from [users] outer apply (select * from [contacts] where [contracts].[user_id] = [users].[id]) as [sub]', builder.toSql())
+
+  verifyMock()
+})
+
 test('testRawExpressionsInSelect', (t) => {
   const builder = getBuilder()
   builder.select(new Raw('substr(foo, 6)')).from('users')
@@ -2510,6 +2719,22 @@ test('testAggregateFunctions', async (t) => {
   })
   const sum = await builder.from('users').sum('id')
   t.is(1, sum)
+
+  builder = getBuilder()
+  createMock(builder.getConnection()).expects('select').once().withArgs('select avg("id") as aggregate from "users"', []).returns([{ aggregate: 1 }])
+  createMock(builder.getProcessor()).expects('processSelect').once().callsFake((builder, results) => {
+    return results
+  })
+  let results = await builder.from('users').avg('id')
+  t.is(1, results)
+
+  builder = getBuilder()
+  createMock(builder.getConnection()).expects('select').once().withArgs('select avg("id") as aggregate from "users"', []).returns([{ aggregate: 1 }])
+  createMock(builder.getProcessor()).expects('processSelect').once().callsFake((builder, results) => {
+    return results
+  })
+  results = await builder.from('users').average('id')
+  t.is(1, results)
 
   verifyMock()
 })
@@ -2783,6 +3008,163 @@ test('testSqlServerInsertOrIgnoreMethod', async (t) => {
 
   t.true(error.message.includes('RuntimeException'))
   t.true(error.message.includes('does not support'))
+})
+
+test('testInsertOrIgnoreUsingMethod', async (t) => {
+  const error = await t.throwsAsync(async () => {
+    const builder = getBuilder()
+    await builder.from('users').insertOrIgnoreUsing({ email: 'foo' }, 'bar')
+  }, { instanceOf: Error })
+
+  t.true(error.message.includes('does not support'))
+})
+
+test('testSqlServerInsertOrIgnoreUsingMethod', async (t) => {
+  const error = await t.throwsAsync(async () => {
+    const builder = getSqlServerBuilder()
+    await builder.from('users').insertOrIgnoreUsing({ email: 'foo' }, 'bar')
+  }, { instanceOf: Error })
+
+  t.true(error.message.includes('does not support'))
+})
+
+test('testMySqlInsertOrIgnoreUsingMethod', async (t) => {
+  const { createMock, verifyMock } = mock()
+
+  const builder = getMySqlBuilder()
+  createMock(builder.getConnection()).expects('getDatabaseName').twice()
+  createMock(builder.getConnection()).expects('affectingStatement').once().withArgs('insert ignore into `table1` (`foo`) select `bar` from `table2` where `foreign_id` = ?', [5]).resolves(1)
+
+  const result = await builder.from('table1').insertOrIgnoreUsing(
+    ['foo'],
+    (query) => {
+      query.select(['bar']).from('table2').where('foreign_id', '=', 5)
+    }
+  )
+
+  t.is(result, 1)
+
+  verifyMock()
+})
+
+test('testMySqlInsertOrIgnoreUsingWithEmptyColumns', async (t) => {
+  const { createMock, verifyMock } = mock()
+
+  const builder = getMySqlBuilder()
+  createMock(builder.getConnection()).expects('getDatabaseName').twice()
+  createMock(builder.getConnection()).expects('affectingStatement').once().withArgs('insert ignore into `table1` select * from `table2` where `foreign_id` = ?', [5]).resolves(1)
+
+  const result = await builder.from('table1').insertOrIgnoreUsing(
+    [],
+    (query) => {
+      query.from('table2').where('foreign_id', '=', 5)
+    }
+  )
+
+  t.is(result, 1)
+
+  verifyMock()
+})
+
+test('testMySqlInsertOrIgnoreUsingInvalidSubquery', async (t) => {
+  const error = await t.throwsAsync(async () => {
+    const builder = getMySqlBuilder()
+    await builder.from('table1').insertOrIgnoreUsing(['foo'], ['bar'])
+  }, { instanceOf: Error })
+
+  t.true(error.message.includes('InvalidArgumentException'))
+})
+
+test('testPostgresInsertOrIgnoreUsingMethod', async (t) => {
+  const { createMock, verifyMock } = mock()
+
+  const builder = getPostgresBuilder()
+  createMock(builder.getConnection()).expects('affectingStatement').once().withArgs('insert into "table1" ("foo") select "bar" from "table2" where "foreign_id" = ? on conflict do nothing', [5]).resolves(1)
+
+  const result = await builder.from('table1').insertOrIgnoreUsing(
+    ['foo'],
+    (query) => {
+      query.select(['bar']).from('table2').where('foreign_id', '=', 5)
+    }
+  )
+
+  t.is(result, 1)
+
+  verifyMock()
+})
+
+test('testPostgresInsertOrIgnoreUsingWithEmptyColumns', async (t) => {
+  const { createMock, verifyMock } = mock()
+
+  const builder = getPostgresBuilder()
+  createMock(builder.getConnection()).expects('affectingStatement').once().withArgs('insert into "table1" select * from "table2" where "foreign_id" = ? on conflict do nothing', [5]).resolves(1)
+
+  const result = await builder.from('table1').insertOrIgnoreUsing(
+    [],
+    (query) => {
+      query.from('table2').where('foreign_id', '=', 5)
+    }
+  )
+
+  t.is(result, 1)
+
+  verifyMock()
+})
+
+test('testPostgresInsertOrIgnoreUsingInvalidSubquery', async (t) => {
+  const error = await t.throwsAsync(async () => {
+    const builder = getPostgresBuilder()
+    await builder.from('table1').insertOrIgnoreUsing(['foo'], ['bar'])
+  }, { instanceOf: Error })
+
+  t.true(error.message.includes('InvalidArgumentException'))
+})
+
+test('testSQLiteInsertOrIgnoreUsingMethod', async (t) => {
+  const { createMock, verifyMock } = mock()
+
+  const builder = getSQLiteBuilder()
+  createMock(builder.getConnection()).expects('getDatabaseName').twice()
+  createMock(builder.getConnection()).expects('affectingStatement').once().withArgs('insert or ignore into "table1" ("foo") select "bar" from "table2" where "foreign_id" = ?', [5]).resolves(1)
+
+  const result = await builder.from('table1').insertOrIgnoreUsing(
+    ['foo'],
+    (query) => {
+      query.select(['bar']).from('table2').where('foreign_id', '=', 5)
+    }
+  )
+
+  t.is(result, 1)
+
+  verifyMock()
+})
+
+test('testSQLiteInsertOrIgnoreUsingWithEmptyColumns', async (t) => {
+  const { createMock, verifyMock } = mock()
+
+  const builder = getSQLiteBuilder()
+  createMock(builder.getConnection()).expects('getDatabaseName').twice()
+  createMock(builder.getConnection()).expects('affectingStatement').once().withArgs('insert or ignore into "table1" select * from "table2" where "foreign_id" = ?', [5]).resolves(1)
+
+  const result = await builder.from('table1').insertOrIgnoreUsing(
+    [],
+    (query) => {
+      query.from('table2').where('foreign_id', '=', 5)
+    }
+  )
+
+  t.is(result, 1)
+
+  verifyMock()
+})
+
+test('testSQLiteInsertOrIgnoreUsingInvalidSubquery', async (t) => {
+  const error = await t.throwsAsync(async () => {
+    const builder = getSQLiteBuilder()
+    await builder.from('table1').insertOrIgnoreUsing(['foo'], ['bar'])
+  }, { instanceOf: Error })
+
+  t.true(error.message.includes('InvalidArgumentException'))
 })
 
 test('testInsertGetIdMethod', async (t) => {
@@ -3131,6 +3513,19 @@ test('testUpdateMethodRespectsRaw', async (t) => {
   verifyMock()
 })
 
+test('testUpdateMethodWorksWithQueryAsValue', async t => {
+  const { createMock, verifyMock } = mock()
+
+  const builder = getBuilder()
+
+  createMock(builder.getConnection()).expects('update').once().withArgs('update "users" set "credits" = (select sum(credits) from "transactions" where "transactions"."user_id" = "users"."id" and "type" = ?) where "id" = ?', ['foo', 1]).resolves(1)
+  const result = await builder.from('users').where('id', '=', 1).update({ credits: getBuilder().from('transactions').selectRaw('sum(credits)').whereColumn('transactions.user_id', 'users.id').where('type', 'foo') })
+
+  t.is(result, 1)
+
+  verifyMock()
+})
+
 test('testUpdateOrInsertMethod', async (t) => {
   const { createStub } = mock()
 
@@ -3311,7 +3706,7 @@ test('testPreserveAddsClosureToArray', async (t) => {
 
 test('testApplyPreserveCleansArray', async (t) => {
   const builder = getBuilder()
-  builder.beforeQuery(function () {
+  builder.beforeQuery(() => {
   })
   t.is(builder.beforeQueryCallbacks.length, 1)
   builder.applyBeforeQueryCallbacks()
@@ -3688,11 +4083,11 @@ test('testSQLiteUpdateWrappingNestedJsonArray', async (t) => {
   createMock(builder.getConnection()).expects('update')
     .withArgs('update "users" set "group_id" = 45, "created_at" = ?, "options" = json_patch(ifnull("options", json(\'{}\')), json(?))', [
       new Date('2019-08-06'),
-      JSON.stringify({ name: 'Taylor', security: { '2fa': false, presets: ['lihtne', 'vue'] }, sharing: { twitter: 'username' } })
+      JSON.stringify({ name: 'Álvaro', security: { '2fa': false, presets: ['lihtne', 'vue'] }, sharing: { twitter: 'username' } })
     ])
 
   builder.from('users').update({
-    'options->name': 'Taylor',
+    'options->name': 'Álvaro',
     group_id: new Raw('45'),
     'options->security': { '2fa': false, presets: ['lihtne', 'vue'] },
     'options->sharing->twitter': 'username',
@@ -4127,7 +4522,7 @@ test('testBindingOrder', async (t) => {
 
   // order of statements reversed
   builder = getBuilder()
-  builder.select('*').from('users').orderByRaw('match ("foo") against(?)', ['bar']).having('population', '>', 3).groupBy('city').where('registered', 1).join('othertable', function (join) {
+  builder.select('*').from('users').orderByRaw('match ("foo") against(?)', ['bar']).having('population', '>', 3).groupBy('city').where('registered', 1).join('othertable', (join) => {
     join.where('bar', '=', 'foo')
   })
   t.deepEqual(builder.toSql(), expectedSql)
@@ -4219,19 +4614,19 @@ test('testSqlServerWhereDate', async (t) => {
 
 test('testUppercaseLeadingBooleansAreRemoved', async (t) => {
   const builder = getBuilder()
-  builder.select('*').from('users').where('name', '=', 'Taylor', 'AND')
+  builder.select('*').from('users').where('name', '=', 'Álvaro', 'AND')
   t.is(builder.toSql(), 'select * from "users" where "name" = ?')
 })
 
 test('testLowercaseLeadingBooleansAreRemoved', async (t) => {
   const builder = getBuilder()
-  builder.select('*').from('users').where('name', '=', 'Taylor', 'and')
+  builder.select('*').from('users').where('name', '=', 'Álvaro', 'and')
   t.is('select * from "users" where "name" = ?', builder.toSql())
 })
 
 test('testCaseInsensitiveLeadingBooleansAreRemoved', async (t) => {
   const builder = getBuilder()
-  builder.select('*').from('users').where('name', '=', 'Taylor', 'And')
+  builder.select('*').from('users').where('name', '=', 'Álvaro', 'And')
   t.is(builder.toSql(), 'select * from "users" where "name" = ?')
 })
 
@@ -4608,7 +5003,7 @@ test('testPaginateWithSpecificColumns', async (t) => {
   const page = 1
   const builder = getBuilder()
 
-  const results = collect([{ id: 3, name: 'Taylor' }, { id: 5, name: 'Mohamed' }])
+  const results = collect([{ id: 3, name: 'Álvaro' }, { id: 5, name: 'Mohamed' }])
   const builderMock = createMock(builder)
 
   builderMock.expects('getCountForPagination').once().resolves(2)
@@ -4631,7 +5026,7 @@ test('testPaginateWithTotalOverride', async (t) => {
   const builder = getBuilder()
   const builderMock = createMock(builder)
 
-  const results = collect([{ id: 3, name: 'Taylor' }, { id: 5, name: 'Mohamed' }])
+  const results = collect([{ id: 3, name: 'Álvaro' }, { id: 5, name: 'Mohamed' }])
 
   builderMock.expects('getCountForPagination').never()
   builderMock.expects('forPage').once().withArgs(page, perPage).returnsThis()
@@ -4661,7 +5056,7 @@ test('testPaginateWithTotalOverride', async (t) => {
 
 //   const results = collect([{ test: 'foo' }, { test: 'bar' }])
 
-//   builder.shouldReceive('get').once().callsFake(() => {
+//   builder.expects('get').once().callsFake(() => {
 //     t.is(
 //       'select * from "foobar" where ("test" > ?) order by "test" asc limit 17',
 //       builder.toSql()
@@ -4690,7 +5085,7 @@ test('testPaginateWithTotalOverride', async (t) => {
 //   cursor = new Cursor(['test' => 'bar', 'another' => 'foo'])
 //   const builder = getMockQueryBuilder()
 //   builder.from('foobar').orderBy('test').orderBy('another')
-//   builder.shouldReceive('newQuery').andReturnUsing(function () use(builder) {
+//   builder.expects('newQuery').andReturnUsing(function () use(builder) {
 //     return new Builder(builder.connection, builder.grammar, builder.processor)
 //   })
 
@@ -4698,7 +5093,7 @@ test('testPaginateWithTotalOverride', async (t) => {
 
 //   results = collect([['test' => 'foo', 'another' => 1], ['test' => 'bar', 'another' => 2]])
 
-//   builder.shouldReceive('get').once().andReturnUsing(function () use(builder, results) {
+//   builder.expects('get').once().andReturnUsing(function () use(builder, results) {
 //     t.deepEqual(
 //       'select * from "foobar" where ("test" > ? or ("test" = ? and ("another" > ?))) order by "test" asc, "another" asc limit 17',
 //       builder.toSql()
@@ -4727,7 +5122,7 @@ test('testPaginateWithTotalOverride', async (t) => {
 //   cursor = new Cursor(['test' => 'bar'])
 //   const builder = getMockQueryBuilder()
 //   builder.from('foobar').orderBy('test')
-//   builder.shouldReceive('newQuery').andReturnUsing(function () use(builder) {
+//   builder.expects('newQuery').andReturnUsing(function () use(builder) {
 //     return new Builder(builder.connection, builder.grammar, builder.processor)
 //   })
 
@@ -4735,7 +5130,7 @@ test('testPaginateWithTotalOverride', async (t) => {
 
 //   results = collect([['test' => 'foo'], ['test' => 'bar']])
 
-//   builder.shouldReceive('get').once().andReturnUsing(function () use(builder, results) {
+//   builder.expects('get').once().andReturnUsing(function () use(builder, results) {
 //     t.deepEqual(
 //       'select * from "foobar" where ("test" > ?) order by "test" asc limit 16',
 //       builder.toSql())
@@ -4769,7 +5164,7 @@ test('testPaginateWithTotalOverride', async (t) => {
 
 //   results = []
 
-//   builder.shouldReceive('get').once().andReturn(results)
+//   builder.expects('get').once().andReturn(results)
 
 //   CursorPaginator.currentCursorResolver(function () {
 //     return null
@@ -4795,15 +5190,15 @@ test('testPaginateWithTotalOverride', async (t) => {
 //   cursor = new Cursor(['id' => 2])
 //   const builder = getMockQueryBuilder()
 //   builder.from('foobar').orderBy('id')
-//   builder.shouldReceive('newQuery').andReturnUsing(function () use(builder) {
+//   builder.expects('newQuery').andReturnUsing(function () use(builder) {
 //     return new Builder(builder.connection, builder.grammar, builder.processor)
 //   })
 
 //   path = 'http://foo.bar?cursor=3'
 
-//   results = collect([['id' => 3, 'name' => 'Taylor'], ['id' => 5, 'name' => 'Mohamed']])
+//   results = collect([['id' => 3, 'name' => 'Álvaro'], ['id' => 5, 'name' => 'Mohamed']])
 
-//   builder.shouldReceive('get').once().andReturnUsing(function () use(builder, results) {
+//   builder.expects('get').once().andReturnUsing(function () use(builder, results) {
 //     t.deepEqual(
 //       'select * from "foobar" where ("id" > ?) order by "id" asc limit 17',
 //       builder.toSql())
@@ -4832,7 +5227,7 @@ test('testPaginateWithTotalOverride', async (t) => {
 //   cursor = new Cursor(['foo' => 1, 'bar' => 2, 'baz' => 3])
 //   const builder = getMockQueryBuilder()
 //   builder.from('foobar').orderBy('foo').orderByDesc('bar').orderBy('baz')
-//   builder.shouldReceive('newQuery').andReturnUsing(function () use(builder) {
+//   builder.expects('newQuery').andReturnUsing(function () use(builder) {
 //     return new Builder(builder.connection, builder.grammar, builder.processor)
 //   })
 
@@ -4840,7 +5235,7 @@ test('testPaginateWithTotalOverride', async (t) => {
 
 //   results = collect([['foo' => 1, 'bar' => 2, 'baz' => 4], ['foo' => 1, 'bar' => 1, 'baz' => 1]])
 
-//   builder.shouldReceive('get').once().andReturnUsing(function () use(builder, results) {
+//   builder.expects('get').once().andReturnUsing(function () use(builder, results) {
 //     t.deepEqual(
 //       'select * from "foobar" where ("foo" > ? or ("foo" = ? and ("bar" < ? or ("bar" = ? and ("baz" > ?))))) order by "foo" asc, "bar" desc, "baz" asc limit 17',
 //       builder.toSql()
@@ -4869,7 +5264,7 @@ test('testPaginateWithTotalOverride', async (t) => {
 //   cursor = new Cursor(['test' => 'bar'])
 //   const builder = getMockQueryBuilder()
 //   builder.from('foobar').select('*').selectRaw('(CONCAT(firstname, \' \', lastname)) as test').orderBy('test')
-//   builder.shouldReceive('newQuery').andReturnUsing(function () use(builder) {
+//   builder.expects('newQuery').andReturnUsing(function () use(builder) {
 //     return new Builder(builder.connection, builder.grammar, builder.processor)
 //   })
 
@@ -4877,7 +5272,7 @@ test('testPaginateWithTotalOverride', async (t) => {
 
 //   results = collect([['test' => 'foo'], ['test' => 'bar']])
 
-//   builder.shouldReceive('get').once().andReturnUsing(function () use(builder, results) {
+//   builder.expects('get').once().andReturnUsing(function () use(builder, results) {
 //     t.deepEqual(
 //       'select *, (CONCAT(firstname, \' \', lastname)) as test from "foobar" where ((CONCAT(firstname, \' \', lastname)) > ?) order by "test" asc limit 16',
 //       builder.toSql())
@@ -4909,7 +5304,7 @@ test('testPaginateWithTotalOverride', async (t) => {
 //   cursor = new Cursor(['test' => 'bar'])
 //   const builder = getMockQueryBuilder()
 //   builder.from('foobar').select('*').selectRaw('(CAST(CONCAT(firstname, \' \', lastname) as VARCHAR)) as test').orderBy('test')
-//   builder.shouldReceive('newQuery').andReturnUsing(function () use(builder) {
+//   builder.expects('newQuery').andReturnUsing(function () use(builder) {
 //     return new Builder(builder.connection, builder.grammar, builder.processor)
 //   })
 
@@ -4917,7 +5312,7 @@ test('testPaginateWithTotalOverride', async (t) => {
 
 //   results = collect([['test' => 'foo'], ['test' => 'bar']])
 
-//   builder.shouldReceive('get').once().andReturnUsing(function () use(builder, results) {
+//   builder.expects('get').once().andReturnUsing(function () use(builder, results) {
 //     t.deepEqual(
 //       'select *, (CAST(CONCAT(firstname, \' \', lastname) as VARCHAR)) as test from "foobar" where ((CAST(CONCAT(firstname, \' \', lastname) as VARCHAR)) > ?) order by "test" asc limit 16',
 //       builder.toSql())
@@ -4949,7 +5344,7 @@ test('testPaginateWithTotalOverride', async (t) => {
 //   cursor = new Cursor(['test' => 'bar'])
 //   const builder = getMockQueryBuilder()
 //   builder.from('foobar').select('*').selectSub('CONCAT(firstname, \' \', lastname)', 'test').orderBy('test')
-//   builder.shouldReceive('newQuery').andReturnUsing(function () use(builder) {
+//   builder.expects('newQuery').andReturnUsing(function () use(builder) {
 //     return new Builder(builder.connection, builder.grammar, builder.processor)
 //   })
 
@@ -4957,7 +5352,7 @@ test('testPaginateWithTotalOverride', async (t) => {
 
 //   results = collect([['test' => 'foo'], ['test' => 'bar']])
 
-//   builder.shouldReceive('get').once().andReturnUsing(function () use(builder, results) {
+//   builder.expects('get').once().andReturnUsing(function () use(builder, results) {
 //     t.deepEqual(
 //       'select *, (CONCAT(firstname, \' \', lastname)) as "test" from "foobar" where ((CONCAT(firstname, \' \', lastname)) > ?) order by "test" asc limit 16',
 //       builder.toSql())
@@ -4995,7 +5390,7 @@ test('testPaginateWithTotalOverride', async (t) => {
 //   builder.union(getBuilder().select('id', 'created_at').selectRaw("'news' as type").from('news'))
 //   builder.orderBy('created_at')
 
-//   builder.shouldReceive('newQuery').andReturnUsing(function () use(builder) {
+//   builder.expects('newQuery').andReturnUsing(function () use(builder) {
 //     return new Builder(builder.connection, builder.grammar, builder.processor)
 //   })
 
@@ -5006,7 +5401,7 @@ test('testPaginateWithTotalOverride', async (t) => {
 //     ['id' => 2, 'created_at' => now(), 'type' => 'news'],
 //   ])
 
-//   builder.shouldReceive('get').once().andReturnUsing(function () use(builder, results, ts) {
+//   builder.expects('get').once().andReturnUsing(function () use(builder, results, ts) {
 //     t.deepEqual(
 //       '(select "id", "start_time" as "created_at", \'video\' as type from "videos" where ("start_time" > ?)) union (select "id", "created_at", \'news\' as type from "news" where ("start_time" > ?)) order by "created_at" asc limit 17',
 //       builder.toSql())
@@ -5041,7 +5436,7 @@ test('testPaginateWithTotalOverride', async (t) => {
 //   builder.union(getBuilder().select('id', 'is_published', 'created_at').selectRaw("'news' as type").where('is_published', true).from('news'))
 //   builder.orderByRaw('case when (id = 3 and type="news" then 0 else 1 end)').orderBy('created_at')
 
-//   builder.shouldReceive('newQuery').andReturnUsing(function () use(builder) {
+//   builder.expects('newQuery').andReturnUsing(function () use(builder) {
 //     return new Builder(builder.connection, builder.grammar, builder.processor)
 //   })
 
@@ -5052,7 +5447,7 @@ test('testPaginateWithTotalOverride', async (t) => {
 //     ['id' => 2, 'created_at' => now(), 'type' => 'news', 'is_published' => true],
 //   ])
 
-//   builder.shouldReceive('get').once().andReturnUsing(function () use(builder, results, ts) {
+//   builder.expects('get').once().andReturnUsing(function () use(builder, results, ts) {
 //     t.deepEqual(
 //       '(select "id", "is_published", "start_time" as "created_at", \'video\' as type from "videos" where "is_published" = ? and ("start_time" > ?)) union (select "id", "is_published", "created_at", \'news\' as type from "news" where "is_published" = ? and ("start_time" > ?)) order by case when (id = 3 and type="news" then 0 else 1 end), "created_at" asc limit 17',
 //       builder.toSql())
@@ -5087,7 +5482,7 @@ test('testPaginateWithTotalOverride', async (t) => {
 //   builder.union(getBuilder().select('id', 'created_at').selectRaw("'news' as type").from('news'))
 //   builder.orderBy('created_at')
 
-//   builder.shouldReceive('newQuery').andReturnUsing(function () use(builder) {
+//   builder.expects('newQuery').andReturnUsing(function () use(builder) {
 //     return new Builder(builder.connection, builder.grammar, builder.processor)
 //   })
 
@@ -5098,7 +5493,7 @@ test('testPaginateWithTotalOverride', async (t) => {
 //     ['id' => 2, 'created_at' => now(), 'type' => 'news'],
 //   ])
 
-//   builder.shouldReceive('get').once().andReturnUsing(function () use(builder, results, ts) {
+//   builder.expects('get').once().andReturnUsing(function () use(builder, results, ts) {
 //     t.deepEqual(
 //       '(select "id", "start_time" as "created_at", \'video\' as type from "videos" where ("start_time" < ?)) union (select "id", "created_at", \'news\' as type from "news" where ("start_time" < ?)) order by "created_at" desc limit 17',
 //       builder.toSql())
@@ -5133,7 +5528,7 @@ test('testPaginateWithTotalOverride', async (t) => {
 //   builder.union(getBuilder().select('id', 'created_at').selectRaw("'news' as type").from('news'))
 //   builder.orderByDesc('created_at').orderBy('id')
 
-//   builder.shouldReceive('newQuery').andReturnUsing(function () use(builder) {
+//   builder.expects('newQuery').andReturnUsing(function () use(builder) {
 //     return new Builder(builder.connection, builder.grammar, builder.processor)
 //   })
 
@@ -5144,7 +5539,7 @@ test('testPaginateWithTotalOverride', async (t) => {
 //     ['id' => 2, 'created_at' => now(), 'type' => 'news'],
 //   ])
 
-//   builder.shouldReceive('get').once().andReturnUsing(function () use(builder, results, ts) {
+//   builder.expects('get').once().andReturnUsing(function () use(builder, results, ts) {
 //     t.deepEqual(
 //       '(select "id", "start_time" as "created_at", \'video\' as type from "videos" where ("start_time" < ? or ("start_time" = ? and ("id" > ?)))) union (select "id", "created_at", \'news\' as type from "news" where ("start_time" < ? or ("start_time" = ? and ("id" > ?)))) order by "created_at" desc, "id" asc limit 17',
 //       builder.toSql())

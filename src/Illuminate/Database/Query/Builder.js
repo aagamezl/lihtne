@@ -19,7 +19,7 @@ import ConditionExpression from './ConditionExpression.js'
 import EloquentBuilder from '../Eloquent/Builder.js'
 import Expression from './Expression.js'
 import IndexHint from './IndexHint.js'
-import { JoinClause } from './internal.js'
+import { JoinClause, JoinLateralClause } from './internal.js'
 import LengthAwarePaginator from '../../Pagination/LengthAwarePaginator.js'
 import Macroable from '../../Macroable/Traits/Macroable.js'
 import Relation from '../Eloquent/Relations/Relation.js'
@@ -78,9 +78,9 @@ import { collect, head, last, reset, value } from '../../Collections/helpers.js'
 /**
  * @typedef {Object} Order
  * @property {string} sql - The raw SQL expression for ordering.
- * @property {string} type - The type of ordering (e.g., 'basic', 'raw').
- * @property {string} column - The column name for ordering.
- * @property {string} direction - The order direction ('asc' for ascending, 'desc' for descending).
+ * @property {string} [type] - The type of ordering (e.g., 'basic', 'raw').
+ * @property {string} [column] - The column name for ordering.
+ * @property {string} [direction] - The order direction ('asc' for ascending, 'desc' for descending).
  */
 
 /**
@@ -95,6 +95,12 @@ import { collect, head, last, reset, value } from '../../Collections/helpers.js'
  * @property {number} total - The total number of items across all pages.
  * @property {number} perPage - The number of items per page.
  * @property {number} currentPage - The current page number.
+ */
+
+/**
+ * @typedef {Object} GroupLimit
+ * @property {string} column
+ * @property {number} value
  */
 
 export default class Builder {
@@ -168,9 +174,16 @@ export default class Builder {
   grammar
 
   /**
+   * The maximum number of records to return per group.
+   *
+   * @type {GroupLimit|undefined}
+   */
+  groupLimitProperty
+
+  /**
    * The groupings for the query.
    *
-   * @type {Array}
+   * @type {any[]}
    */
   groups = []
 
@@ -180,6 +193,13 @@ export default class Builder {
    * @type {Having[]}
    */
   havings = []
+
+  /**
+   * The index hint for the query.
+   *
+   * @type {IndexHint|undefined}
+   */
+  indexHint
 
   /**
    * The table joins for the query.
@@ -277,18 +297,17 @@ export default class Builder {
    * @param  {import('./Processors/Processor.js').default}  [processor]
    */
   constructor (connection, grammar, processor) {
-    use(Builder, [Macroable, BuildsQueries])
+    use(Builder, [BuildsQueries, Macroable])
 
     this.connection = connection
-
     this.grammar = grammar ?? connection.getQueryGrammar()
-
     this.processor = processor ?? connection.getPostProcessor()
   }
 
   /**
    * Add an array of where clauses to the query.
    *
+   * @protected
    * @param  {any}  column
    * @param  {string}  boolean
    * @param  {string}  method
@@ -332,6 +351,7 @@ export default class Builder {
   /**
    * Add a date based (year, month, day, time) statement to the query.
    *
+   * @protected
    * @param  {string}  type
    * @param  {string}  column
    * @param  {string}  operator
@@ -483,6 +503,26 @@ export default class Builder {
   }
 
   /**
+   * Alias for the "avg" method.
+   *
+   * @param  {Expression|string}  column
+   * @return {any}
+   */
+  average (column) {
+    return this.avg(column)
+  }
+
+  /**
+   * Retrieve the average of the values of a given column.
+   *
+   * @param  {Expression|string}  column
+   * @return {any}
+   */
+  avg (column) {
+    return this.aggregate('avg', [column])
+  }
+
+  /**
    * Register a closure to be invoked before the query is executed.
    *
    * @param  {Function}  callback
@@ -495,15 +535,37 @@ export default class Builder {
   }
 
   /**
+   * Cast the given binding value.
+   *
+   * @param  {unknown}  value
+   * @return {unknown}
+   */
+  castBinding (value) {
+    if (isPlainObject(value)) {
+      return value.value ?? value.name
+    }
+
+    return value
+  }
+
+  /**
    * Remove all of the expressions from a list of bindings.
    *
    * @param  {Array}  bindings
    * @return {Array}
    */
   cleanBindings (bindings) {
-    return Arr.values(bindings.filter((binding) => {
-      return !(binding instanceof Expression)
-    }))
+    // return Arr.values(bindings.filter((binding) => {
+    //   return !(binding instanceof Expression)
+    // }))
+    return collect(bindings)
+      .reject((binding) => {
+        return binding instanceof Expression
+      })
+      // .map([this, 'castBinding'])
+      .map(this.castBinding)
+      .values()
+      .all()
   }
 
   /**
@@ -586,7 +648,7 @@ export default class Builder {
    * Creates a subquery and parse it.
    *
    * @param  {Function|Builder|EloquentBuilder|string}  query
-   * @return {Array}
+   * @return {any[]}
    */
   createSub (query) {
     // If the given query is a Closure, we will execute it while passing in a new
@@ -918,7 +980,7 @@ export default class Builder {
    * Set the table which the query is targeting.
    *
    * @param  {Function|Builder|string}  table
-   * @param  {string|undefined}  as
+   * @param  {string}  [as]
    * @return {this}
    * @memberof Builder
    */
@@ -952,24 +1014,30 @@ export default class Builder {
    * @param  {string}  as
    * @return {this}
    *
-   * @throws {\InvalidArgumentException}
+   * @throws {Error}
    */
   fromSub (query, as) {
     let bindings;
+
     [query, bindings] = this.createSub(query)
+
     return this.fromRaw(`(${query}) as ${this.grammar.wrapTable(as)}`, bindings)
   }
 
   /**
    * Execute the query as a "select" statement.
    *
-   * @param  {unknown[]|string}  columns
-   * @return {Collection}
+   * @param  {any[]|string}  columns
+   * @return {Promise<Collection>}
    */
   async get (columns = ['*']) {
-    return collect(await this.onceWithColumns(Arr.wrap(columns), () => {
+    const items = collect(await this.onceWithColumns(Arr.wrap(columns), () => {
       return this.processor.processSelect(this, this.runSelect())
     }))
+
+    return this.groupLimitProperty
+      ? this.withoutGroupLimitKeys(items)
+      : items
   }
 
   /**
@@ -1041,7 +1109,7 @@ export default class Builder {
   /**
    * Add a "group by" clause to the query.
    *
-   * @param  {string|string[]}  groups
+   * @param  {any[]|Expression|string}  groups
    * @return {this}
    */
   groupBy (...groups) {
@@ -1051,6 +1119,7 @@ export default class Builder {
         ...Arr.wrap(group)
       ]
     }
+
     return this
   }
 
@@ -1064,6 +1133,21 @@ export default class Builder {
   groupByRaw (sql, bindings = []) {
     this.groups.push(new Expression(sql))
     this.addBinding(bindings, 'groupBy')
+    return this
+  }
+
+  /**
+   * Add a "group limit" clause to the query.
+   *
+   * @param  {number}  value
+   * @param  {string}  column
+   * @return {this}
+   */
+  groupLimit (value, column) {
+    if (value >= 0) {
+      this.groupLimitProperty = { value, column }
+    }
+
     return this
   }
 
@@ -1238,21 +1322,22 @@ export default class Builder {
    *
    * @param  {string}  column
    * @param  {string}  [glue='']
-   * @return {string}
+   * @return {Promise<string>}
    */
   async implode (column, glue = '') {
     const result = await this.pluck(column)
+
     return result.implode(glue)
   }
 
   /**
    * Increment the given column's values by the given amounts.
    *
-   * @param  {array<string, float|int|numeric-string>}  columns
-   * @param  {array<string, unknown>}  extra
+   * @param  {Record<string, number|string>}  columns
+   * @param  {Record<string, any>}  extra
    * @return {number}
    *
-   * @throws \InvalidArgumentException
+   * @throws {Error}
    */
   incrementEach (columns, extra = []) {
     for (const [column, amount] of Object.entries(columns)) {
@@ -1321,7 +1406,7 @@ export default class Builder {
    * Insert new records into the database while ignoring errors.
    *
    * @param  {Array}  values
-   * @return {number}
+   * @return {Promise<number>}
    */
   async insertOrIgnore (values) {
     if (values.length === 0 || Object.keys(values).length === 0) {
@@ -1335,6 +1420,24 @@ export default class Builder {
     this.applyBeforeQueryCallbacks()
 
     return await this.connection.affectingStatement(this.grammar.compileInsertOrIgnore(this, values), this.cleanBindings(Arr.flatten(values, 1)))
+  }
+
+  /**
+   * Insert new records into the table using a subquery while ignoring errors.
+   *
+   * @param  {array}  columns
+   * @param  {Function|Builder|EloquentBuilder|string}  query
+   * @return {Promise<number>}
+   */
+  async insertOrIgnoreUsing (columns, query) {
+    this.applyBeforeQueryCallbacks()
+
+    const [sql, bindings] = this.createSub(query)
+
+    return this.connection.affectingStatement(
+      this.grammar.compileInsertOrIgnoreUsing(this, columns, sql),
+      this.cleanBindings(bindings)
+    )
   }
 
   /**
@@ -1449,6 +1552,52 @@ export default class Builder {
   }
 
   /**
+   * Add a lateral join clause to the query.
+   *
+   * @param {Function|EloquentBuilder|string} query The query or closure to join laterally
+   * @param {string} as Alias for the lateral join
+   * @param {string} type The type of join ('inner' by default)
+   * @returns {this} This instance for chaining
+   */
+  joinLateral (query, as, type = 'inner') {
+    let bindings
+
+    [query, bindings] = this.createSub(query)
+
+    const expression = `(${query}) as ${this.grammar.wrapTable(as)}`
+
+    this.addBinding(bindings, 'join')
+
+    this.joins.push(this.newJoinLateralClause(this, type, new Expression(expression)))
+
+    return this
+  }
+
+  /**
+   * Add a lateral left join to the query.
+   *
+   * @param  {Function|Builder|EloquentBuilder|string}  query
+   * @param  {string}  as
+   * @return {this}
+   */
+  leftJoinLateral (query, as) {
+    return this.joinLateral(query, as, 'left')
+  }
+
+  /**
+   * Get a new join lateral clause.
+   *
+   * @protected
+   * @param {Object} parentQuery The parent query builder
+   * @param {string} type The type of join
+   * @param {string|Expression} table The table to join
+   * @returns {JoinLateralClause} A new JoinLateralClause instance
+   */
+  newJoinLateralClause (parentQuery, type, table) {
+    return new JoinLateralClause(parentQuery, type, table)
+  }
+
+  /**
    * Add a subquery join clause to the query.
    *
    * @param  {Function|Builder|EloquentBuilder|string}  query
@@ -1460,7 +1609,7 @@ export default class Builder {
    * @param  {boolean}  [where=false]
    * @return {this}
    *
-   * @throws \InvalidArgumentException
+   * @throws {Error}
    */
   joinSub (query, as, first, operator, second, type = 'inner', where = false) {
     let bindings;
@@ -1680,7 +1829,7 @@ export default class Builder {
   /**
    * Add an "order by" clause for a timestamp to the query.
    *
-   * @param  {Function|Builder|\Illuminate\Contracts\Database\Query\Expression|string}  column
+   * @param  {Function|Builder|Expression|string}  column
    * @return {this}
    */
   oldest (column = 'created_at') {
@@ -1690,11 +1839,11 @@ export default class Builder {
   /**
    * Add an "order by" clause to the query.
    *
-   * @param  {Function|Builder|\Illuminate\Database\Query\Expression|string}  column
+   * @param  {Function|Builder|Expression|string}  column
    * @param  {string}  [direction=asc]
    * @return {this}
    *
-   * @throws {\InvalidArgumentException}
+   * @throws {Error}
    */
   orderBy (column, direction = 'asc') {
     if (this.isQueryable(column)) {
@@ -1720,7 +1869,7 @@ export default class Builder {
   /**
    * Add a descending "order by" clause to the query.
    *
-   * @param  {Function|Builder|\Illuminate\Database\Query\Expression|string}  column
+   * @param  {Function|Builder|Expression|string}  column
    * @return {this}
    */
   orderByDesc (column) {
@@ -1807,9 +1956,33 @@ export default class Builder {
   }
 
   /**
+   * Add an "or where" clause to the query for multiple columns with "and" conditions between them.
+   *
+   * @param  {string[]}  columns
+   * @param  {string}  [operator]
+   * @param  {any}  [value]
+   * @return {this}
+   */
+  orWhereAll (columns, operator, value) {
+    return this.whereAll(columns, operator, value, 'or')
+  }
+
+  /**
+   * Add an "or where" clause to the query for multiple columns with "or" conditions between them.
+   *
+   * @param  {string[]}  columns
+   * @param  {string}  [operator]
+   * @param  {any}  [value]
+   * @return {this}
+   */
+  orWhereAny (columns, operator, value) {
+    return this.whereAny(columns, operator, value, 'or')
+  }
+
+  /**
    * Add an or where between statement to the query.
    *
-   * @param  {\Illuminate\Contracts\Database\Query\Expression|string}  column
+   * @param  {Expression|string}  column
    * @param  {array}  values
    * @returns {this}
    */
@@ -1820,7 +1993,7 @@ export default class Builder {
   /**
    * Add an or where between statement using columns to the query.
    *
-   * @param  {\Illuminate\Contracts\Database\Query\Expression|string}  column
+   * @param  {Expression|string}  column
    * @param  {Array}  values
    * @returns {this}
    */
@@ -2146,9 +2319,9 @@ export default class Builder {
    * Parse the subquery into SQL and bindings.
    *
    * @param  {any}  query
-   * @return {Array}
+   * @return {[string, any[]]}
    *
-   * @throws {\InvalidArgumentException}
+   * @throws {TypeError}
    */
   parseSub (query) {
     if (query instanceof Builder ||
@@ -2161,7 +2334,7 @@ export default class Builder {
     } else if (typeof query === 'string') {
       return [query, []]
     } else {
-      throw new Error('InvalidArgumentException: A subquery must be a query builder instance, a Closure, or a string.')
+      throw new TypeError('InvalidArgumentException: A subquery must be a query builder instance, a Closure, or a string.')
     }
   }
 
@@ -2225,12 +2398,12 @@ export default class Builder {
   /**
    * Prepare the value and operator for a where clause.
    *
-   * @param  {Date|string|number|undefined}  value
+   * @param  {string}  value
    * @param  {string}  operator
    * @param  {boolean}  useDefault
-   * @return {Array}
+   * @return {string[]}
    *
-   * @throws {\InvalidArgumentException}
+   * @throws {Error}
    */
   prepareValueAndOperator (value, operator, useDefault = false) {
     if (useDefault) {
@@ -2439,7 +2612,7 @@ export default class Builder {
    * @param {string}  as
    * @return {this}
    *
-   * @throws {\InvalidArgumentException}
+   * @throws {Error}
    */
   selectSub (query, as) {
     const [querySub, bindings] = this.createSub(query)
@@ -2587,19 +2760,37 @@ export default class Builder {
    * @return {number}
    */
   update (values) {
+    // this.applyBeforeQueryCallbacks()
+
+    // const sql = this.grammar.compileUpdate(this, values)
+
+    // return this.connection.update(sql, this.cleanBindings(
+    //   this.grammar.prepareBindingsForUpdate(this.bindings, values)
+    // ))
+
     this.applyBeforeQueryCallbacks()
 
-    const sql = this.grammar.compileUpdate(this, values)
+    const valuesCol = collect(values).map((value, key) => {
+      if (!(value instanceof Builder)) {
+        return { value, bindings: value }
+      }
+
+      const [query, bindings] = this.parseSub(value)
+
+      return { value: new Expression(`(${query})`), bindings: () => bindings }
+    })
+
+    const sql = this.grammar.compileUpdate(this, valuesCol.map(value => value.value).all())
 
     return this.connection.update(sql, this.cleanBindings(
-      this.grammar.prepareBindingsForUpdate(this.bindings, values)
+      this.grammar.prepareBindingsForUpdate(this.bindings, valuesCol.map(value => value.bindings).all())
     ))
   }
 
   /**
    * Update records in a PostgreSQL database using the update from syntax.
    *
-   * @param  {Object.<string, unknown>}  values
+   * @param  {Record<string, unknown>}  values
    * @return {number}
    */
   updateFrom (values) {
@@ -2619,11 +2810,11 @@ export default class Builder {
   /**
    * Insert or update a record matching the attributes, and fill it with values.
    *
-   * @param  {Object.<string, unknown>}  attributes
-   * @param  {Object.<string, unknown>}  values
-   * @return {boolean}
+   * @param  {Record<string, unknown>}  attributes
+   * @param  {Record<string, unknown>}  values
+   * @return {Promise<boolean>}
    */
-  async updateOrInsert (attributes, values = []) {
+  async updateOrInsert (attributes, values = {}) {
     const exists = await this.where(attributes).exists()
 
     if (!(exists)) {
@@ -2810,9 +3001,53 @@ export default class Builder {
   }
 
   /**
+   * Add a "where" clause to the query for multiple columns with "and" conditions between them.
+   *
+   * @param  {string[]}  columns
+   * @param  {any}  [operator]
+   * @param  {any}  [value]
+   * @param  {string}  [boolean]
+   * @return {this}
+   */
+  whereAll (columns, operator = undefined, value = undefined, boolean = 'and') {
+    [value, operator] = this.prepareValueAndOperator(
+      value, operator, arguments.length === 2
+    )
+
+    this.whereNested((query) => {
+      for (const column of columns) {
+        query.where(column, operator, value, 'and')
+      }
+    }, boolean)
+
+    return this
+  }
+
+  /**
+   * Add an "where" clause to the query for multiple columns with "or" conditions between them.
+   *
+   * @param {string[]} columns The columns to apply the conditions on
+   * @param {string} operator The operator to apply to the conditions
+   * @param {any} value The value to compare against
+   * @param {string} [boolean] The boolean operator to use ('and' or 'or')
+   * @returns {this} This instance for chaining
+   */
+  whereAny (columns, operator, value, boolean = 'and') {
+    [value, operator] = this.prepareValueAndOperator(value, operator, arguments.length === 2)
+
+    this.whereNested(query => {
+      for (const column of columns) {
+        query.where(column, operator, value, 'or')
+      }
+    }, boolean)
+
+    return this
+  }
+
+  /**
    * Add a where between statement to the query.
    *
-   * @param  {\Illuminate\Database\Query\Expression|string}  column
+   * @param  {Expression|string}  column
    * @param  {any[]}  values
    * @param  {string}  boolean
    * @param  {boolean}  not
@@ -3258,7 +3493,7 @@ export default class Builder {
    * @param  {string}  [boolean='and']
    * @return {this}
    *
-   * @throws \InvalidArgumentException
+   * @throws {Error}
    */
   whereRowValues (columns, operator, values, boolean = 'and') {
     if (columns.length !== values.length) {
@@ -3352,6 +3587,30 @@ export default class Builder {
     }
 
     return this.addDateBasedWhere('Year', column, operator, value, boolean)
+  }
+
+  /**
+   * @protected
+   * @param {Collection} items The collection of items
+   * @returns {Collection} The modified collection
+   */
+  withoutGroupLimitKeys (items) {
+    const keysToRemove = ['lihtne_row']
+
+    if (typeof this.groupLimitProperty?.column === 'string') {
+      const column = this.groupLimitProperty?.column.split('.').pop()
+
+      keysToRemove.push('@lihtne_group := ' + this.grammar.wrap(column))
+      keysToRemove.push('@lihtne_group := ' + this.grammar.wrap('pivot_' + column))
+    }
+
+    items.each(item => {
+      keysToRemove.forEach(key => {
+        delete item[key]
+      })
+    })
+
+    return items
   }
 
   /**

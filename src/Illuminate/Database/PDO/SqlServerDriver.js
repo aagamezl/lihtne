@@ -12,7 +12,7 @@ export class SqlServerDriver extends AbstractSQLServerDriver {
    * @param  {object}  driverOptions
    * @return {\Illuminate\Database\PDO\Connection}
    *
-   * @throws {\InvalidArgumentException}
+   * @throws {Error}
    */
   connect (params, username = undefined, password = undefined, driverOptions = {}) {
     return new SqlServerConnection(

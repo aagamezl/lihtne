@@ -6,19 +6,19 @@ export default class ConnectsToDatabase {
   /**
    * Create a new database connection.
    *
-   * @param  {object}  params
+   * @param  {Record<string, any>}  params
    * @param  {string|undefined}  [username]
    * @param  {string|undefined}  [password]
-   * @param  {object}  [driverOptions]
+   * @param  {Record<string, any>}  [driverOptions]
    * @return {import('../Connection.js').default}
    *
-   * @throws {\InvalidArgumentException}
+   * @throws {Error}
    */
   connect (params, username = undefined, password = undefined, driverOptions = {}) {
     if (isNil(params.pdo) || !isObject(params.pdo)) {
       throw new Error('InvalidArgumentException: Lihtne requires the "pdo" property to be set and be a Connection Object instance.')
     }
 
-    return new Connection(params.pdo)
+    return new Connection(params.ndo)
   }
 }

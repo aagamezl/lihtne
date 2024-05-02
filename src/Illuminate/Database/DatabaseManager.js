@@ -86,9 +86,9 @@ export default class DatabaseManager {
  * Get the configuration for a connection.
  *
  * @param  {string}  name
- * @return {Array}
+ * @return {Record<string, unknown>}
  *
- * @throws {\InvalidArgumentException}
+ * @throws {TypeError}
  */
   configuration (name) {
     name = name ?? this.getDefaultConnection()

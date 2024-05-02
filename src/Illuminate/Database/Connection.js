@@ -134,7 +134,8 @@ export default class Connection {
   constructor (ndo, // TODO: verify the real type and remove the any
     database = '', tablePrefix = '', config = {}
   ) {
-    use(this.constructor, [DetectsLostConnections])
+    // use(this.constructor, [DetectsLostConnections])
+    use(Connection, [DetectsLostConnections])
 
     this.ndo = ndo
 

@@ -22,9 +22,9 @@ export default class ConnectionFactory {
    * @param  {string}  database
    * @param  {string}  [prefix='']
    * @param  {object}  [config={}]
-   * @return {\Illuminate\Database\Connection}
+   * @return {Connection}
    *
-   * @throws \InvalidArgumentException
+   * @throws {Error}
    */
   createConnection (driver, connection, database, prefix = '', config = {}) {
     const resolver = Connection.getResolver(driver)
@@ -54,7 +54,7 @@ export default class ConnectionFactory {
    *
    * @return {import('../Connectors/Connector.js').default}
    *
-   * @throws \InvalidArgumentException
+   * @throws {TypeError}
    */
   createConnector (config) {
     if (!config.driver) {
@@ -215,10 +215,10 @@ export default class ConnectionFactory {
   /**
    * Parse the hosts configuration item into an array.
    *
-   * @param  {object}  config
-   * @return {array}
+   * @param  {Record<string, any>}  config
+   * @return {any[]}
    *
-   * @throws \InvalidArgumentException
+   * @throws {Error}
    */
   parseHosts (config) {
     const hosts = Arr.wrap(config.host)

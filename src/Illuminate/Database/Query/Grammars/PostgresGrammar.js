@@ -7,31 +7,27 @@ import { collect } from '../../../Collections/helpers.js'
 import { pregMatchAll } from '../../../Support/helpers.js'
 
 export default class PostgresGrammar extends Grammar {
-  constructor () {
-    super(...arguments)
+  /**
+   * The grammar specific bitwise operators.
+   *
+   * @type {string[]}
+   */
+  bitwiseOperators = [
+    '~', '&', '|', '#', '<<', '>>', '<<=', '>>='
+  ]
 
-    /**
-     * The grammar specific bitwise operators.
-     *
-     * @type {string[]}
-     */
-    this.bitwiseOperators = [
-      '~', '&', '|', '#', '<<', '>>', '<<=', '>>='
-    ]
-
-    /**
-     * All of the available clause operators.
-     *
-     * @var string[]
-     */
-    this.operators = [
-      '=', '<', '>', '<=', '>=', '<>', '!=',
-      'like', 'not like', 'between', 'ilike', 'not ilike',
-      '~', '&', '|', '#', '<<', '>>', '<<=', '>>=',
-      '&&', '@>', '<@', '?', '?|', '?&', '||', '-', '@?', '@@', '#-',
-      'is distinct from', 'is not distinct from'
-    ]
-  }
+  /**
+   * All of the available clause operators.
+   *
+   * @type {string[]}
+   */
+  operators = [
+    '=', '<', '>', '<=', '>=', '<>', '!=',
+    'like', 'not like', 'between', 'ilike', 'not ilike',
+    '~', '&', '|', '#', '<<', '>>', '<<=', '>>=',
+    '&&', '@>', '<@', '?', '?|', '?&', '||', '-', '@?', '@@', '#-',
+    'is distinct from', 'is not distinct from'
+  ]
 
   /**
    * Compile the "select *" portion of the query.
@@ -123,7 +119,7 @@ export default class PostgresGrammar extends Grammar {
    * Compile an insert and get ID statement into SQL.
    *
    * @param  {import('./../Builder.js').default}  query
-   * @param  {Object.<string, unknown>}  values
+   * @param  {Record<string, unknown>}  values
    * @param  {string}  sequence
    * @return {string}
    */
@@ -140,6 +136,29 @@ export default class PostgresGrammar extends Grammar {
    */
   compileInsertOrIgnore (query, values) {
     return this.compileInsert(query, values) + ' on conflict do nothing'
+  }
+
+  /**
+   * Compile an insert ignore statement using a subquery into SQL.
+   *
+   * @param  {import('../../Query/Builder.js').default}  $query
+   * @param  {any[]}  columns
+   * @param  {string}  sql
+   * @return {string}
+   */
+  compileInsertOrIgnoreUsing (query, columns, sql) {
+    return this.compileInsertUsing(query, columns, sql) + ' on conflict do nothing'
+  }
+
+  /**
+   * Compile a "lateral join" clause.
+   *
+   * @param  {import('../../Query/JoinLateralClause.js').default}  join
+   * @param  {string}  expression
+   * @return {string}
+   */
+  compileJoinLateral (join, expression) {
+    return `${join.type} join lateral ${expression} on true`.trim()
   }
 
   /**
@@ -238,22 +257,22 @@ export default class PostgresGrammar extends Grammar {
   }
 
   /**
-     * Compile a truncate table statement into SQL.
-     *
-     * @param  {import('./../Builder.js').default}  query
-     * @return {Object.<string, unknown[]>}
-     */
+   * Compile a truncate table statement into SQL.
+   *
+   * @param  {import('./../Builder.js').default}  query
+   * @return {Record<string, unknown[]>}
+   */
   compileTruncate (query) {
     return { ['truncate ' + this.wrapTable(query.fromProperty) + ' restart identity cascade']: [] }
   }
 
   /**
-     * Compile an update statement into SQL.
-     *
-     * @param  {import('./../Builder.js').default}  query
-     * @param  {Object.<string, unknown>}  values
-     * @return [string]
-     */
+   * Compile an update statement into SQL.
+   *
+   * @param  {import('./../Builder.js').default}  query
+   * @param  {Record<string, unknown>}  values
+   * @return {string}
+   */
   compileUpdate (query, values) {
     if (query.joins.length > 0 || query.limitProperty !== undefined) {
       return this.compileUpdateWithJoinsOrLimit(query, values)
@@ -263,12 +282,12 @@ export default class PostgresGrammar extends Grammar {
   }
 
   /**
-     * Compile the columns for an update statement.
-     *
-     * @param  {import('./../Builder.js').default}  query
-     * @param  {Object.<string, unknown>}  values
-     * @return {string}
-     */
+   * Compile the columns for an update statement.
+   *
+   * @param  {import('./../Builder.js').default}  query
+   * @param  {Record<string, unknown>}  values
+   * @return {string}
+   */
   compileUpdateColumns (query, values) {
     return collect(values).map((value, key) => {
       const column = key.split('.').pop()
@@ -282,12 +301,12 @@ export default class PostgresGrammar extends Grammar {
   }
 
   /**
-     * Compile an update from statement into SQL.
-     *
-     * @param  {import('./../Builder.js').default}  query
-     * @param  {Object.<string, unknown>}  values
-     * @return {string}
-     */
+   * Compile an update from statement into SQL.
+   *
+   * @param  {import('./../Builder.js').default}  query
+   * @param  {Record<string, unknown>}  values
+   * @return {string}
+   */
   compileUpdateFrom (query, values) {
     const table = this.wrapTable(query.fromProperty)
 
@@ -317,11 +336,11 @@ export default class PostgresGrammar extends Grammar {
   }
 
   /**
-     * Compile the "join" clause where clauses for an update.
-     *
-     * @param  {import('./../Builder.js').default}  query
-     * @return {string}
-     */
+   * Compile the "join" clause where clauses for an update.
+   *
+   * @param  {import('./../Builder.js').default}  query
+   * @return {string}
+   */
   compileUpdateJoinWheres (query) {
     const joinWheres = []
 
@@ -340,11 +359,11 @@ export default class PostgresGrammar extends Grammar {
   }
 
   /**
-     * Compile the additional where clauses for updates with joins.
-     *
-     * @param  {import('./../Builder.js').default}  query
-     * @return {string}
-     */
+   * Compile the additional where clauses for updates with joins.
+   *
+   * @param  {import('./../Builder.js').default}  query
+   * @return {string}
+   */
   compileUpdateWheres (query) {
     const baseWheres = this.compileWheres(query)
 
@@ -365,12 +384,12 @@ export default class PostgresGrammar extends Grammar {
   }
 
   /**
-     * Compile an update statement with joins or limit into SQL.
-     *
-     * @param  {import('./../Builder.js').default}  query
-     * @param  {Object.<string, unknown>}  values
-     * @return {string}
-     */
+   * Compile an update statement with joins or limit into SQL.
+   *
+   * @param  {import('./../Builder.js').default}  query
+   * @param  {Record<string, unknown>}  values
+   * @return {string}
+   */
   compileUpdateWithJoinsOrLimit (query, values) {
     const table = this.wrapTable(query.fromProperty)
 
@@ -387,7 +406,7 @@ export default class PostgresGrammar extends Grammar {
    * Compile an "upsert" statement into SQL.
    *
    * @param  {import('./../Builder.js').default}  query
-   * @param  {Object.<string, unknown>}  values
+   * @param  {Record<string, unknown>}  values
    * @param  {array}  uniqueBy
    * @param  {array}  update
    * @return {string}
@@ -421,11 +440,11 @@ export default class PostgresGrammar extends Grammar {
   }
 
   /**
-     * Parse the given JSON path attribute for array keys.
-     *
-     * @param  {string}  attribute
-     * @return {array}
-     */
+   * Parse the given JSON path attribute for array keys.
+   *
+   * @param  {string}  attribute
+   * @return {array}
+   */
   parseJsonPathArrayKeys (attribute) {
     const parts = attribute.match(/(\[[^\]]+\])+$/)
 
@@ -447,12 +466,12 @@ export default class PostgresGrammar extends Grammar {
   }
 
   /**
-     * Prepare the bindings for an update statement.
-     *
-     * @param  {array}  bindings
-     * @param  {Object.<string, unknown>}  values
-     * @return {array}
-     */
+   * Prepare the bindings for an update statement.
+   *
+   * @param  {array}  bindings
+   * @param  {Record<string, unknown>}  values
+   * @return {array}
+   */
   prepareBindingsForUpdate (bindings, values) {
     values = collect(values).map((value, column) => {
       return (Array.isArray(value) || isPlainObject(value)) || (this.isJsonSelector(column) && !this.isExpression(value))
@@ -469,12 +488,12 @@ export default class PostgresGrammar extends Grammar {
   }
 
   /**
-     * Prepare the bindings for an update statement.
-     *
-     * @param  {import('./../Builder.js').Bindings}  bindings
-     * @param  {Object.<string, unknown>}  values
-     * @return {array}
-     */
+   * Prepare the bindings for an update statement.
+   *
+   * @param  {import('./../Builder.js').Bindings}  bindings
+   * @param  {Record<string, unknown>}  values
+   * @return {array}
+   */
   prepareBindingsForUpdateFrom (bindings, values) {
     values = collect(values).map((value, column) => {
       return (Array.isArray(value) || isPlainObject(value)) || (this.isJsonSelector(column) && !this.isExpression(value))
@@ -495,12 +514,12 @@ export default class PostgresGrammar extends Grammar {
   }
 
   /**
-     * Substitute the given bindings into the given raw SQL query.
-     *
-     * @param  {string}  sql
-     * @param  {import('./../Builder.js').Bindings}  bindings
-     * @return {string}
-     */
+   * Substitute the given bindings into the given raw SQL query.
+   *
+   * @param  {string}  sql
+   * @param  {import('./../Builder.js').Bindings}  bindings
+   * @return {string}
+   */
   substituteBindingsIntoRawSql (sql, bindings) {
     let query = super.substituteBindingsIntoRawSql(sql, bindings)
 
@@ -516,10 +535,10 @@ export default class PostgresGrammar extends Grammar {
   }
 
   /**
-     * Get an array of valid full text languages.
-     *
-     * @return {string[]}
-     */
+   * Get an array of valid full text languages.
+   *
+   * @return {string[]}
+   */
   validFullTextLanguages () {
     return [
       'simple',
@@ -563,12 +582,12 @@ export default class PostgresGrammar extends Grammar {
   }
 
   /**
-     * Compile a bitwise operator where clause.
-     *
+   * Compile a bitwise operator where clause.
+   *
    * @param  {import('./../Builder.js').default}  query
    * @param  {import('./../Builder.js').Where}  where
    * @return {string}
-     */
+   */
   whereBitwise (query, where) {
     const value = this.parameter(where.value)
 
@@ -635,11 +654,11 @@ export default class PostgresGrammar extends Grammar {
   }
 
   /**
-     * Wrap the given JSON selector for boolean values.
-     *
-     * @param  {string}  value
-     * @return {string}
-     */
+   * Wrap the given JSON selector for boolean values.
+   *
+   * @param  {string}  value
+   * @return {string}
+   */
   wrapJsonBooleanSelector (value) {
     const selector = this.wrapJsonSelector(value).replace('->>', '->')
 
@@ -657,11 +676,11 @@ export default class PostgresGrammar extends Grammar {
   }
 
   /**
-     * Wrap the attributes of the given JSON path.
-     *
-     * @param  {array}  path
-     * @return {unknown[]}
-     */
+   * Wrap the attributes of the given JSON path.
+   *
+   * @param  {array}  path
+   * @return {unknown[]}
+   */
   wrapJsonPathAttributes (path) {
     const quote = arguments.length === 2 ? arguments[1] : "'"
 
@@ -675,11 +694,11 @@ export default class PostgresGrammar extends Grammar {
   }
 
   /**
-     * Wrap the given JSON selector.
-     *
-     * @param  {string}  value
-     * @return {string}
-     */
+   * Wrap the given JSON selector.
+   *
+   * @param  {string}  value
+   * @return {string}
+   */
   wrapJsonSelector (value) {
     const path = value.split('->')
 

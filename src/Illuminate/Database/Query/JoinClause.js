@@ -1,7 +1,6 @@
 import { Builder } from './internal.js'
+
 /**
- *
- *
  * @export
  * @class JoinClause
  * @extends {Builder}
@@ -11,10 +10,9 @@ export default class JoinClause extends Builder {
    * Create a new join clause instance.
    *
    * @constructor
-   * @param  {{\Illuminate\Database\Query\Builder}}  parentQuery
+   * @param  {Builder}  parentQuery
    * @param  {string}  type
-   * @param  {string}  table
-   * @return {void}
+   * @param  {string|import('./Expression.js').default}  table
    */
   constructor (parentQuery, type, table) {
     const parentConnection = parentQuery.getConnection()
@@ -26,15 +24,15 @@ export default class JoinClause extends Builder {
     this.type = type
     this.table = table
     this.parentClass = parentQuery.constructor
-    this.parentConnection = parentQuery.getConnection()
     this.parentGrammar = parentGrammar
     this.parentProcessor = parentProcessor
+    this.parentConnection = parentQuery.getConnection()
   }
 
   /**
    * Create a new query instance for sub-query.
    *
-   * @return {\Illuminate\Database\Query\Builder}
+   * @return {Builder}
    */
   forSubQuery () {
     return this.newParentQuery().newQuery()
@@ -43,7 +41,7 @@ export default class JoinClause extends Builder {
   /**
    * Create a new parent query instance.
    *
-   * @return {\Illuminate\Database\Query\Builder}
+   * @return {Builder}
    */
   newParentQuery () {
     const constructor = this.parentClass
@@ -53,7 +51,7 @@ export default class JoinClause extends Builder {
   /**
    * Get a new instance of the join clause builder.
    *
-   * @return {\Illuminate\Database\Query\JoinClause}
+   * @return {JoinClause}
    */
   newQuery () {
     return new JoinClause(this.newParentQuery(), this.type, this.table)
@@ -71,15 +69,15 @@ export default class JoinClause extends Builder {
    *
    * on `contacts`.`user_id` = `users`.`id` and `contacts`.`info_id` = `info`.`id`
    *
-   * @param  {\Function|string}  first
+   * @param  {Function|string}  first
    * @param  {string}  [operator]
    * @param  {\Illuminate\Database\Query\Expression|string|undefined}  [second]
    * @param  {string}  [boolean=and]
    * @return {this}
    *
-   * @throws {\InvalidArgumentException}
+   * @throws {Error}
    */
-  on (first, operator, second, boolean = 'and') {
+  on (first, operator, second = undefined, boolean = 'and') {
     if (first instanceof Function) {
       return this.whereNested(first, boolean)
     }

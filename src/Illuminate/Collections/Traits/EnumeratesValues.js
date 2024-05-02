@@ -3,8 +3,23 @@ import { isFunction, isPlainObject, isString } from '@devnetic/utils'
 import Collection from '../Collection.js'
 import { dataGet } from '../helpers.js'
 
-// export const EnumeratesValues = {
-export class EnumeratesValues {
+export default class EnumeratesValues {
+  /**
+   * Execute a callback over each item.
+   *
+   * @param  {(TValue, TKey) => any}  callback
+   * @return {this}
+   */
+  each (callback) {
+    for (const [key, item] of this.items) {
+      if (callback(item, key) === false) {
+        break
+      }
+    }
+
+    return this
+  }
+
   /**
    * Results array of items from Collection or Arrayable.
    *
@@ -18,7 +33,8 @@ export class EnumeratesValues {
       return items.all()
     } else if (isPlainObject(items)) {
       this.entries = true
-      return Object.entries(items)
+      // return Object.entries(items)
+      return items
     } else if (items === undefined) {
       return []
     }

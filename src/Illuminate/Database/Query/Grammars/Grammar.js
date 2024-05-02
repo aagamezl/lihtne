@@ -3,9 +3,9 @@ import { capitalize, isTruthy } from '@devnetic/utils'
 import Arr from '../../../Collections/Arr.js'
 import BaseGrammar from '../../Grammar.js'
 import CompilesJsonPaths from '../../Concerns/CompilesJsonPaths.js'
-import { JoinClause } from './../internal.js'
+import { JoinClause, JoinLateralClause } from './../internal.js'
 import use from '../../../Support/Traits/use.js'
-import { collect, end, head, last, reset } from '../../../Collections/helpers.js'
+import { collect, end, head, last, reset, value as getValue } from '../../../Collections/helpers.js'
 import Expression from './../Expression.js'
 
 /**
@@ -32,7 +32,8 @@ export default class Grammar extends BaseGrammar {
   constructor () {
     super()
 
-    use(this.constructor, [CompilesJsonPaths])
+    // use(this.constructor, [CompilesJsonPaths])
+    use(Grammar, [CompilesJsonPaths])
 
     /**
      * The grammar specific operators.
@@ -72,6 +73,7 @@ export default class Grammar extends BaseGrammar {
   /**
    * Compile an aggregated select clause.
    *
+   * @protected
    * @param  {import('./../Builder.js').default}  query
    * @param  {Aggregate}  aggregate
    * @return {string}
@@ -129,9 +131,10 @@ export default class Grammar extends BaseGrammar {
    * Compile the components necessary for a select clause.
    *
    * @param  {import('./../Builder.js').default}  query
-   * @return {Object.<string, string>}
+   * @return {Record<string, string>}
    */
   compileComponents (query) {
+    /** @type {Record<string, string>} */
     const sql = {}
 
     for (const { name, property } of this.selectComponents) {
@@ -206,6 +209,7 @@ export default class Grammar extends BaseGrammar {
   /**
    * Compile the "from" portion of the query.
    *
+   * @protected
    * @param  {import('./../Builder.js').default}  query
    * @param  {string}  table
    * @return {string}
@@ -393,10 +397,24 @@ export default class Grammar extends BaseGrammar {
   }
 
   /**
+   * Compile an insert ignore statement using a subquery into SQL.
+   *
+   * @param  {Builder}  query
+   * @param  {array}  columns
+   * @param  {string}  sql
+   * @return {string}
+   *
+   * @throws {Error}
+   */
+  compileInsertOrIgnoreUsing (query, columns, sql) {
+    throw new Error('RuntimeException: This database engine does not support inserting while ignoring errors.')
+  }
+
+  /**
    * Compile an insert statement using a subquery into SQL.
    *
    * @param  {import('./../Builder.js').default}  query
-   * @param  {unknown[]}  columns
+   * @param  {any[]}  columns
    * @param  {string}  sql
    * @return {string}
    */
@@ -408,6 +426,19 @@ export default class Grammar extends BaseGrammar {
     }
 
     return `insert into ${table} (${this.columnize(columns)}) ${sql}`
+  }
+
+  /**
+   * Compile a "lateral join" clause.
+   *
+   * @param  {JoinLateralClause}  join
+   * @param  {string}  expression
+   * @return {string}
+   *
+   * @throws Error
+   */
+  compileJoinLateral (join, expression) {
+    throw new Error('RuntimeException: This database engine does not support lateral joins.')
   }
 
   /**
@@ -424,6 +455,10 @@ export default class Grammar extends BaseGrammar {
       const nestedJoins = join.joins.length === 0 ? '' : ' ' + this.compileJoins(query, join.joins)
 
       const tableAndNestedJoins = join.joins.length === 0 ? table : '(' + table + nestedJoins + ')'
+
+      if (join instanceof JoinLateralClause) {
+        return this.compileJoinLateral(join, tableAndNestedJoins)
+      }
 
       return `${join.type} join ${tableAndNestedJoins} ${this.compileWheres(join)}`.trim()
     }).implode(' ')
@@ -617,7 +652,7 @@ export default class Grammar extends BaseGrammar {
    * Compile a truncate table statement into SQL.
    *
    * @param  {import('./../Builder.js').default}  query
-   * @return {array}
+   * @return {Record<string, unknown[]>}
    */
   compileTruncate (query) {
     return { ['truncate table ' + this.wrapTable(query.fromProperty)]: [] }
@@ -639,7 +674,7 @@ export default class Grammar extends BaseGrammar {
    * Compile an update statement into SQL.
    *
    * @param  {import('./../Builder.js').default}  query
-   * @param  {array}  values
+   * @param  {Record<string, unknown>}  values
    * @return {string}
    */
   compileUpdate (query, values) {
@@ -660,7 +695,7 @@ export default class Grammar extends BaseGrammar {
    * Compile the columns for an update statement.
    *
    * @param  {import('./../Builder.js').default}  query
-   * @param  {array}  values
+   * @param  {Record<string, unknown>}  values
    * @return {string}
    */
   compileUpdateColumns (query, values) {
@@ -893,13 +928,23 @@ export default class Grammar extends BaseGrammar {
    * @return {unknown[]} // TODO: verify this type
    */
   prepareBindingsForUpdate (bindings, values) {
+    // const cleanBindings = Arr.except(bindings, ['select', 'join'])
+
+    // return [
+    //   ...Object.values(bindings.join),
+    //   ...Object.values(values),
+    //   ...Object.values(Arr.flatten(cleanBindings))
+    // ].flat()
+
     const cleanBindings = Arr.except(bindings, ['select', 'join'])
 
-    return [
+    values = Arr.flatten(Object.values(values).map((value) => getValue(value)))
+
+    return Object.values([
       ...Object.values(bindings.join),
       ...Object.values(values),
       ...Object.values(Arr.flatten(cleanBindings))
-    ].flat()
+    ])
   }
 
   /**

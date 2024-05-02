@@ -200,6 +200,22 @@ export const mergeArrays = (array1, array2) => {
   return result
 }
 
+export const arrayMerge = (value1, value2) => {
+  if (typeof value1 === 'object' && typeof value2 === 'object') {
+    // Merge dictionaries (objects)
+    if (Array.isArray(value1)) {
+      // Merge arrays
+      return value1.concat(value2)
+    } else {
+      // Merge objects
+      const mergedObject = { ...value1, ...value2 }
+      return mergedObject
+    }
+  } else {
+    throw new Error('Both input arguments must be either dictionaries (objects) or arrays.')
+  }
+}
+
 export const objectDiffKey = (target, ...from) => {
   const keys = from.reduce((result, current) => {
     return result.concat(Object.keys(current))

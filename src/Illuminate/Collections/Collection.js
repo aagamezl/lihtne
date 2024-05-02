@@ -2,20 +2,30 @@ import { getType, isFunction, isPlainObject, isString, range } from '@devnetic/u
 
 import use from '../Support/Traits/use.js'
 import Arr from './Arr.js'
-import { EnumeratesValues } from './Traits/EnumeratesValues.js'
+import EnumeratesValues from './Traits/EnumeratesValues.js'
 import Macroable from '../Macroable/Traits/Macroable.js'
 import { dataGet } from './helpers.js'
-import { arrayDiff, mergeArrays, spaceship } from '../Support/index.js'
+import { arrayDiff, arrayMerge, spaceship } from '../Support/index.js'
 
+/** @typedef {Collection & import('./Traits/EnumeratesValues.js').default} CollectionWithTraits */
+
+/**
+ * @class CollectionWithTraits
+ * @template TKey
+ * @template TValue
+ *
+ */
 export default class Collection {
   /**
    * Create a new collection.
    *
    * @param  {\Illuminate\Contracts\Support\Arrayable<TKey, TValue>|iterable<TKey, TValue>|null}  items
-   * @return {void}
    */
   constructor (items = []) {
-    use(this.constructor, [EnumeratesValues, Macroable])
+    // super(items)
+
+    // use(this.constructor, [EnumeratesValues, Macroable])
+    use(Collection, [EnumeratesValues, Macroable])
 
     // We don't want to enumerate this property with Object.entries() or similar
     Object.defineProperty(this, 'entries', {
@@ -29,7 +39,12 @@ export default class Collection {
    *
    * @type {any[]}
    */
-    this.items = this.getArrayableItems(items)
+    // this.items = this.getArrayableItems(items)
+    this.items = items
+  }
+
+  valueOf () {
+    return this.items
   }
 
   /**
@@ -128,13 +143,18 @@ export default class Collection {
    * @return {string}
    */
   implode (value, glue) {
+    if (this.useAsCallable(value)) {
+      return this.map(value).all().implode(glue ?? '')
+    }
+
     const first = this.first()
 
     if (Array.isArray(first) || (isPlainObject(first) && typeof first !== 'string')) {
       return this.pluck(value).all().join(glue ?? '')
     }
 
-    return this.items.join(value ?? '')
+    // return this.items.join(value ?? '')
+    return Object.values(this.items).join(value ?? '')
   }
 
   /**
@@ -202,16 +222,29 @@ export default class Collection {
    * @param  {Function}  callback
    * @return {Collection}
    */
+
+  /**
+   * Run a map over each of the items.
+   *
+   * @template TValue
+   * @template TMapValue
+   *
+   * @param {function(TValue, TKey): TMapValue} callback
+   * @returns {Collection<TKey, TMapValue>}
+   */
   map (callback) {
-    return new Collection(this.items.map((item, key) => {
-      if (isFunction(callback)) {
-        [key, item] = Array.isArray(item) && item.length > 1 ? item : [key, item]
+    // return new Collection(this.items.map((item, key) => {
+    //   if (isFunction(callback)) {
+    //     [key, item] = Array.isArray(item) && item.length > 1 ? item : [key, item]
 
-        return callback(item, key)
-      }
+    //     return callback(item, key)
+    //   }
 
-      return item
-    }))
+    //   return item
+    // }))
+
+    // return new Collection(Arr.map(this.entries ? Object.fromEntries(this.items) : this.items, callback))
+    return new Collection(Arr.map(this.items, callback))
   }
 
   /**
@@ -221,7 +254,8 @@ export default class Collection {
    * @return {Collection}
    */
   merge (items) {
-    return new this.constructor(mergeArrays(this.items, this.getArrayableItems(items)))
+    // return new this.constructor(mergeArrays(this.items, this.getArrayableItems(items)))
+    return new this.constructor(arrayMerge(this.items, this.getArrayableItems(items)))
   }
 
   /**
