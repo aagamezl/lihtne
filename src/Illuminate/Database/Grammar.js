@@ -44,6 +44,15 @@ export default class Grammar {
   }
 
   /**
+   * Get the grammar's table prefix.
+   *
+   * @return {string}
+   */
+  getTablePrefix () {
+    return this.tablePrefix
+  }
+
+  /**
    * Get the value of a raw expression.
    *
    * @param  {Expression}  expression
@@ -119,6 +128,7 @@ export default class Grammar {
    */
   setTablePrefix (prefix) {
     this.tablePrefix = prefix
+
     return this
   }
 

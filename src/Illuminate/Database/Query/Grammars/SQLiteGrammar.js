@@ -151,12 +151,17 @@ export default class SQLiteGrammar extends Grammar {
   /**
    * Compile a truncate table statement into SQL.
    *
-   * @param  {import('./../Builder.js').default}  $query
+   * @param  {import('./../Builder.js').default}  query
    * @return {Object.<string, unknown>}
    */
   compileTruncate (query) {
+    // return {
+    //   'delete from sqlite_sequence where name = ?': [query.fromProperty],
+    //   ['delete from ' + this.wrapTable(query.fromProperty)]: []
+    // }
+
     return {
-      'delete from sqlite_sequence where name = ?': [query.fromProperty],
+      'delete from sqlite_sequence where name = ?': [this.getTablePrefix() + query.fromProperty],
       ['delete from ' + this.wrapTable(query.fromProperty)]: []
     }
   }

@@ -16,9 +16,11 @@ import MySqlGrammar from '../../src/Illuminate/Database/Query/Grammars/MySqlGram
 import Connection from '../../src/Illuminate/Database/Connection.js'
 import Processor from '../../src/Illuminate/Database/Query/Processors/Processor.js'
 import ConditionExpression from '../../src/Illuminate/Database/Query/ConditionExpression.js'
+// import Cursor from '../../src/Illuminate/Pagination/Cursor.js'
 import { collect } from '../../src/Illuminate/Collections/helpers.js'
 
 import mock from '../helpers/mock.js'
+import { IntegerStatus, NonBackedStatus } from './Enums.js'
 
 test('testBasicSelect', (t) => {
   const builder = getBuilder()
@@ -299,12 +301,12 @@ test('testBasicWheres', t => {
   t.deepEqual([1], builder.getBindings())
 })
 
-// test('testBasicWheresInvalidOperator', t => {
-//   const builder = getBuilder()
-//   builder.select('*').from('users').where('id', '#', 1)
-//   t.is('select * from "users" where "id" = ?', builder.toSql())
-//   t.deepEqual(['#'], builder.getBindings())
-// })
+test('testBasicWheresInvalidOperator', t => {
+  const builder = getBuilder()
+  builder.select('*').from('users').where('id', '#', 1)
+  t.is('select * from "users" where "id" = ?', builder.toSql())
+  t.deepEqual(['#'], builder.getBindings())
+})
 
 test('testBasicWhereNot', async (t) => {
   const builder = getBuilder()
@@ -3696,6 +3698,26 @@ test('testTruncateMethod', async (t) => {
   verifyMock()
 })
 
+test('testTruncateMethodWithPrefix', async t => {
+  const { createMock, verifyMock } = mock()
+
+  let builder = getBuilder()
+  builder.getGrammar().setTablePrefix('prefix_')
+  createMock(builder.getConnection()).expects('statement').once().withArgs('truncate table "prefix_users"', [])
+  builder.from('users').truncate()
+
+  const sqlite = new SQLiteGrammar()
+  sqlite.setTablePrefix('prefix_')
+  builder = getBuilder()
+  builder.from('users')
+  t.deepEqual(sqlite.compileTruncate(builder), {
+    'delete from sqlite_sequence where name = ?': ['prefix_users'],
+    'delete from "prefix_users"': []
+  })
+
+  verifyMock()
+})
+
 test('testPreserveAddsClosureToArray', async (t) => {
   const builder = getBuilder()
   builder.beforeQuery(() => {
@@ -4543,6 +4565,13 @@ test('testAddBindingWithArrayMergesBindingsInCorrectOrder', async (t) => {
   t.deepEqual(builder.getBindings(), ['foo', 'bar', 'baz'])
 })
 
+test('testAddBindingWithEnum', async t => {
+  const builder = getBuilder()
+  builder.addBinding(IntegerStatus.done)
+  builder.addBinding([NonBackedStatus.done])
+  t.deepEqual(builder.getBindings(), [2, 'done'])
+})
+
 test('testMergeBuilders', async (t) => {
   const builder = getBuilder()
   builder.addBinding(['foo', 'bar'])
@@ -5039,7 +5068,7 @@ test('testPaginateWithTotalOverride', async (t) => {
   verifyMock()
 })
 
-// test.only('testCursorPaginate', async (t) => {
+// test('testCursorPaginate', async (t) => {
 //   const { createMock, verifyMock } = mock()
 
 //   const perPage = 16
