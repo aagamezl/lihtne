@@ -1,0 +1,14 @@
+{
+  "database": {
+    "default": "pgsql",
+    "connections": {
+      "pgsql": {
+        "driver": "pgsql",
+        "host": "127.0.0.1",
+        "database": "rest-api-db",
+        "username": "rest-api-user",
+        "password": "ujt9ack5gbn_TGD4mje"
+      }
+    }
+  }
+}
