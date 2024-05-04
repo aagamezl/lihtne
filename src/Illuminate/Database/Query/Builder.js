@@ -1043,7 +1043,7 @@ export default class Builder {
   /**
    * Get the current query value bindings in a flattened array.
    *
-   * @return {any[]}
+   * @return {unknown[]}
    */
   getBindings () {
     return Arr.flatten(this.bindings)

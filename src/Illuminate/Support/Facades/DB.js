@@ -7,6 +7,7 @@ import DatabaseManager from '../../Database/DatabaseManager.js'
  * @returns {import('../../Database/Connection.js').default}
  */
 const DB = () => {
+  // TODO: avoid the databaseManager variable instantiation
   const databaseManager = new DatabaseManager(
     new ConnectionFactory(),
     new Repository()
