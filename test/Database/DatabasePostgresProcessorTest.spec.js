@@ -2,7 +2,7 @@ import test from 'ava'
 
 import PostgresProcessor from '../../src/Illuminate/Database/Query/Processors/PostgresProcessor.js'
 
-test.only('testProcessColumns', async t => {
+test('testProcessColumns', async t => {
   const processor = new PostgresProcessor()
 
   const listing = [
