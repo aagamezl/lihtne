@@ -524,11 +524,9 @@ export default class PostgresGrammar extends Grammar {
     let query = super.substituteBindingsIntoRawSql(sql, bindings)
 
     for (const operator of this.operators) {
-      if (!operator.includes('?')) {
-        continue
+      if (operator.includes('?')) {
+        query = query.replace(operator.replace('?', '??'), operator)
       }
-
-      query = operator.replace('?', '??').replace(operator, query)
     }
 
     return query
