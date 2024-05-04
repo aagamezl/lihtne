@@ -17,7 +17,7 @@ export default class MySqlProcessor extends Processor {
         nullable: result.nullable === 'YES',
         default: result.default,
         auto_increment: result.extra === 'auto_increment',
-        comment: result.comment ?? null,
+        comment: result.comment || null,
         generation: result.expression
           ? {
               type: {
