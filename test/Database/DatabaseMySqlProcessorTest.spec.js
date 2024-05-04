@@ -1,9 +1,9 @@
 import test from 'ava'
 
-import MariaDbProcessor from '../../src/Illuminate/Database/Query/Processors/MariaDbProcessor.js'
+import MySqlProcessor from '../../src/Illuminate/Database/Query/Processors/MySqlProcessor.js'
 
 test('testProcessColumns', async t => {
-  const processor = new MariaDbProcessor()
+  const processor = new MySqlProcessor()
 
   const listing = [
     { name: 'id', type_name: 'bigint', type: 'bigint', collation: 'collate', nullable: 'YES', default: '', extra: 'auto_increment', comment: 'bar' },
