@@ -311,16 +311,6 @@ export default class Connection {
   }
 
   /**
-   * Get the NDO connection to use for a select query.
-   *
-   * @param  {boolean}  [useReadNdo=true]
-   * @return {Statement}
-   */
-  // getNdoForSelect () {
-  //   return this.getNdo()
-  // }
-
-  /**
    * Get the query post processor used by the connection.
    *
    * @return {import('./Query/Processors/Processor.js').default}
@@ -336,15 +326,6 @@ export default class Connection {
    */
   getQueryGrammar () {
     return this.queryGrammar
-  }
-
-  /**
-   * Get the current PDO connection parameter without executing any reconnect logic.
-   *
-   * @return {Statement|Function|undefined}
-   */
-  getRawNdo () {
-    return this.ndo
   }
 
   /**
@@ -512,7 +493,7 @@ export default class Connection {
    * @param  {Function} callback
    * @return {Promise<any>}
    *
-   * @throws {\Illuminate\Database\QueryException}
+   * @throws {Error<QueryException>}
    */
   async run (query, bindings, callback) {
     this.reconnectIfMissingConnection()
@@ -544,9 +525,9 @@ export default class Connection {
    * @param  {string}  query
    * @param  {object}  bindings
    * @param  {Function}  callback
-   * @return {*}
+   * @return {unknown}
    *
-   * @throws {\Illuminate\Database\QueryException}
+   * @throws {Error<QueryException>}
    */
   async runQueryCallback (query, bindings, callback) {
     // To execute the statement, we'll simply call the callback, which will actually
@@ -571,7 +552,7 @@ export default class Connection {
    *
    * @param  {string}  query
    * @param  {object}  [bindings]
-   * @return {object}
+   * @return {Promise<unknown[]>}
    */
   async select (query, bindings) {
     return await this.run(query, bindings, async (query, bindings) => {
@@ -599,11 +580,11 @@ export default class Connection {
    * Run a select statement against the database.
    *
    * @param  {string}  query
-   * @param  {Object.<string, unknown>}  bindings
-   * @returns {array}
+   * @param  {Record<string, unknown>}  bindings
+   * @returns {unknown}
    */
-  selectFromWriteConnection (query, bindings = []) {
-    return this.select(query, bindings, false)
+  selectFromWriteConnection (query, bindings = {}) {
+    return this.select(query, bindings)
   }
 
   /**

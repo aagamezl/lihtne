@@ -11,7 +11,6 @@ export default class Statement {
    * @memberof Statement
    */
   constructor (dsn, options) {
-    // TODO: verify if username and password are necessary
     if (new.target === Statement) {
       throwException('abstract')
     }
@@ -43,14 +42,10 @@ export default class Statement {
   }
 
   parameterize () {
-    // throwException('concrete-method', 'parameterize')
+    throwException('concrete-method', 'parameterize')
   }
 
   rowCount () {
-    // throwException('concrete-method', 'rowCount')
-  }
-
-  setFetchMode (mode) {
-    this.fetchMode = mode
+    throwException('concrete-method', 'rowCount')
   }
 }

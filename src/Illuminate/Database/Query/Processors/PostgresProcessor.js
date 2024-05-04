@@ -8,9 +8,9 @@ export default class PostgresProcessor extends Processor {
    *
    * @param  {import('./../Builder').default}  query
    * @param  {string}  sql
-   * @param  {array}  values
+   * @param  {Record<string, unknown>}  values
    * @param  {string}  [sequence]
-   * @return {number|string}
+   * @return {Promise<number|string>}
    */
   async processInsertGetId (query, sql, values, sequence) {
     const connection = query.getConnection()

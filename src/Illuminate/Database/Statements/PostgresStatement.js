@@ -12,7 +12,6 @@ export default class PostgresStatement extends Statement {
       max: 50,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 2000
-
     })
   }
 
