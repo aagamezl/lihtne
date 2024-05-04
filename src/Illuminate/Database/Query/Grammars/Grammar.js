@@ -29,45 +29,45 @@ import Expression from './../Expression.js'
 /** @typedef {import('./../Builder.js').Where} Where */
 
 export default class Grammar extends BaseGrammar {
+  /**
+   * The grammar specific operators.
+   *
+   * @type {string[]}
+   */
+  operators = []
+
+  /**
+   * The grammar specific bitwise operators.
+   *
+   * @type {string[]}
+   */
+  bitwiseOperators = []
+
+  /**
+   * The components that make up a select clause.
+   *
+   * @type {SelectComponent[]}
+   */
+  selectComponents = [
+    { name: 'aggregate', property: 'aggregateProperty' },
+    { name: 'columns', property: 'columns' },
+    { name: 'from', property: 'fromProperty' },
+    { name: 'indexHint', property: 'indexHint' },
+    { name: 'joins', property: 'joins' },
+    { name: 'wheres', property: 'wheres' },
+    { name: 'groups', property: 'groups' },
+    { name: 'havings', property: 'havings' },
+    { name: 'orders', property: 'orders' },
+    { name: 'limit', property: 'limitProperty' },
+    { name: 'offset', property: 'offsetProperty' },
+    { name: 'lock', property: 'lockProperty' }
+  ]
+
   constructor () {
     super()
 
     // use(this.constructor, [CompilesJsonPaths])
     use(Grammar, [CompilesJsonPaths])
-
-    /**
-     * The grammar specific operators.
-     *
-     * @type {string[]}
-     */
-    this.operators = []
-
-    /**
-     * The grammar specific bitwise operators.
-     *
-     * @type {string[]}
-     */
-    this.bitwiseOperators = []
-
-    /**
-     * The components that make up a select clause.
-     *
-     * @type {SelectComponent[]}
-     */
-    this.selectComponents = [
-      { name: 'aggregate', property: 'aggregateProperty' },
-      { name: 'columns', property: 'columns' },
-      { name: 'from', property: 'fromProperty' },
-      { name: 'indexHint', property: 'indexHint' },
-      { name: 'joins', property: 'joins' },
-      { name: 'wheres', property: 'wheres' },
-      { name: 'groups', property: 'groups' },
-      { name: 'havings', property: 'havings' },
-      { name: 'orders', property: 'orders' },
-      { name: 'limit', property: 'limitProperty' },
-      { name: 'offset', property: 'offsetProperty' },
-      { name: 'lock', property: 'lockProperty' }
-    ]
   }
 
   /**
@@ -978,7 +978,7 @@ export default class Grammar extends BaseGrammar {
       // Single quotes can be escaped as '' according to the SQL standard while
       // MySQL uses \'. Postgres has operators like ?| that must get encoded
       // in PHP like ??|. We should skip over the escaped characters here.
-      if (["'", "''", '??'].includes(char + nextChar)) {
+      if (["\\'", "''", '??'].includes(char + nextChar)) {
         query += char + nextChar
         i += 1
       } else if (char === "'") { // Starting / leaving string literal...
