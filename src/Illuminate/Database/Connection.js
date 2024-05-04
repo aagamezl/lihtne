@@ -161,7 +161,7 @@ export default class Connection {
    *
    * @param  {string}  query
    * @param  {object}  bindings
-   * @return {number}
+   * @return {Promise<number>}
    */
   async affectingStatement (query, bindings = {}) {
     return await this.run(query, bindings, async (query, bindings) => {
@@ -216,6 +216,71 @@ export default class Connection {
    */
   disconnect () {
     this.setNdo(undefined)
+  }
+
+  /**
+   * Escape a value for safe SQL embedding.
+   *
+   * @param {string|number|boolean|null} [value] - The value to escape.
+   * @param {boolean} [binary=false] - Whether the value is binary.
+   * @returns {string} - The escaped value.
+   */
+  escape (value, binary = false) {
+    if (value === null) {
+      return 'null'
+    } else if (binary) {
+      return this.escapeBinary(value)
+    } else if (typeof value === 'number') {
+      return String(value)
+    } else if (typeof value === 'boolean') {
+      return this.escapeBool(value)
+    } else if (Array.isArray(value)) {
+      throw new Error('RuntimeException: The database connection does not support escaping arrays.')
+    } else {
+      if (value.includes('\x00')) {
+        throw new Error('RuntimeException: Strings with null bytes cannot be escaped. Use the binary escape option.')
+      }
+
+      // eslint-disable-next-line no-control-regex
+      if (!/^[\x00-\x7F]*$/.test(value)) {
+        throw new Error('RuntimeException: Strings with invalid UTF-8 byte sequences cannot be escaped.')
+      }
+
+      return this.escapeString(value)
+    }
+  }
+
+  /**
+ * Escape a binary value for safe SQL embedding.
+ *
+ * @protected
+ * @param  {string}  value
+ * @return {string}
+ */
+  escapeBinary (value) {
+    throw new Error('RuntimeException: The database connection does not support escaping binary values.')
+  }
+
+  /**
+ * Escape a boolean value for safe SQL embedding.
+ *
+ * @protected
+ * @param  {boolean}  value
+ * @return {string}
+ */
+  escapeBool (value) {
+    return value ? '1' : '0'
+  }
+
+  /**
+   * Escape a string value for safe SQL embedding.
+   *
+   * @protected
+   * @param  {string}  value
+   * @return {string}
+   */
+  escapeString (value) {
+    return this.quote(value)
   }
 
   /**
@@ -435,6 +500,13 @@ export default class Connection {
    */
   query () {
     return new QueryBuilder(this, this.getQueryGrammar(), this.getPostProcessor())
+  }
+
+  quote (value) {
+    // Escape special characters within the input string
+    const escapedString = value.replace(/'/g, "''")
+
+    return `'${escapedString}'`
   }
 
   /**

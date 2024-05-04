@@ -35,6 +35,21 @@ export default class Grammar {
   }
 
   /**
+   * Escapes a value for safe SQL embedding.
+   *
+   * @param  {string|number|boolean|null}  value
+   * @param  {boolean}  [binary=false]
+   * @return {string}
+   */
+  escape (value, binary = false) {
+    if (!this.connection) {
+      throw new Error("RuntimeException: The database driver's grammar implementation does not support escaping values.")
+    }
+
+    return this.connection.escape(value, binary)
+  }
+
+  /**
    * Get the format for database stored dates.
    *
    * @return {string}
