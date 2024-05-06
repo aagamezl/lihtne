@@ -4,9 +4,9 @@ export default class SQLiteProcessor extends Processor {
   /**
    * Process the results of a columns query.
    *
-   * @param {Array} results - The results of the columns query.
+   * @param {Record<string, unknown>[]} results - The results of the columns query.
    * @param {string} sql - The SQL query.
-   * @returns {Array} - Processed column results.
+   * @returns {Record<string, unknown>[]} - Processed column results.
    */
   processColumns (results, sql = '') {
     const hasPrimaryKey = results.reduce((acc, result) => acc + Number(result.primary), 0) === 1
@@ -27,7 +27,7 @@ export default class SQLiteProcessor extends Processor {
         type_name: type.split('(')[0] || '',
         type,
         collation,
-        nullable: Boolean(result.nullable),
+        nullable: Boolean(parseInt(result.nullable, 10)),
         default: result.default,
         auto_increment: hasPrimaryKey && result.primary && type === 'integer',
         comment: null,
@@ -51,16 +51,35 @@ export default class SQLiteProcessor extends Processor {
   }
 
   /**
+   * Process the results of a foreign keys query.
+   *
+   * @param {Record<string, unknown>[]} results - The results of the foreign keys query.
+   * @returns {Record<string, unknown>[]} - Processed foreign key results.
+   */
+  processForeignKeys (results) {
+    return results.map(result => ({
+      name: null,
+      columns: result.columns.split(','),
+      foreign_schema: null,
+      foreign_table: result.foreign_table,
+      foreign_columns: result.foreign_columns.split(','),
+      on_update: result.on_update.toLowerCase(),
+      on_delete: result.on_delete.toLowerCase()
+    }))
+  }
+
+  /**
    * Process the results of an indexes query.
    *
-   * @param {Array} results - The results of the indexes query.
-   * @returns {Array} - Processed index results.
+   * @param {Record<string, unknown[]} results - The results of the indexes query.
+   * @returns {Record<string, unknown[]} - Processed index results.
    */
   processIndexes (results) {
     let primaryCount = 0
 
     let indexes = results.map(result => {
       const isPrimary = Boolean(result.primary)
+
       if (isPrimary) {
         primaryCount += 1
       }
@@ -79,23 +98,5 @@ export default class SQLiteProcessor extends Processor {
     }
 
     return indexes
-  }
-
-  /**
-   * Process the results of a foreign keys query.
-   *
-   * @param {Array} results - The results of the foreign keys query.
-   * @returns {Array} - Processed foreign key results.
-   */
-  processForeignKeys (results) {
-    return results.map(result => ({
-      name: null,
-      columns: result.columns.split(','),
-      foreign_schema: null,
-      foreign_table: result.foreign_table,
-      foreign_columns: result.foreign_columns.split(','),
-      on_update: result.on_update.toLowerCase(),
-      on_delete: result.on_delete.toLowerCase()
-    }))
   }
 }

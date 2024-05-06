@@ -2,20 +2,18 @@ import test from 'ava'
 
 import SQLiteProcessor from '../../src/Illuminate/Database/Query/Processors/SQLiteProcessor.js'
 
-test.skip('testProcessColumns', async t => {
+test.only('testProcessColumns', async t => {
   const processor = new SQLiteProcessor()
 
   const listing = [
-    { name: 'id', type_name: 'int4', type: 'integer', collation: '', nullable: true, default: "nextval('employee_id_seq'::regclass)", comment: '' },
-    { name: 'name', type_name: 'varchar', type: 'character varying(100)', collation: 'collate', nullable: false, default: '', comment: 'foo' },
-    { name: 'balance', type_name: 'numeric', type: 'numeric(8,2)', collation: '', nullable: true, default: '4', comment: 'NULL' },
-    { name: 'birth_date', type_name: 'timestamp', type: 'timestamp(6) without time zone', collation: '', nullable: false, default: '', comment: '' }
+    { name: 'id', type: 'INTEGER', nullable: '0', default: '', primary: '1' },
+    { name: 'name', type: 'varchar', nullable: '1', default: 'foo', primary: '0' },
+    { name: 'is_active', type: 'tinyint(1)', nullable: '0', default: '1', primary: '0' }
   ]
   const expected = [
-    { name: 'id', type_name: 'int4', type: 'integer', collation: '', nullable: true, default: "nextval('employee_id_seq'::regclass)", auto_increment: true, comment: '', generation: null },
-    { name: 'name', type_name: 'varchar', type: 'character varying(100)', collation: 'collate', nullable: false, default: '', auto_increment: false, comment: 'foo', generation: null },
-    { name: 'balance', type_name: 'numeric', type: 'numeric(8,2)', collation: '', nullable: true, default: '4', auto_increment: false, comment: 'NULL', generation: null },
-    { name: 'birth_date', type_name: 'timestamp', type: 'timestamp(6) without time zone', collation: '', nullable: false, default: '', auto_increment: false, comment: '', generation: null }
+    { name: 'id', type_name: 'integer', type: 'integer', collation: null, nullable: false, default: '', auto_increment: true, comment: null, generation: null },
+    { name: 'name', type_name: 'varchar', type: 'varchar', collation: null, nullable: true, default: 'foo', auto_increment: false, comment: null, generation: null },
+    { name: 'is_active', type_name: 'tinyint', type: 'tinyint(1)', collation: null, nullable: false, default: '1', auto_increment: false, comment: null, generation: null }
   ]
 
   t.deepEqual(processor.processColumns(listing), expected)
