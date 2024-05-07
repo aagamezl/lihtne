@@ -55,7 +55,7 @@ import { collect, head, last, reset, value } from '../../Collections/helpers.js'
  * @property {string} [operator] - The comparison operator for the where condition.
  * @property {unknown} [value] - The value to compare with in the where condition.
  * @property {string} boolean - The boolean operator to combine multiple where conditions.
- * @property {string} [sql] - The raw sql for where conditions.
+ * @property {string | Expression} [sql] - The raw sql for where conditions.
  * @property {Options} [options] - The options for where conditions.
  * @property {Builder} [query] - The query associated to the where conditions.
  * @property {unknown[]|Record<string, unknown>} [values] - The values to compare with in the where condition.
