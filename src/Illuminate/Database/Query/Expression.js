@@ -1,8 +1,16 @@
 export default class Expression {
   /**
+   * The value of the expression.
+   *
+   * @protected
+   * @type {string|number}
+   */
+  value = -1
+
+  /**
    * Create a new raw query expression.
    *
-   * @param  {unknown}  value
+   * @param  {string|number}  value
    */
   constructor (value) {
     this.value = value
@@ -11,18 +19,10 @@ export default class Expression {
   /**
    * Get the value of the expression.
    *
-   * @return {unknown}
+   * @param  {import('../Grammar').default}  grammar
+   * @return {string|number}
    */
-  getValue () {
+  getValue (grammar) {
     return this.value
-  }
-
-  /**
-   * Get the value of the expression.
-   *
-   * @return {string}
-   */
-  toString () {
-    return String(this.getValue())
   }
 }

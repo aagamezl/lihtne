@@ -5,9 +5,6 @@ import Processor from '../../../src/Illuminate/Database/Query/Processors/Process
 import getConnection from './getConnection.js'
 
 const getBuilder = (connection, grammar, processor) => {
-  // const grammar = new Grammar()
-  // const processor = new Processor()
-
   return new Builder(
     connection ?? getConnection(),
     grammar ?? new Grammar(),
