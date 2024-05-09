@@ -1,9 +1,17 @@
-import Statement from '../Statements/Statement.js'
-import { objectDiffKey } from './../../Support/index.js'
+// import Statement from '../Statements/Statement.js'
+import { objectDiffKey, CustomException } from './../../Support/index.js'
 
 export default class Connector {
+  /**
+   * @protected
+   * @type {Record<string, string>}
+   */
+  options = {}
+
   constructor () {
-    this.options = {}
+    if (new.target === Connector) {
+      CustomException('abstract')
+    }
   }
 
   /**
@@ -11,7 +19,7 @@ export default class Connector {
    *
    * @param  {string}  dsn
    * @param  {object}  config
-   * @param  {Array}  options
+   * @param  {Record<string, unknown>}  options
    * @return \PDO
    *
    * @throws \Exception
@@ -33,13 +41,13 @@ export default class Connector {
    *
    * @protected
    * @param  {string}  dsn
-   * @param  {string}  username
-   * @param  {string}  password
-   * @param  {array}  options
-   * @return {Statement}
+   * @param  {Record<string, unknown>}  options
+   * @returns {import('../PDO/Driver.js').default}
+   * @throws {Error}
    */
   createNdoConnection (dsn, options) {
-    return new Statement(dsn, options)
+    // return new Statement(dsn, options)
+    throw CustomException('concrete-method', 'createNdoConnection')
   }
 
   /**

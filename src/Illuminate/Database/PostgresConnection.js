@@ -5,7 +5,7 @@ import Connection from './Connection.js'
 // import PostgresDriver from './../Database/PDO/PostgresDriver.js'
 import QueryGrammar from '../Database/Query/Grammars/PostgresGrammar.js'
 import PostgresProcessor from './../Database/Query/Processors/PostgresProcessor.js'
-import PostgresStatement from './../Database/Statements/PostgresStatement.js'
+// import PostgresStatement from './../Database/Statements/PostgresStatement.js'
 
 export default class PostgresConnection extends Connection {
   /**
@@ -23,7 +23,8 @@ export default class PostgresConnection extends Connection {
   /**
    * Get the default post processor instance.
    *
-   * @return {\Illuminate\Database\Query\Processors\PostgresProcessor}
+   *
+   * @return {import('./Query/Processors/PostgresProcessor.js').default}
    */
   getDefaultPostProcessor () {
     return new PostgresProcessor()
@@ -55,9 +56,9 @@ export default class PostgresConnection extends Connection {
    * @return {import('./Statements/Statement.js').default}
    * @memberof {PostgresConnection}
    */
-  getPrepareStatement (dsn, options) {
-    return new PostgresStatement(dsn, options)
-  }
+  // getPrepareStatement (dsn, options) {
+  //   return new PostgresStatement(dsn, options)
+  // }
 
   /**
    * Get a schema builder instance for the connection.

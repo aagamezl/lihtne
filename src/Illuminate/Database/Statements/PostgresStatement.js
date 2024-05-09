@@ -4,8 +4,15 @@ import { uuid } from '@devnetic/utils'
 import Statement from './Statement.js'
 
 export default class PostgresStatement extends Statement {
-  constructor (dsn, options) {
-    super(dsn, options)
+  /**
+   * Creates an instance of Statement.
+   * @param {string} dsn
+   * @param {Record<string, unknown>} options
+   * @param {string} query
+   * @memberof Statement
+   */
+  constructor (dsn, options, query) {
+    super(dsn, options, query)
 
     this.pool = new pg.Pool({
       connectionString: this.dsn,
@@ -13,6 +20,15 @@ export default class PostgresStatement extends Statement {
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 2000
     })
+
+    this.statement = {
+      // give the query a unique name
+      name: `prepared-statement-${uuid()}`,
+      text: this.parameterize(query),
+      rowMode: this.fetchMode
+    }
+
+    this.bindings = {}
   }
 
   async close () {
@@ -40,7 +56,6 @@ export default class PostgresStatement extends Statement {
 
       return this.result.rows
     } finally {
-      // await client.end()
       client.end()
     }
   }
@@ -60,18 +75,18 @@ export default class PostgresStatement extends Statement {
     return query.replace(regex, () => `$${++index}`)
   }
 
-  prepare (query) {
-    this.statement = {
-      // give the query a unique name
-      name: `prepared-statement-${uuid()}`,
-      text: this.parameterize(query),
-      rowMode: this.fetchMode
-    }
+  // prepare (query) {
+  //   this.statement = {
+  //     // give the query a unique name
+  //     name: `prepared-statement-${uuid()}`,
+  //     text: this.parameterize(query),
+  //     rowMode: this.fetchMode
+  //   }
 
-    this.bindings = {}
+  //   this.bindings = {}
 
-    return this
-  }
+  //   return this
+  // }
 
   rowCount () {
     return this.result.rowCount

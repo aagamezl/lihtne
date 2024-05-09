@@ -1,35 +1,68 @@
-import { throwException } from './../../Support/index.js'
+import { CustomException } from './../../Support/index.js'
+
+/**
+ * @typedef {Object} PreparedStatement
+ * @property {string} name
+ * @property {string} text
+ * @property {import('../PDO/Driver.js').FetchMode} rowMode
+ */
 
 /**
  * @description Implementation of the PHP PDOStatement class
  */
 export default class Statement {
+  /** @type {} */
+  bindings = {}
+
+  /** @type {string} */
+  dsn = ''
+
+  /** @type {import('../PDO/Driver.js').FetchMode} */
+  fetchMode = 'object'
+
+  /** @type {Record<string, unknown>} */
+  options = {}
+
+  /** @type {string|undefined} */
+  query = undefined
+
+  /**
+   * @protected
+   * @type {any}
+   */
+  result = {}
+
+  /** @type {number} */
+  rowCountProperty = 0
+
+  /**
+   * @protected
+   * @type {PreparedStatement|undefined}
+   */
+  statement = undefined
+
   /**
    * Creates an instance of Statement.
    * @param {string} dsn
    * @param {Record<string, unknown>} options
+   * @param {string} query
    * @memberof Statement
    */
-  constructor (dsn, options) {
+  constructor (dsn, options, query) {
     if (new.target === Statement) {
-      throwException('abstract')
+      throw CustomException('abstract')
     }
 
-    this.bindings = {}
     this.dsn = dsn
-    this.fetchMode = undefined
     this.options = options
-
-    this.result = undefined
-    this.rowCountProperty = 0
-    this.statement = undefined
+    this.query = query
   }
 
   /**
    *
    * @param {string|number} param
    * @param {*} value
-   * @return boolean
+   * @return {boolean}
    */
   bindValue (param, value) {
     try {
@@ -41,11 +74,29 @@ export default class Statement {
     }
   }
 
+  /**
+   *
+   * @param {unknown[]} values
+   * @returns {Promise<any[]>}
+   */
+  execute (values) {
+    throw CustomException('concrete-method', 'execute')
+  }
+
   parameterize () {
-    throwException('concrete-method', 'parameterize')
+    throw CustomException('concrete-method', 'parameterize')
+  }
+
+  /**
+   * Prepares a statement for execution and returns a statement object
+   *
+   * @param {string} query
+   */
+  prepare (query) {
+    throw CustomException('concrete-method', 'prepare')
   }
 
   rowCount () {
-    throwException('concrete-method', 'rowCount')
+    throw CustomException('concrete-method', 'rowCount')
   }
 }

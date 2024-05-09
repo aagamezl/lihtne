@@ -1,14 +1,15 @@
 import Connector from './Connector.js'
-import { PostgresStatement } from './../Statements/index.js'
+import PostgresDriver from '../PDO/PostgresDriver.js'
+import { isNil } from '@devnetic/utils'
 
-const DEFAULT_PORT = 5432
+/** @typedef {import('../PDO/Driver.js').default} Driver */
 
 export default class PostgresConnector extends Connector {
   /**
    * Add the SSL options to the DSN.
    *
    * @param  {string}  dsn
-   * @param  {array}  config
+   * @param  {Record<string, unknown>}  config
    * @return {string}
    */
   addSslOptions (dsn, config) {
@@ -24,7 +25,7 @@ export default class PostgresConnector extends Connector {
   /**
    * Set the schema on the connection.
    *
-   * @param  {Statement}  connection
+   * @param  {Driver}  connection
    * @param  {object}  config
    * @return {void}
    */
@@ -37,7 +38,7 @@ export default class PostgresConnector extends Connector {
   /**
    * Set the connection character set and collation.
    *
-   * @param  {Statement}  connection
+   * @param  {Driver}  connection
    * @param  {object}  config
    * @return {void}
    */
@@ -52,7 +53,7 @@ export default class PostgresConnector extends Connector {
   /**
    * Set the schema on the connection.
    *
-   * @param  {Statement}  connection
+   * @param  {Driver}  connection
    * @param  {object}  config
    * @return {void}
    */
@@ -67,7 +68,7 @@ export default class PostgresConnector extends Connector {
   /**
    * Configure the synchronous_commit setting.
    *
-   * @param  {Statement}  connection
+   * @param  {Driver}  connection
    * @param  {object}  config
    * @return {void}
    */
@@ -80,7 +81,7 @@ export default class PostgresConnector extends Connector {
   /**
    * Set the timezone on the connection.
    *
-   * @param  {Statement}  connection
+   * @param  {Driver}  connection
    * @param  {object}  config
    * @return {void}
    */
@@ -127,13 +128,13 @@ export default class PostgresConnector extends Connector {
    * Create a new PDO connection instance.
    *
    * @param  {string}  dsn
-   * @param  {string}  username
-   * @param  {string}  password
-   * @param  {object}  options
+   * @param  {Record<string, unknown>}  options
    * @return {object}
    */
   createNdoConnection (dsn, options) {
-    return new PostgresStatement(dsn, options)
+    // TODO: Return PostgresDriver
+    // return new PostgresStatement(dsn, options)
+    return new PostgresDriver()
   }
 
   /**
@@ -153,16 +154,39 @@ export default class PostgresConnector extends Connector {
   /**
    * Create a DSN string from a configuration.
    *
-   * @param  {object}  config
+   * @param  {Record<string, unknown>}  config
    * @return {string}
    */
   getDsn (config) {
     // First we will create the basic DSN setup as well as the port if it is in
     // in the configuration options. This will give us the basic DSN we will
     // need to establish the PDO connections and return them back for use.
-    const { database, username, password, host, port } = config
+    let {
+      host,
+      port,
+      connect_via_port:
+      connectViaPort,
+      connect_via_database:
+      connectViaDatabase,
+      database
+    } = config
 
-    const dsn = `pgsql://${username}:${password}@${host}:${port ?? DEFAULT_PORT}/${database}`
+    host = host ? `host=${host};` : ''
+
+    // Sometimes - users may need to connect to a database that has a different
+    // name than the database used for "information_schema" queries. This is
+    // typically the case if using "pgbouncer" type software when pooling.
+    database = connectViaDatabase ?? database
+    port = connectViaPort ?? port ?? null
+
+    let dsn = `pgsql:${host}dbname='${database}'`
+
+    // If a port was specified, we will add it to this Postgres DSN connections
+    // format. Once we have done that we are ready to return this connection
+    // string back out for usage, as this has been fully constructed here.
+    if (!isNil(port)) {
+      dsn += ';port={port}'
+    }
 
     return this.addSslOptions(dsn, config)
   }

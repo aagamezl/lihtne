@@ -345,12 +345,12 @@ export const tap = (value, callback) => {
  * @param {string} [message]
  * @throws {RuntimeException}
  */
-export const throwException = (type, message = undefined) => {
+export const CustomException = (type, message = undefined) => {
   switch (type) {
     case 'abstract':
-      throw new Error('RuntimeException: Cannot create an instance of an abstract class.')
+      return new Error('RuntimeException: Cannot create an instance of an abstract class.')
 
     case 'concrete-method':
-      throw new Error(`RuntimeException: Implement ${message} method on concrete class.`)
+      return new Error(`RuntimeException: Implement ${message} method on concrete class.`)
   }
 }

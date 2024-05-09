@@ -6,8 +6,8 @@ export default class PostgresProcessor extends Processor {
   /**
    * Process the results of a columns query.
    *
-   * @param {Array<Object>} results
-   * @returns {Array<Object>}
+   * @param {Array<Record<string, any>>} results
+   * @returns {Array<Record<string, any>>}
    */
   processColumns (results) {
     return results.map(result => {
@@ -39,7 +39,7 @@ export default class PostgresProcessor extends Processor {
    *
    * @param  {import('./../Builder').default}  query
    * @param  {string}  sql
-   * @param  {Record<string, unknown>}  values
+   * @param  {Record<string, any>}  values
    * @param  {string}  [sequence]
    * @return {Promise<number|string>}
    */
