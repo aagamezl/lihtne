@@ -11,8 +11,6 @@ import { arrayDiff, arrayMerge, spaceship } from '../Support/index.js'
 
 /**
  * @class CollectionWithTraits
- * @template TKey
- * @template TValue
  *
  */
 export default class Collection {

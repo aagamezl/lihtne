@@ -16,15 +16,17 @@ import use from '../Support/Traits/use.js'
  * @property {number} time - The time parameter.
  */
 
-/** @typedef {import('./Drivers/Driver.js').default} {Driver} */
+/** @typedef {import('./Drivers/Driver.js').default} Driver */
 
 export default class Connection {
   /**
    * The connection resolvers.
    *
-   * @var Record<string, unknown>
+   * @protected
+   * @type {Record<string, Function>}
    */
-  static { this.resolvers = {} }
+  static resolvers = {}
+  // static { this.resolvers = {} }
 
   /**
    * The database connection configuration options.
@@ -64,13 +66,14 @@ export default class Connection {
   /**
    * The active driver connection.
    *
-   * @member {Driver|Function}
+   * @type {Driver|Function}
    */
   driver
 
   /**
    * The query post processor implementation.
    *
+   * @protected
    * @type {import('./Query/Processors/Processor.js').default}
    */
   postProcessor
@@ -85,9 +88,10 @@ export default class Connection {
   /**
    * The query grammar implementation.
    *
+   * @protected
    * @type {import('./Query/Grammars/Grammar.js').default}
    */
-  queryGrammar = undefined
+  queryGrammar
 
   /**
    * All of the queries run against the connection.
@@ -153,9 +157,9 @@ export default class Connection {
     // We need to initialize a query grammar and the query post processors
     // which are both very importa parts of the database abstractions
     // so we initialize these to their default values while starting.
-    this.useDefaultQueryGrammar()
+    this.queryGrammar = this.getDefaultQueryGrammar()
 
-    this.useDefaultPostProcessor()
+    this.postProcessor = this.getDefaultPostProcessor()
   }
 
   /**
@@ -174,7 +178,7 @@ export default class Connection {
       // For update or delete statements, we want to get the number of rows affected
       // by the statement and return that back to the developer. We'll first need
       // to execute the statement and then we'll use PDO to fetch the affected.
-      const statement = this.getdriver().prepare(query)
+      const statement = this.getDriver().prepare(query)
 
       this.bindValues(statement, this.prepareBindings(bindings))
 
@@ -217,7 +221,7 @@ export default class Connection {
    * @return {void}
    */
   disconnect () {
-    this.setdriver(undefined)
+    this.setDriver(undefined)
   }
 
   /**
@@ -319,7 +323,8 @@ export default class Connection {
   /**
    * Get the default post processor instance.
    *
-   * @return {\Illuminate\Database\Query\Processors\Processor}
+   * @protected
+   * @return {import('./Query/Processors/Processor.js').default}
    */
   getDefaultPostProcessor () {
     return new Processor()
@@ -328,7 +333,8 @@ export default class Connection {
   /**
    * Get the default query grammar instance.
    *
-   * @return {\Illuminate\Database\Query\Grammars\Grammar}
+   * @protected
+   * @return {import('./Query/Grammars/Grammar.js').default}
    */
   getDefaultQueryGrammar () {
     return new QueryGrammar()
@@ -367,7 +373,7 @@ export default class Connection {
    *
    * @return {import('./Statements/Statement.js').default}
    */
-  getdriver () {
+  getDriver () {
     if (isFunction(this.driver)) {
       this.driver = this.driver()
 
@@ -397,7 +403,7 @@ export default class Connection {
 
   /**
    * Get the connection resolver for the given driver.
-   *
+   * @static
    * @param  {string}  driver
    * @return {any}
    */
@@ -626,7 +632,7 @@ export default class Connection {
    *
    * @param  {string}  query
    * @param  {object}  [bindings]
-   * @return {Promise<unknown[]>}
+   * @return {Promise<unknown | Record<string, unknown>[]>}
    */
   async select (query, bindings) {
     return await this.run(query, bindings, async (query, bindings) => {
@@ -639,7 +645,7 @@ export default class Connection {
       // row from the database table, and will either be an array or objects.
       const statement = this.prepared(
         // this.connection, query
-        this.getdriver().prepare(query)
+        this.getDriver().prepare(query)
       )
 
       this.bindValues(statement, this.prepareBindings(bindings))
@@ -679,7 +685,7 @@ export default class Connection {
    * @param  {object|Function}  driver
    * @return {this}
    */
-  setdriver (driver) {
+  setDriver (driver) {
     this.transactions = 0
 
     this.driver = driver
@@ -712,7 +718,7 @@ export default class Connection {
         return true
       }
 
-      const statement = this.getdriver().prepare(query)
+      const statement = this.getDriver().prepare(query)
 
       this.bindValues(statement, this.prepareBindings(bindings))
 

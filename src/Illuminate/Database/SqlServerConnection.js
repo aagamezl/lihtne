@@ -1,5 +1,4 @@
 import Connection from './Connection.js'
-// import SqlServerDriver from './../Database/PDO/SqlServerDriver.js'
 
 export default class SqlServerConnection extends Connection {
   /**
@@ -10,13 +9,4 @@ export default class SqlServerConnection extends Connection {
   compileDisableForeignKeyConstraints () {
     return 'EXEC sp_msforeachtable "ALTER TABLE ? NOCHECK CONSTRAINT all";'
   }
-
-  /**
-   * Get the Doctrine DBAL driver.
-   *
-   * @return {\Illuminate\Database\PDO\SqlServerDriver}
-   */
-  // getDoctrineDriver () {
-  //   return new SqlServerDriver()
-  // }
 }

@@ -9,8 +9,34 @@ import PostgresProcessor from './../Database/Query/Processors/PostgresProcessor.
 
 export default class PostgresConnection extends Connection {
   /**
+   * Escape a binary value for safe SQL embedding.
+   *
+   * @protected
+   * @param {string} value - The binary value to escape.
+   * @returns {string} - The escaped binary value.
+   */
+  escapeBinary (value) {
+    const hex = Buffer.from(value).toString('hex')
+
+    return `'\\x${hex}'::bytea`
+  }
+
+  /**
+   * Escape a bool value for safe SQL embedding.
+   *
+   * @protected
+   * @param {boolean} value - The boolean value to escape.
+   * @returns {string} - The escaped boolean value.
+   */
+  escapeBool (value) {
+    return value ? 'true' : 'false'
+  }
+
+  /**
    * Get the default query grammar instance.
    *
+   * @protected
+   * @override
    * @return {import('./Query/Grammars/PostgresGrammar.js').default}
    */
   getDefaultQueryGrammar () {
@@ -31,45 +57,14 @@ export default class PostgresConnection extends Connection {
   }
 
   /**
-   * Get the default schema grammar instance.
-   *
-   * @return {\Illuminate\Database\Schema\Grammars\PostgresGrammar}
-   */
-  // getDefaultSchemaGrammar() {
-  //   return this.withTablePrefix(new SchemaGrammar())
-  // }
-
-  /**
-   * Get the Doctrine DBAL driver.
-   *
-   * @return {\Illuminate\Database\PDO\PostgresDriver}
-   */
-  // getDoctrineDriver () {
-  //   return new PostgresDriver()
-  // }
-
-  /**
-   *
-   *
-   * @param {string} dsn
-   * @param {string} options
-   * @return {import('./Statements/Statement.js').default}
-   * @memberof {PostgresConnection}
-   */
-  // getPrepareStatement (dsn, options) {
-  //   return new PostgresStatement(dsn, options)
-  // }
-
-  /**
-   * Get a schema builder instance for the connection.
-   *
-   * @return {\Illuminate\Database\Schema\PostgresBuilder}
-   */
-  // getSchemaBuilder () {
-  //   if (isNil(this.schemaGrammar)) {
-  //     this.useDefaultSchemaGrammar()
-  //   }
-
-  //   return new PostgresBuilder(this)
-  // }
+ * Determine if the given database exception was caused by a unique constraint violation.
+ *
+ * @protected
+ * @param {Error} exception - The exception object.
+ * @returns {boolean} - Whether the exception indicates a unique constraint violation.
+ */
+  isUniqueConstraintError (exception) {
+    // Assuming the error code is attached to the exception object
+    return exception.code === '23505'
+  }
 }

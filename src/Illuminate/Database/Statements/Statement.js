@@ -76,10 +76,10 @@ export default class Statement {
 
   /**
    *
-   * @param {unknown[]} values
+   * @param {Record<string, unknown>} [params]
    * @returns {Promise<any[]>}
    */
-  execute (values) {
+  execute (params) {
     throw CustomException('concrete-method', 'execute')
   }
 
@@ -91,6 +91,7 @@ export default class Statement {
    * Prepares a statement for execution and returns a statement object
    *
    * @param {string} query
+   * @returns {Statement}
    */
   prepare (query) {
     throw CustomException('concrete-method', 'prepare')
