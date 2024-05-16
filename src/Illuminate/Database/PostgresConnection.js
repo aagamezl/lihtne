@@ -36,7 +36,6 @@ export default class PostgresConnection extends Connection {
    * Get the default query grammar instance.
    *
    * @protected
-   * @override
    * @return {import('./Query/Grammars/PostgresGrammar.js').default}
    */
   getDefaultQueryGrammar () {

@@ -165,9 +165,7 @@ export default class PostgresConnector extends Connector {
    * @return {object}
    */
   createDriverConnection (dsn, options) {
-    // TODO: Return PostgresDriver
-    // return new PostgresStatement(dsn, options)
-    return new PostgresDriver()
+    return new PostgresDriver(dsn, options)
   }
 
   /**
@@ -196,6 +194,8 @@ export default class PostgresConnector extends Connector {
     // in the configuration options. This will give us the basic DSN we will
     // need to establish the PDO connections and return them back for use.
     let {
+      username,
+      password,
       host,
       port,
       connect_via_port:
@@ -205,22 +205,22 @@ export default class PostgresConnector extends Connector {
       database
     } = config
 
-    host = host ? `host=${host};` : ''
-
     // Sometimes - users may need to connect to a database that has a different
     // name than the database used for "information_schema" queries. This is
     // typically the case if using "pgbouncer" type software when pooling.
     database = connectViaDatabase ?? database
     port = connectViaPort ?? port ?? null
 
-    let dsn = `pgsql:${host}dbname='${database}'`
+    let dsn = `pgsql://${username}:${password}@${host}`
 
     // If a port was specified, we will add it to this Postgres DSN connections
     // format. Once we have done that we are ready to return this connection
     // string back out for usage, as this has been fully constructed here.
     if (!isNil(port)) {
-      dsn += ';port={port}'
+      dsn += `:${port}`
     }
+
+    dsn += `/${database}`
 
     return this.addSslOptions(dsn, config)
   }

@@ -4,7 +4,7 @@ import { CustomException } from './../../Support/index.js'
  * @typedef {Object} PreparedStatement
  * @property {string} name
  * @property {string} text
- * @property {import('../PDO/Driver.js').FetchMode} rowMode
+ * @property {import('../Drivers/Driver.js').FetchMode} rowMode
  */
 
 /**
@@ -17,7 +17,7 @@ export default class Statement {
   /** @type {string} */
   dsn = ''
 
-  /** @type {import('../PDO/Driver.js').FetchMode} */
+  /** @type {import('../Drivers/Driver.js').FetchMode} */
   fetchMode = 'object'
 
   /** @type {Record<string, unknown>} */
@@ -81,6 +81,15 @@ export default class Statement {
    */
   execute (params) {
     throw CustomException('concrete-method', 'execute')
+  }
+
+  /**
+   * Returns an array containing all of the remaining rows in the result set
+   *
+   * @returns {unknown[]}
+   */
+  fetchAll () {
+    throw CustomException('concrete-method', 'fetchAll')
   }
 
   parameterize () {

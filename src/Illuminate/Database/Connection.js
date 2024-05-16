@@ -66,7 +66,7 @@ export default class Connection {
   /**
    * The active driver connection.
    *
-   * @type {Driver|Function}
+   * @type {Driver|Function|undefined}
    */
   driver
 
@@ -371,7 +371,7 @@ export default class Connection {
   /**
    * Get the current PDO connection.
    *
-   * @return {import('./Statements/Statement.js').default}
+   * @return {Driver}
    */
   getDriver () {
     if (isFunction(this.driver)) {
@@ -682,7 +682,7 @@ export default class Connection {
   /**
    * Set the PDO connection.
    *
-   * @param  {object|Function}  driver
+   * @param  {Driver|Function|undefined}  driver
    * @return {this}
    */
   setDriver (driver) {
