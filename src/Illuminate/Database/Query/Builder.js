@@ -1810,7 +1810,7 @@ export default class Builder {
    *
    * @param  {Array<string | Expression>}  columns
    * @param  {Function}  callback
-   * @return {any}
+   * @return {Promise<any>}
    */
   async onceWithColumns (columns, callback) {
     const original = this.columns
@@ -2555,7 +2555,7 @@ export default class Builder {
   /**
    * Run the query as a "select" statement against the connection.
    *
-   * @return {Array}
+   * @returns {Promise<unknown | Record<string, unknown>[]>}
    */
   runSelect () {
     return this.connection.select(this.toSql(), this.getBindings())

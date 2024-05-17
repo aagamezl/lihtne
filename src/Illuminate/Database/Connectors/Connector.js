@@ -1,26 +1,44 @@
-import Statement from '../Statements/Statement.js'
-import { objectDiffKey } from './../../Support/index.js'
+// import Statement from '../Statements/Statement.js'
+import { objectDiffKey, CustomException } from './../../Support/index.js'
+
+/** @typedef {import('../Drivers/Driver.js').default} Driver */
 
 export default class Connector {
+  /**
+   * @protected
+   * @type {Record<string, string>}
+   */
+  options = {}
+
   constructor () {
-    this.options = {}
+    if (new.target === Connector) {
+      CustomException('abstract')
+    }
+  }
+
+  /**
+   * Establish a database connection.
+   *
+   * @param  {Record<string, any>}  config
+   * @returns {Driver}
+   */
+  connect (config) {
+    throw CustomException('concrete-method', 'prepare')
   }
 
   /**
    * Create a new PDO connection.
    *
    * @param  {string}  dsn
-   * @param  {object}  config
-   * @param  {Array}  options
-   * @return \PDO
+   * @param  {Record<string, any>}  config
+   * @param  {Record<string, unknown>}  options
+   * @return {Driver}
    *
-   * @throws \Exception
+   * @throws {Error}
    */
   createConnection (dsn, config, options) {
     try {
-      return this.createNdoConnection(
-        dsn, options
-      )
+      return this.createDriverConnection(dsn, options)
     } catch (error) {
       return this.tryAgainIfCausedByLostConnection(
         error, dsn, options
@@ -33,20 +51,20 @@ export default class Connector {
    *
    * @protected
    * @param  {string}  dsn
-   * @param  {string}  username
-   * @param  {string}  password
-   * @param  {array}  options
-   * @return {Statement}
+   * @param  {Record<string, unknown>}  options
+   * @returns {import('../Drivers/Driver.js').default}
+   * @throws {Error}
    */
-  createNdoConnection (dsn, options) {
-    return new Statement(dsn, options)
+  createDriverConnection (dsn, options) {
+    // return new Statement(dsn, options)
+    throw CustomException('concrete-method', 'createDriverConnection')
   }
 
   /**
    * Get the PDO options based on the configuration.
    *
-   * @param  {object}  config
-   * @return {array}
+   * @param  {Record<string, any>}  config
+   * @return {Record<string, any>}
    */
   getOptions (config) {
     const options = config.options ?? {}

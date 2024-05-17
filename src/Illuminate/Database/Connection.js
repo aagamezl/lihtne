@@ -16,13 +16,17 @@ import use from '../Support/Traits/use.js'
  * @property {number} time - The time parameter.
  */
 
+/** @typedef {import('./Drivers/Driver.js').default} Driver */
+
 export default class Connection {
   /**
    * The connection resolvers.
    *
-   * @var Record<string, unknown>
+   * @protected
+   * @type {Record<string, Function>}
    */
-  static { this.resolvers = {} }
+  static resolvers = {}
+  // static { this.resolvers = {} }
 
   /**
    * The database connection configuration options.
@@ -60,15 +64,16 @@ export default class Connection {
   loggingQueries = false
 
   /**
-   * The active NDO connection.
+   * The active driver connection.
    *
-   * @member {object|Function}
+   * @type {Driver|Function|undefined}
    */
-  ndo
+  driver
 
   /**
    * The query post processor implementation.
    *
+   * @protected
    * @type {import('./Query/Processors/Processor.js').default}
    */
   postProcessor
@@ -83,9 +88,10 @@ export default class Connection {
   /**
    * The query grammar implementation.
    *
+   * @protected
    * @type {import('./Query/Grammars/Grammar.js').default}
    */
-  queryGrammar = undefined
+  queryGrammar
 
   /**
    * All of the queries run against the connection.
@@ -125,19 +131,19 @@ export default class Connection {
   /**
    * Create a new database connection instance.
    *
-   * @param  {object|Function}  ndo
+   * @param  {Driver|Function}  driver
    * @param  {string}  database
    * @param  {string}  tablePrefix
    * @param  {object}  config
    * @return {void}
    */
-  constructor (ndo, // TODO: verify the real type and remove the any
+  constructor (driver, // TODO: verify the real type and remove the any
     database = '', tablePrefix = '', config = {}
   ) {
     // use(this.constructor, [DetectsLostConnections])
     use(Connection, [DetectsLostConnections])
 
-    this.ndo = ndo
+    this.driver = driver
 
     // First we will setup the default properties. We keep track of the DB
     // name we are connected to since it is needed when some reflective
@@ -151,9 +157,9 @@ export default class Connection {
     // We need to initialize a query grammar and the query post processors
     // which are both very importa parts of the database abstractions
     // so we initialize these to their default values while starting.
-    this.useDefaultQueryGrammar()
+    this.queryGrammar = this.getDefaultQueryGrammar()
 
-    this.useDefaultPostProcessor()
+    this.postProcessor = this.getDefaultPostProcessor()
   }
 
   /**
@@ -172,7 +178,7 @@ export default class Connection {
       // For update or delete statements, we want to get the number of rows affected
       // by the statement and return that back to the developer. We'll first need
       // to execute the statement and then we'll use PDO to fetch the affected.
-      const statement = this.getNdo().prepare(query)
+      const statement = this.getDriver().prepare(query)
 
       this.bindValues(statement, this.prepareBindings(bindings))
 
@@ -215,7 +221,7 @@ export default class Connection {
    * @return {void}
    */
   disconnect () {
-    this.setNdo(undefined)
+    this.setDriver(undefined)
   }
 
   /**
@@ -317,7 +323,8 @@ export default class Connection {
   /**
    * Get the default post processor instance.
    *
-   * @return {\Illuminate\Database\Query\Processors\Processor}
+   * @protected
+   * @return {import('./Query/Processors/Processor.js').default}
    */
   getDefaultPostProcessor () {
     return new Processor()
@@ -326,7 +333,8 @@ export default class Connection {
   /**
    * Get the default query grammar instance.
    *
-   * @return {\Illuminate\Database\Query\Grammars\Grammar}
+   * @protected
+   * @return {import('./Query/Grammars/Grammar.js').default}
    */
   getDefaultQueryGrammar () {
     return new QueryGrammar()
@@ -363,16 +371,16 @@ export default class Connection {
   /**
    * Get the current PDO connection.
    *
-   * @return {import('./Statements/Statement.js').default}
+   * @return {Driver}
    */
-  getNdo () {
-    if (isFunction(this.ndo)) {
-      this.ndo = this.ndo()
+  getDriver () {
+    if (isFunction(this.driver)) {
+      this.driver = this.driver()
 
-      return this.ndo
+      return this.driver
     }
 
-    return this.ndo
+    return this.driver
   }
 
   /**
@@ -395,7 +403,7 @@ export default class Connection {
 
   /**
    * Get the connection resolver for the given driver.
-   *
+   * @static
    * @param  {string}  driver
    * @return {any}
    */
@@ -540,7 +548,7 @@ export default class Connection {
    * @return {void}
    */
   reconnectIfMissingConnection () {
-    if (this.ndo !== undefined) {
+    if (this.driver !== undefined) {
       this.reconnect()
     }
   }
@@ -624,7 +632,7 @@ export default class Connection {
    *
    * @param  {string}  query
    * @param  {object}  [bindings]
-   * @return {Promise<unknown[]>}
+   * @return {Promise<unknown | Record<string, unknown>[]>}
    */
   async select (query, bindings) {
     return await this.run(query, bindings, async (query, bindings) => {
@@ -637,7 +645,7 @@ export default class Connection {
       // row from the database table, and will either be an array or objects.
       const statement = this.prepared(
         // this.connection, query
-        this.getNdo().prepare(query)
+        this.getDriver().prepare(query)
       )
 
       this.bindValues(statement, this.prepareBindings(bindings))
@@ -653,7 +661,7 @@ export default class Connection {
    *
    * @param  {string}  query
    * @param  {Record<string, unknown>}  bindings
-   * @returns {unknown}
+   * @returns {Promise<any[]>}
    */
   selectFromWriteConnection (query, bindings = {}) {
     return this.select(query, bindings)
@@ -674,13 +682,13 @@ export default class Connection {
   /**
    * Set the PDO connection.
    *
-   * @param  {object|Function}  ndo
+   * @param  {Driver|Function|undefined}  driver
    * @return {this}
    */
-  setNdo (ndo) {
+  setDriver (driver) {
     this.transactions = 0
 
-    this.ndo = ndo
+    this.driver = driver
 
     return this
   }
@@ -710,7 +718,7 @@ export default class Connection {
         return true
       }
 
-      const statement = this.getNdo().prepare(query)
+      const statement = this.getDriver().prepare(query)
 
       this.bindValues(statement, this.prepareBindings(bindings))
 
