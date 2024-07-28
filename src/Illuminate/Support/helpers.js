@@ -340,6 +340,16 @@ export const tap = (value, callback) => {
 }
 
 /**
+ * Make a string's first character uppercase
+ *
+ * @param  {string}  value
+ * @return {string}
+ */
+export const ucfirst = (value) => {
+  return value.charAt(0).toUpperCase() + value.slice(1)
+}
+
+/**
  *
  * @param {string} type
  * @param {string} [message]
@@ -353,4 +363,21 @@ export const CustomException = (type, message = undefined) => {
     case 'concrete-method':
       return new Error(`RuntimeException: Implement ${message} method on concrete class.`)
   }
+}
+
+/**
+ * Helper function to get all traits used by a class, including inherited traits.
+ *
+ * @param {Object} obj
+ * @returns {string[]}
+ */
+export const classUsesRecursive = (obj) => {
+  const traits = []
+  while (obj) {
+    if (obj.constructor.traits) {
+      traits.push(...obj.constructor.traits)
+    }
+    obj = Object.getPrototypeOf(obj)
+  }
+  return traits
 }

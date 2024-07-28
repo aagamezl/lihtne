@@ -8,6 +8,7 @@ import QueryExecuted from './Events/QueryExecuted.js'
 import QueryGrammar from './Query/Grammars/Grammar.js'
 import StatementPrepared from './Events/StatementPrepared.js'
 import use from '../Support/Traits/use.js'
+import Driver from './Drivers/Driver.js'
 
 /**
  * @typedef {Object} QueryLogEntry
@@ -15,8 +16,6 @@ import use from '../Support/Traits/use.js'
  * @property {Record<string, unknown>} bindings - Bindings for the query parameters.
  * @property {number} time - The time parameter.
  */
-
-/** @typedef {import('./Drivers/Driver.js').default} Driver */
 
 export default class Connection {
   /**
@@ -45,9 +44,10 @@ export default class Connection {
   /**
    * The event dispatcher instance.
    *
+   * @protected
    * @type {import('../Contracts/Events/Dispatcher.js').default}
    */
-  events = undefined
+  events = {}
 
   /**
    * The default fetch mode of the connection.
@@ -66,7 +66,7 @@ export default class Connection {
   /**
    * The active driver connection.
    *
-   * @type {Driver|Function|undefined}
+   * @type {Driver|Function}
    */
   driver
 
@@ -305,7 +305,7 @@ export default class Connection {
    * Get an option from the configuration options.
    *
    * @param  {string}  [option]
-   * @return {unknown}
+   * @return {any}
    */
   getConfig (option) {
     return option === undefined ? this.config : getValue(this.config, option)
@@ -412,11 +412,20 @@ export default class Connection {
   }
 
   /**
+ * Get the server version for the connection.
+ *
+ * @return {string}
+ */
+  getServerVersion () {
+    return this.getDriver().getAttribute(Driver.ATTR_SERVER_VERSION)
+  }
+
+  /**
    * Handle a query exception.
    *
    * @param  {Error}  error
    * @param  {string}  query
-   * @param  {Bindings}  bindings
+   * @param  {import('./Query/Builder.js').Bindings}  bindings
    * @param  {Function}  callback
    * @return {unknown}
    *
@@ -435,7 +444,7 @@ export default class Connection {
    *
    * @param  {string}  query
    * @param  {object}  bindings
-   * @return {boolean}
+   * @return {Promise<boolean>}
    */
   async insert (query, bindings = {}) {
     return await this.statement(query, bindings)
@@ -460,7 +469,7 @@ export default class Connection {
   /**
    * Prepare the query bindings for execution.
    *
-   * @param  {object}  object
+   * @param  {object}  bindings
    * @return {object}
    */
   prepareBindings (bindings) {
@@ -520,7 +529,7 @@ export default class Connection {
   /**
    * Get a new raw query expression.
    *
-   * @param  {unknown}  value
+   * @param  {any}  value
    * @return {import('./Query/Expression.js').default}
    */
   raw (value) {
@@ -532,7 +541,7 @@ export default class Connection {
    *
    * @return {void}
    *
-   * @throws \LogicException
+   * @throws {LogicException}
    */
   reconnect () {
     if (isFunction(this.reconnector)) {
@@ -605,7 +614,7 @@ export default class Connection {
    * @param  {string}  query
    * @param  {object}  bindings
    * @param  {Function}  callback
-   * @return {unknown}
+   * @return {Promise<unknown>}
    *
    * @throws {Error<QueryException>}
    */
@@ -661,7 +670,7 @@ export default class Connection {
    *
    * @param  {string}  query
    * @param  {Record<string, unknown>}  bindings
-   * @returns {Promise<any[]>}
+   * @returns {Promise<unknown | Record<string, unknown>[]>}
    */
   selectFromWriteConnection (query, bindings = {}) {
     return this.select(query, bindings)
@@ -670,7 +679,7 @@ export default class Connection {
   /**
    * Set the event dispatcher instance on the connection.
    *
-   * @param  {\Illuminate\Contracts\Events\Dispatcher}  events
+   * @param  {import('../Contracts/Events/Dispatcher.js').default}  events
    * @return {this}
    */
   setEventDispatcher (events) {
@@ -696,7 +705,7 @@ export default class Connection {
   /**
    * Set the reconnect instance on the connection.
    *
-   * @param  {callable}  reconnector
+   * @param  {Function}  reconnector
    * @return {this}
    */
   setReconnector (reconnector) {
@@ -739,7 +748,7 @@ export default class Connection {
    * @param  {Function}  callback
    * @return {unknown}
    *
-   * @throws \Illuminate\Database\QueryException
+   * @throws {QueryException}
    */
   tryAgainIfCausedByLostConnection (error, query, bindings, callback) {
     if (this.causedByLostConnection(error)) {
@@ -754,7 +763,7 @@ export default class Connection {
    *
    * @param  {string}  query
    * @param  {unknown[]}  bindings
-   * @return {number}
+   * @return {Promise<number>}
    */
   update (query, bindings = []) {
     return this.affectingStatement(query, bindings)
@@ -781,8 +790,8 @@ export default class Connection {
   /**
    * Set the table prefix and return the grammar.
    *
-   * @param  {\Illuminate\Database\Grammar}  grammar
-   * @return {\Illuminate\Database\Grammar}
+   * @param  {import('./Grammar.js').default}  grammar
+   * @return {import('./Grammar.js').default}
    */
   withTablePrefix (grammar) {
     grammar.setTablePrefix(this.tablePrefix)

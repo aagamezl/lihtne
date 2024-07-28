@@ -111,8 +111,8 @@ export default class Collection {
   /**
    * Run a filter over each of the items.
    *
-   * @param  {(callable(TValue, TKey) => boolean)}  [callback]
-   * @return {static}
+   * @param  {(TValue, TKey) => boolean}  [callback]
+   * @return {Collection}
    */
   filter (callback) {
     if (callback) {

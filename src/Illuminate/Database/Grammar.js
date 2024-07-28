@@ -1,8 +1,21 @@
 import { collect } from '../Collections/helpers.js'
+import Macroable from '../Macroable/Traits/Macroable.js'
+import { CustomException } from '../Support/helpers.js'
+import use from '../Support/Traits/use.js'
 import Expression from './Query/Expression.js'
 
+/**
+ * @class
+ * @abstract
+ */
 export default class Grammar {
   constructor () {
+    use(Grammar, [Macroable])
+
+    if (new.target === Grammar) {
+      throw CustomException('abstract')
+    }
+
     /**
      * The grammar table prefix.
      *
@@ -70,7 +83,7 @@ export default class Grammar {
   /**
    * Get the value of a raw expression.
    *
-   * @param  {Expression}  expression
+   * @param  {Expression|string|number}  expression
    * @return {any}
    */
   getValue (expression) {
@@ -85,7 +98,7 @@ export default class Grammar {
   /**
    * Determine if the given value is a raw expression.
    *
-   * @param  {unknown}  value
+   * @param  {any}  value
    * @return {boolean}
    */
   isExpression (value) {

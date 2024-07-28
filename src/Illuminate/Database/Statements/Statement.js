@@ -8,6 +8,8 @@ import { CustomException } from './../../Support/index.js'
  */
 
 /**
+ * @class
+ * @abstract
  * @description Implementation of the PHP PDOStatement class
  */
 export default class Statement {

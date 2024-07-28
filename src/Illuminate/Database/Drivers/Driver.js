@@ -9,6 +9,9 @@ export default class Driver {
   /** @type {Record<string, unknown>} */
   options = {}
 
+  /** @type {string} */
+  ATTR_SERVER_VERSION = 'PDO::ATTR_SERVER_VERSION' // TODO: Change this value to number
+
   /**
  * Creates an instance of Statement.
  * @param {string} dsn
@@ -18,6 +21,15 @@ export default class Driver {
   constructor (dsn, options) {
     this.dsn = dsn
     this.options = options
+  }
+
+  /**
+   *
+   * @param {number} attribute
+   * @returns {any}
+   */
+  getAttribute (attribute) {
+    throw CustomException('concrete-method', 'getAttribute')
   }
 
   /**

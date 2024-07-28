@@ -5,7 +5,7 @@ import { collect } from '../../../Collections/helpers.js'
 
 export default class MySqlGrammar extends Grammar {
   constructor () {
-    super(...arguments)
+    super()
 
     /**
      * The grammar specific operators.
@@ -62,7 +62,7 @@ export default class MySqlGrammar extends Grammar {
    * Compile an insert statement into SQL.
    *
    * @param  {import('./../Builder.js').default}  query
-   * @param  {unknown[]}  values
+   * @param  {Object.<string, any>}  values
    * @returns {string}
    */
   compileInsert (query, values) {
