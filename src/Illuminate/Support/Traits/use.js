@@ -54,3 +54,15 @@ const use = (target, traits) => {
 // }
 
 export default use
+
+class MixinBuilder {
+  constructor (superclass) {
+    this.superclass = superclass
+  }
+
+  use (...mixins) {
+    return mixins.reduce((c, mixin) => mixin(c), this.superclass)
+  }
+}
+// this will combine everything in one class
+export const mix = (superclass = class { }) => new MixinBuilder(superclass)

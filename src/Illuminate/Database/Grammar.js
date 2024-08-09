@@ -1,16 +1,18 @@
 import { collect } from '../Collections/helpers.js'
 import Macroable from '../Macroable/Traits/Macroable.js'
 import { CustomException } from '../Support/helpers.js'
-import use from '../Support/Traits/use.js'
+import { mix } from '../Support/Traits/use.js'
+// import use from '../Support/Traits/use.js'
 import Expression from './Query/Expression.js'
 
 /**
  * @class
  * @abstract
  */
-export default class Grammar {
+export default class Grammar extends mix().use(Macroable) {
   constructor () {
-    use(Grammar, [Macroable])
+    super()
+    // use(Grammar, [Macroable])
 
     if (new.target === Grammar) {
       throw CustomException('abstract')
@@ -175,7 +177,8 @@ export default class Grammar {
     // If the value being wrapped has a column alias we will need to separate out
     // the pieces so we can wrap each of the segments of the expression on its
     // own, and then join these both back together using the "as" connector.
-    if (/\sas\s/i.test(value)) {
+    // if (/\sas\s/i.test(value)) {
+    if (value.includes(' as ')) {
       return this.wrapAliasedValue(value, prefixAlias)
     }
 

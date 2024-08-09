@@ -1,4 +1,5 @@
-export default class ForwardsCalls {
+// export default class ForwardsCalls {
+const ForwardsCalls = (superclass) => class extends superclass {
   /**
    * Forward a method call to the given object.
    *
@@ -29,3 +30,5 @@ export default class ForwardsCalls {
     throw new Error(`BadMethodCallException: Call to undefined method ${this.constructor.name}::${method}`)
   }
 }
+
+export default ForwardsCalls

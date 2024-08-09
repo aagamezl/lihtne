@@ -106,7 +106,7 @@ export default class PostgresGrammar extends Grammar {
    * @param  {string} schema
    * @param  {string} table
    * @return {string}
- */
+   */
   compileColumns (schema, table) {
     return 'select a.attname as name, t.typname as type_name, format_type(a.atttypid, a.atttypmod) as type, ' +
       '(select tc.collcollate from pg_catalog.pg_collation tc where tc.oid = a.attcollation) as collation, ' +
@@ -120,12 +120,12 @@ export default class PostgresGrammar extends Grammar {
   }
 
   /**
- * Compile the query to determine the indexes.
- *
- * @param  {string} schema
- * @param  {string} table
- * @return {string}
- */
+   * Compile the query to determine the indexes.
+   *
+   * @param  {string} schema
+   * @param  {string} table
+   * @return {string}
+   */
   compileIndexes (schema, table) {
     return 'select ic.relname as name, string_agg(a.attname, \',\' order by indseq.ord) as columns, ' +
        'am.amname as "type", i.indisunique as "unique", i.indisprimary as "primary" ' +
@@ -141,12 +141,12 @@ export default class PostgresGrammar extends Grammar {
   }
 
   /**
- * Compile the query to determine the foreign keys.
- *
- * @param  {string} schema
- * @param  {string} table
- * @return {string}
- */
+   * Compile the query to determine the foreign keys.
+   *
+   * @param  {string} schema
+   * @param  {string} table
+   * @return {string}
+   */
   compileForeignKeys (schema, table) {
     return 'select c.conname as name, ' +
       'string_agg(la.attname, \',\' order by conseq.ord) as columns, ' +
@@ -166,12 +166,12 @@ export default class PostgresGrammar extends Grammar {
   }
 
   /**
- * Compile a create table command.
- *
- * @param  {Blueprint} blueprint
- * @param  {Fluent} command
- * @return {string}
- */
+   * Compile a create table command.
+   *
+   * @param  {Blueprint} blueprint
+   * @param  {Fluent} command
+   * @return {string}
+   */
   compileCreate (blueprint, command) {
     return `${blueprint.temporaryProperty ? 'create temporary' : 'create'} table ${this.wrapTable(blueprint)} (${this.getColumns(blueprint).join(', ')})`
   }
@@ -184,36 +184,38 @@ export default class PostgresGrammar extends Grammar {
    * @return {string}
    */
   compileAdd (blueprint, command) {
-    return `alter table ${this.wrapTable(blueprint)} ${this.prefixArray('add column', this.getColumns(blueprint)).join(', ')}`
+    return `alter table ${this.wrapTable(blueprint)} add column ${this.getColumn(blueprint, command.get('column'))}`
   }
 
   /**
- * Compile the auto-incrementing column starting values.
- *
- * @param  {Blueprint} blueprint
- * @param  {Fluent} command
- * @return {string|undefined}
- */
+   * Compile the auto-incrementing column starting values.
+   *
+   * @param  {Blueprint} blueprint
+   * @param  {Fluent} command
+   * @return {string|undefined}
+   */
   compileAutoIncrementStartingValues (blueprint, command) {
-    if (command.get('column').autoIncrement) {
+    if (command.get('column').get('autoIncrement')) {
       const value = command.get('column').get('startingValue') || command.get('column').get('from')
+
       if (value) {
         const table = blueprint.getTable().split('.').pop()
-        return `alter sequence ${blueprint.getPrefix()}${table}_${command.get('column').name}_seq restart with ${value}`
+
+        return `alter sequence ${blueprint.getPrefix()}${table}_${command.get('column').get('name')}_seq restart with ${value}`
       }
     }
   }
 
   /**
- * Compile a change column command into a series of SQL statements.
- *
- * @param  {Blueprint} blueprint
- * @param  {Fluent} command
- * @param  {Connection} connection
- * @return {string|string[]}
- *
- * @throws {RuntimeException}
- */
+   * Compile a change column command into a series of SQL statements.
+   *
+   * @param  {Blueprint} blueprint
+   * @param  {Fluent} command
+   * @param  {Connection} connection
+   * @return {string|string[]}
+   *
+   * @throws {RuntimeException}
+   */
   compileChange (blueprint, command, connection) {
     const columns = []
 
@@ -255,12 +257,12 @@ export default class PostgresGrammar extends Grammar {
   }
 
   /**
- * Compile a unique key command.
- *
- * @param  {Blueprint} blueprint
- * @param  {Fluent} command
- * @return {string}
- */
+   * Compile a unique key command.
+   *
+   * @param  {Blueprint} blueprint
+   * @param  {Fluent} command
+   * @return {string}
+   */
   compileUnique (blueprint, command) {
     let sql = `alter table ${this.wrapTable(blueprint)} add constraint ${this.wrap(command.get('index'))} unique (${this.columnize(command.get('columns'))})`
 
@@ -276,12 +278,12 @@ export default class PostgresGrammar extends Grammar {
   }
 
   /**
- * Compile a plain index key command.
- *
- * @param  {Blueprint} blueprint
- * @param  {Fluent} command
- * @return {string}
- */
+   * Compile a plain index key command.
+   *
+   * @param  {Blueprint} blueprint
+   * @param  {Fluent} command
+   * @return {string}
+   */
   compileIndex (blueprint, command) {
     return `create index ${this.wrap(command.get('index'))} on ${this.wrapTable(blueprint)}${command.get('algorithm') ? ' using ' + command.get('algorithm') : ''} (${this.columnize(command.get('columns'))})`
   }
@@ -306,12 +308,12 @@ export default class PostgresGrammar extends Grammar {
   }
 
   /**
- * Compile a spatial index key command.
- *
- * @param  {Blueprint} blueprint
- * @param  {Fluent} command
- * @return {string}
- */
+   * Compile a spatial index key command.
+   *
+   * @param  {Blueprint} blueprint
+   * @param  {Fluent} command
+   * @return {string}
+   */
   compileSpatialIndex (blueprint, command) {
     command.set('algorithm', 'gist')
 
@@ -400,11 +402,11 @@ export default class PostgresGrammar extends Grammar {
   }
 
   /**
- * Compile the SQL needed to drop all domains.
- *
- * @param  {string[]} domains
- * @return {string}
- */
+   * Compile the SQL needed to drop all domains.
+   *
+   * @param  {string[]} domains
+   * @return {string}
+   */
   compileDropAllDomains (domains) {
     return 'drop domain ' + this.escapeNames(domains).join(',') + ' cascade'
   }
@@ -450,12 +452,12 @@ export default class PostgresGrammar extends Grammar {
   }
 
   /**
- * Compile a drop index command.
- *
- * @param  {Blueprint} blueprint
- * @param  {Fluent} command
- * @return {string}
- */
+   * Compile a drop index command.
+   *
+   * @param  {Blueprint} blueprint
+   * @param  {Fluent} command
+   * @return {string}
+   */
   compileDropIndex (blueprint, command) {
     return `drop index ${this.wrap(command.get('index'))}`
   }
@@ -483,12 +485,12 @@ export default class PostgresGrammar extends Grammar {
   }
 
   /**
- * Compile a drop foreign key command.
- *
- * @param  {Blueprint} blueprint
- * @param  {Fluent} command
- * @return {string}
- */
+   * Compile a drop foreign key command.
+   *
+   * @param  {Blueprint} blueprint
+   * @param  {Fluent} command
+   * @return {string}
+   */
   compileDropForeign (blueprint, command) {
     const index = this.wrap(command.get('index'))
 
@@ -538,12 +540,12 @@ export default class PostgresGrammar extends Grammar {
   }
 
   /**
- * Compile a comment command.
- *
- * @param  {Blueprint} blueprint
- * @param  {Fluent} command
- * @return {string|undefined}
- */
+   * Compile a comment command.
+   *
+   * @param  {Blueprint} blueprint
+   * @param  {Fluent} command
+   * @return {string|undefined}
+   */
   compileComment (blueprint, command) {
     const column = command.get('column')
     const comment = column.get('comment')
@@ -620,12 +622,12 @@ export default class PostgresGrammar extends Grammar {
   }
 
   /**
- * Create the column definition for a text type.
- *
- * @protected
- * @param  {Fluent} column
- * @return {string}
- */
+   * Create the column definition for a text type.
+   *
+   * @protected
+   * @param  {Fluent} column
+   * @return {string}
+   */
   typeText (column) {
     return 'text'
   }
@@ -952,12 +954,12 @@ export default class PostgresGrammar extends Grammar {
   }
 
   /**
- * Create the column definition for a spatial Geography type.
- *
- * @protected
- * @param  {Fluent} column
- * @return {string}
- */
+   * Create the column definition for a spatial Geography type.
+   *
+   * @protected
+   * @param  {Fluent} column
+   * @return {string}
+   */
   typeGeography (column) {
     const subtype = column.get('subtype')
     const srid = column.get('srid')
@@ -1076,7 +1078,7 @@ export default class PostgresGrammar extends Grammar {
    * @protected
    * @param {Blueprint} blueprint
    * @param {Fluent} column
-   * @returns {string|undefined}
+   * @return {string|undefined}
    */
   modifyStoredAs (blueprint, column) {
     if (column.get('change')) {
@@ -1098,7 +1100,7 @@ export default class PostgresGrammar extends Grammar {
    * @protected
    * @param {Blueprint} blueprint
    * @param {Fluent} column
-   * @returns {string|string[]|undefined}
+   * @return {string|string[]|undefined}
    */
   modifyGeneratedAs (blueprint, column) {
     let sql

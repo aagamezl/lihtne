@@ -3,7 +3,8 @@ import { isFunction, isPlainObject, isString } from '@devnetic/utils'
 import Collection from '../Collection.js'
 import { dataGet } from '../helpers.js'
 
-export default class EnumeratesValues {
+// export default class EnumeratesValues {
+const EnumeratesValues = (superclass) => class extends superclass {
   /**
    * Execute a callback over each item.
    *
@@ -85,3 +86,5 @@ export default class EnumeratesValues {
     }
   }
 }
+
+export default EnumeratesValues

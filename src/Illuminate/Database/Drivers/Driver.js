@@ -9,8 +9,10 @@ export default class Driver {
   /** @type {Record<string, unknown>} */
   options = {}
 
-  /** @type {string} */
-  ATTR_SERVER_VERSION = 'PDO::ATTR_SERVER_VERSION' // TODO: Change this value to number
+  /** @type {number} */
+  static ATTR_SERVER_VERSION = 4
+
+  static FETCH_OBJ = 5
 
   /**
  * Creates an instance of Statement.

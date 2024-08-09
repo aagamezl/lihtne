@@ -1,4 +1,5 @@
 import { castArray } from '@devnetic/utils'
+import { collect } from '../Collections/helpers.js'
 
 export default class Str {
   /**
@@ -99,6 +100,30 @@ export default class Str {
   }
 
   /**
+ * Replace a given value in the string sequentially with an array.
+ *
+ * @param  {string}  search
+ * @param  {string[]}  replace
+ * @param  {string}  subject
+ * @return {string}
+ */
+  static replaceArray (search, replace, subject) {
+    if (Symbol.iterator in Object(replace)) {
+      replace = collect(replace).all()
+    }
+
+    const segments = subject.split(search)
+
+    let result = segments.shift()
+
+    for (const segment of segments) {
+      result += this.toStringOr(replace.shift() ?? search, search) + segment
+    }
+
+    return result
+  }
+
+  /**
      * Returns the portion of the string specified by the start and length parameters.
      *
      * @param  {string}  string
@@ -109,5 +134,21 @@ export default class Str {
      */
   static substr (string, start, length = undefined, encoding = 'UTF-8') {
     return string.substring(start, start + length)
+  }
+
+  /**
+   * Convert the given value to a string or return the given fallback on failure.
+   *
+   * @private
+   * @param  {any}  value
+   * @param  {string}  fallback
+   * @return {string}
+   */
+  static toStringOr (value, fallback) {
+    try {
+      return String(value)
+    } catch (e) {
+      return fallback
+    }
   }
 }

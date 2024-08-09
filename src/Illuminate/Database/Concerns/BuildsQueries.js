@@ -1,9 +1,10 @@
 import { getValue } from '@devnetic/utils'
 
 import Conditionable from '../../Conditionable/Traits/Conditionable.js'
-import use from '../../Support/Traits/use.js'
+import { mix } from '../../Support/Traits/use.js'
 
-export default class BuildsQueries {
+// export default class BuildsQueries {
+const BuildsQueries = (superclass) => class extends mix(superclass).use(Conditionable) {
   /**
    * Chunk the results of the query.
    *
@@ -154,4 +155,6 @@ export default class BuildsQueries {
   }
 }
 
-use(BuildsQueries, [Conditionable])
+// use(BuildsQueries, [Conditionable])
+
+export default BuildsQueries

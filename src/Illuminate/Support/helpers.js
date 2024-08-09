@@ -1,4 +1,6 @@
-import { lstatSync } from 'fs'
+import { fstatSync, lstatSync } from 'node:fs'
+import net from 'node:net'
+import { Stream } from 'node:stream'
 
 import { getValue, isFalsy, isTruthy } from '@devnetic/utils'
 
@@ -362,6 +364,10 @@ export const CustomException = (type, message = undefined) => {
 
     case 'concrete-method':
       return new Error(`RuntimeException: Implement ${message} method on concrete class.`)
+
+    case 'multiple-columns-selected': {
+      return new Error('MultipleColumnsSelectedException')
+    }
   }
 }
 
@@ -373,11 +379,106 @@ export const CustomException = (type, message = undefined) => {
  */
 export const classUsesRecursive = (obj) => {
   const traits = []
+
   while (obj) {
     if (obj.constructor.traits) {
       traits.push(...obj.constructor.traits)
     }
+
     obj = Object.getPrototypeOf(obj)
   }
+
   return traits
+}
+
+export const versionCompare = (version1, version2, operator = '=') => {
+  const parts1 = version1.split('.')
+  const parts2 = version2.split('.')
+
+  for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
+    const a = parseInt(parts1[i] || 0, 10)
+    const b = parseInt(parts2[i] || 0, 10)
+
+    if (a === b) {
+      continue
+    }
+
+    return compareNumbers(a, b, operator)
+  }
+
+  return true // Versions are equal
+}
+
+export const compareNumbers = (a, b, operator) => {
+  switch (operator) {
+    case '=':
+      return a === b
+    case '<':
+      return a < b
+    case '>':
+      return a > b
+    case '<=':
+      return a <= b
+    case '>=':
+      return a >= b
+    case '!=':
+      return a !== b
+    default:
+      throw new Error('Invalid operator')
+  }
+}
+
+export const match = (value, cases) => {
+  for (const [pattern, result] of Object.entries(cases)) {
+    if (pattern === value) {
+      return result
+    }
+  }
+
+  // Default case (optional)
+  if (cases.default) {
+    return cases.default
+  }
+
+  throw new Error('No matching case found')
+}
+
+// const fs = require('fs')
+// const stream = require('stream')
+// const net = require('net')
+
+/**
+ * Checks if a value is a resource.
+ *
+ * @param  {any}  value
+ * @return {boolean}
+ */
+export const isResource = (value) => {
+  if (value === null || value === undefined) {
+    return false
+  }
+
+  // Check for file descriptors
+  if (typeof value === 'number' && !isNaN(value) && value >= 0) {
+    try {
+      fstatSync(value)
+      return true
+    } catch (err) {
+      return false
+    }
+  }
+
+  // Check for streams (Readable, Writable, Duplex)
+  if (value instanceof Stream.Stream) {
+    return true
+  }
+
+  // Check for net.Socket (TCP/UDP connections)
+  if (value instanceof net.Socket) {
+    return true
+  }
+
+  // Additional checks can be added here for other types of resources
+
+  return false
 }

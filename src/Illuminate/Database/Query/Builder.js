@@ -23,7 +23,7 @@ import { JoinClause, JoinLateralClause } from './internal.js'
 import LengthAwarePaginator from '../../Pagination/LengthAwarePaginator.js'
 import Macroable from '../../Macroable/Traits/Macroable.js'
 import Relation from '../Eloquent/Relations/Relation.js'
-import use from '../../Support/Traits/use.js'
+import { mix } from '../../Support/Traits/use.js'
 import { castArray, changeKeyCase, clone, ksort, tap } from '../../Support/index.js'
 import { collect, head, last, reset, value } from '../../Collections/helpers.js'
 
@@ -103,7 +103,7 @@ import { collect, head, last, reset, value } from '../../Collections/helpers.js'
  * @property {number} value
  */
 
-export default class Builder {
+export default class Builder extends mix().use(BuildsQueries, Macroable) {
   /**
    * An aggregate function and column to be run.
    *
@@ -297,7 +297,8 @@ export default class Builder {
    * @param  {import('./Processors/Processor.js').default}  [processor]
    */
   constructor (connection, grammar, processor) {
-    use(Builder, [BuildsQueries, Macroable])
+    // use(Builder, [BuildsQueries, Macroable])
+    super()
 
     this.connection = connection
     this.grammar = grammar ?? connection.getQueryGrammar()
@@ -979,8 +980,8 @@ export default class Builder {
   /**
    * Set the table which the query is targeting.
    *
-   * @param  {Function|Builder|string}  table
-   * @param  {string}  [as]
+   * @param  {Function|Builder|Expression|EloquentBuilder|string}  table
+   * @param  {string|null}  [as]
    * @return {this}
    * @memberof Builder
    */

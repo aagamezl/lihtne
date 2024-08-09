@@ -2,17 +2,18 @@ import { isNil } from '@devnetic/utils'
 
 import Connector from './Connector.js'
 import PostgresDriver from '../Drivers/PostgresDriver.js'
-import use from '../../Support/Traits/use.js'
+import { mix } from '../../Support/Traits/use.js'
 import ParsesSearchPath from '../Concerns/ParsesSearchPath.js'
 
 /** @typedef {import('../Drivers/Driver.js').default} Driver */
 
-export default class PostgresConnector extends Connector {
-  constructor () {
-    super()
+// export default class PostgresConnector extends Connector {
+export default class PostgresConnector extends mix(Connector).use(ParsesSearchPath) {
+  // constructor () {
+  //   super()
 
-    use(PostgresConnector, [ParsesSearchPath])
-  }
+  //   use(PostgresConnector, [ParsesSearchPath])
+  // }
 
   /**
    * Add the SSL options to the DSN.

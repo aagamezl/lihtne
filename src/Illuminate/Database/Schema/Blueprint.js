@@ -4,20 +4,22 @@ import Builder from './Builder.js'
 import ColumnDefinition from './ColumnDefinition.js'
 import Fluent from './../../Support/Fluent.js'
 import Macroable from '../../Macroable/Traits/Macroable.js'
-import use from '../../Support/Traits/use.js'
+import { mix } from '../../Support/Traits/use.js'
 import { collect } from '../../Collections/helpers.js'
 import MySqlGrammar from './Grammars/MySqlGrammar.js'
 import { classUsesRecursive, ucfirst } from '../../Support/helpers.js'
 import { Expression } from '../Query/internal.js'
 import ForeignKeyDefinition from './ForeignKeyDefinition.js'
 import ForeignIdColumnDefinition from './ForeignIdColumnDefinition.js'
+import BlueprintState from './BlueprintState.js'
+import SQLiteGrammar from './Grammars/SQLiteGrammar.js'
 
 /** @typedef {import('../Connection.js').default} Connection */
 /** @typedef {import('./Grammars/Grammar.js').default} Grammar */
 /** @typedef {import('../Eloquent/Model.js').default} Model */
 /** @typedef {import('./IndexDefinition.js').default} IndexDefinition */
 
-export default class Blueprint {
+export default class Blueprint extends mix().use(Macroable) {
   /**
    * The table the blueprint describes.
    *
@@ -86,6 +88,14 @@ export default class Blueprint {
   afterProperty = null
 
   /**
+   * The blueprint state instance.
+   *
+   * @protected
+   * @type {\Illuminate\Database\Schema\BlueprintState|null}
+   */
+  state
+
+  /**
    * Create a new schema blueprint.
    *
    * @param  {string}  table
@@ -93,7 +103,8 @@ export default class Blueprint {
    * @param  {string}  [prefix='']
    */
   constructor (table, callbackFunction = undefined, prefix = '') {
-    use(Blueprint, [Macroable])
+    // use(Blueprint, [Macroable])
+    super()
 
     this.table = table
     this.prefix = prefix
@@ -138,6 +149,10 @@ export default class Blueprint {
       const method = `compile${ucfirst(command.get('name'))}`
 
       if (typeof grammar[method] === 'function'/*  || grammar.constructor.hasMacro(method) */) {
+        if (this.hasState()) {
+          this.state.update(command)
+        }
+
         const sql = grammar[method](this, command, connection)
 
         if (!isNil(sql)) {
@@ -178,17 +193,29 @@ export default class Blueprint {
    * @returns {void}
    */
   addImpliedCommands (connection, grammar) {
-    if (this.getAddedColumns().length > 0 && !this.creating()) {
-      this.commands.unshift(this.createCommand('add'))
-    }
+    // if (this.getAddedColumns().length > 0 && !this.creating()) {
+    //   this.commands.unshift(this.createCommand('add'))
+    // }
 
-    if (this.getChangedColumns().length > 0 && !this.creating()) {
-      this.commands.unshift(this.createCommand('change'))
-    }
+    // if (this.getChangedColumns().length > 0 && !this.creating()) {
+    //   this.commands.unshift(this.createCommand('change'))
+    // }
 
+    // this.addFluentIndexes(connection, grammar)
+
+    // this.addFluentCommands(connection, grammar)
     this.addFluentIndexes(connection, grammar)
-
     this.addFluentCommands(connection, grammar)
+
+    if (!this.creating()) {
+      this.commands = this.commands.map(command =>
+        command instanceof ColumnDefinition
+          ? this.createCommand(command.get('change') ? 'change' : 'add', { column: command })
+          : command
+      )
+
+      this.addAlterCommands(connection, grammar)
+    }
   }
 
   /**
@@ -254,19 +281,58 @@ export default class Blueprint {
   }
 
   /**
+   * Add the alter commands if whenever needed.
+   *
+   * @param {Object} connection
+   * @param {Object} grammar
+   */
+  addAlterCommands (connection, grammar) {
+    if (!(grammar instanceof SQLiteGrammar)) {
+      return
+    }
+
+    const alterCommands = grammar.getAlterCommands(connection)
+    const commands = []
+    let lastCommandWasAlter = false
+    let hasAlterCommand = false
+
+    for (const command of this.commands) {
+      if (alterCommands.includes(command.get('name'))) {
+        hasAlterCommand = true
+        lastCommandWasAlter = true
+      } else if (lastCommandWasAlter) {
+        commands.push(this.createCommand('alter'))
+        lastCommandWasAlter = false
+      }
+
+      commands.push(command)
+    }
+
+    if (lastCommandWasAlter) {
+      commands.push(this.createCommand('alter'))
+    }
+
+    if (hasAlterCommand) {
+      this.state = new BlueprintState(this, connection, grammar)
+    }
+
+    this.commands = commands
+  }
+
+  /**
    * @returns {boolean}
    */
   creating () {
-    // for (const command of this.commands) {
-    //   if (command.get('name') === 'create') {
-    //     return true
-    //   }
-    // }
+    for (const command of this.commands) {
+      if (command.get('name') === 'create') {
+        return true
+      }
+    }
 
-    // return false
-    return collect(this.commands).contains((/** @type {Fluent} */ command) => {
-      return command.get('name') === 'create'
-    })
+    return false
+    // return collect(this.commands).contains((/** @type {Fluent} */ command) => {
+    //   return command.get('name') === 'create'
+    // })
   }
 
   /**
@@ -1464,6 +1530,10 @@ export default class Blueprint {
   addColumnDefinition (definition) {
     this.columns.push(definition)
 
+    if (!this.creating()) {
+      this.commands.push(definition)
+    }
+
     if (this.afterProperty) {
       definition.after(this.afterProperty)
 
@@ -1495,7 +1565,8 @@ export default class Blueprint {
    * @returns {this}
    */
   removeColumn (name) {
-    this.columns = this.columns.filter(c => c.name !== name)
+    this.columns = this.columns.filter(c => c.get('name') !== name)
+
     return this
   }
 
@@ -1509,7 +1580,9 @@ export default class Blueprint {
    */
   addCommand (name, parameters = {}) {
     const command = this.createCommand(name, parameters)
+
     this.commands.push(command)
+
     return command
   }
 
@@ -1559,6 +1632,26 @@ export default class Blueprint {
    */
   getCommands () {
     return this.commands
+  }
+
+  /**
+   * Determine if the blueprint has state.
+   *
+   * @private
+   * @param  {any}  name
+   * @return {boolean}
+   */
+  hasState () {
+    return !isNil(this.state)
+  }
+
+  /**
+   * Get the state of the blueprint.
+   *
+   * @return {BlueprintState}
+   */
+  getState () {
+    return this.state
   }
 
   /**

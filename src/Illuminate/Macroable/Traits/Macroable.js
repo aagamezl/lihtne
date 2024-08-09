@@ -1,12 +1,4 @@
-class Trait {
-  constructor () {
-    if (typeof new.target !== 'undefined' && new.target !== Trait) {
-      throw new Error('Trait cannot be instantiated directly')
-    }
-  }
-}
-
-export default class Macroable extends Trait {
+const Macroable = (superclass) => class extends superclass {
   /**
    * The registered string macros.
    *
@@ -58,3 +50,5 @@ export default class Macroable extends Trait {
     return macro(...parameters)
   }
 }
+
+export default Macroable

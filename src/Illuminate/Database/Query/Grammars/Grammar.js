@@ -4,7 +4,7 @@ import Arr from '../../../Collections/Arr.js'
 import BaseGrammar from '../../Grammar.js'
 import CompilesJsonPaths from '../../Concerns/CompilesJsonPaths.js'
 import { JoinClause, JoinLateralClause } from './../internal.js'
-import use from '../../../Support/Traits/use.js'
+import { mix } from '../../../Support/Traits/use.js'
 import { collect, end, head, last, reset, value as getValue } from '../../../Collections/helpers.js'
 import Expression from './../Expression.js'
 
@@ -28,7 +28,7 @@ import Expression from './../Expression.js'
 /** @typedef {import('./../Builder.js').Union} Union */
 /** @typedef {import('./../Builder.js').Where} Where */
 
-export default class Grammar extends BaseGrammar {
+export default class Grammar extends mix(BaseGrammar).use(CompilesJsonPaths) {
   /**
    * The grammar specific operators.
    *
@@ -63,12 +63,12 @@ export default class Grammar extends BaseGrammar {
     { name: 'lock', property: 'lockProperty' }
   ]
 
-  constructor () {
-    super()
+  // constructor () {
+  //   super()
 
-    // use(this.constructor, [CompilesJsonPaths])
-    use(Grammar, [CompilesJsonPaths])
-  }
+  //   // use(this.constructor, [CompilesJsonPaths])
+  //   // use(Grammar, [CompilesJsonPaths])
+  // }
 
   /**
    * Compile an aggregated select clause.
