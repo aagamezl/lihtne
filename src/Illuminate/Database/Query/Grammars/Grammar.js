@@ -4,7 +4,7 @@ import Arr from '../../../Collections/Arr.js'
 import BaseGrammar from '../../Grammar.js'
 import CompilesJsonPaths from '../../Concerns/CompilesJsonPaths.js'
 import { JoinClause, JoinLateralClause } from './../internal.js'
-import use from '../../../Support/Traits/use.js'
+import { mix } from '../../../Support/Traits/use.js'
 import { collect, end, head, last, reset, value as getValue } from '../../../Collections/helpers.js'
 import Expression from './../Expression.js'
 
@@ -28,47 +28,47 @@ import Expression from './../Expression.js'
 /** @typedef {import('./../Builder.js').Union} Union */
 /** @typedef {import('./../Builder.js').Where} Where */
 
-export default class Grammar extends BaseGrammar {
-  constructor () {
-    super()
+export default class Grammar extends mix(BaseGrammar).use(CompilesJsonPaths) {
+  /**
+   * The grammar specific operators.
+   *
+   * @type {string[]}
+   */
+  operators = []
 
-    // use(this.constructor, [CompilesJsonPaths])
-    use(Grammar, [CompilesJsonPaths])
+  /**
+   * The grammar specific bitwise operators.
+   *
+   * @type {string[]}
+   */
+  bitwiseOperators = []
 
-    /**
-     * The grammar specific operators.
-     *
-     * @type {string[]}
-     */
-    this.operators = []
+  /**
+   * The components that make up a select clause.
+   *
+   * @type {SelectComponent[]}
+   */
+  selectComponents = [
+    { name: 'aggregate', property: 'aggregateProperty' },
+    { name: 'columns', property: 'columns' },
+    { name: 'from', property: 'fromProperty' },
+    { name: 'indexHint', property: 'indexHint' },
+    { name: 'joins', property: 'joins' },
+    { name: 'wheres', property: 'wheres' },
+    { name: 'groups', property: 'groups' },
+    { name: 'havings', property: 'havings' },
+    { name: 'orders', property: 'orders' },
+    { name: 'limit', property: 'limitProperty' },
+    { name: 'offset', property: 'offsetProperty' },
+    { name: 'lock', property: 'lockProperty' }
+  ]
 
-    /**
-     * The grammar specific bitwise operators.
-     *
-     * @type {string[]}
-     */
-    this.bitwiseOperators = []
+  // constructor () {
+  //   super()
 
-    /**
-     * The components that make up a select clause.
-     *
-     * @type {SelectComponent[]}
-     */
-    this.selectComponents = [
-      { name: 'aggregate', property: 'aggregateProperty' },
-      { name: 'columns', property: 'columns' },
-      { name: 'from', property: 'fromProperty' },
-      { name: 'indexHint', property: 'indexHint' },
-      { name: 'joins', property: 'joins' },
-      { name: 'wheres', property: 'wheres' },
-      { name: 'groups', property: 'groups' },
-      { name: 'havings', property: 'havings' },
-      { name: 'orders', property: 'orders' },
-      { name: 'limit', property: 'limitProperty' },
-      { name: 'offset', property: 'offsetProperty' },
-      { name: 'lock', property: 'lockProperty' }
-    ]
-  }
+  //   // use(this.constructor, [CompilesJsonPaths])
+  //   // use(Grammar, [CompilesJsonPaths])
+  // }
 
   /**
    * Compile an aggregated select clause.
@@ -978,7 +978,7 @@ export default class Grammar extends BaseGrammar {
       // Single quotes can be escaped as '' according to the SQL standard while
       // MySQL uses \'. Postgres has operators like ?| that must get encoded
       // in PHP like ??|. We should skip over the escaped characters here.
-      if (["'", "''", '??'].includes(char + nextChar)) {
+      if (["\\'", "''", '??'].includes(char + nextChar)) {
         query += char + nextChar
         i += 1
       } else if (char === "'") { // Starting / leaving string literal...

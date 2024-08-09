@@ -1,10 +1,11 @@
-export default class Macroable {
+const Macroable = (superclass) => class extends superclass {
   /**
    * The registered string macros.
    *
-   * @var array
+   * @type {any[]}
    */
-  static { this.macros = [] }
+  static macros = []
+
   /**
    * Checks if macro is registered.
    *
@@ -36,11 +37,11 @@ export default class Macroable {
    * @throws \BadMethodCallException
    */
   __call (method, parameters) {
-    if (this.hasMacro(method) === false) {
+    if (Macroable.hasMacro(method) === false) {
       throw new Error(`BadMethodCallException: Method ${this.constructor.name}::${method} does not exist.`)
     }
 
-    let macro = this.constructor.macros[method]
+    let macro = Macroable.macros[method]
 
     if (macro instanceof Function) {
       macro = macro.bindTo(this, this.constructor.name)
@@ -49,3 +50,5 @@ export default class Macroable {
     return macro(...parameters)
   }
 }
+
+export default Macroable

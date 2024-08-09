@@ -189,12 +189,12 @@ export default class Arr {
    * Get an item from an array using "dot" notation.
    *
    * @param  {Record<string, any>|any[]}  array
-   * @param  {string|number|undefined}  key
-   * @param  {any}  defaultValue
+   * @param  {string|number|null}  key
+   * @param  {any}  [defaultValue=null]
    * @return {any}
    */
-  static get (array, key, defaultValue) {
-    if (key === undefined) {
+  static get (array, key, defaultValue = null) {
+    if (key === null) {
       return array
     }
     if (Object.values(array).includes(key)) {

@@ -1,7 +1,8 @@
 import { isFalsy, isTruthy } from '@devnetic/utils'
 
 // import { isFalsy, isTruthy } from '@devnetic/utils'
-export default class Conditionable {
+// export default class Conditionable {
+const Conditionable = (superclass) => class extends superclass {
   /**
    * Apply the callback's query changes if the given "value" is false.
    *
@@ -42,3 +43,5 @@ export default class Conditionable {
     return this
   }
 }
+
+export default Conditionable

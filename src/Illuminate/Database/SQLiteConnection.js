@@ -1,4 +1,4 @@
-import SQLiteDriver from './../Database/PDO/SQLiteDriver.js'
+import SQLiteDriver from './../Database/Drivers/SQLiteDriver.js'
 import { SQLiteGrammar as QueryGrammar } from '../Database/Query/Grammars/index.js'
 import Connection from './Connection.js'
 import { bin2hex } from '../Support/helpers.js'

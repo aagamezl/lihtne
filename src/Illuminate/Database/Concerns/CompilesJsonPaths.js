@@ -3,7 +3,8 @@ import { collect } from '../../Collections/helpers.js'
 import { explode } from '../../Support/helpers.js'
 
 // export const CompilesJsonPaths = {
-export default class CompilesJsonPaths {
+// export default class CompilesJsonPaths {
+const CompilesJsonPaths = (superclass) => class extends superclass {
   /**
    * Split the given JSON selector into the field and the optional path and wrap them separately.
    *
@@ -14,10 +15,6 @@ export default class CompilesJsonPaths {
     // const parts = column.split('->', 2)
     const parts = explode('->', column, 2)
 
-    /**
-     * The wrap method exists on the trait target prototype
-     *
-     * @ts-expect-error */
     const field = this.wrap(parts[0])
 
     const path = parts.length > 1 ? ', ' + this.wrapJsonPath(parts[1], '->') : ''
@@ -65,3 +62,5 @@ export default class CompilesJsonPaths {
     return '"' + segment + '"'
   }
 }
+
+export default CompilesJsonPaths

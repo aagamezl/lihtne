@@ -4,9 +4,8 @@ export default class QueryExecuted {
    *
    * @param  {string}  sql
    * @param  {array}  bindings
-   * @param  {number}  [time]
+   * @param  {number|null}  time
    * @param  {import('./../Connection').default}  connection
-   * @return {void}
    */
   constructor (sql, bindings, time, connection) {
     this.sql = sql
@@ -14,5 +13,17 @@ export default class QueryExecuted {
     this.bindings = bindings
     this.connection = connection
     this.connectionName = connection.getName()
+  }
+
+  /**
+   * Get the raw SQL representation of the query with embedded bindings.
+   *
+   * @return {string}
+   */
+  toRawSql () {
+    return this.connection
+      .query()
+      .getGrammar()
+      .substituteBindingsIntoRawSql(this.sql, this.connection.prepareBindings(this.bindings))
   }
 }

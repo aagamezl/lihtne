@@ -5,12 +5,37 @@ import Connection from './Connection.js'
 // import PostgresDriver from './../Database/PDO/PostgresDriver.js'
 import QueryGrammar from '../Database/Query/Grammars/PostgresGrammar.js'
 import PostgresProcessor from './../Database/Query/Processors/PostgresProcessor.js'
-import PostgresStatement from './../Database/Statements/PostgresStatement.js'
+// import PostgresStatement from './../Database/Statements/PostgresStatement.js'
 
 export default class PostgresConnection extends Connection {
   /**
+   * Escape a binary value for safe SQL embedding.
+   *
+   * @protected
+   * @param {string} value - The binary value to escape.
+   * @returns {string} - The escaped binary value.
+   */
+  escapeBinary (value) {
+    const hex = Buffer.from(value).toString('hex')
+
+    return `'\\x${hex}'::bytea`
+  }
+
+  /**
+   * Escape a bool value for safe SQL embedding.
+   *
+   * @protected
+   * @param {boolean} value - The boolean value to escape.
+   * @returns {string} - The escaped boolean value.
+   */
+  escapeBool (value) {
+    return value ? 'true' : 'false'
+  }
+
+  /**
    * Get the default query grammar instance.
    *
+   * @protected
    * @return {import('./Query/Grammars/PostgresGrammar.js').default}
    */
   getDefaultQueryGrammar () {
@@ -23,52 +48,22 @@ export default class PostgresConnection extends Connection {
   /**
    * Get the default post processor instance.
    *
-   * @return {\Illuminate\Database\Query\Processors\PostgresProcessor}
+   *
+   * @return {import('./Query/Processors/PostgresProcessor.js').default}
    */
   getDefaultPostProcessor () {
     return new PostgresProcessor()
   }
 
   /**
-   * Get the default schema grammar instance.
-   *
-   * @return {\Illuminate\Database\Schema\Grammars\PostgresGrammar}
-   */
-  // getDefaultSchemaGrammar() {
-  //   return this.withTablePrefix(new SchemaGrammar())
-  // }
-
-  /**
-   * Get the Doctrine DBAL driver.
-   *
-   * @return {\Illuminate\Database\PDO\PostgresDriver}
-   */
-  // getDoctrineDriver () {
-  //   return new PostgresDriver()
-  // }
-
-  /**
-   *
-   *
-   * @param {string} dsn
-   * @param {string} options
-   * @return {import('./Statements/Statement.js').default}
-   * @memberof {PostgresConnection}
-   */
-  getPrepareStatement (dsn, options) {
-    return new PostgresStatement(dsn, options)
+ * Determine if the given database exception was caused by a unique constraint violation.
+ *
+ * @protected
+ * @param {Error} exception - The exception object.
+ * @returns {boolean} - Whether the exception indicates a unique constraint violation.
+ */
+  isUniqueConstraintError (exception) {
+    // Assuming the error code is attached to the exception object
+    return exception.code === '23505'
   }
-
-  /**
-   * Get a schema builder instance for the connection.
-   *
-   * @return {\Illuminate\Database\Schema\PostgresBuilder}
-   */
-  // getSchemaBuilder () {
-  //   if (isNil(this.schemaGrammar)) {
-  //     this.useDefaultSchemaGrammar()
-  //   }
-
-  //   return new PostgresBuilder(this)
-  // }
 }

@@ -1,6 +1,13 @@
 import Str from '../Support/Str.js'
 
-export default class DetectsLostConnections {
+// const SocialNetwork = (superclass) => class extends superclass {
+//   foo() {
+//     console.log('foo');
+//   }
+// }
+
+// export default class DetectsLostConnections {
+const DetectsLostConnections = (superclass) => class extends superclass {
   /**
    * Determine if the given exception was caused by a lost connection.
    *
@@ -52,3 +59,5 @@ export default class DetectsLostConnections {
     return Str.contains(message, messages)
   }
 }
+
+export default DetectsLostConnections

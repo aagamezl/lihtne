@@ -1,8 +1,23 @@
 import { collect } from '../Collections/helpers.js'
+import Macroable from '../Macroable/Traits/Macroable.js'
+import { CustomException } from '../Support/helpers.js'
+import { mix } from '../Support/Traits/use.js'
+// import use from '../Support/Traits/use.js'
 import Expression from './Query/Expression.js'
 
-export default class Grammar {
+/**
+ * @class
+ * @abstract
+ */
+export default class Grammar extends mix().use(Macroable) {
   constructor () {
+    super()
+    // use(Grammar, [Macroable])
+
+    if (new.target === Grammar) {
+      throw CustomException('abstract')
+    }
+
     /**
      * The grammar table prefix.
      *
@@ -35,6 +50,21 @@ export default class Grammar {
   }
 
   /**
+   * Escapes a value for safe SQL embedding.
+   *
+   * @param  {string|number|boolean|null}  value
+   * @param  {boolean}  [binary=false]
+   * @return {string}
+   */
+  escape (value, binary = false) {
+    if (!this.connection) {
+      throw new Error("RuntimeException: The database driver's grammar implementation does not support escaping values.")
+    }
+
+    return this.connection.escape(value, binary)
+  }
+
+  /**
    * Get the format for database stored dates.
    *
    * @return {string}
@@ -55,7 +85,7 @@ export default class Grammar {
   /**
    * Get the value of a raw expression.
    *
-   * @param  {Expression}  expression
+   * @param  {Expression|string|number}  expression
    * @return {any}
    */
   getValue (expression) {
@@ -70,7 +100,7 @@ export default class Grammar {
   /**
    * Determine if the given value is a raw expression.
    *
-   * @param  {unknown}  value
+   * @param  {any}  value
    * @return {boolean}
    */
   isExpression (value) {
@@ -147,7 +177,8 @@ export default class Grammar {
     // If the value being wrapped has a column alias we will need to separate out
     // the pieces so we can wrap each of the segments of the expression on its
     // own, and then join these both back together using the "as" connector.
-    if (/\sas\s/i.test(value)) {
+    // if (/\sas\s/i.test(value)) {
+    if (value.includes(' as ')) {
       return this.wrapAliasedValue(value, prefixAlias)
     }
 

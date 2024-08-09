@@ -11,6 +11,58 @@ const use = (target, traits) => {
       }
     }
   }
+
+  // NEW WAY, TEST IT - 2024-07-23
+  // traits.forEach((traitClass) => {
+  //   // Check if traitClass is a class (avoids errors with non-functions)
+  //   if (typeof traitClass !== 'function') {
+  //     throw new Error('Trait must be a class')
+  //   }
+
+  //   // Ensure the trait cannot be directly instantiated
+  //   if (typeof traitClass.prototype.constructor !== 'function') {
+  //     throw new Error('Trait cannot be instantiated directly')
+  //   }
+
+  //   // Copy static methods from trait to target class
+  //   Object.getOwnPropertyNames(traitClass)
+  //     .filter((name) => name !== 'constructor' && typeof traitClass[name] === 'function')
+  //     .forEach((methodName) => {
+  //       target[methodName] = traitClass[methodName]
+  //     })
+
+  //   // Copy instance methods from trait prototype to target class prototype
+  //   Object.getOwnPropertyNames(traitClass.prototype)
+  //     .filter((name) => name !== 'constructor' && typeof traitClass.prototype[name] === 'function')
+  //     .forEach((methodName) => {
+  //       target.prototype[methodName] = traitClass.prototype[methodName]
+  //     })
+  // })
 }
 
+// const use = (derivedCtor, constructors) => {
+//   constructors.forEach((baseCtor) => {
+//     Object.getOwnPropertyNames(baseCtor.prototype).forEach((name) => {
+//       Object.defineProperty(
+//         derivedCtor.prototype,
+//         name,
+//         Object.getOwnPropertyDescriptor(baseCtor.prototype, name) ||
+//         Object.create(null)
+//       )
+//     })
+//   })
+// }
+
 export default use
+
+class MixinBuilder {
+  constructor (superclass) {
+    this.superclass = superclass
+  }
+
+  use (...mixins) {
+    return mixins.reduce((c, mixin) => mixin(c), this.superclass)
+  }
+}
+// this will combine everything in one class
+export const mix = (superclass = class { }) => new MixinBuilder(superclass)

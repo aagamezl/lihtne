@@ -36,7 +36,7 @@ export default class DatabaseManager {
   /**
    * The custom connection resolvers.
    *
-   * @type {Record<string, unknown>}
+   * @type {Record<string, Function>}
    */
   extensions = {}
 
@@ -65,6 +65,7 @@ export default class DatabaseManager {
     this.repository = repository
 
     this.reconnector = (connection) => {
+      // TODO: rename getNameWithReadWriteType method
       this.reconnect(connection.getNameWithReadWriteType())
     }
 
@@ -86,7 +87,7 @@ export default class DatabaseManager {
  * Get the configuration for a connection.
  *
  * @param  {string}  name
- * @return {Record<string, unknown>}
+ * @return {Record<string, any>}
  *
  * @throws {TypeError}
  */
@@ -142,9 +143,9 @@ export default class DatabaseManager {
    * @return {Connection}
    */
   connection (name = undefined) {
-    const [database, type] = this.parseConnectionName(name)
+    name = name ?? this.getDefaultConnection()
 
-    name = name ?? database
+    const [database, type] = this.parseConnectionName(name)
 
     // If we haven't created this connection, we'll create it based on the config
     // provided in the application. Once we've created the connections we will
@@ -153,6 +154,9 @@ export default class DatabaseManager {
       this.connections[name] = this.configure(
         this.makeConnection(database), type
       )
+
+      // TODO: Implement events
+      // this.dispatchConnectionEstablishedEvent(this.connections[name])
     }
 
     return this.connections[name]
@@ -241,7 +245,7 @@ export default class DatabaseManager {
       return this.connection(name)
     }
 
-    return this.refreshNdoConnections(name)
+    return this.refreshDriversConnections(name)
   }
 
   /**
@@ -250,7 +254,7 @@ export default class DatabaseManager {
    * @param  {string}  name
    * @return {Connection}
    */
-  refreshNdoConnections (name) {
+  refreshDriversConnections (name) {
     const [database, type] = this.parseConnectionName(name)
 
     const fresh = this.configure(
@@ -258,7 +262,7 @@ export default class DatabaseManager {
     )
 
     return this.connections[name]
-      .setNdo(fresh.getNdo())
+      .setDriver(fresh.getDriver())
   }
 
   /**

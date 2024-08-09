@@ -3,11 +3,11 @@ import { clone, isFalsy, isNil, isTruthy, merge } from '@devnetic/utils'
 import { collect } from '../../Collections/helpers.js'
 import InstanceProxy from '../../Support/Proxies/InstanceProxy.js'
 import ForwardsCalls from '../../Support/Traits/ForwardsCalls.js'
-import use from '../../Support/Traits/use.js'
+import { mix } from '../../Support/Traits/use.js'
 import BuildsQueries from '../Concerns/BuildsQueries.js'
 import Scope from './Scope.js'
 
-export default class Builder {
+export default class Builder extends mix().use(BuildsQueries, ForwardsCalls) {
   /**
    * All of the globally registered builder macros.
    *
@@ -22,7 +22,8 @@ export default class Builder {
    */
   constructor (query) {
     // use(this.constructor, [BuildsQueries, ForwardsCalls])
-    use(Builder, [BuildsQueries, ForwardsCalls])
+    // use(Builder, [BuildsQueries, ForwardsCalls])
+    super()
 
     /**
      * All of the locally registered builder macros.

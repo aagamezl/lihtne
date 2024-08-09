@@ -1,6 +1,6 @@
 import { getType, isFunction, isPlainObject, isString, range } from '@devnetic/utils'
 
-import use from '../Support/Traits/use.js'
+import { mix } from '../Support/Traits/use.js'
 import Arr from './Arr.js'
 import EnumeratesValues from './Traits/EnumeratesValues.js'
 import Macroable from '../Macroable/Traits/Macroable.js'
@@ -11,11 +11,9 @@ import { arrayDiff, arrayMerge, spaceship } from '../Support/index.js'
 
 /**
  * @class CollectionWithTraits
- * @template TKey
- * @template TValue
  *
  */
-export default class Collection {
+export default class Collection extends mix().use(EnumeratesValues, Macroable) {
   /**
    * Create a new collection.
    *
@@ -23,9 +21,10 @@ export default class Collection {
    */
   constructor (items = []) {
     // super(items)
+    super()
 
     // use(this.constructor, [EnumeratesValues, Macroable])
-    use(Collection, [EnumeratesValues, Macroable])
+    // use(Collection, [EnumeratesValues, Macroable])
 
     // We don't want to enumerate this property with Object.entries() or similar
     Object.defineProperty(this, 'entries', {
@@ -113,8 +112,8 @@ export default class Collection {
   /**
    * Run a filter over each of the items.
    *
-   * @param  {(callable(TValue, TKey) => boolean)}  [callback]
-   * @return {static}
+   * @param  {(TValue, TKey) => boolean}  [callback]
+   * @return {Collection}
    */
   filter (callback) {
     if (callback) {
@@ -230,7 +229,7 @@ export default class Collection {
    * @template TMapValue
    *
    * @param {function(TValue, TKey): TMapValue} callback
-   * @returns {Collection<TKey, TMapValue>}
+   * @returns {Collection}
    */
   map (callback) {
     // return new Collection(this.items.map((item, key) => {

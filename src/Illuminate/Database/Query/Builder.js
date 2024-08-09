@@ -23,7 +23,7 @@ import { JoinClause, JoinLateralClause } from './internal.js'
 import LengthAwarePaginator from '../../Pagination/LengthAwarePaginator.js'
 import Macroable from '../../Macroable/Traits/Macroable.js'
 import Relation from '../Eloquent/Relations/Relation.js'
-import use from '../../Support/Traits/use.js'
+import { mix } from '../../Support/Traits/use.js'
 import { castArray, changeKeyCase, clone, ksort, tap } from '../../Support/index.js'
 import { collect, head, last, reset, value } from '../../Collections/helpers.js'
 
@@ -55,7 +55,7 @@ import { collect, head, last, reset, value } from '../../Collections/helpers.js'
  * @property {string} [operator] - The comparison operator for the where condition.
  * @property {unknown} [value] - The value to compare with in the where condition.
  * @property {string} boolean - The boolean operator to combine multiple where conditions.
- * @property {string} [sql] - The raw sql for where conditions.
+ * @property {string | Expression} [sql] - The raw sql for where conditions.
  * @property {Options} [options] - The options for where conditions.
  * @property {Builder} [query] - The query associated to the where conditions.
  * @property {unknown[]|Record<string, unknown>} [values] - The values to compare with in the where condition.
@@ -103,7 +103,7 @@ import { collect, head, last, reset, value } from '../../Collections/helpers.js'
  * @property {number} value
  */
 
-export default class Builder {
+export default class Builder extends mix().use(BuildsQueries, Macroable) {
   /**
    * An aggregate function and column to be run.
    *
@@ -297,7 +297,8 @@ export default class Builder {
    * @param  {import('./Processors/Processor.js').default}  [processor]
    */
   constructor (connection, grammar, processor) {
-    use(Builder, [BuildsQueries, Macroable])
+    // use(Builder, [BuildsQueries, Macroable])
+    super()
 
     this.connection = connection
     this.grammar = grammar ?? connection.getQueryGrammar()
@@ -979,8 +980,8 @@ export default class Builder {
   /**
    * Set the table which the query is targeting.
    *
-   * @param  {Function|Builder|string}  table
-   * @param  {string}  [as]
+   * @param  {Function|Builder|Expression|EloquentBuilder|string}  table
+   * @param  {string|null}  [as]
    * @return {this}
    * @memberof Builder
    */
@@ -1043,7 +1044,7 @@ export default class Builder {
   /**
    * Get the current query value bindings in a flattened array.
    *
-   * @return {any[]}
+   * @return {unknown[]}
    */
   getBindings () {
     return Arr.flatten(this.bindings)
@@ -1810,7 +1811,7 @@ export default class Builder {
    *
    * @param  {Array<string | Expression>}  columns
    * @param  {Function}  callback
-   * @return {any}
+   * @return {Promise<any>}
    */
   async onceWithColumns (columns, callback) {
     const original = this.columns
@@ -2555,7 +2556,7 @@ export default class Builder {
   /**
    * Run the query as a "select" statement against the connection.
    *
-   * @return {Array}
+   * @returns {Promise<unknown | Record<string, unknown>[]>}
    */
   runSelect () {
     return this.connection.select(this.toSql(), this.getBindings())

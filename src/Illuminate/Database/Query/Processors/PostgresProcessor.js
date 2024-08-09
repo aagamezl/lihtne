@@ -4,13 +4,44 @@ import Processor from './Processor.js'
 
 export default class PostgresProcessor extends Processor {
   /**
+   * Process the results of a columns query.
+   *
+   * @param {Array<Record<string, any>>} results
+   * @returns {Array<Record<string, any>>}
+   */
+  processColumns (results) {
+    return results.map(result => {
+      const autoincrement = result.default !== null && result.default.startsWith('nextval(')
+
+      return {
+        name: result.name,
+        type_name: result.type_name,
+        type: result.type,
+        collation: result.collation,
+        nullable: Boolean(result.nullable),
+        default: result.generated ? null : result.default,
+        auto_increment: autoincrement,
+        comment: result.comment,
+        generation: result.generated
+          ? {
+              type: {
+                s: 'stored'
+              }[result.generated] ?? null,
+              expression: result.default
+            }
+          : null
+      }
+    })
+  }
+
+  /**
    * Process an "insert get ID" query.
    *
    * @param  {import('./../Builder').default}  query
    * @param  {string}  sql
-   * @param  {array}  values
+   * @param  {Record<string, any>}  values
    * @param  {string}  [sequence]
-   * @return {number|string}
+   * @return {Promise<number|string>}
    */
   async processInsertGetId (query, sql, values, sequence) {
     const connection = query.getConnection()

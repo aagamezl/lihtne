@@ -1,4 +1,4 @@
-import { omit, setValue } from '@devnetic/utils'
+import { setValue } from '@devnetic/utils'
 
 import Arr from './../../Collections/Arr.js'
 import Connection from './../Connection.js'
@@ -13,12 +13,15 @@ import {
   SqlServerConnector
 } from './index.js'
 
+/** @typedef {import('../Drivers/Driver.js').default} Driver */
+
 export default class ConnectionFactory {
   /**
    * Create a new connection instance.
    *
+   * @protected
    * @param  {string}  driver
-   * @param  {object|Function}  connection
+   * @param  {Driver|Function}  connection
    * @param  {string}  database
    * @param  {string}  [prefix='']
    * @param  {object}  [config={}]
@@ -76,34 +79,12 @@ export default class ConnectionFactory {
   }
 
   /**
-   * Create a new PDO instance for reading.
-   *
-   * @param  {object}  config
-   * @return {Function}
-   */
-  createReadNdo (config) {
-    return this.createPdoResolver(this.getReadConfig(config))
-  }
-
-  /**
-   * Create a read / write database connection instance.
-   *
-   * @param  {object}  config
-   * @return {\Illuminate\Database\Connection}
-   */
-  createReadWriteConnection (config) {
-    const connection = this.createSingleConnection(this.getWriteConfig(config))
-
-    return connection.setReadNdo(this.createReadNdo(config))
-  }
-
-  /**
    * Create a new Closure that resolves to a PDO instance.
    *
-   * @param  {object}  config
+   * @param  {Record<string, any>}  config
    * @return {Function}
    */
-  createResolver (config) {
+  createDriverResolver (config) {
     return Reflect.has(config, 'host')
       ? this.createResolverWithHosts(config)
       : this.createResolverWithoutHosts(config)
@@ -112,10 +93,10 @@ export default class ConnectionFactory {
   /**
    * Create a new Closure that resolves to a PDO instance with a specific host or an array of hosts.
    *
-   * @param  array  config
-   * @return \Closure
+   * @param  {Record<string, any>}  config
+   * @return {Function}
    *
-   * @throws \PDOException
+   * @throws {DriverException}
    */
   createResolverWithHosts (config) {
     return () => {
@@ -138,7 +119,7 @@ export default class ConnectionFactory {
   /**
    * Create a new Closure that resolves to a PDO instance where there is no configured host.
    *
-   * @param  {object}  config
+   * @param  {Record<string, any>}  config
    * @return {Function}
    */
   createResolverWithoutHosts (config) {
@@ -150,11 +131,12 @@ export default class ConnectionFactory {
   /**
    * Create a single database connection instance.
    *
-   * @param  {object}  config
-   * @return {\Illuminate\Database\Connection}
+   * @protected
+   * @param  {Record<string, any>}  config
+   * @return {import('../Connection.js').default}
    */
   createSingleConnection (config) {
-    const resolver = this.createResolver(config)
+    const resolver = this.createDriverResolver(config)
 
     return this.createConnection(
       config.driver, resolver, config.database, config.prefix, config
@@ -162,53 +144,26 @@ export default class ConnectionFactory {
   }
 
   /**
-   * Get the write configuration for a read / write connection.
-   *
-   * @param  {object}  config
-   * @return {object}
-   */
-  getWriteConfig (config) {
-    return this.mergeReadWriteConfig(
-      config, this.getReadWriteConfig(config, 'write')
-    )
-  }
-
-  /**
    * Establish a PDO connection based on the configuration.
    *
-   * @param  {object}  config
-   * @param  {string|undefined}  [name=undefined]
-   * @return {\Illuminate\Database\Connection}
+   * @param  {Record<string, any>}  config
+   * @param  {string|undefined}  [name]
+   * @return {import('../Connection.js').default}
    */
   make (config, name = undefined) {
     config = this.parseConfig(config, name)
-
-    if (config.read !== undefined) {
-      return this.createReadWriteConnection(config)
-    }
 
     return this.createSingleConnection(config)
   }
 
   /**
-   * Merge a configuration for a read / write connection.
+   * Parse and prepare the database configuration.
    *
-   * @param  {object}  config
-   * @param  {object}  merge
-   * @return {object}
+   * @param  {Record<string, any>}  config
+   * @param  {string}  [name]
+   * @return {Record<string, any>}
    */
-  mergeReadWriteConfig (config, merge) {
-    return omit({ ...config, ...merge }, ['read', 'write'])
-  }
-
-  /**
- * Parse and prepare the database configuration.
- *
- * @param  {object}  config
- * @param  {string}  name
- * @return {object}
- */
-  parseConfig (config, name) {
+  parseConfig (config, name = undefined) {
     return setValue(setValue(config, 'prefix', ''), 'name', name)
   }
 
