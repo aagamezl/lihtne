@@ -11,8 +11,8 @@ export default class Processor {
   /**
    * Process the results of a columns query.
    *
-   * @param  {Array<Object>}  results
-   * @return {Array<Object>}
+   * @param  {Array<Record<string, any>>}  results
+   * @return {Array<Record<string, any>>}
    */
   processColumns (results) {
     return results
@@ -40,8 +40,8 @@ export default class Processor {
   /**
    * Process the results of a foreign keys query.
    *
-   * @param  {unknown[]}  results
-   * @return {unknown[]}
+   * @param  {Array<Record<string, any>>}  results
+   * @return {Array<Record<string, any>>}
    */
   processForeignKeys (results) {
     return results
@@ -50,8 +50,8 @@ export default class Processor {
   /**
    * Process the results of an indexes query.
    *
-     * @param  {unknown[]}  results
-     * @return {unknown[]}
+     * @param  {Record<string, any>[]}  results
+     * @return {Record<string, any>[]}
    */
   processIndexes (results) {
     return results
