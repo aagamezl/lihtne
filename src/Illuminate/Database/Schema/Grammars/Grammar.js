@@ -4,7 +4,6 @@ import Fluent from '../../../Support/Fluent.js'
 import { CustomException, ucfirst } from '../../../Support/helpers.js'
 import { Expression } from '../../Query/internal.js'
 
-/** @typedef {import('../../Query/Expression.js').default} Expression */
 /** @typedef {import('../../Connection.js').default} Connection */
 
 export default class Grammar extends BaseGrammar {

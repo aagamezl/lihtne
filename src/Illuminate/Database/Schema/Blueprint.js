@@ -719,7 +719,7 @@ export default class Blueprint extends mix().use(Macroable) {
    * @returns {ColumnDefinition}
    */
   char (column, length = null) {
-    length = length !== null ? length : Builder.defaultStringLength
+    length = length !== null ? length : Builder.defaultStringLengthProperty
 
     return this.addColumn('char', column, { length })
   }
@@ -732,7 +732,7 @@ export default class Blueprint extends mix().use(Macroable) {
    * @returns {ColumnDefinition}
    */
   string (column, length = null) {
-    length = length !== null ? length : Builder.defaultStringLength
+    length = length !== null ? length : Builder.defaultStringLengthProperty
 
     return this.addColumn('string', column, { length })
   }
