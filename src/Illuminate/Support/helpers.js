@@ -482,3 +482,20 @@ export const isResource = (value) => {
 
   return false
 }
+
+export const addslashes = (str) => {
+  return str.replace(/[\\"'\0]/g, (char) => {
+    switch (char) {
+      case '\\':
+        return '\\\\'
+      case "'":
+        return "\\'"
+      case '"':
+        return '\\"'
+      case '\0':
+        return '\\0'
+      default:
+        return char
+    }
+  })
+}

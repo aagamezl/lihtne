@@ -76,7 +76,8 @@ export default class ColumnDefinition extends Fluent {
    * @returns {this}
    */
   comment (comment) {
-    // Implementation here
+    this.offsetSet('comment', comment)
+
     return this
   }
 
