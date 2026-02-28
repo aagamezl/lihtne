@@ -1,5 +1,0 @@
-// export * from './ConfigurationUrlParser'
-// export * from './HigherOrderTapProxy'
-export { default as Str } from './Str.js'
-// export { default as Stringable } from './Stringable.js'
-export * from './helpers.js'
