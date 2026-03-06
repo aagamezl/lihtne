@@ -1,0 +1,36 @@
+{
+  "name": "lihtne",
+  "version": "1.0.0",
+  "description": "Relational Database ORM",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "NODE_ENV=test NODE_OPTIONS=--experimental-vm-modules jest --coverage --runInBand",
+    "test:watch": "npm run test -- --watch"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aagamezl/kiirus-orm.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/aagamezl/kiirus-orm/issues"
+  },
+  "homepage": "https://github.com/aagamezl/kiirus-orm#readme",
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^25.3.2",
+    "jest": "^30.2.0",
+    "ts-jest": "^29.4.6",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@jest/globals": "^30.2.0"
+  }
+}
