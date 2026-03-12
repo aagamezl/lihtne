@@ -4,7 +4,7 @@ export default {
   testEnvironment: 'node',
   testPathIgnorePatterns: ['/build/', '/dist/', '/node_modules/'],
   // testRegex: ['spec\\.[jt]s$'],
-  testMatch: ['**/tests/**/*.spec.ts'],
+  testMatch: ['**/test/**/*.spec.ts'],
   extensionsToTreatAsEsm: ['.ts'],
   globals: {
     'ts-jest': {
