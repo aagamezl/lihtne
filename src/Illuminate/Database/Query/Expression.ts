@@ -19,7 +19,7 @@ export class Expression implements ExpressionContract {
    * @param  {Grammar}  grammar
    * @return {string | number}
    */
-  getValue(_: Grammar): string | number {
+  getValue(grammar: Grammar): string | number {
     return this.value;
   }
 }

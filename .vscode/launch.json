@@ -28,32 +28,30 @@
         "<node_internals>/**"
       ]
     },
+    // {
+    //   "type": "node",
+    //   "request": "launch",
+    //   "name": "Launch TypeScript Program",
+    //   "skipFiles": [
+    //     "<node_internals>/**"
+    //   ],
+    //   "program": "${file}",
+    //   "preLaunchTask": "tsc: build - tsconfig.json",
+    //   "outFiles": [
+    //     "${file}"
+    //   ]
+    // }
     {
       "type": "node",
       "request": "launch",
       "name": "Launch TypeScript Program",
-      "skipFiles": [
-        "<node_internals>/**"
-      ],
-      "program": "${workspaceFolder}/lib/index.js",
-      "preLaunchTask": "tsc: build - tsconfig.json",
-      "outFiles": [
-        "${file}"
-      ]
-    },
-    {
-      "type": "node",
-      "request": "launch",
-      "name": "Debug AVA test file",
-      "program": "${workspaceFolder}/node_modules/ava/entrypoints/cli.mjs",
-      "args": [
-        "${file}"
-      ],
-      "outputCapture": "std",
-      // "console": "integratedTerminal", // optional
-      "skipFiles": [
-        "<node_internals>/**/*.js"
-      ]
+      "runtimeExecutable": "tsx",
+      "preLaunchTask": "tsc: build - tsconfig.development.json",
+      "sourceMaps": true,
+      "smartStep": true,
+      "program": "${file}",
+      "console": "integratedTerminal",
+
     }
   ]
 }

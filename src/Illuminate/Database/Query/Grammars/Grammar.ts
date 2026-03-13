@@ -1,6 +1,14 @@
-import { capitalize } from 'es-toolkit';
+import { isNull, upperFirst } from 'es-toolkit';
+
 import { Grammar as BaseGrammar } from '../../Grammar';
-import { Builder } from '../Builder';
+import { type Agregate, Builder } from '../Builder';
+import { isEmpty } from '../../../Support/helpers';
+import { Expression } from '../Expression';
+
+export type SelectComponent = {
+  name: string;
+  property: keyof Builder;
+}
 
 export class Grammar extends BaseGrammar {
     // use CompilesJsonPaths;
@@ -20,20 +28,34 @@ export class Grammar extends BaseGrammar {
     // protected $bitwiseOperators = [];
 
     // The components that make up a select clause.
-    protected selectComponents: Array<keyof Builder> = [
-      'aggregate',
-      'columns',
-      'from',
-      'indexHint',
-      'joins',
-      'wheres',
-      'groups',
-      'havings',
-      'orders',
-      'limitProperty',
-      'offset',
-      'lock',
-    ];
+    // protected selectComponents: Array<keyof Builder> = [
+    //   'aggregateProperty',
+    //   'columns',
+    //   'fromProperty',
+    //   'indexHint',
+    //   'joins',
+    //   'wheres',
+    //   'groups',
+    //   'havings',
+    //   'orders',
+    //   'limitProperty',
+    //   'offsetProperty',
+    //   'lock',
+    // ];
+    selectComponents: SelectComponent[] = [
+      { name: 'aggregate', property: 'aggregateProperty' },
+      { name: 'columns', property: 'columns' },
+      { name: 'from', property: 'fromProperty' },
+      { name: 'indexHint', property: 'indexHint' },
+      { name: 'joins', property: 'joins' },
+      { name: 'wheres', property: 'wheres' },
+      { name: 'groups', property: 'groups' },
+      { name: 'havings', property: 'havings' },
+      { name: 'orders', property: 'orders' },
+      { name: 'limit', property: 'limitProperty' },
+      { name: 'offset', property: 'offsetProperty' },
+      { name: 'lock', property: 'lockProperty' }
+    ]
 
     /**
      * Compile a select query into SQL.
@@ -42,7 +64,7 @@ export class Grammar extends BaseGrammar {
      * @return string
      */
     public compileSelect(query: Builder): string {
-        if ((query.unions || query.havings) && query.aggregate) {
+        if ((query.unions || query.havings) && query.aggregateProperty) {
             return this.compileUnionAggregate(query);
         }
 
@@ -69,9 +91,9 @@ export class Grammar extends BaseGrammar {
         // To compile the query, we'll spin through each component of the query and
         // see if that component exists. If it does we'll just call the compiler
         // function for the component which is responsible for making the SQL.
-        const sql = trim(this.concatenate(
+        let sql = this.concatenate(
             this.compileComponents(query)
-        ));
+        ).trim();
 
         if (query.unions) {
             sql = this.wrapUnion(sql) + ' ' + this.compileUnions(query);
@@ -86,21 +108,36 @@ export class Grammar extends BaseGrammar {
      * Compile the components necessary for a select clause.
      *
      * @param  \Illuminate\Database\Query\Builder  $query
-     * @return array
+     * @return {Record<string, any>}
      */
-    protected compileComponents(query: Builder){
+    protected compileComponents(query: Builder): Record<string, any> {
       const sql: Record<string, any> = {};
 
-      for (const component of this.selectComponents) {
-          if (query[component]) {
+      // for (const component of this.selectComponents) {
+      for (const { name, property } of this.selectComponents) {
+        if (this.isExecutable(query, property)) {
             // TODO: fix the following 2 types
-              const method: keyof this = 'compile' + capitalize(component) as keyof this;
+            const method: keyof this = 'compile' + upperFirst(name) as keyof this;
 
-              sql[component] = (this[method] as any)(query, query[component]);
+            sql[name] = (this[method] as any)(query, query[property]);
           }
       }
 
       return sql;
+    }
+
+    protected isExecutable(query: Builder, property: keyof Builder) {
+      const subject = query[property]
+
+      if (subject === undefined || subject === null || subject === '') {
+        return false
+      }
+
+      if (Array.isArray(subject) && subject.length === 0) {
+        return false
+      }
+
+      return true
     }
 
     /**
@@ -110,57 +147,51 @@ export class Grammar extends BaseGrammar {
      * @param  array{function: string, columns: array<\Illuminate\Contracts\Database\Query\Expression|string>}  $aggregate
      * @return string
      */
-    protected compileAggregate(query: Builder, aggregate: { function: string; columns: (Expression | string)[] }): string {
-        const column = this.columnize(aggregate['columns']);
+    protected compileAggregate(query: Builder, aggregate: Agregate): string {
+      let column = this.columnize(aggregate['columns']);
 
-        // If the query has a "distinct" constraint and we're not asking for all columns
-        // we need to prepend "distinct" onto the column name so that the query takes
-        // it into account when it performs the aggregating operations on the data.
-        if (Array.isArray(query.distinct)) {
-            column = 'distinct ' + this.columnize(query.distinct);
-        } else if (query.distinct && column !== '*') {
-            column = 'distinct ' + column;
-        }
+      // If the query has a "distinct" constraint and we're not asking for all columns
+      // we need to prepend "distinct" onto the column name so that the query takes
+      // it into account when it performs the aggregating operations on the data.
+      if (Array.isArray(query.distinctProperty)) {
+          column = 'distinct ' + this.columnize(query.distinctProperty);
+      } else if (query.distinctProperty && column !== '*') {
+          column = 'distinct ' + column;
+      }
 
-        return 'select ' + aggregate['function'] + '(' + column + ') as aggregate';
+      return 'select ' + aggregate['function'] + '(' + column + ') as aggregate';
     }
 
-    // /**
-    //  * Compile the "select *" portion of the query.
-    //  *
-    //  * @param  \Illuminate\Database\Query\Builder  $query
-    //  * @param  array  $columns
-    //  * @return string|null
-    //  */
-    // protected function compileColumns(Builder $query, $columns)
-    // {
-    //     // If the query is actually performing an aggregating select, we will let that
-    //     // compiler handle the building of the select clauses, as it will need some
-    //     // more syntax that is best handled by that function to keep things neat.
-    //     if (! is_null($query->aggregate)) {
-    //         return;
-    //     }
+    /**
+     * Compile the "select *" portion of the query.
+     *
+     * @param  \Illuminate\Database\Query\Builder  $query
+     * @param  array  $columns
+     * @return string|null
+     */
+    protected compileColumns(query: Builder, columns: string[]): string | null {
+        // If the query is actually performing an aggregating select, we will let that
+        // compiler handle the building of the select clauses, as it will need some
+        // more syntax that is best handled by that function to keep things neat.
+        if (!isNull(query.aggregateProperty)) {
+            return null;
+        }
 
-    //     if ($query->distinct) {
-    //         $select = 'select distinct ';
-    //     } else {
-    //         $select = 'select ';
-    //     }
+        const select = query.distinctProperty ? 'select distinct ' : 'select ';
 
-    //     return $select.$this->columnize($columns);
-    // }
+        return select + this.columnize(columns);
+    }
 
-    // /**
-    //  * Compile the "from" portion of the query.
-    //  *
-    //  * @param  \Illuminate\Database\Query\Builder  $query
-    //  * @param  string  $table
-    //  * @return string
-    //  */
-    // protected function compileFrom(Builder $query, $table)
-    // {
-    //     return 'from '.$this->wrapTable($table);
-    // }
+    /**
+     * Compile the "from" portion of the query.
+     *
+     * @param  \Illuminate\Database\Query\Builder  $query
+     * @param  string  $table
+     * @return string
+     */
+    protected compileFrom(query: Builder, table: string): string {
+        return 'from ' + this.wrapTable(table);
+    }
 
     // /**
     //  * Compile the "join" portions of the query.
@@ -245,11 +276,11 @@ export class Grammar extends BaseGrammar {
     //  * @param  array  $sql
     //  * @return string
     //  */
-    // protected function concatenateWhereClauses($query, $sql)
+    // protected concatenateWhereClauses(query: Builder, sql: string[]): string
     // {
-    //     $conjunction = $query instanceof JoinClause ? 'on' : 'where';
+    //     const conjunction = query instanceof JoinClause ? 'on' : 'where';
 
-    //     return $conjunction.' '.$this->removeLeadingBoolean(implode(' ', $sql));
+    //     return conjunction + ' ' + this.removeLeadingBoolean(implode(' ', sql));
     // }
 
     // /**
@@ -957,202 +988,195 @@ export class Grammar extends BaseGrammar {
     //     return '('.substr($this->compileHavings($having['query']), 7).')';
     // }
 
-    // /**
-    //  * Compile the "order by" portions of the query.
-    //  *
-    //  * @param  \Illuminate\Database\Query\Builder  $query
-    //  * @param  array  $orders
-    //  * @return string
-    //  */
-    // protected function compileOrders(Builder $query, $orders)
-    // {
-    //     if (! empty($orders)) {
-    //         return 'order by '.implode(', ', $this->compileOrdersToArray($query, $orders));
-    //     }
+    /**
+     * Compile the "order by" portions of the query.
+     *
+     * @param  \Illuminate\Database\Query\Builder  $query
+     * @param  array  $orders
+     * @return string
+     */
+    protected compileOrders(query: Builder, orders: any[]) {
+        if (! isEmpty(orders)) {
+            return 'order by '+this.compileOrdersToArray(query, orders).join(', ');
+        }
 
-    //     return '';
-    // }
+        return '';
+    }
 
-    // /**
-    //  * Compile the query orders to an array.
-    //  *
-    //  * @param  \Illuminate\Database\Query\Builder  $query
-    //  * @param  array  $orders
-    //  * @return array
-    //  */
-    // protected function compileOrdersToArray(Builder $query, $orders)
-    // {
-    //     return array_map(function ($order) use ($query) {
-    //         if (isset($order['sql']) && $order['sql'] instanceof Expression) {
-    //             return $order['sql']->getValue($query->getGrammar());
-    //         }
+    /**
+     * Compile the query orders to an array.
+     *
+     * @param  \Illuminate\Database\Query\Builder  $query
+     * @param  array  $orders
+     * @return array
+     */
+    protected compileOrdersToArray(query: Builder, orders: any[]) {
+      return orders.map((order) => {
+        if (order['sql'] && order['sql'] instanceof Expression) {
+            return order['sql'].getValue(query.getGrammar());
+        }
 
-    //         return $order['sql'] ?? $this->wrap($order['column']).' '.$order['direction'];
-    //     }, $orders);
-    // }
+        return order['sql'] ?? this.wrap(order['column']) + ' ' + order['direction'];
+      }, orders);
+    }
 
-    // /**
-    //  * Compile the random statement into SQL.
-    //  *
-    //  * @param  string|int  $seed
-    //  * @return string
-    //  */
-    // public function compileRandom($seed)
-    // {
-    //     return 'RANDOM()';
-    // }
+    /**
+     * Compile the random statement into SQL.
+     *
+     * @param  string|int  $seed
+     * @return string
+     */
+    public compileRandom(seed: string | number) {
+        return 'RANDOM()';
+    }
 
-    // /**
-    //  * Compile the "limit" portions of the query.
-    //  *
-    //  * @param  \Illuminate\Database\Query\Builder  $query
-    //  * @param  int  $limit
-    //  * @return string
-    //  */
-    // protected function compileLimit(Builder $query, $limit)
-    // {
-    //     return 'limit '.(int) $limit;
-    // }
+    /**
+     * Compile the "limit" portions of the query.
+     *
+     * @param  \Illuminate\Database\Query\Builder  $query
+     * @param  int  $limit
+     * @return string
+     */
+    protected compileLimit(query: Builder, limit: number) {
+        return 'limit ' + parseInt(String(limit), 10);
+    }
 
-    // /**
-    //  * Compile a group limit clause.
-    //  *
-    //  * @param  \Illuminate\Database\Query\Builder  $query
-    //  * @return string
-    //  */
-    // protected function compileGroupLimit(Builder $query)
-    // {
-    //     $selectBindings = array_merge($query->getRawBindings()['select'], $query->getRawBindings()['order']);
+    /**
+     * Compile a group limit clause.
+     *
+     * @param  \Illuminate\Database\Query\Builder  $query
+     * @return string
+     */
+    protected compileGroupLimit(query: Builder) {
+        const selectBindings = {
+          ...query.getRawBindings()['select'],
+          ...query.getRawBindings()['order']
+        };
 
-    //     $query->setBindings($selectBindings, 'select');
-    //     $query->setBindings([], 'order');
+        query.setBindings(selectBindings, 'select');
+        query.setBindings({}, 'order');
 
-    //     $limit = (int) $query->groupLimit['value'];
-    //     $offset = $query->offset;
+        let limit = parseInt(query.groupLimit!['value'], 10);
+        const offset = query.offsetProperty;
 
-    //     if (isset($offset)) {
-    //         $offset = (int) $offset;
-    //         $limit += $offset;
+        if (offset !== undefined) {
+            const offsetInt = parseInt(String(offset), 10);
+            limit += offsetInt;
 
-    //         $query->offset = null;
-    //     }
+            query.offsetProperty = null;
+        }
 
-    //     $components = $this->compileComponents($query);
+        const components = this.compileComponents(query);
 
-    //     $components['columns'] .= $this->compileRowNumber(
-    //         $query->groupLimit['column'],
-    //         $components['orders'] ?? ''
-    //     );
+        components['columns'] += this.compileRowNumber(
+            query.groupLimit!['column'],
+            components['orders'] ?? ''
+        );
 
-    //     unset($components['orders']);
+        delete components['orders'];
 
-    //     $table = $this->wrap('laravel_table');
-    //     $row = $this->wrap('laravel_row');
+        const table = this.wrap('laravel_table');
+        const row = this.wrap('laravel_row');
 
-    //     $sql = $this->concatenate($components);
+        let sql = this.concatenate(components);
 
-    //     $sql = 'select * from ('.$sql.') as '.$table.' where '.$row.' <= '.$limit;
+        sql = 'select * from (' + sql + ') as ' + table + ' where ' + row + ' <= ' + limit;
 
-    //     if (isset($offset)) {
-    //         $sql .= ' and '.$row.' > '.$offset;
-    //     }
+        if (offset !== undefined) {
+          sql += ' and ' + row + ' > ' + offset;
+        }
 
-    //     return $sql.' order by '.$row;
-    // }
+        return sql + ' order by ' + row;
+    }
 
-    // /**
-    //  * Compile a row number clause.
-    //  *
-    //  * @param  string  $partition
-    //  * @param  string  $orders
-    //  * @return string
-    //  */
-    // protected function compileRowNumber($partition, $orders)
-    // {
-    //     $over = trim('partition by '.$this->wrap($partition).' '.$orders);
+    /**
+     * Compile a row number clause.
+     *
+     * @param  string  partition
+     * @param  string  orders
+     * @return string
+     */
+    protected compileRowNumber(partition: string, orders: string): string
+    {
+        const over = ('partition by ' + this.wrap(partition) + ' ' + orders).trim();
 
-    //     return ', row_number() over ('.$over.') as '.$this->wrap('laravel_row');
-    // }
+        return ', row_number() over (' + over + ') as ' + this.wrap('laravel_row');
+    }
 
-    // /**
-    //  * Compile the "offset" portions of the query.
-    //  *
-    //  * @param  \Illuminate\Database\Query\Builder  $query
-    //  * @param  int  $offset
-    //  * @return string
-    //  */
-    // protected function compileOffset(Builder $query, $offset)
-    // {
-    //     return 'offset '.(int) $offset;
-    // }
+    /**
+     * Compile the "offset" portions of the query.
+     *
+     * @param  \Illuminate\Database\Query\Builder  $query
+     * @param  int  $offset
+     * @return string
+     */
+    protected compileOffset(query: Builder, offset: number) {
+        return 'offset ' + parseInt(String(offset), 10);
+    }
 
-    // /**
-    //  * Compile the "union" queries attached to the main query.
-    //  *
-    //  * @param  \Illuminate\Database\Query\Builder  $query
-    //  * @return string
-    //  */
-    // protected function compileUnions(Builder $query)
-    // {
-    //     $sql = '';
+    /**
+     * Compile the "union" queries attached to the main query.
+     *
+     * @param  \Illuminate\Database\Query\Builder  $query
+     * @return string
+     */
+    protected compileUnions(query: Builder) {
+        let sql = '';
 
-    //     foreach ($query->unions as $union) {
-    //         $sql .= $this->compileUnion($union);
-    //     }
+        for (const union of query.unions!) {
+            sql += this.compileUnion(union);
+        }
 
-    //     if (! empty($query->unionOrders)) {
-    //         $sql .= ' '.$this->compileOrders($query, $query->unionOrders);
-    //     }
+        if (! isEmpty(query.unionOrders)) {
+            sql += ' ' + this.compileOrders(query, query.unionOrders!);
+        }
 
-    //     if (isset($query->unionLimit)) {
-    //         $sql .= ' '.$this->compileLimit($query, $query->unionLimit);
-    //     }
+        if (query.unionLimit !== undefined) {
+            sql += ' ' + this.compileLimit(query, query.unionLimit!);
+        }
 
-    //     if (isset($query->unionOffset)) {
-    //         $sql .= ' '.$this->compileOffset($query, $query->unionOffset);
-    //     }
+        if (query.unionOffset !== undefined) {
+            sql += ' ' + this.compileOffset(query, query.unionOffset!);
+        }
 
-    //     return ltrim($sql);
-    // }
+        return sql.trimStart();
+    }
 
-    // /**
-    //  * Compile a single union statement.
-    //  *
-    //  * @param  array  $union
-    //  * @return string
-    //  */
-    // protected function compileUnion(array $union)
-    // {
-    //     $conjunction = $union['all'] ? ' union all ' : ' union ';
+    /**
+     * Compile a single union statement.
+     *
+     * @param  array  $union
+     * @return string
+     */
+    protected compileUnion(union: any) {
+        const conjunction = union['all'] ? ' union all ' : ' union ';
 
-    //     return $conjunction.$this->wrapUnion($union['query']->toSql());
-    // }
+        return conjunction + this.wrapUnion(union['query'].toSql());
+    }
 
-    // /**
-    //  * Wrap a union subquery in parentheses.
-    //  *
-    //  * @param  string  $sql
-    //  * @return string
-    //  */
-    // protected function wrapUnion($sql)
-    // {
-    //     return '('.$sql.')';
-    // }
+    /**
+     * Wrap a union subquery in parentheses.
+     *
+     * @param  string  $sql
+     * @return string
+     */
+    protected wrapUnion(sql: string) {
+        return '(' + sql + ')';
+    }
 
-    // /**
-    //  * Compile a union aggregate query into SQL.
-    //  *
-    //  * @param  \Illuminate\Database\Query\Builder  $query
-    //  * @return string
-    //  */
-    // protected function compileUnionAggregate(Builder $query)
-    // {
-    //     $sql = $this->compileAggregate($query, $query->aggregate);
+    /**
+     * Compile a union aggregate query into SQL.
+     *
+     * @param  \Illuminate\Database\Query\Builder  $query
+     * @return string
+     */
+    protected compileUnionAggregate( query: Builder) {
+        const sql = this.compileAggregate(query, query.aggregateProperty!);
 
-    //     $query->aggregate = null;
+        query.aggregateProperty = null;
 
-    //     return $sql.' from ('.$this->compileSelect($query).') as '.$this->wrapTable('temp_table');
-    // }
+        return sql + ' from (' + this.compileSelect(query) + ') as ' + this.wrapTable('temp_table');
+    }
 
     // /**
     //  * Compile an exists statement into SQL.
@@ -1511,29 +1535,25 @@ export class Grammar extends BaseGrammar {
     //     return $value;
     // }
 
-    // /**
-    //  * Concatenate an array of segments, removing empties.
-    //  *
-    //  * @param  array  $segments
-    //  * @return string
-    //  */
-    // protected function concatenate($segments)
-    // {
-    //     return implode(' ', array_filter($segments, function ($value) {
-    //         return (string) $value !== '';
-    //     }));
-    // }
+    /**
+     * Concatenate an array of segments, removing empties.
+     *
+     * @param  Record<string, any>  segments
+     * @return string
+     */
+    protected concatenate(segments: Record<string, any>): string {
+      return Object.values(segments).filter((value) => value !== '').join(' ');
+    }
 
-    // /**
-    //  * Remove the leading boolean from a statement.
-    //  *
-    //  * @param  string  $value
-    //  * @return string
-    //  */
-    // protected function removeLeadingBoolean($value)
-    // {
-    //     return preg_replace('/and |or /i', '', $value, 1);
-    // }
+    /**
+     * Remove the leading boolean from a statement.
+     *
+     * @param  string  $value
+     * @return string
+     */
+    protected removeLeadingBoolean(value: string): string {
+      return value.replace(/and |or /i, '');
+    }
 
     // /**
     //  * Substitute the given bindings into the given raw SQL query.

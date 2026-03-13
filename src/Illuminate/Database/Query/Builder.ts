@@ -18,6 +18,8 @@ export type Bindings = {
   unionOrder: unknown[];
 }
 
+export type Agregate = { function: string; columns: Array<Expression | string> };
+
 export class Builder {
   //   /**
   //  * The database connection instance.
@@ -68,7 +70,7 @@ export class Builder {
   }
 
   // An aggregate function and column to be run.
-  public aggregate: { function: string; columns: (Expression | string)[] } | null = null;
+  public aggregateProperty: Agregate | null = null;
 
   /**
    * The columns that should be returned.
@@ -139,47 +141,47 @@ export class Builder {
   /**
    * The maximum number of records to return per group.
    *
-   * @var array|null
+   * @var Record<string, any> | null
    */
-  public groupLimit: any[] | null = null;
+  public groupLimit: Record<string, any> | null = null;
 
   /**
    * The number of records to skip.
    *
    * @var int|null
    */
-  public offset: number | null = null;
+  public offsetProperty: number | null = null;
 
   // The query union statements.
   public unions: any[] | null = null;
 
-  // /**
-  //  * The maximum number of union records to return.
-  //  *
-  //  * @var int|null
-  //  */
-  // public $unionLimit;
+  /**
+   * The maximum number of union records to return.
+   *
+   * @var int|null
+   */
+  public unionLimit: number | null = null;
 
-  // /**
-  //  * The number of union records to skip.
-  //  *
-  //  * @var int|null
-  //  */
-  // public $unionOffset;
+  /**
+   * The number of union records to skip.
+   *
+   * @var int|null
+   */
+  public unionOffset: number | null = null;
 
-  // /**
-  //  * The orderings for the union query.
-  //  *
-  //  * @var array|null
-  //  */
-  // public $unionOrders;
+  /**
+   * The orderings for the union query.
+   *
+   * @var array|null
+   */
+  public unionOrders: any[] | null = null;
 
   /**
    * Indicates whether row locking is being used.
    *
    * @var string|bool|null
    */
-  public lock: string | boolean | null = null;
+  public lockProperty: string | boolean | null = null;
 
   // /**
   //  * The query execution timeout in seconds.
@@ -232,13 +234,13 @@ export class Builder {
    * Create a new query builder instance.
    */
   public constructor(
-      public connection: Connection,
-      public grammar: Grammar,
-      public processor: Processor,
+    public connection: Connection,
+    public grammar: Grammar,
+    public processor: Processor,
   ) {
-      this.connection = connection;
-      this.grammar = grammar ?? connection.getQueryGrammar();
-      this.processor = processor ?? connection.getPostProcessor();
+    this.connection = connection;
+    this.grammar = grammar ?? connection.getQueryGrammar();
+    this.processor = processor ?? connection.getPostProcessor();
   }
 
   /**
@@ -274,11 +276,11 @@ export class Builder {
    * @throws \InvalidArgumentException
    */
   public selectSub(query: any | string, as: string) {
-      const [subQuery, bindings] = this.createSub(query);
+    const [subQuery, bindings] = this.createSub(query);
 
-      return this.selectRaw(
-          '(' + subQuery + ') as ' + this.grammar.wrap(as), bindings
-      );
+    return this.selectRaw(
+      '(' + subQuery + ') as ' + this.grammar.wrap(as), bindings
+    );
   }
 
   // /**
@@ -295,22 +297,21 @@ export class Builder {
   //     );
   // }
 
-  // /**
-  //  * Add a new "raw" select expression to the query.
-  //  *
-  //  * @param  string  $expression
-  //  * @return $this
-  //  */
-  // public function selectRaw($expression, array $bindings = [])
-  // {
-  //     $this->addSelect(new Expression($expression));
+  /**
+   * Add a new "raw" select expression to the query.
+   *
+   * @param  string  $expression
+   * @return $this
+   */
+  public selectRaw(expression: string, bindings: any[] = []): this {
+    this.addSelect(new Expression(expression));
 
-  //     if ($bindings) {
-  //         $this->addBinding($bindings, 'select');
-  //     }
+    if (bindings.length > 0) {
+      this.addBinding(bindings, 'select');
+    }
 
-  //     return $this;
-  // }
+    return this;
+  }
 
   /**
    * Makes "from" fetch from a subquery.
@@ -324,7 +325,7 @@ export class Builder {
   public fromSub(query: Function | Builder | EloquentBuilder | string, as: string) {
     const [subQuery, bindings] = this.createSub(query);
 
-    return this.fromRaw('('+subQuery+') as '+this.grammar.wrapTable(as!), bindings);
+    return this.fromRaw('(' + subQuery + ') as ' + this.grammar.wrapTable(as!), bindings);
   }
 
   /**
@@ -395,7 +396,7 @@ export class Builder {
     ) {
       const databaseName = query.getConnection().getDatabaseName();
 
-      if (! query.from.startsWith(databaseName) && ! query.from.includes('.')) {
+      if (!query.from.startsWith(databaseName) && !query.from.includes('.')) {
         query.from = databaseName + '.' + query.from;
       }
     }
@@ -403,34 +404,33 @@ export class Builder {
     return query;
   }
 
-  // /**
-  //  * Add a new select column to the query.
-  //  *
-  //  * @param  mixed  $column
-  //  * @return $this
-  //  */
-  // public function addSelect($column)
-  // {
-  //     $columns = is_array($column) ? $column : func_get_args();
+  /**
+   * Add a new select column to the query.
+   *
+   * @param  mixed  $column
+   * @return $this
+   */
+  public addSelect(column: any | string[]): this {
+    const columns = Array.isArray(column) ? column : [column];
 
-  //     foreach ($columns as $as => $column) {
-  //         if (is_string($as) && $this->isQueryable($column)) {
-  //             if (is_null($this->columns)) {
-  //                 $this->select($this->from.'.*');
-  //             }
+    for (const [as, column] of Object.entries(columns)) {
+      if (typeof as === 'string' && this.isQueryable(column)) {
+        if (this.columns === null) {
+          this.select(this.fromProperty + '.*');
+        }
 
-  //             $this->selectSub($column, $as);
-  //         } else {
-  //             if (is_array($this->columns) && in_array($column, $this->columns, true)) {
-  //                 continue;
-  //             }
+        this.selectSub(column, as);
+      } else {
+        if (Array.isArray(this.columns) && this.columns.includes(column)) {
+          continue;
+        }
 
-  //             $this->columns[] = $column;
-  //         }
-  //     }
+        this.columns!.push(column);
+      }
+    }
 
-  //     return $this;
-  // }
+    return this;
+  }
 
   // /**
   //  * Add a vector-similarity selection to the query.
@@ -4369,7 +4369,7 @@ export class Builder {
    * @return \Illuminate\Database\Query\Builder
    */
   public newQuery() {
-      return new Builder(this.connection, this.grammar, this.processor);
+    return new Builder(this.connection, this.grammar, this.processor);
   }
 
   /**
@@ -4378,7 +4378,7 @@ export class Builder {
    * @return \Illuminate\Database\Query\Builder
    */
   protected forSubQuery() {
-      return this.newQuery();
+    return this.newQuery();
   }
 
   // /**
@@ -4465,30 +4465,28 @@ export class Builder {
   //  *      unionOrder: list<mixed>,
   //  * }
   //  */
-  // public function getRawBindings()
-  // {
-  //     return $this->bindings;
-  // }
+  public getRawBindings() {
+    return this.bindings;
+  }
 
-  // /**
-  //  * Set the bindings on the query builder.
-  //  *
-  //  * @param  list<mixed>  $bindings
-  //  * @param  "select"|"from"|"join"|"where"|"groupBy"|"having"|"order"|"union"|"unionOrder"  $type
-  //  * @return $this
-  //  *
-  //  * @throws \InvalidArgumentException
-  //  */
-  // public function setBindings(array $bindings, $type = 'where')
-  // {
-  //     if (! array_key_exists($type, $this->bindings)) {
-  //         throw new InvalidArgumentException("Invalid binding type: {$type}.");
-  //     }
+  /**
+   * Set the bindings on the query builder.
+   *
+   * @param  list<mixed>  $bindings
+   * @param  "select"|"from"|"join"|"where"|"groupBy"|"having"|"order"|"union"|"unionOrder"  $type
+   * @return $this
+   *
+   * @throws \InvalidArgumentException
+   */
+  public setBindings(bindings: Record<string, any>, type: keyof Bindings = 'where') {
+      if (! Object.keys(this.bindings).includes(type)) {
+          throw new Error("InvalidArgumentException: Invalid binding type: " + type);
+      }
 
-  //     $this->bindings[$type] = $bindings;
+      this.bindings[type].push(bindings);
 
-  //     return $this;
-  // }
+      return this;
+  }
 
   /**
    * Add a binding to the query.
@@ -4499,30 +4497,29 @@ export class Builder {
    *
    * @throws \InvalidArgumentException
    */
-  public addBinding(value: any, type: string = 'where') {
-    if (! (type in this.bindings)) {
+  public addBinding(value: any, type: keyof Bindings = 'where') {
+    if (!(type in this.bindings)) {
       throw new Error(`Invalid binding type: ${type}.`);
     }
 
     if (Array.isArray(value)) {
-        this.bindings[type] = value.map((v) => this.castBinding(v));
+      this.bindings[type] = value.map((v) => this.castBinding(v));
     } else {
-        this.bindings[type].push(this.castBinding(value));
+      this.bindings[type].push(this.castBinding(value));
     }
 
     return this;
   }
 
-  // /**
-  //  * Cast the given binding value.
-  //  *
-  //  * @param  mixed  $value
-  //  * @return mixed
-  //  */
-  // public function castBinding($value)
-  // {
-  //     return enum_value($value);
-  // }
+  /**
+   * Cast the given binding value.
+   *
+   * @param  mixed  $value
+   * @return mixed
+   */
+  public castBinding(value: any) {
+    return value;
+  }
 
   // /**
   //  * Merge an array of bindings into our bindings.
@@ -4596,25 +4593,23 @@ export class Builder {
   //     }
   // }
 
-  // /**
-  //  * Get the database query processor instance.
-  //  *
-  //  * @return \Illuminate\Database\Query\Processors\Processor
-  //  */
-  // public function getProcessor()
-  // {
-  //     return $this->processor;
-  // }
+  /**
+   * Get the database query processor instance.
+   *
+   * @return \Illuminate\Database\Query\Processors\Processor
+   */
+  public getProcessor() {
+    return this.processor;
+  }
 
-  // /**
-  //  * Get the query grammar instance.
-  //  *
-  //  * @return \Illuminate\Database\Query\Grammars\Grammar
-  //  */
-  // public function getGrammar()
-  // {
-  //     return $this->grammar;
-  // }
+  /**
+   * Get the query grammar instance.
+   *
+   * @return \Illuminate\Database\Query\Grammars\Grammar
+   */
+  public getGrammar() {
+    return this.grammar;
+  }
 
   // /**
   //  * Use the "write" PDO connection when executing the query.
@@ -4636,9 +4631,9 @@ export class Builder {
    */
   protected isQueryable(value: any): boolean {
     return value instanceof Builder ||
-           value instanceof EloquentBuilder ||
-           value instanceof Relation ||
-           value instanceof Function;
+      value instanceof EloquentBuilder ||
+      value instanceof Relation ||
+      value instanceof Function;
   }
 
   // /**
