@@ -5,6 +5,8 @@ import { Relation } from "../Eloquent/Relations";
 import { Connection } from "../Connection";
 import { Expression } from "./Expression";
 import { IndexHint } from "./IndexHint";
+import { Collection } from "../../Collections";
+import { Arr } from "../../Collections/Arr";
 
 export type Bindings = {
   select: unknown[];
@@ -21,26 +23,26 @@ export type Bindings = {
 export type Agregate = { function: string; columns: Array<Expression | string> };
 
 export class Builder {
-  //   /**
-  //  * The database connection instance.
-  //  *
-  //  * @var \Illuminate\Database\ConnectionInterface
-  //  */
-  // public $connection;
+  /**
+ * The database connection instance.
+ *
+ * @var \Illuminate\Database\ConnectionInterface
+ */
+  public connection: Connection;
 
-  // /**
-  //  * The database query grammar instance.
-  //  *
-  //  * @var \Illuminate\Database\Query\Grammars\Grammar
-  //  */
-  // public $grammar;
+  /**
+   * The database query grammar instance.
+   *
+   * @var \Illuminate\Database\Query\Grammars\Grammar
+   */
+  public grammar: Grammar;
 
-  // /**
-  //  * The database query post processor instance.
-  //  *
-  //  * @var \Illuminate\Database\Query\Processors\Processor
-  //  */
-  // public $processor;
+  /**
+   * The database query post processor instance.
+   *
+   * @var \Illuminate\Database\Query\Processors\Processor
+   */
+  public processor: Processor;
 
   // /**
   //  * The current query value bindings.
@@ -77,7 +79,7 @@ export class Builder {
    *
    * @var array<string|\Illuminate\Contracts\Database\Query\Expression>|null
    */
-  public columns: string[] | null = null
+  public columns: Array<string | Expression> | null = null
 
   /**
    * Indicates if the query returns distinct results.
@@ -143,7 +145,7 @@ export class Builder {
    *
    * @var Record<string, any> | null
    */
-  public groupLimit: Record<string, any> | null = null;
+  public groupLimitProperty: Record<string, any> | null = null;
 
   /**
    * The number of records to skip.
@@ -234,9 +236,9 @@ export class Builder {
    * Create a new query builder instance.
    */
   public constructor(
-    public connection: Connection,
-    public grammar: Grammar,
-    public processor: Processor,
+    connection: Connection,
+    grammar: Grammar,
+    processor: Processor,
   ) {
     this.connection = connection;
     this.grammar = grammar ?? connection.getQueryGrammar();
@@ -249,7 +251,10 @@ export class Builder {
    * @param  mixed  $columns
    * @return $this
    */
-  public select(columns: string | string[] = ['*']) {
+  // public select(columns: string | string[] = ['*']) {
+  public select(...columns: string[]) {
+    columns = columns.length === 0 ? ['*'] : columns;
+
     this.columns = [];
     this.bindings['select'] = [];
 
@@ -3397,60 +3402,57 @@ export class Builder {
   //     return array_first($result);
   // }
 
-  // /**
-  //  * Execute the query as a "select" statement.
-  //  *
-  //  * @param  string|\Illuminate\Contracts\Database\Query\Expression|array<string|\Illuminate\Contracts\Database\Query\Expression>  $columns
-  //  * @return \Illuminate\Support\Collection<int, \stdClass>
-  //  */
-  // public function get($columns = ['*'])
-  // {
-  //     $items = new Collection($this->onceWithColumns(Arr::wrap($columns), function () {
-  //         return $this->processor->processSelect($this, $this->runSelect());
-  //     }));
+  /**
+    * Execute the query as a "select" statement.
+    *
+    * @param  string|\Illuminate\Contracts\Database\Query\Expression|array<string|\Illuminate\Contracts\Database\Query\Expression>  $columns
+    * @return \Illuminate\Support\Collection<int, \stdClass>
+    */
+  public get(columns: string | Expression[] | string[] = ['*']) {
+    const items = new Collection(this.onceWithColumns(Arr.wrap(columns), function () {
+      return this.processor.processSelect(this, this.runSelect());
+    }));
 
-  //     return $this->applyAfterQueryCallbacks(
-  //         isset($this->groupLimit) ? $this->withoutGroupLimitKeys($items) : $items
-  //     );
-  // }
+    return this.applyAfterQueryCallbacks(
+      isset(this.groupLimitProperty) ? this.withoutGroupLimitKeys(items) : items
+    );
+  }
 
-  // /**
-  //  * Run the query as a "select" statement against the connection.
-  //  *
-  //  * @return array
-  //  */
-  // protected function runSelect()
-  // {
-  //     return $this->connection->select(
-  //         $this->toSql(), $this->getBindings(), ! $this->useWritePdo
-  //     );
-  // }
+  /**
+   * Run the query as a "select" statement against the connection.
+   *
+   * @return array
+   */
+  protected runSelect() {
+    return this.connection.select(
+      this.toSql(), this.getBindings()
+    );
+  }
 
-  // /**
-  //  * Remove the group limit keys from the results in the collection.
-  //  *
-  //  * @param  \Illuminate\Support\Collection  $items
-  //  * @return \Illuminate\Support\Collection
-  //  */
-  // protected function withoutGroupLimitKeys($items)
-  // {
-  //     $keysToRemove = ['laravel_row'];
+  /**
+   * Remove the group limit keys from the results in the collection.
+   *
+   * @param  \Illuminate\Support\Collection  $items
+   * @return \Illuminate\Support\Collection
+   */
+  protected withoutGroupLimitKeys(items: Collection) {
+    const keysToRemove: string[] = [];
 
-  //     if (is_string($this->groupLimit['column'])) {
-  //         $column = last(explode('.', $this->groupLimit['column']));
+    if (typeof this.groupLimitProperty!['column'] === 'string') {
+      const column = this.groupLimitProperty!['column'].split('.').pop()!;
 
-  //         $keysToRemove[] = '@laravel_group := '.$this->grammar->wrap($column);
-  //         $keysToRemove[] = '@laravel_group := '.$this->grammar->wrap('pivot_'.$column);
-  //     }
+      keysToRemove.push('@laravel_group := ' + this.grammar.wrap(column));
+      keysToRemove.push('@laravel_group := ' + this.grammar.wrap('pivot_' + column));
+    }
 
-  //     $items->each(function ($item) use ($keysToRemove) {
-  //         foreach ($keysToRemove as $key) {
-  //             unset($item->$key);
-  //         }
-  //     });
+    items.each((item: any) => {
+      keysToRemove.forEach((key: string) => {
+        delete item[key];
+      });
+    });
 
-  //     return $items;
-  // }
+    return items;
+  }
 
   // /**
   //  * Paginate the given query into a simple paginator.
@@ -3977,31 +3979,30 @@ export class Builder {
   //     return $this;
   // }
 
-  // /**
-  //  * Execute the given callback while selecting the given columns.
-  //  *
-  //  * After running the callback, the columns are reset to the original value.
-  //  *
-  //  * @template TResult
-  //  *
-  //  * @param  array<string|\Illuminate\Contracts\Database\Query\Expression>  $columns
-  //  * @param  callable(): TResult  $callback
-  //  * @return TResult
-  //  */
-  // protected function onceWithColumns($columns, $callback)
-  // {
-  //     $original = $this->columns;
+  /**
+   * Execute the given callback while selecting the given columns.
+   *
+   * After running the callback, the columns are reset to the original value.
+   *
+   * @template TResult
+   *
+   * @param  array<string|\Illuminate\Contracts\Database\Query\Expression>  $columns
+   * @param  callable(): TResult  $callback
+   * @return TResult
+   */
+  protected onceWithColumns<TResult>(columns: Array<string | Expression>, callback: () => TResult): TResult {
+    const original = this.columns;
 
-  //     if (is_null($original)) {
-  //         $this->columns = $columns;
-  //     }
+    if (!original) {
+      this.columns = columns;
+    }
 
-  //     $result = $callback();
+    const result = callback();
 
-  //     $this->columns = $original;
+    this.columns = original;
 
-  //     return $result;
-  // }
+    return result;
+  }
 
   // /**
   //  * Insert new records into the database.
@@ -4440,15 +4441,14 @@ export class Builder {
   //     return ! is_null($value) ? (int) $value : null;
   // }
 
-  // /**
-  //  * Get the current query value bindings in a flattened array.
-  //  *
-  //  * @return list<mixed>
-  //  */
-  // public function getBindings()
-  // {
-  //     return Arr::flatten($this->bindings);
-  // }
+  /**
+   * Get the current query value bindings in a flattened array.
+   *
+   * @return list<mixed>
+   */
+  public getBindings() {
+    return Arr.flatten(this.bindings);
+  }
 
   // /**
   //  * Get the raw array of bindings.
@@ -4479,13 +4479,13 @@ export class Builder {
    * @throws \InvalidArgumentException
    */
   public setBindings(bindings: Record<string, any>, type: keyof Bindings = 'where') {
-      if (! Object.keys(this.bindings).includes(type)) {
-          throw new Error("InvalidArgumentException: Invalid binding type: " + type);
-      }
+    if (!Object.keys(this.bindings).includes(type)) {
+      throw new Error("InvalidArgumentException: Invalid binding type: " + type);
+    }
 
-      this.bindings[type].push(bindings);
+    this.bindings[type].push(bindings);
 
-      return this;
+    return this;
   }
 
   /**

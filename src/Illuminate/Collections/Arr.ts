@@ -7,6 +7,7 @@ import {
 
 import { toArray } from 'es-toolkit/compat'
 import { findKey, isEmpty, isNumeric, value } from "../Support";
+import { Collection } from "./Collection";
 
 export type MapCallback = (value: any, index: number, array?: unknown[] | undefined) => unknown;
 
@@ -347,35 +348,35 @@ export class Arr {
   //     return array_slice($array, 0, $limit);
   // }
 
-  // /**
-  //  * Flatten a multi-dimensional array into a single level.
-  //  *
-  //  * @param  iterable  $array
-  //  * @param  int  $depth
-  //  * @return array
-  //  */
-  // public static function flatten($array, $depth = INF)
-  // {
-  //     $result = [];
+  /**
+   * Flatten a multi-dimensional array into a single level.
+   *
+   * @param  iterable  $array
+   * @param  int  $depth
+   * @return array
+   */
+  public static flatten(array: any, depth = Number.POSITIVE_INFINITY): any[] {
+    const result = []
+    const entries = array instanceof Map ? array.entries() : Object.entries(array)
 
-  //     foreach ($array as $item) {
-  //         $item = $item instanceof Collection ? $item->all() : $item;
+    for (let [, item] of entries) {
+      item = item instanceof Collection ? item.all() : item
 
-  //         if (! is_array($item)) {
-  //             $result[] = $item;
-  //         } else {
-  //             $values = $depth === 1
-  //                 ? array_values($item)
-  //                 : static::flatten($item, $depth - 1);
+      if (!Array.isArray(item) && !isPlainObject(item)) {
+        result.push(item)
+      } else {
+        const values = depth === 1
+          ? Object.values(item)
+          : this.flatten(item, depth - 1)
 
-  //             foreach ($values as $value) {
-  //                 $result[] = $value;
-  //             }
-  //         }
-  //     }
+        for (const value of values) {
+          result.push(value)
+        }
+      }
+    }
 
-  //     return $result;
-  // }
+    return result
+  }
 
   // /**
   //  * Get a float item from an array using "dot" notation.

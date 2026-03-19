@@ -51,7 +51,30 @@
       "smartStep": true,
       "program": "${file}",
       "console": "integratedTerminal",
-
-    }
+    },
+    // Source - https://stackoverflow.com/a/72872275
+    // Posted by Alberto S.
+    // Retrieved 2026-03-13, License - CC BY-SA 4.0
+    {
+      "name": "Jest file",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "${workspaceRoot}/node_modules/.bin/jest",
+      "args": [
+        "${fileBasenameNoExtension}",
+        "--runInBand",
+        "--watch",
+        "--coverage=false",
+        "--no-cache"
+      ],
+      "program": "${file}",
+      "cwd": "${workspaceRoot}",
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "sourceMaps": true,
+      "windows": {
+        "program": "${workspaceFolder}/node_modules/jest/bin/jest"
+      }
+    },
   ]
 }

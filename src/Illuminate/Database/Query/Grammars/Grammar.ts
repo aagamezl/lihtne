@@ -71,7 +71,7 @@ export class Grammar extends BaseGrammar {
         // If a "group limit" is in place, we will need to compile the SQL to use a
         // different syntax. This primarily supports limits on eager loads using
         // Eloquent. We'll also set the columns if they have not been defined.
-        if (query.groupLimit) {
+        if (query.groupLimitProperty) {
             if (query.columns === null) {
                 query.columns = ['*'];
             }
@@ -1056,7 +1056,7 @@ export class Grammar extends BaseGrammar {
         query.setBindings(selectBindings, 'select');
         query.setBindings({}, 'order');
 
-        let limit = parseInt(query.groupLimit!['value'], 10);
+        let limit = parseInt(query.groupLimitProperty!['value'], 10);
         const offset = query.offsetProperty;
 
         if (offset !== undefined) {
@@ -1069,7 +1069,7 @@ export class Grammar extends BaseGrammar {
         const components = this.compileComponents(query);
 
         components['columns'] += this.compileRowNumber(
-            query.groupLimit!['column'],
+            query.groupLimitProperty!['column'],
             components['orders'] ?? ''
         );
 
