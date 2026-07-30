@@ -21,7 +21,7 @@ export abstract class Grammar {
   //  * @param  array<\Illuminate\Contracts\Database\Query\Expression|string>  $values
   //  * @return array<string>
   //  */
-  // public function wrapArray(array $values)
+  // public wrapArray(array $values)
   // {
   //     return array_map($this->wrap(...), $values);
   // }
@@ -185,7 +185,7 @@ export abstract class Grammar {
   //  * @param  array<mixed>  $values
   //  * @return string
   //  */
-  // public function parameterize(array $values)
+  // public parameterize(array $values)
   // {
   //     return implode(', ', array_map($this->parameter(...), $values));
   // }
@@ -196,7 +196,7 @@ export abstract class Grammar {
   //  * @param  mixed  $value
   //  * @return string
   //  */
-  // public function parameter($value)
+  // public parameter($value)
   // {
   //     return $this->isExpression($value) ? $this->getValue($value) : '?';
   // }
@@ -207,7 +207,7 @@ export abstract class Grammar {
   //  * @param  string|array<string>  $value
   //  * @return string
   //  */
-  // public function quoteString($value)
+  // public quoteString($value)
   // {
   //     if (is_array($value)) {
   //         return implode(', ', array_map([$this, __FUNCTION__], $value));
@@ -223,7 +223,7 @@ export abstract class Grammar {
   //  * @param  bool  $binary
   //  * @return string
   //  */
-  // public function escape($value, $binary = false)
+  // public escape($value, $binary = false)
   // {
   //     return $this->connection->escape($value, $binary);
   // }
@@ -252,15 +252,14 @@ export abstract class Grammar {
     return expression;
   }
 
-  // /**
-  //  * Get the format for database stored dates.
-  //  *
-  //  * @return string
-  //  */
-  // public function getDateFormat()
-  // {
-  //     return 'Y-m-d H:i:s';
-  // }
+  /**
+   * Get the format for database stored dates.
+   *
+   * @return string
+   */
+  public getDateFormat(): string {
+    return 'Y-m-d H:i:s';
+  }
 
   // /**
   //  * Get the grammar's table prefix.
@@ -269,7 +268,7 @@ export abstract class Grammar {
   //  *
   //  * @return string
   //  */
-  // public function getTablePrefix()
+  // public getTablePrefix()
   // {
   //     return $this->connection->getTablePrefix();
   // }
@@ -282,7 +281,7 @@ export abstract class Grammar {
   //  * @param  string  $prefix
   //  * @return $this
   //  */
-  // public function setTablePrefix($prefix)
+  // public setTablePrefix($prefix)
   // {
   //     $this->connection->setTablePrefix($prefix);
 

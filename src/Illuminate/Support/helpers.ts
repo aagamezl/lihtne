@@ -44,3 +44,30 @@ export const iterableValues = <TValue>(value: Record<string, TValue> | TValue[])
 export const value = (value: any, ...args: any[]) => {
   return value instanceof Function ? value(...args) : value;
 };
+
+/**
+ *
+ * @param {string} type
+ * @param {string} [message]
+ * @throws {RuntimeException}
+ */
+export const CustomException = (type: string, message?: string): Error => {
+  switch (type) {
+    case 'abstract':
+      return new Error('RuntimeException: Cannot create an instance of an abstract class.');
+
+    case 'concrete-method':
+      return new Error(`RuntimeException: Implement ${message} method on concrete class.`);
+
+    default:
+      return new Error('RuntimeException: Cannot create an instance of an abstract class.');
+  }
+}
+
+export type Entries<T> = {
+  [K in keyof T]: [K, T[K]];
+}[keyof T][];
+
+export const typedEntries = <T extends object>(obj: T): Entries<T> => {
+  return Object.entries(obj) as Entries<T>;
+}

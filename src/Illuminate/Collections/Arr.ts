@@ -5,7 +5,7 @@ import {
   isPlainObject
 } from "es-toolkit";
 
-import { toArray } from 'es-toolkit/compat'
+import { get, toArray } from 'es-toolkit/compat'
 import { findKey, isEmpty, isNumeric, value } from "../Support";
 import { Collection } from "./Collection";
 
@@ -18,7 +18,7 @@ export class Arr {
   //  * @param  mixed  $value
   //  * @return bool
   //  */
-  // public static function accessible($value)
+  // public static accessible($value)
   // {
   //     return is_array($value) || $value instanceof ArrayAccess;
   // }
@@ -41,7 +41,7 @@ export class Arr {
   //  *     )
   //  * )
   //  */
-  // public static function arrayable($value)
+  // public static arrayable($value)
   // {
   //     return is_array($value)
   //         || $value instanceof Arrayable
@@ -58,7 +58,7 @@ export class Arr {
   //  * @param  mixed  $value
   //  * @return array
   //  */
-  // public static function add($array, $key, $value)
+  // public static add($array, $key, $value)
   // {
   //     if (is_null(static::get($array, $key))) {
   //         static::set($array, $key, $value);
@@ -72,7 +72,7 @@ export class Arr {
   //  *
   //  * @throws \InvalidArgumentException
   //  */
-  // public static function array(ArrayAccess|array $array, string|int|null $key, ?array $default = null): array
+  // public static array(ArrayAccess|array $array, string|int|null $key, ?array $default = null): array
   // {
   //     $value = Arr::get($array, $key, $default);
 
@@ -90,7 +90,7 @@ export class Arr {
   //  *
   //  * @throws \InvalidArgumentException
   //  */
-  // public static function boolean(ArrayAccess|array $array, string|int|null $key, ?bool $default = null): bool
+  // public static boolean(ArrayAccess|array $array, string|int|null $key, ?bool $default = null): bool
   // {
   //     $value = Arr::get($array, $key, $default);
 
@@ -109,7 +109,7 @@ export class Arr {
   //  * @param  iterable  $array
   //  * @return array
   //  */
-  // public static function collapse($array)
+  // public static collapse($array)
   // {
   //     $results = [];
 
@@ -132,7 +132,7 @@ export class Arr {
   //  * @param  iterable<TValue>  ...$arrays
   //  * @return array<int, array<array-key, TValue>>
   //  */
-  // public static function crossJoin(...$arrays)
+  // public static crossJoin(...$arrays)
   // {
   //     $results = [[]];
 
@@ -162,7 +162,7 @@ export class Arr {
   //  * @param  array<TKey, TValue>  $array
   //  * @return array{TKey[], TValue[]}
   //  */
-  // public static function divide($array)
+  // public static divide($array)
   // {
   //     return [array_keys($array), array_values($array)];
   // }
@@ -175,11 +175,11 @@ export class Arr {
   //  * @param  int  $depth
   //  * @return array
   //  */
-  // public static function dot($array, $prepend = '', $depth = INF)
+  // public static dot($array, $prepend = '', $depth = INF)
   // {
   //     $results = [];
 
-  //     $flatten = function ($data, $prefix, $currentDepth) use (&$results, &$flatten, $depth): void {
+  //     $flatten = ($data, $prefix, $currentDepth) use (&$results, &$flatten, $depth): void {
   //         foreach ($data as $key => $value) {
   //             $newKey = $prefix.$key;
 
@@ -205,7 +205,7 @@ export class Arr {
   //  * @param  iterable  $array
   //  * @return array
   //  */
-  // public static function undot($array)
+  // public static undot($array)
   // {
   //     $results = [];
 
@@ -223,7 +223,7 @@ export class Arr {
   //  * @param  array|string|int|float  $keys
   //  * @return array
   //  */
-  // public static function except($array, $keys)
+  // public static except($array, $keys)
   // {
   //     static::forget($array, $keys);
 
@@ -238,11 +238,11 @@ export class Arr {
   //  * @param  bool  $strict
   //  * @return array
   //  */
-  // public static function exceptValues($array, $values, $strict = false)
+  // public static exceptValues($array, $values, $strict = false)
   // {
   //     $values = (array) $values;
 
-  //     return array_filter($array, function ($value) use ($values, $strict) {
+  //     return array_filter($array, ($value) use ($values, $strict) {
   //         return ! in_array($value, $values, $strict);
   //     });
   // }
@@ -254,7 +254,7 @@ export class Arr {
   //  * @param  string|int|float  $key
   //  * @return bool
   //  */
-  // public static function exists($array, $key)
+  // public static exists($array, $key)
   // {
   //     if ($array instanceof Enumerable) {
   //         return $array->has($key);
@@ -323,7 +323,7 @@ export class Arr {
   //  * @param  TLastDefault|(\Closure(): TLastDefault)  $default
   //  * @return TValue|TLastDefault
   //  */
-  // public static function last($array, ?callable $callback = null, $default = null)
+  // public static last($array, ?callable $callback = null, $default = null)
   // {
   //     if (is_null($callback)) {
   //         return empty($array) ? value($default) : array_last($array);
@@ -339,7 +339,7 @@ export class Arr {
   //  * @param  int  $limit
   //  * @return array
   //  */
-  // public static function take($array, $limit)
+  // public static take($array, $limit)
   // {
   //     if ($limit < 0) {
   //         return array_slice($array, $limit, abs($limit));
@@ -383,7 +383,7 @@ export class Arr {
   //  *
   //  * @throws \InvalidArgumentException
   //  */
-  // public static function float(ArrayAccess|array $array, string|int|null $key, ?float $default = null): float
+  // public static float(ArrayAccess|array $array, string|int|null $key, ?float $default = null): float
   // {
   //     $value = Arr::get($array, $key, $default);
 
@@ -403,7 +403,7 @@ export class Arr {
   //  * @param  array|string|int|float  $keys
   //  * @return void
   //  */
-  // public static function forget(&$array, $keys)
+  // public static forget(&$array, $keys)
   // {
   //     $original = &$array;
 
@@ -471,42 +471,37 @@ export class Arr {
     throw new Error("Items cannot be represented by a scalar value.")
   }
 
-  // /**
-  //  * Get an item from an array using "dot" notation.
-  //  *
-  //  * @param  \ArrayAccess|array  $array
-  //  * @param  string|int|null  $key
-  //  * @param  mixed  $default
-  //  * @return mixed
-  //  */
-  // public static function get($array, $key, $default = null)
-  // {
-  //     if (! static::accessible($array)) {
-  //         return value($default);
-  //     }
+  /**
+   * Get an item from an array using "dot" notation.
+   *
+   * @param  \ArrayAccess|array  $array
+   * @param  string|int|null  $key
+   * @param  mixed  $default
+   * @return mixed
+   */
+  /**
+   * Get an item from an array using "dot" notation.
+   *
+   * @param  {Record<string, any>}  array
+   * @param  {string|number|undefined}  key
+   * @param  {any}  defaultValue
+   * @return {unknown}
+   */
+  static get(
+    array: Record<string, unknown>,
+    key?: string | number,
+    defaultValue?: unknown
+  ) {
+    if (key === undefined) {
+      return array
+    }
 
-  //     if (is_null($key)) {
-  //         return $array;
-  //     }
+    if (Object.values(array).includes(key)) {
+      return array[key]
+    }
 
-  //     if (static::exists($array, $key)) {
-  //         return $array[$key];
-  //     }
-
-  //     if (! str_contains($key, '.')) {
-  //         return value($default);
-  //     }
-
-  //     foreach (explode('.', $key) as $segment) {
-  //         if (static::accessible($array) && static::exists($array, $segment)) {
-  //             $array = $array[$segment];
-  //         } else {
-  //             return value($default);
-  //         }
-  //     }
-
-  //     return $array;
-  // }
+    return get(array, key, defaultValue);
+  }
 
   // /**
   //  * Check if an item or items exist in an array using "dot" notation.
@@ -515,7 +510,7 @@ export class Arr {
   //  * @param  string|array  $keys
   //  * @return bool
   //  */
-  // public static function has($array, $keys)
+  // public static has($array, $keys)
   // {
   //     $keys = (array) $keys;
 
@@ -549,7 +544,7 @@ export class Arr {
   //  * @param  string|array  $keys
   //  * @return bool
   //  */
-  // public static function hasAll($array, $keys)
+  // public static hasAll($array, $keys)
   // {
   //     $keys = (array) $keys;
 
@@ -573,7 +568,7 @@ export class Arr {
   //  * @param  string|array  $keys
   //  * @return bool
   //  */
-  // public static function hasAny($array, $keys)
+  // public static hasAny($array, $keys)
   // {
   //     if (is_null($keys)) {
   //         return false;
@@ -605,7 +600,7 @@ export class Arr {
   //  * @param  (callable(mixed, array-key): bool)  $callback
   //  * @return bool
   //  */
-  // public static function every($array, callable $callback)
+  // public static every($array, callable $callback)
   // {
   //     return array_all($array, $callback);
   // }
@@ -617,7 +612,7 @@ export class Arr {
   //  * @param  (callable(mixed, array-key): bool)  $callback
   //  * @return bool
   //  */
-  // public static function some($array, callable $callback)
+  // public static some($array, callable $callback)
   // {
   //     return array_any($array, $callback);
   // }
@@ -627,7 +622,7 @@ export class Arr {
   //  *
   //  * @throws \InvalidArgumentException
   //  */
-  // public static function integer(ArrayAccess|array $array, string|int|null $key, ?int $default = null): int
+  // public static integer(ArrayAccess|array $array, string|int|null $key, ?int $default = null): int
   // {
   //     $value = Arr::get($array, $key, $default);
 
@@ -648,7 +643,7 @@ export class Arr {
   //  * @param  array  $array
   //  * @return ($array is list ? false : true)
   //  */
-  // public static function isAssoc(array $array)
+  // public static isAssoc(array $array)
   // {
   //     return ! array_is_list($array);
   // }
@@ -661,7 +656,7 @@ export class Arr {
   //  * @param  array  $array
   //  * @return ($array is list ? true : false)
   //  */
-  // public static function isList($array)
+  // public static isList($array)
   // {
   //     return array_is_list($array);
   // }
@@ -674,7 +669,7 @@ export class Arr {
   //  * @param  string  $finalGlue
   //  * @return string
   //  */
-  // public static function join($array, $glue, $finalGlue = '')
+  // public static join($array, $glue, $finalGlue = '')
   // {
   //     if ($finalGlue === '') {
   //         return implode($glue, $array);
@@ -700,7 +695,7 @@ export class Arr {
   //  * @param  callable|array|string  $keyBy
   //  * @return array
   //  */
-  // public static function keyBy($array, $keyBy)
+  // public static keyBy($array, $keyBy)
   // {
   //     return (new Collection($array))->keyBy($keyBy)->all();
   // }
@@ -712,7 +707,7 @@ export class Arr {
   //  * @param  string  $prependWith
   //  * @return array
   //  */
-  // public static function prependKeysWith($array, $prependWith)
+  // public static prependKeysWith($array, $prependWith)
   // {
   //     return static::mapWithKeys($array, fn ($item, $key) => [$prependWith.$key => $item]);
   // }
@@ -724,7 +719,7 @@ export class Arr {
   //  * @param  array|string  $keys
   //  * @return array
   //  */
-  // public static function only($array, $keys)
+  // public static only($array, $keys)
   // {
   //     return array_intersect_key($array, array_flip((array) $keys));
   // }
@@ -737,11 +732,11 @@ export class Arr {
   //  * @param  bool  $strict
   //  * @return array
   //  */
-  // public static function onlyValues($array, $values, $strict = false)
+  // public static onlyValues($array, $values, $strict = false)
   // {
   //     $values = (array) $values;
 
-  //     return array_filter($array, function ($value) use ($values, $strict) {
+  //     return array_filter($array, ($value) use ($values, $strict) {
   //         return in_array($value, $values, $strict);
   //     });
   // }
@@ -753,11 +748,11 @@ export class Arr {
   //  * @param  array|string  $keys
   //  * @return array
   //  */
-  // public static function select($array, $keys)
+  // public static select($array, $keys)
   // {
   //     $keys = static::wrap($keys);
 
-  //     return static::map($array, function ($item) use ($keys) {
+  //     return static::map($array, ($item) use ($keys) {
   //         $result = [];
 
   //         foreach ($keys as $key) {
@@ -780,7 +775,7 @@ export class Arr {
   //  * @param  string|array|Closure|null  $key
   //  * @return array
   //  */
-  // public static function pluck($array, $value, $key = null)
+  // public static pluck($array, $value, $key = null)
   // {
   //     $results = [];
 
@@ -819,7 +814,7 @@ export class Arr {
   //  * @param  string|array|Closure|null  $key
   //  * @return array
   //  */
-  // protected static function explodePluckParameters($value, $key)
+  // protected static explodePluckParameters($value, $key)
   // {
   //     $value = is_string($value) ? explode('.', $value) : $value;
 
@@ -869,7 +864,7 @@ export class Arr {
   //  * @param  callable(TValue, TKey): array<TMapWithKeysKey, TMapWithKeysValue>  $callback
   //  * @return array
   //  */
-  // public static function mapWithKeys(array $array, callable $callback)
+  // public static mapWithKeys(array $array, callable $callback)
   // {
   //     $result = [];
 
@@ -894,9 +889,9 @@ export class Arr {
   //  * @param  callable(mixed...): TValue  $callback
   //  * @return array<TKey, TValue>
   //  */
-  // public static function mapSpread(array $array, callable $callback)
+  // public static mapSpread(array $array, callable $callback)
   // {
-  //     return static::map($array, function ($chunk, $key) use ($callback) {
+  //     return static::map($array, ($chunk, $key) use ($callback) {
   //         $chunk[] = $key;
 
   //         return $callback(...$chunk);
@@ -911,7 +906,7 @@ export class Arr {
   //  * @param  mixed  $key
   //  * @return array
   //  */
-  // public static function prepend($array, $value, $key = null)
+  // public static prepend($array, $value, $key = null)
   // {
   //     if (func_num_args() == 2) {
   //         array_unshift($array, $value);
@@ -930,7 +925,7 @@ export class Arr {
   //  * @param  mixed  $default
   //  * @return mixed
   //  */
-  // public static function pull(&$array, $key, $default = null)
+  // public static pull(&$array, $key, $default = null)
   // {
   //     $value = static::get($array, $key, $default);
 
@@ -945,7 +940,7 @@ export class Arr {
   //  * @param  array  $array
   //  * @return string
   //  */
-  // public static function query($array)
+  // public static query($array)
   // {
   //     return http_build_query($array, '', '&', PHP_QUERY_RFC3986);
   // }
@@ -960,7 +955,7 @@ export class Arr {
   //  *
   //  * @throws \InvalidArgumentException
   //  */
-  // public static function random($array, $number = null, $preserveKeys = false)
+  // public static random($array, $number = null, $preserveKeys = false)
   // {
   //     $requested = is_null($number) ? 1 : $number;
 
@@ -1007,7 +1002,7 @@ export class Arr {
   //  * @param  mixed  $value
   //  * @return array
   //  */
-  // public static function set(&$array, $key, $value)
+  // public static set(&$array, $key, $value)
   // {
   //     if (is_null($key)) {
   //         return $array = $value;
@@ -1045,7 +1040,7 @@ export class Arr {
   //  * @param  mixed  $values
   //  * @return array
   //  */
-  // public static function push(ArrayAccess|array &$array, string|int|null $key, mixed ...$values): array
+  // public static push(ArrayAccess|array &$array, string|int|null $key, mixed ...$values): array
   // {
   //     $target = static::array($array, $key, []);
 
@@ -1060,7 +1055,7 @@ export class Arr {
   //  * @param  array  $array
   //  * @return array
   //  */
-  // public static function shuffle($array)
+  // public static shuffle($array)
   // {
   //     return (new Randomizer)->shuffleArray($array);
   // }
@@ -1074,7 +1069,7 @@ export class Arr {
   //  * @throws \Illuminate\Support\ItemNotFoundException
   //  * @throws \Illuminate\Support\MultipleItemsFoundException
   //  */
-  // public static function sole($array, ?callable $callback = null)
+  // public static sole($array, ?callable $callback = null)
   // {
   //     if ($callback) {
   //         $array = static::where($array, $callback);
@@ -1103,7 +1098,7 @@ export class Arr {
   //  * @param  callable|string|null|array<int, (callable(TValue, TValue): -1|0|1)|array{string, 'asc'|'desc'}>  $callback
   //  * @return array<TKey, TValue>
   //  */
-  // public static function sort($array, $callback = null)
+  // public static sort($array, $callback = null)
   // {
   //     return (new Collection($array))->sortBy($callback)->all();
   // }
@@ -1118,7 +1113,7 @@ export class Arr {
   //  * @param  callable|string|null|array<int, (callable(TValue, TValue): -1|0|1)|array{string, 'asc'|'desc'}>  $callback
   //  * @return array<TKey, TValue>
   //  */
-  // public static function sortDesc($array, $callback = null)
+  // public static sortDesc($array, $callback = null)
   // {
   //     return (new Collection($array))->sortByDesc($callback)->all();
   // }
@@ -1134,7 +1129,7 @@ export class Arr {
   //  * @param  bool  $descending
   //  * @return array<TKey, TValue>
   //  */
-  // public static function sortRecursive($array, $options = SORT_REGULAR, $descending = false)
+  // public static sortRecursive($array, $options = SORT_REGULAR, $descending = false)
   // {
   //     foreach ($array as &$value) {
   //         if (is_array($value)) {
@@ -1165,7 +1160,7 @@ export class Arr {
   //  * @param  int-mask-of<SORT_REGULAR|SORT_NUMERIC|SORT_STRING|SORT_LOCALE_STRING|SORT_NATURAL|SORT_FLAG_CASE>  $options
   //  * @return array<TKey, TValue>
   //  */
-  // public static function sortRecursiveDesc($array, $options = SORT_REGULAR)
+  // public static sortRecursiveDesc($array, $options = SORT_REGULAR)
   // {
   //     return static::sortRecursive($array, $options, true);
   // }
@@ -1175,7 +1170,7 @@ export class Arr {
   //  *
   //  * @throws \InvalidArgumentException
   //  */
-  // public static function string(ArrayAccess|array $array, string|int|null $key, ?string $default = null): string
+  // public static string(ArrayAccess|array $array, string|int|null $key, ?string $default = null): string
   // {
   //     $value = Arr::get($array, $key, $default);
 
@@ -1194,7 +1189,7 @@ export class Arr {
   //  * @param  array<string, bool>|array<int, string|int>|string  $array
   //  * @return ($array is array<string, false> ? '' : ($array is '' ? '' : ($array is array{} ? '' : non-empty-string)))
   //  */
-  // public static function toCssClasses($array)
+  // public static toCssClasses($array)
   // {
   //     $classList = static::wrap($array);
 
@@ -1217,7 +1212,7 @@ export class Arr {
   //  * @param  array<string, bool>|array<int, string|int>|string  $array
   //  * @return ($array is array<string, false> ? '' : ($array is '' ? '' : ($array is array{} ? '' : non-empty-string)))
   //  */
-  // public static function toCssStyles($array)
+  // public static toCssStyles($array)
   // {
   //     $styleList = static::wrap($array);
 
@@ -1244,7 +1239,7 @@ export class Arr {
   //  * @param  callable(TValue, TKey): bool  $callback
   //  * @return array<TKey, TValue>
   //  */
-  // public static function where($array, callable $callback)
+  // public static where($array, callable $callback)
   // {
   //     return array_filter($array, $callback, ARRAY_FILTER_USE_BOTH);
   // }
@@ -1259,7 +1254,7 @@ export class Arr {
   //  * @param  callable(TValue, TKey): bool  $callback
   //  * @return array<TKey, TValue>
   //  */
-  // public static function reject($array, callable $callback)
+  // public static reject($array, callable $callback)
   // {
   //     return static::where($array, fn ($value, $key) => ! $callback($value, $key));
   // }
@@ -1274,7 +1269,7 @@ export class Arr {
   //  * @param  callable(TValue, TKey): bool  $callback
   //  * @return array<int<0, 1>, array<TKey, TValue>>
   //  */
-  // public static function partition($array, callable $callback)
+  // public static partition($array, callable $callback)
   // {
   //     $passed = [];
   //     $failed = [];
@@ -1296,7 +1291,7 @@ export class Arr {
   //  * @param  array  $array
   //  * @return array
   //  */
-  // public static function whereNotNull($array)
+  // public static whereNotNull($array)
   // {
   //     return static::where($array, fn ($value) => ! is_null($value));
   // }

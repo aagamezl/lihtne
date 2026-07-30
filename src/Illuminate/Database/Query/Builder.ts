@@ -8,17 +8,22 @@ import { IndexHint } from "./IndexHint";
 import { Collection } from "../../Collections";
 import { Arr } from "../../Collections/Arr";
 
+type Prettify<T> = {
+  [K in keyof T]: T[K];
+} & {};
+
 export type Bindings = {
-  select: unknown[];
-  from: unknown[];
-  join: unknown[];
-  where: unknown[];
-  groupBy: unknown[];
-  having: unknown[];
-  order: unknown[];
-  union: unknown[];
-  unionOrder: unknown[];
+  select: unknown | unknown[];
+  from: unknown |unknown[];
+  join: unknown |unknown[];
+  where: unknown |unknown[];
+  groupBy: unknown |unknown[];
+  having: unknown |unknown[];
+  order: unknown |unknown[];
+  union: unknown |unknown[];
+  unionOrder: unknown |unknown[];
 }
+
 
 export type Agregate = { function: string; columns: Array<Expression | string> };
 
