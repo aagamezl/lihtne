@@ -9,10 +9,11 @@ import { Arr } from "../Collections/Arr";
 import Driver from "./Drivers/Driver";
 import QueryExecuted from "./Events/QueryExecuted";
 import { dateFormat } from "@devnetic/utils";
+import { StatementResultingChanges } from "node:sqlite";
 
 export type QueryLogEntry = {
   query: string
-  bindings: Record<string, unknown>
+  bindings: unknown[]
   time: number
 }
 
@@ -708,7 +709,7 @@ export class Connection {
   /**
    * Prepare the query bindings for execution.
    *
-   * @param  array  $bindings
+   * @param  array  bindings
    * @return array
    */
   public prepareBindings(bindings: Bindings) {
@@ -738,7 +739,7 @@ export class Connection {
    *
    * @throws \Illuminate\Database\QueryException
    */
-  protected run(
+  protected async run(
     query: string,
     bindings: Bindings,
     callback: Function
@@ -758,8 +759,8 @@ export class Connection {
     // to re-establish connection and re-run the query with a fresh connection.
     try {
       result = this.runQueryCallback(query, bindings, callback);
-    } catch (e: Error) {
-      result = this.handleQueryException(e, query, bindings, callback);
+    } catch (e) {
+      result = this.handleQueryException(e as Error, query, bindings, callback);
     }
 
     // Once we have run the query we will calculate the time that it took to run and
@@ -782,7 +783,7 @@ export class Connection {
    *
    * @throws \Illuminate\Database\QueryException
    */
-  protected runQueryCallback(
+  protected async runQueryCallback(
     query: string,
     bindings: Bindings,
     callback: Function
@@ -804,14 +805,13 @@ export class Connection {
         ? 'UniqueConstraintViolationException'
         : 'QueryException';
 
-      throw new Error(exceptionType + (
-        this.getNameWithReadWriteType(),
+      throw new Error(`${exceptionType}: ${JSON.stringify({
+        name: this.getNameWithReadWriteType(),
         query,
-        this.prepareBindings(bindings),
+        bindings: this.prepareBindings(bindings),
         e,
-        this.getConnectionDetails(),
-        this.latestReadWriteTypeUsed(),
-      );
+        connectionDetails: this.getConnectionDetails()
+      })}`);
     }
   }
 
@@ -833,7 +833,7 @@ export class Connection {
    * @param  float|null  time
    * @return void
    */
-  public logQuery(query: string, bindings: Bindings, time: number) {
+  public logQuery(query: string, bindings: unknown[], time: number) {
     this.totalQueryDurationProperty += time ?? 0.0;
 
     this.event(new QueryExecuted(query, bindings, time, this));
@@ -1358,36 +1358,30 @@ export class Connection {
     return Arr.get(this.config, option)
   }
 
-  // /**
-  //  * Get the basic connection information as an array for debugging.
-  //  *
-  //  * @return array
-  //  */
-  // protected getConnectionDetails()
-  // {
-  //     $config = $this->latestReadWriteTypeUsed() === 'read'
-  //         ? $this->readPdoConfig
-  //         : $this->config;
+  /**
+   * Get the basic connection information as an array for debugging.
+   *
+   * @return array
+   */
+  protected getConnectionDetails(): Record<string, unknown> {
+    return {
+      'driver': this.getDriverName(),
+      'name': this.getNameWithReadWriteType(),
+      'host': this.config.host ?? null,
+      'port': this.config.port ?? null,
+      'database': this.config.database ?? null,
+      'unix_socket': this.config.unix_socket ?? null,
+    };
+  }
 
-  //     return [
-  //         'driver' => $this->getDriverName(),
-  //         'name' => $this->getNameWithReadWriteType(),
-  //         'host' => $config['host'] ?? null,
-  //         'port' => $config['port'] ?? null,
-  //         'database' => $config['database'] ?? null,
-  //         'unix_socket' => $config['unix_socket'] ?? null,
-  //     ];
-  // }
-
-  // /**
-  //  * Get the PDO driver name.
-  //  *
-  //  * @return string
-  //  */
-  // public getDriverName()
-  // {
-  //     return $this->getConfig('driver');
-  // }
+  /**
+   * Get the PDO driver name.
+   *
+   * @return string
+   */
+  public getDriverName() {
+    return this.getConfig('driver');
+  }
 
   // /**
   //  * Get a human-readable name for the given connection driver.

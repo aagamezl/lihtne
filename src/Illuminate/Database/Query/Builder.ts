@@ -7,21 +7,22 @@ import { Expression } from "./Expression";
 import { IndexHint } from "./IndexHint";
 import { Collection } from "../../Collections";
 import { Arr } from "../../Collections/Arr";
+import { isSet } from "../../Support";
 
 type Prettify<T> = {
   [K in keyof T]: T[K];
 } & {};
 
 export type Bindings = {
-  select: unknown | unknown[];
-  from: unknown |unknown[];
-  join: unknown |unknown[];
-  where: unknown |unknown[];
-  groupBy: unknown |unknown[];
-  having: unknown |unknown[];
-  order: unknown |unknown[];
-  union: unknown |unknown[];
-  unionOrder: unknown |unknown[];
+  select: unknown[];
+  from: unknown[];
+  join: unknown[];
+  where: unknown[];
+  groupBy: unknown[];
+  having: unknown[];
+  order: unknown[];
+  union: unknown[];
+  unionOrder: unknown[];
 }
 
 
@@ -84,7 +85,8 @@ export class Builder {
    *
    * @var array<string|\Illuminate\Contracts\Database\Query\Expression>|null
    */
-  public columns: Array<string | Expression> | null = null
+  // public columns: Array<string | Expression> | null = null
+  public columns: Array<string | Expression> = [];
 
   /**
    * Indicates if the query returns distinct results.
@@ -200,12 +202,12 @@ export class Builder {
   // The callbacks that should be invoked before the query is executed.
   public beforeQueryCallbacks: Array<(query: Builder) => void> = [];
 
-  // /**
-  //  * The callbacks that should be invoked after retrieving data from the database.
-  //  *
-  //  * @var array
-  //  */
-  // protected $afterQueryCallbacks = [];
+  /**
+   * The callbacks that should be invoked after retrieving data from the database.
+   *
+   * @var array
+   */
+  protected afterQueryCallbacks: Function[] = [];
 
   // /**
   //  * All of the available clause operators.
@@ -3291,20 +3293,19 @@ export class Builder {
   //     return $this;
   // }
 
-  // /**
-  //  * Invoke the "after query" modification callbacks.
-  //  *
-  //  * @param  mixed  $result
-  //  * @return mixed
-  //  */
-  // public function applyAfterQueryCallbacks($result)
-  // {
-  //     foreach ($this->afterQueryCallbacks as $afterQueryCallback) {
-  //         $result = $afterQueryCallback($result) ?: $result;
-  //     }
+  /**
+   * Invoke the "after query" modification callbacks.
+   *
+   * @param  mixed  result
+   * @return mixed
+   */
+  public applyAfterQueryCallbacks(result: unknown) {
+    for (const afterQueryCallback of this.afterQueryCallbacks) {
+      result = afterQueryCallback(result) ?? result;
+    }
 
-  //     return $result;
-  // }
+    return result;
+  }
 
   /**
    * Get the SQL representation of the query.
@@ -3413,13 +3414,13 @@ export class Builder {
     * @param  string|\Illuminate\Contracts\Database\Query\Expression|array<string|\Illuminate\Contracts\Database\Query\Expression>  $columns
     * @return \Illuminate\Support\Collection<int, \stdClass>
     */
-  public get(columns: string | Expression[] | string[] = ['*']) {
-    const items = new Collection(this.onceWithColumns(Arr.wrap(columns), function () {
+  public get(columns: string | string[] | Expression[] = ['*']) {
+    const items = new Collection(this.onceWithColumns(Arr.wrap(columns), () => {
       return this.processor.processSelect(this, this.runSelect());
     }));
 
     return this.applyAfterQueryCallbacks(
-      isset(this.groupLimitProperty) ? this.withoutGroupLimitKeys(items) : items
+      isSet(this.groupLimitProperty) ? this.withoutGroupLimitKeys(items) : items
     );
   }
 
@@ -3440,7 +3441,7 @@ export class Builder {
    * @param  \Illuminate\Support\Collection  $items
    * @return \Illuminate\Support\Collection
    */
-  protected withoutGroupLimitKeys(items: Collection) {
+  protected withoutGroupLimitKeys(items: Collection): Collection {
     const keysToRemove: string[] = [];
 
     if (typeof this.groupLimitProperty!['column'] === 'string') {
@@ -3998,7 +3999,7 @@ export class Builder {
   protected onceWithColumns<TResult>(columns: Array<string | Expression>, callback: () => TResult): TResult {
     const original = this.columns;
 
-    if (!original) {
+    if (original.length === 0) {
       this.columns = columns;
     }
 
@@ -4451,8 +4452,8 @@ export class Builder {
    *
    * @return list<mixed>
    */
-  public getBindings() {
-    return Arr.flatten(this.bindings);
+  public getBindings(): unknown[] {
+    return Object.values(this.bindings).flat();
   }
 
   // /**
@@ -4483,7 +4484,7 @@ export class Builder {
    *
    * @throws \InvalidArgumentException
    */
-  public setBindings(bindings: Record<string, any>, type: keyof Bindings = 'where') {
+  public setBindings(bindings: Bindings, type: keyof Bindings = 'where') {
     if (!Object.keys(this.bindings).includes(type)) {
       throw new Error("InvalidArgumentException: Invalid binding type: " + type);
     }

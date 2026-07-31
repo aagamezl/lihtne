@@ -47,7 +47,7 @@ export default class QueryExecuted {
    */
   constructor(
     sql: string,
-    bindings: Bindings,
+    bindings: unknown[],
     time: number = 0,
     connection: Connection
   ) {

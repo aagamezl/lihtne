@@ -72,7 +72,7 @@ export class Grammar extends BaseGrammar {
     // different syntax. This primarily supports limits on eager loads using
     // Eloquent. We'll also set the columns if they have not been defined.
     if (query.groupLimitProperty) {
-      if (query.columns === null) {
+      if (query.columns.length === 0) {
         query.columns = ['*'];
       }
 
@@ -84,7 +84,7 @@ export class Grammar extends BaseGrammar {
     // can build the query and concatenate all the pieces together as one.
     const original = query.columns;
 
-    if (query.columns === null) {
+    if (query.columns.length === 0) {
       query.columns = ['*'];
     }
 

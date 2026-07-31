@@ -12,66 +12,67 @@ describe('Database Query Builder', () => {
   })
 
   test('testBasicSelectWithGetColumns', async () => {
-  const builder = getBuilder()
+    const builder = getBuilder()
 
-  const processor = builder.getProcessor()
-  const connection = builder.getConnection()
+    const processor = builder.getProcessor()
+    const connection = builder.getConnection()
 
-  // processSelect expectation
-  jest
-    .spyOn(processor, 'processSelect')
-    .mockImplementation(() => ({}))
+    // processSelect expectation
+    jest
+      .spyOn(processor, 'processSelect')
+      .mockImplementation(() => ({}))
 
-  // select expectations (sequential)
-  jest.spyOn(connection, 'select')
-    .mockImplementationOnce((sql) => {
-      expect(sql).toBe('select * from "users"')
-      return []
-    })
-    .mockImplementationOnce((sql) => {
-      expect(sql).toBe('select "foo", "bar" from "users"')
-      return []
-    })
-    .mockImplementationOnce((sql) => {
-      expect(sql).toBe('select "baz" from "users"')
-      return []
-    })
+    // select expectations (sequential)
+    jest.spyOn(connection, 'select')
+      .mockImplementationOnce((sql: string) => {
+        expect(sql).toBe('select * from "users"')
 
-  builder.from('users').get()
-  expect(builder.columns).toBeNull()
+        return Promise.resolve([])
+      })
+      .mockImplementationOnce((sql: string) => {
+        expect(sql).toBe('select "foo", "bar" from "users"')
 
-  builder.from('users').get(['foo', 'bar'])
-  expect(builder.columns).toBeNull()
+        return Promise.resolve([])
+      })
+      .mockImplementationOnce((sql: string) => {
+        expect(sql).toBe('select "baz" from "users"')
 
-  builder.from('users').get('baz')
-  expect(builder.columns).toBeNull()
+        return Promise.resolve([])
+      })
 
-  expect(builder.toSql()).toBe('select * from "users"')
-  expect(builder.columns).toBeNull()
+    builder.from('users').get()
+    expect(builder.columns).toEqual([])
 
-  expect(connection.select).toHaveBeenCalledTimes(3)
+    builder.from('users').get(['foo', 'bar'])
+    expect(builder.columns).toEqual([])
+
+    builder.from('users').get('baz')
+    expect(builder.columns).toEqual([])
+
+    expect(builder.toSql()).toBe('select * from "users"')
+    expect(builder.columns).toEqual([])
+
+    expect(connection.select).toHaveBeenCalledTimes(3)
   })
 
-  // builder.getProcessor().shouldReceive('processSelect');
-  // builder.getConnection().shouldReceive('select').once().andReturnUsing((sql: string) => {
-  //   expect(sql).toBe('select * from "users"');
-  // });
-  // builder.getConnection().shouldReceive('select').once().andReturnUsing((sql: string) => {
-  //   expect(sql).toBe('select "foo", "bar" from "users"');
-  // });
-  // builder.getConnection().shouldReceive('select').once().andReturnUsing((sql: string) => {
-  //   expect(sql).toBe('select "baz" from "users"');
-  // });
+  test('testBasicMySqlSelect', async t => {
+    let builder = getMySqlBuilderWithProcessor()
 
-  // builder.from('users').get();
-  // expect(builder.columns).toBeNull();
+    let connectionMock = createMock(builder.getConnection())
 
-  // builder.from('users').get(['foo', 'bar']);
-  // expect(builder.columns).toBeNull();
+    connectionMock.expects('select').once()
+      .withArgs('select * from `users`', [])
 
-  // builder.from('users').get('baz');
-  // expect(builder.columns).toBeNull();
+    await builder.select('*').from('users').get()
 
-  // expect(builder.toSql()).toBe('select * from "users"');
-  // expect(builder.columns).toBeNull();
+    builder = getMySqlBuilderWithProcessor()
+    connectionMock = createMock(builder.getConnection())
+
+    connectionMock.expects('select').once()
+      .withArgs('select * from `users`', [])
+
+    await builder.select('*').from('users').get()
+
+    t.is('select * from `users`', builder.toSql())
+  })
 })

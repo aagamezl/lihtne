@@ -355,7 +355,7 @@ export class Arr {
    * @param  int  $depth
    * @return array
    */
-  public static flatten(array: any, depth = Number.POSITIVE_INFINITY): any[] {
+  public static flatten<T>(array: any, depth = Number.POSITIVE_INFINITY): T[] {
     const result = []
     const entries = array instanceof Map ? array.entries() : Object.entries(array)
 

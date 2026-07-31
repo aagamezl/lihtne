@@ -35,6 +35,10 @@ export const isNumeric = (value: any): boolean => {
   return !Array.isArray(value) && (value - parseFloat(value) + 1) >= 0
 };
 
+export const isSet = (value: any): boolean => {
+  return value !== undefined && value !== null;
+}
+
 export const iterableValues = <TValue>(value: Record<string, TValue> | TValue[]): Iterable<TValue> => {
   return Array.isArray(value)
     ? value
