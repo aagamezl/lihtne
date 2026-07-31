@@ -1,1 +1,1 @@
-export * from "./Database/Eloquent";
+export * from './Database/Eloquent'

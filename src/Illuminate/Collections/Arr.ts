@@ -2,14 +2,18 @@ import {
   // findKey,
   isJSON,
   isNull,
-  isPlainObject
-} from "es-toolkit";
+  isPlainObject,
+} from 'es-toolkit'
 
 import { get, toArray } from 'es-toolkit/compat'
-import { findKey, isEmpty, isNumeric, value } from "../Support";
-import { Collection } from "./Collection";
+import { findKey, isEmpty, isNumeric, value } from '../Support'
+import { Collection } from './Collection'
 
-export type MapCallback = (value: any, index: number, array?: unknown[] | undefined) => unknown;
+export type MapCallback = (
+  value: any,
+  index: number,
+  array?: unknown[] | undefined
+) => unknown
 
 export class Arr {
   // /**
@@ -290,25 +294,25 @@ export class Arr {
   ) {
     if (isNull(callback)) {
       if (isEmpty(array)) {
-        return value(defaultVal);
+        return value(defaultVal)
       }
 
       if (Array.isArray(array)) {
-        return array[0];
+        return array[0]
       }
 
       for (const item of array) {
-        return item;
+        return item
       }
 
-      return value(defaultVal);
+      return value(defaultVal)
     }
 
-    array = this.from(array);
+    array = this.from(array)
 
-    const key = findKey(array, callback);
+    const key = findKey(array, callback)
 
-    return key !== undefined ? (array as any)[key] : value(defaultVal);
+    return key !== undefined ? (array as any)[key] : value(defaultVal)
   }
 
   // /**
@@ -357,7 +361,8 @@ export class Arr {
    */
   public static flatten<T>(array: any, depth = Number.POSITIVE_INFINITY): T[] {
     const result = []
-    const entries = array instanceof Map ? array.entries() : Object.entries(array)
+    const entries =
+      array instanceof Map ? array.entries() : Object.entries(array)
 
     for (let [, item] of entries) {
       item = item instanceof Collection ? item.all() : item
@@ -365,9 +370,8 @@ export class Arr {
       if (!Array.isArray(item) && !isPlainObject(item)) {
         result.push(item)
       } else {
-        const values = depth === 1
-          ? Object.values(item)
-          : this.flatten(item, depth - 1)
+        const values =
+          depth === 1 ? Object.values(item) : this.flatten(item, depth - 1)
 
         for (const value of values) {
           result.push(value)
@@ -453,7 +457,7 @@ export class Arr {
    */
   public static from(items: any) {
     if (Array.isArray(items)) {
-      return items;
+      return items
     }
 
     if (Symbol.iterator in Object(items)) {
@@ -468,7 +472,7 @@ export class Arr {
       return items
     }
 
-    throw new Error("Items cannot be represented by a scalar value.")
+    throw new Error('Items cannot be represented by a scalar value.')
   }
 
   /**
@@ -500,7 +504,7 @@ export class Arr {
       return array[key]
     }
 
-    return get(array, key, defaultValue);
+    return get(array, key, defaultValue)
   }
 
   // /**
@@ -830,14 +834,11 @@ export class Arr {
    * @param  callable  $callback
    * @return array
    */
-  public static map(
-    array: any,
-    callback: MapCallback
-  ) {
+  public static map(array: any, callback: MapCallback) {
     // const keys = toArray(array);
     const keys = Object.keys(array)
 
-    let items;
+    let items
 
     try {
       items = keys.map((key: any) => {
@@ -847,7 +848,9 @@ export class Arr {
       items = Object.values(array).map(callback)
     }
 
-    return Array.isArray(array) ? items : Object.fromEntries(keys.map((key, index) => [key, items[index]]))
+    return Array.isArray(array)
+      ? items
+      : Object.fromEntries(keys.map((key, index) => [key, items[index]]))
   }
 
   // /**
@@ -1307,9 +1310,9 @@ export class Arr {
    */
   public static wrap(value: any) {
     if (isNull(value)) {
-      return [];
+      return []
     }
 
-    return Array.isArray(value) ? value : [value];
+    return Array.isArray(value) ? value : [value]
   }
 }

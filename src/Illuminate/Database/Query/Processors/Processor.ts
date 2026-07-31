@@ -1,4 +1,4 @@
-import { Builder } from "../Builder";
+import { Builder } from '../Builder'
 
 export class Processor {
   /**
@@ -9,7 +9,7 @@ export class Processor {
    * @return array
    */
   public processSelect(query: Builder, results: Record<string, any>) {
-    return results;
+    return results
   }
 
   // /**

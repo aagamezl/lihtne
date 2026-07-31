@@ -1,6 +1,6 @@
 // type Constructor<T = {}> = new (...args: any[]) => T;
 
-import { Constructor } from "../../Support/Traits/use";
+import { Constructor } from '../../Support/Traits/use'
 
 // const Macroable = (superclass: Constructor): Constructor => class extends superclass {
 //   // The registered string macros.
@@ -92,7 +92,9 @@ export const Macroable = <TBase extends Constructor>(Base: TBase) => {
      */
     __call(method: string, parameters: any[]) {
       if ((this.constructor as any).hasMacro(method) === false) {
-        throw new Error(`BadMethodCallException: Method ${this.constructor.name}::${method} does not exist.`)
+        throw new Error(
+          `BadMethodCallException: Method ${this.constructor.name}::${method} does not exist.`
+        )
       }
 
       let macro = (this.constructor as any).macros[method]
@@ -103,5 +105,5 @@ export const Macroable = <TBase extends Constructor>(Base: TBase) => {
 
       return macro(...parameters)
     }
-  };
+  }
 }

@@ -9,12 +9,12 @@ export default class Driver {
   options = {}
 
   /**
- * Creates an instance of Statement.
- * @param {string} dsn
- * @param {Record<string, unknown>} options
- * @memberof Driver
- */
-  constructor (dsn: string, options: Record<string, unknown>) {
+   * Creates an instance of Statement.
+   * @param {string} dsn
+   * @param {Record<string, unknown>} options
+   * @memberof Driver
+   */
+  constructor(dsn: string, options: Record<string, unknown>) {
     this.dsn = dsn
     this.options = options
   }
@@ -25,7 +25,7 @@ export default class Driver {
    * @returns {Statement}
    * @throws {Error}
    */
-  prepare (query: string): Statement {
+  prepare(query: string): Statement {
     throw CustomException('concrete-method', 'prepare')
   }
 }

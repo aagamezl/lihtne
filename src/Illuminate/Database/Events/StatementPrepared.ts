@@ -1,5 +1,5 @@
-import { Connection } from "../Connection";
-import { Statement } from "../Statements";
+import { Connection } from '../Connection'
+import { Statement } from '../Statements'
 
 export class StatementPrepared {
   /**
@@ -8,6 +8,8 @@ export class StatementPrepared {
    * @param  {import('./../Connection').default}  connection
    * @param  {import('./../Statements/Statement.js').default}  statement
    */
-  constructor (protected connection: Connection, protected statement: Statement) {
-  }
+  constructor(
+    protected connection: Connection,
+    protected statement: Statement
+  ) {}
 }

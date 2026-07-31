@@ -1,13 +1,13 @@
-import { isNull, upperFirst } from 'es-toolkit';
+import { isNull, upperFirst } from 'es-toolkit'
 
-import { Grammar as BaseGrammar } from '../../Grammar';
-import { type Agregate, Bindings, Builder } from '../Builder';
-import { isEmpty } from '../../../Support/helpers';
-import { Expression } from '../Expression';
+import { Grammar as BaseGrammar } from '../../Grammar'
+import { type Agregate, Bindings, Builder } from '../Builder'
+import { isEmpty } from '../../../Support/helpers'
+import { Expression } from '../Expression'
 
 export type SelectComponent = {
-  name: string;
-  property: keyof Builder;
+  name: string
+  property: keyof Builder
 }
 
 export class Grammar extends BaseGrammar {
@@ -54,7 +54,7 @@ export class Grammar extends BaseGrammar {
     { name: 'orders', property: 'orders' },
     { name: 'limit', property: 'limitProperty' },
     { name: 'offset', property: 'offsetProperty' },
-    { name: 'lock', property: 'lockProperty' }
+    { name: 'lock', property: 'lockProperty' },
   ]
 
   /**
@@ -65,7 +65,7 @@ export class Grammar extends BaseGrammar {
    */
   public compileSelect(query: Builder): string {
     if ((query.unions || query.havings) && query.aggregateProperty) {
-      return this.compileUnionAggregate(query);
+      return this.compileUnionAggregate(query)
     }
 
     // If a "group limit" is in place, we will need to compile the SQL to use a
@@ -73,35 +73,33 @@ export class Grammar extends BaseGrammar {
     // Eloquent. We'll also set the columns if they have not been defined.
     if (query.groupLimitProperty) {
       if (query.columns.length === 0) {
-        query.columns = ['*'];
+        query.columns = ['*']
       }
 
-      return this.compileGroupLimit(query);
+      return this.compileGroupLimit(query)
     }
 
     // If the query does not have any columns set, we'll set the columns to the
     // * character to just get all of the columns from the database. Then we
     // can build the query and concatenate all the pieces together as one.
-    const original = query.columns;
+    const original = query.columns
 
     if (query.columns.length === 0) {
-      query.columns = ['*'];
+      query.columns = ['*']
     }
 
     // To compile the query, we'll spin through each component of the query and
     // see if that component exists. If it does we'll just call the compiler
     // function for the component which is responsible for making the SQL.
-    let sql = this.concatenate(
-      this.compileComponents(query)
-    ).trim();
+    let sql = this.concatenate(this.compileComponents(query)).trim()
 
     if (query.unions) {
-      sql = this.wrapUnion(sql) + ' ' + this.compileUnions(query);
+      sql = this.wrapUnion(sql) + ' ' + this.compileUnions(query)
     }
 
-    query.columns = original;
+    query.columns = original
 
-    return sql;
+    return sql
   }
 
   /**
@@ -111,19 +109,19 @@ export class Grammar extends BaseGrammar {
    * @return {Record<string, any>}
    */
   protected compileComponents(query: Builder): Record<string, any> {
-    const sql: Record<string, any> = {};
+    const sql: Record<string, any> = {}
 
     // for (const component of this.selectComponents) {
     for (const { name, property } of this.selectComponents) {
       if (this.isExecutable(query, property)) {
         // TODO: fix the following 2 types
-        const method: keyof this = 'compile' + upperFirst(name) as keyof this;
+        const method: keyof this = ('compile' + upperFirst(name)) as keyof this
 
-        sql[name] = (this[method] as any)(query, query[property]);
+        sql[name] = (this[method] as any)(query, query[property])
       }
     }
 
-    return sql;
+    return sql
   }
 
   protected isExecutable(query: Builder, property: keyof Builder) {
@@ -148,18 +146,18 @@ export class Grammar extends BaseGrammar {
    * @return string
    */
   protected compileAggregate(query: Builder, aggregate: Agregate): string {
-    let column = this.columnize(aggregate['columns']);
+    let column = this.columnize(aggregate['columns'])
 
     // If the query has a "distinct" constraint and we're not asking for all columns
     // we need to prepend "distinct" onto the column name so that the query takes
     // it into account when it performs the aggregating operations on the data.
     if (Array.isArray(query.distinctProperty)) {
-      column = 'distinct ' + this.columnize(query.distinctProperty);
+      column = 'distinct ' + this.columnize(query.distinctProperty)
     } else if (query.distinctProperty && column !== '*') {
-      column = 'distinct ' + column;
+      column = 'distinct ' + column
     }
 
-    return 'select ' + aggregate['function'] + '(' + column + ') as aggregate';
+    return 'select ' + aggregate['function'] + '(' + column + ') as aggregate'
   }
 
   /**
@@ -174,12 +172,12 @@ export class Grammar extends BaseGrammar {
     // compiler handle the building of the select clauses, as it will need some
     // more syntax that is best handled by that function to keep things neat.
     if (!isNull(query.aggregateProperty)) {
-      return null;
+      return null
     }
 
-    const select = query.distinctProperty ? 'select distinct ' : 'select ';
+    const select = query.distinctProperty ? 'select distinct ' : 'select '
 
-    return select + this.columnize(columns);
+    return select + this.columnize(columns)
   }
 
   /**
@@ -190,7 +188,7 @@ export class Grammar extends BaseGrammar {
    * @return string
    */
   protected compileFrom(query: Builder, table: string): string {
-    return 'from ' + this.wrapTable(table);
+    return 'from ' + this.wrapTable(table)
   }
 
   // /**
@@ -997,10 +995,10 @@ export class Grammar extends BaseGrammar {
    */
   protected compileOrders(query: Builder, orders: any[]) {
     if (!isEmpty(orders)) {
-      return 'order by ' + this.compileOrdersToArray(query, orders).join(', ');
+      return 'order by ' + this.compileOrdersToArray(query, orders).join(', ')
     }
 
-    return '';
+    return ''
   }
 
   /**
@@ -1013,11 +1011,13 @@ export class Grammar extends BaseGrammar {
   protected compileOrdersToArray(query: Builder, orders: any[]) {
     return orders.map((order) => {
       if (order['sql'] && order['sql'] instanceof Expression) {
-        return order['sql'].getValue(query.getGrammar());
+        return order['sql'].getValue(query.getGrammar())
       }
 
-      return order['sql'] ?? this.wrap(order['column']) + ' ' + order['direction'];
-    }, orders);
+      return (
+        order['sql'] ?? this.wrap(order['column']) + ' ' + order['direction']
+      )
+    }, orders)
   }
 
   /**
@@ -1027,7 +1027,7 @@ export class Grammar extends BaseGrammar {
    * @return string
    */
   public compileRandom(seed: string | number) {
-    return 'RANDOM()';
+    return 'RANDOM()'
   }
 
   /**
@@ -1038,7 +1038,7 @@ export class Grammar extends BaseGrammar {
    * @return string
    */
   protected compileLimit(query: Builder, limit: number) {
-    return 'limit ' + parseInt(String(limit), 10);
+    return 'limit ' + parseInt(String(limit), 10)
   }
 
   /**
@@ -1050,43 +1050,51 @@ export class Grammar extends BaseGrammar {
   protected compileGroupLimit(query: Builder) {
     const selectBindings = {
       ...query.getRawBindings()['select'],
-      ...query.getRawBindings()['order']
-    };
-
-    query.setBindings(selectBindings, 'select');
-    query.setBindings({}, 'order');
-
-    let limit = parseInt(query.groupLimitProperty!['value'], 10);
-    const offset = query.offsetProperty;
-
-    if (offset !== undefined) {
-      const offsetInt = parseInt(String(offset), 10);
-      limit += offsetInt;
-
-      query.offsetProperty = null;
+      ...query.getRawBindings()['order'],
     }
 
-    const components = this.compileComponents(query);
+    query.setBindings(selectBindings, 'select')
+    query.setBindings({}, 'order')
+
+    let limit = parseInt(query.groupLimitProperty!['value'], 10)
+    const offset = query.offsetProperty
+
+    if (offset !== undefined) {
+      const offsetInt = parseInt(String(offset), 10)
+      limit += offsetInt
+
+      query.offsetProperty = null
+    }
+
+    const components = this.compileComponents(query)
 
     components['columns'] += this.compileRowNumber(
       query.groupLimitProperty!['column'],
       components['orders'] ?? ''
-    );
+    )
 
-    delete components['orders'];
+    delete components['orders']
 
-    const table = this.wrap('laravel_table');
-    const row = this.wrap('laravel_row');
+    const table = this.wrap('laravel_table')
+    const row = this.wrap('laravel_row')
 
-    let sql = this.concatenate(components);
+    let sql = this.concatenate(components)
 
-    sql = 'select * from (' + sql + ') as ' + table + ' where ' + row + ' <= ' + limit;
+    sql =
+      'select * from (' +
+      sql +
+      ') as ' +
+      table +
+      ' where ' +
+      row +
+      ' <= ' +
+      limit
 
     if (offset !== undefined) {
-      sql += ' and ' + row + ' > ' + offset;
+      sql += ' and ' + row + ' > ' + offset
     }
 
-    return sql + ' order by ' + row;
+    return sql + ' order by ' + row
   }
 
   /**
@@ -1097,9 +1105,9 @@ export class Grammar extends BaseGrammar {
    * @return string
    */
   protected compileRowNumber(partition: string, orders: string): string {
-    const over = ('partition by ' + this.wrap(partition) + ' ' + orders).trim();
+    const over = ('partition by ' + this.wrap(partition) + ' ' + orders).trim()
 
-    return ', row_number() over (' + over + ') as ' + this.wrap('laravel_row');
+    return ', row_number() over (' + over + ') as ' + this.wrap('laravel_row')
   }
 
   /**
@@ -1110,7 +1118,7 @@ export class Grammar extends BaseGrammar {
    * @return string
    */
   protected compileOffset(query: Builder, offset: number) {
-    return 'offset ' + parseInt(String(offset), 10);
+    return 'offset ' + parseInt(String(offset), 10)
   }
 
   /**
@@ -1120,25 +1128,25 @@ export class Grammar extends BaseGrammar {
    * @return string
    */
   protected compileUnions(query: Builder) {
-    let sql = '';
+    let sql = ''
 
     for (const union of query.unions!) {
-      sql += this.compileUnion(union);
+      sql += this.compileUnion(union)
     }
 
     if (!isEmpty(query.unionOrders)) {
-      sql += ' ' + this.compileOrders(query, query.unionOrders!);
+      sql += ' ' + this.compileOrders(query, query.unionOrders!)
     }
 
     if (query.unionLimit !== undefined) {
-      sql += ' ' + this.compileLimit(query, query.unionLimit!);
+      sql += ' ' + this.compileLimit(query, query.unionLimit!)
     }
 
     if (query.unionOffset !== undefined) {
-      sql += ' ' + this.compileOffset(query, query.unionOffset!);
+      sql += ' ' + this.compileOffset(query, query.unionOffset!)
     }
 
-    return sql.trimStart();
+    return sql.trimStart()
   }
 
   /**
@@ -1148,9 +1156,9 @@ export class Grammar extends BaseGrammar {
    * @return string
    */
   protected compileUnion(union: any) {
-    const conjunction = union['all'] ? ' union all ' : ' union ';
+    const conjunction = union['all'] ? ' union all ' : ' union '
 
-    return conjunction + this.wrapUnion(union['query'].toSql());
+    return conjunction + this.wrapUnion(union['query'].toSql())
   }
 
   /**
@@ -1160,7 +1168,7 @@ export class Grammar extends BaseGrammar {
    * @return string
    */
   protected wrapUnion(sql: string) {
-    return '(' + sql + ')';
+    return '(' + sql + ')'
   }
 
   /**
@@ -1170,11 +1178,17 @@ export class Grammar extends BaseGrammar {
    * @return string
    */
   protected compileUnionAggregate(query: Builder) {
-    const sql = this.compileAggregate(query, query.aggregateProperty!);
+    const sql = this.compileAggregate(query, query.aggregateProperty!)
 
-    query.aggregateProperty = null;
+    query.aggregateProperty = null
 
-    return sql + ' from (' + this.compileSelect(query) + ') as ' + this.wrapTable('temp_table');
+    return (
+      sql +
+      ' from (' +
+      this.compileSelect(query) +
+      ') as ' +
+      this.wrapTable('temp_table')
+    )
   }
 
   // /**
@@ -1541,7 +1555,9 @@ export class Grammar extends BaseGrammar {
    * @return string
    */
   protected concatenate(segments: Record<string, any>): string {
-    return Object.values(segments).filter((value) => value !== '').join(' ');
+    return Object.values(segments)
+      .filter((value) => value !== '')
+      .join(' ')
   }
 
   /**
@@ -1551,7 +1567,7 @@ export class Grammar extends BaseGrammar {
    * @return string
    */
   protected removeLeadingBoolean(value: string): string {
-    return value.replace(/and |or /i, '');
+    return value.replace(/and |or /i, '')
   }
 
   /**
@@ -1578,12 +1594,15 @@ export class Grammar extends BaseGrammar {
       if (["\\'", "''", '??'].includes(char + nextChar)) {
         query += char + nextChar
         i += 1
-      } else if (char === "'") { // Starting / leaving string literal...
+      } else if (char === "'") {
+        // Starting / leaving string literal...
         query += char
         isStringLiteral = !isStringLiteral
-      } else if (char === '?' && !isStringLiteral) { // Substitutable binding...
+      } else if (char === '?' && !isStringLiteral) {
+        // Substitutable binding...
         query += bindings.shift() ?? '?'
-      } else { // Normal character...
+      } else {
+        // Normal character...
         query += char
       }
     }

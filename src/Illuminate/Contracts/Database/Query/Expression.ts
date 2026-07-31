@@ -1,4 +1,4 @@
-import { Grammar } from "../../../Database";
+import { Grammar } from '../../../Database'
 
 export interface Expression {
   /**
@@ -7,5 +7,5 @@ export interface Expression {
    * @param  \Illuminate\Database\Grammar  $grammar
    * @return string|int|float
    */
-  getValue(grammar: Grammar): string | number;
+  getValue(grammar: Grammar): string | number
 }

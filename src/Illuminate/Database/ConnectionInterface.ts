@@ -1,7 +1,7 @@
-import { Grammar } from "./Query/Grammars";
-import { Processor } from "./Query/Processors";
+import { Grammar } from './Query/Grammars'
+import { Processor } from './Query/Processors'
 
 export interface ConnectionInterface {
-  getQueryGrammar(): Grammar;
-  getPostProcessor(): Processor;
+  getQueryGrammar(): Grammar
+  getPostProcessor(): Processor
 }
