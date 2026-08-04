@@ -1,8 +1,8 @@
-import { isPrimitive } from "es-toolkit";
+import { isPrimitive } from 'es-toolkit'
 
-import { Constructor } from "../../Support/Traits/use"
-import { isEnum } from "../../Support";
-import { Arr } from "../Arr";
+import { Constructor } from '../../Support/Traits/use'
+import { isEnum } from '../../Support'
+import { Arr } from '../Arr'
 
 export const EnumeratesValues = <TBase extends Constructor>(Base: TBase) => {
   return class extends Base {
@@ -51,7 +51,7 @@ export const EnumeratesValues = <TBase extends Constructor>(Base: TBase) => {
       'unless',
       'until',
       'when',
-    ];
+    ]
 
     // /**
     //  * Create a new collection instance if the value isn't one already.
@@ -1036,7 +1036,7 @@ export const EnumeratesValues = <TBase extends Constructor>(Base: TBase) => {
     getArrayableItems(items: any) {
       return isPrimitive(items) || isEnum(items)
         ? Arr.wrap(items)
-        : Arr.from(items);
+        : Arr.from(items)
     }
 
     // /**
@@ -1105,7 +1105,7 @@ export const EnumeratesValues = <TBase extends Constructor>(Base: TBase) => {
      * @return bool
      */
     useAsCallable(value: any) {
-        return typeof value === 'function' && typeof value !== 'string';
+      return typeof value === 'function' && typeof value !== 'string'
     }
 
     // /**

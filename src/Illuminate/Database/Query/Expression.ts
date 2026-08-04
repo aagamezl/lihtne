@@ -1,5 +1,5 @@
-import { Expression as ExpressionContract } from "../../Contracts/Database/Query/Expression";
-import { Grammar } from "../Grammar";
+import { Expression as ExpressionContract } from '../../Contracts/Database/Query/Expression'
+import { Grammar } from '../Grammar'
 
 /**
  * @template TValue of string|int|float
@@ -10,8 +10,7 @@ export class Expression implements ExpressionContract {
    *
    * @param  {string | number}  value
    */
-  constructor(protected value: string | number) {
-  }
+  constructor(protected value: string | number) {}
 
   /**
    * Get the value of the expression.
@@ -20,6 +19,6 @@ export class Expression implements ExpressionContract {
    * @return {string | number}
    */
   getValue(grammar: Grammar): string | number {
-    return this.value;
+    return this.value
   }
 }

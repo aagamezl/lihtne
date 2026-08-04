@@ -1,9 +1,9 @@
-import { EnumeratesValues } from './Traits/EnumeratesValues';
-import { Macroable } from '../Macroable/Traits/Macroable';
+import { EnumeratesValues } from './Traits/EnumeratesValues'
+import { Macroable } from '../Macroable/Traits/Macroable'
 import { mix } from '../Support/Traits/use'
-import { Arr, MapCallback } from './Arr';
-import { isPlainObject } from 'es-toolkit';
-import { iterableValues } from '../Support';
+import { Arr, MapCallback } from './Arr'
+import { isPlainObject } from 'es-toolkit'
+import { iterableValues } from '../Support'
 
 export class Collection extends mix().use(EnumeratesValues, Macroable) {
   /**
@@ -11,7 +11,7 @@ export class Collection extends mix().use(EnumeratesValues, Macroable) {
    *
    * @var array<TKey, TValue>
    */
-  protected items: Record<string, unknown> | unknown[] = {};
+  protected items: Record<string, unknown> | unknown[] = {}
 
   /**
    * Create a new collection.
@@ -19,9 +19,9 @@ export class Collection extends mix().use(EnumeratesValues, Macroable) {
    * @param  \Illuminate\Contracts\Support\Arrayable<TKey, TValue>|iterable<TKey, TValue>|null  $items
    */
   public constructor(items: Record<string, unknown> | unknown[] = {}) {
-    super();
+    super()
 
-    this.items = this.getArrayableItems(items);
+    this.items = this.getArrayableItems(items)
   }
 
   // /**
@@ -407,9 +407,15 @@ export class Collection extends mix().use(EnumeratesValues, Macroable) {
    * @param  TFirstDefault|(\Closure(): TFirstDefault)  $default
    * @return TValue|TFirstDefault
    */
-  public first<TValue, TKey>(callback?: (value: TValue, key: TKey) => boolean, defaultVal?: any)
-  {
-      return Arr.first(iterableValues(this.items) as Iterable<TValue>, callback, defaultVal);
+  public first<TValue, TKey>(
+    callback?: (value: TValue, key: TKey) => boolean,
+    defaultVal?: any
+  ) {
+    return Arr.first(
+      iterableValues(this.items) as Iterable<TValue>,
+      callback,
+      defaultVal
+    )
   }
 
   // /**
@@ -616,17 +622,24 @@ export class Collection extends mix().use(EnumeratesValues, Macroable) {
    */
   public implode(value: MapCallback | string | null, glue?: string) {
     if (this.useAsCallable(value)) {
-      return this.map(value as MapCallback).all().implode(glue ?? '')
+      return this.map(value as MapCallback)
+        .all()
+        .implode(glue ?? '')
     }
 
     const first = this.first()
 
-    if (Array.isArray(first) || (isPlainObject(first) && typeof first !== 'string')) {
-      return this.pluck(value).all().join(glue ?? '')
+    if (
+      Array.isArray(first) ||
+      (isPlainObject(first) && typeof first !== 'string')
+    ) {
+      return this.pluck(value)
+        .all()
+        .join(glue ?? '')
     }
 
     // return this.items.join(value ?? '')
-    return Object.values(this.items).join(value as string ?? '')
+    return Object.values(this.items).join((value as string) ?? '')
   }
 
   // /**
@@ -805,7 +818,7 @@ export class Collection extends mix().use(EnumeratesValues, Macroable) {
    * @return static<TKey, TMapValue>
    */
   public map(callback: MapCallback) {
-    return new Collection(Arr.map(this.items, callback));
+    return new Collection(Arr.map(this.items, callback))
   }
 
   // /**

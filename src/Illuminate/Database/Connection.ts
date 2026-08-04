@@ -1,15 +1,20 @@
 // import { ConnectionInterface } from "./ConnectionInterface"
-import { Grammar as QueryGrammar, Processor, Bindings, BindingsKeys } from "./Query";
-import { Statement } from "./Statements";
-import { Grammar } from "./Grammar";
-import { StatementPrepared } from "./Events";
-import { isNil } from "es-toolkit";
-import { isEmpty, isNumeric, typedEntries } from "../Support";
-import { Arr } from "../Collections/Arr";
-import Driver from "./Drivers/Driver";
-import QueryExecuted from "./Events/QueryExecuted";
-import { dateFormat } from "@devnetic/utils";
-import { StatementResultingChanges } from "node:sqlite";
+import {
+  Grammar as QueryGrammar,
+  Processor,
+  Bindings,
+  BindingsKeys,
+} from './Query'
+import { Statement } from './Statements'
+import { Grammar } from './Grammar'
+import { StatementPrepared } from './Events'
+import { isNil } from 'es-toolkit'
+import { isEmpty, isNumeric, typedEntries } from '../Support'
+import { Arr } from '../Collections/Arr'
+import Driver from './Drivers/Driver'
+import QueryExecuted from './Events/QueryExecuted'
+import { dateFormat } from '@devnetic/utils'
+import { StatementResultingChanges } from 'node:sqlite'
 
 export type QueryLogEntry = {
   query: string
@@ -25,7 +30,7 @@ export class Connection {
   //     Macroable;
 
   // The active PDO connection.
-  protected ndo: Statement | any; // TODO: verify the real type and remove the any;
+  protected ndo: Statement | any // TODO: verify the real type and remove the any;
 
   /**
    * The active driver connection.
@@ -33,7 +38,7 @@ export class Connection {
    * @protected
    * @type {Driver}
    */
-  driver: Driver | Function;
+  driver: Driver | Function
 
   // /**
   //  * The database connection configuration options for reading.
@@ -43,7 +48,7 @@ export class Connection {
   // protected $readPdoConfig = [];
 
   // The name of the connected database.
-  protected database: string;
+  protected database: string
 
   // /**
   //  * The type of the connection.
@@ -53,20 +58,20 @@ export class Connection {
   // protected $readWriteType;
 
   // The table prefix for the connection.
-  protected tablePrefix = '';
+  protected tablePrefix = ''
 
   // The database connection configuration options.
-  protected config: Record<string, unknown> = {};
+  protected config: Record<string, unknown> = {}
 
   /**
    * The reconnector instance for the connection.
    *
    * @var (callable(\Illuminate\Database\Connection): mixed)
    */
-  protected reconnector = () => { };
+  protected reconnector = () => {}
 
   // The query grammar implementation.
-  protected queryGrammar: QueryGrammar | undefined = undefined;
+  protected queryGrammar: QueryGrammar | undefined = undefined
 
   // /**
   //  * The schema grammar implementation.
@@ -76,14 +81,14 @@ export class Connection {
   // protected $schemaGrammar;
 
   // The query post processor implementation.
-  protected postProcessor: Processor | undefined = undefined;
+  protected postProcessor: Processor | undefined = undefined
 
   /**
    * The event dispatcher instance.
    *
    * @var \Illuminate\Contracts\Events\Dispatcher|null
    */
-  protected events = null;
+  protected events = null
 
   // /**
   //  * The default fetch mode of the connection.
@@ -97,7 +102,7 @@ export class Connection {
    *
    * @var number
    */
-  protected transactions = 0;
+  protected transactions = 0
 
   // /**
   //  * The transaction manager instance.
@@ -125,21 +130,21 @@ export class Connection {
    *
    * @var QueryLogEntry[]
    */
-  protected queryLog: QueryLogEntry[] = [];
+  protected queryLog: QueryLogEntry[] = []
 
   // /**
   //  * Indicates whether queries are being logged.
   //  *
   //  * @var bool
   //  */
-  protected loggingQueries = false;
+  protected loggingQueries = false
 
   /**
    * The duration of all executed queries in milliseconds.
    *
    * @var {Number}
    */
-  protected totalQueryDurationProperty = 0.0;
+  protected totalQueryDurationProperty = 0.0
 
   // /**
   //  * All of the registered query duration handlers.
@@ -153,7 +158,7 @@ export class Connection {
    *
    * @var bool
    */
-  protected pretendingProperty = false;
+  protected pretendingProperty = false
 
   // /**
   //  * All of the callbacks that should be invoked before a transaction is started.
@@ -167,7 +172,7 @@ export class Connection {
    *
    * @var (\Closure(string, array, \Illuminate\Database\Connection): mixed)[]
    */
-  protected beforeExecutingCallbacks: Function[] = [];
+  protected beforeExecutingCallbacks: Function[] = []
 
   // /**
   //  * The connection resolvers.
@@ -204,18 +209,18 @@ export class Connection {
     // First we will setup the default properties. We keep track of the DB
     // name we are connected to since it is needed when some reflective
     // type commands are run such as checking whether a table exists.
-    this.database = database;
+    this.database = database
 
-    this.tablePrefix = tablePrefix;
+    this.tablePrefix = tablePrefix
 
-    this.config = config;
+    this.config = config
 
     // We need to initialize a query grammar and the query post processors
     // which are both very important parts of the database abstractions
     // so we initialize these to their default values while starting.
-    this.useDefaultQueryGrammar();
+    this.useDefaultQueryGrammar()
 
-    this.useDefaultPostProcessor();
+    this.useDefaultPostProcessor()
   }
 
   /**
@@ -224,7 +229,7 @@ export class Connection {
    * @return void
    */
   public useDefaultQueryGrammar() {
-    this.queryGrammar = this.getDefaultQueryGrammar();
+    this.queryGrammar = this.getDefaultQueryGrammar()
   }
 
   /**
@@ -233,7 +238,7 @@ export class Connection {
    * @return \Illuminate\Database\Query\Grammars\Grammar
    */
   protected getDefaultQueryGrammar() {
-    return new QueryGrammar(this);
+    return new QueryGrammar(this)
   }
 
   // /**
@@ -262,7 +267,7 @@ export class Connection {
    * @return void
    */
   public useDefaultPostProcessor() {
-    this.postProcessor = this.getDefaultPostProcessor();
+    this.postProcessor = this.getDefaultPostProcessor()
   }
 
   /**
@@ -271,7 +276,7 @@ export class Connection {
    * @return \Illuminate\Database\Query\Processors\Processor
    */
   protected getDefaultPostProcessor() {
-    return new Processor();
+    return new Processor()
   }
 
   // /**
@@ -377,25 +382,29 @@ export class Connection {
     query: string,
     bindings: Bindings
   ): Promise<Record<string, unknown>[]> {
-    return await this.run(query, bindings, (query: string, bindings: Bindings) => {
-      if (this.pretending()) {
-        return [];
+    return await this.run(
+      query,
+      bindings,
+      (query: string, bindings: Bindings) => {
+        if (this.pretending()) {
+          return []
+        }
+
+        // For select statements, we'll simply execute the query and return an array
+        // of the database result set. Each element in the array will be a single
+        // row from the database table, and will either be an array or objects.
+        const statement = this.prepared(
+          // this.connection, query
+          this.getDriver().prepare(query)
+        )
+
+        this.bindValues(statement, this.prepareBindings(bindings))
+
+        statement.execute()
+
+        return statement.fetchAll()
       }
-
-      // For select statements, we'll simply execute the query and return an array
-      // of the database result set. Each element in the array will be a single
-      // row from the database table, and will either be an array or objects.
-      const statement = this.prepared(
-        // this.connection, query
-        this.getDriver().prepare(query)
-      )
-
-      this.bindValues(statement, this.prepareBindings(bindings));
-
-      statement.execute();
-
-      return statement.fetchAll();
-    });
+    )
   }
 
   // /**
@@ -476,9 +485,9 @@ export class Connection {
    * @return \PDOStatement
    */
   protected prepared(statement: Statement) {
-    this.event(new StatementPrepared(this, statement));
+    this.event(new StatementPrepared(this, statement))
 
-    return statement;
+    return statement
   }
 
   /**
@@ -491,7 +500,7 @@ export class Connection {
       // this.driver = this.driver()
 
       // return this.driver
-      return this.driver();
+      return this.driver()
     }
 
     return this.driver
@@ -715,7 +724,7 @@ export class Connection {
   public prepareBindings(bindings: Bindings) {
     const grammar = this.getQueryGrammar()
 
-    for (const [key, value]: [BindingsKeys, unknown] of typedEntries(bindings)) {
+    for (const [key, value] of typedEntries(bindings)) {
       // We need to transform all instances of DateTimeInterface into the actual
       // date string. Each query grammar maintains its own date string format
       // so we'll just ask the grammar for the format to get from the date.
@@ -748,29 +757,27 @@ export class Connection {
       await beforeExecutingCallback(query, bindings, this)
     }
 
-    this.reconnectIfMissingConnection();
+    this.reconnectIfMissingConnection()
 
-    const start = Date.now();
+    const start = Date.now()
 
-    let result;
+    let result
 
     // Here we will run this query. If an exception occurs we'll determine if it was
     // caused by a connection that has been lost. If that is the cause, we'll try
     // to re-establish connection and re-run the query with a fresh connection.
     try {
-      result = this.runQueryCallback(query, bindings, callback);
+      result = this.runQueryCallback(query, bindings, callback)
     } catch (e) {
-      result = this.handleQueryException(e as Error, query, bindings, callback);
+      result = this.handleQueryException(e as Error, query, bindings, callback)
     }
 
     // Once we have run the query we will calculate the time that it took to run and
     // then log the query, bindings, and execution time so we will report them on
     // the event that the developer needs them. We'll log time in milliseconds.
-    this.logQuery(
-      query, bindings, this.getElapsedTime(start)
-    );
+    this.logQuery(query, bindings, this.getElapsedTime(start))
 
-    return result;
+    return result
   }
 
   /**
@@ -795,23 +802,23 @@ export class Connection {
       const result = await callback(query, bindings)
 
       return result
-    }
-
-    // If an exception occurs when attempting to run a query, we'll format the error
-    // message to include the bindings with SQL, which will make this exception a
-    // lot more helpful to the developer instead of just the database's errors.
-    catch (e) {
-      const exceptionType = this.isUniqueConstraintError(e)
+    } catch (e) {
+      // If an exception occurs when attempting to run a query, we'll format the error
+      // message to include the bindings with SQL, which will make this exception a
+      // lot more helpful to the developer instead of just the database's errors.
+      const exceptionType = this.isUniqueConstraintError(e as Error)
         ? 'UniqueConstraintViolationException'
-        : 'QueryException';
+        : 'QueryException'
 
-      throw new Error(`${exceptionType}: ${JSON.stringify({
-        name: this.getNameWithReadWriteType(),
-        query,
-        bindings: this.prepareBindings(bindings),
-        e,
-        connectionDetails: this.getConnectionDetails()
-      })}`);
+      throw new Error(
+        `${exceptionType}: ${JSON.stringify({
+          name: this.getNameWithReadWriteType(),
+          query,
+          bindings: this.prepareBindings(bindings),
+          e,
+          connectionDetails: this.getConnectionDetails(),
+        })}`
+      )
     }
   }
 
@@ -822,7 +829,7 @@ export class Connection {
    * @return bool
    */
   protected isUniqueConstraintError(exception: Error) {
-    return false;
+    return false
   }
 
   /**
@@ -834,13 +841,15 @@ export class Connection {
    * @return void
    */
   public logQuery(query: string, bindings: unknown[], time: number) {
-    this.totalQueryDurationProperty += time ?? 0.0;
+    this.totalQueryDurationProperty += time ?? 0.0
 
-    this.event(new QueryExecuted(query, bindings, time, this));
+    this.event(new QueryExecuted(query, bindings, time, this))
 
-    query = this.pretendingProperty === true
-      ? this.queryGrammar?.substituteBindingsIntoRawSql(query, bindings) ?? query
-      : query;
+    query =
+      this.pretendingProperty === true
+        ? (this.queryGrammar?.substituteBindingsIntoRawSql(query, bindings) ??
+          query)
+        : query
 
     if (this.loggingQueries) {
       this.queryLog.push({ query, bindings, time })
@@ -940,12 +949,10 @@ export class Connection {
     callback: Function
   ) {
     if (this.transactions >= 1) {
-      throw e;
+      throw e
     }
 
-    return this.tryAgainIfCausedByLostConnection(
-      e, query, bindings, callback
-    );
+    return this.tryAgainIfCausedByLostConnection(e, query, bindings, callback)
   }
 
   /**
@@ -966,12 +973,12 @@ export class Connection {
     callback: Function
   ) {
     if (this.causedByLostConnection(e.getPrevious())) {
-      this.reconnect();
+      this.reconnect()
 
-      return this.runQueryCallback(query, bindings, callback);
+      return this.runQueryCallback(query, bindings, callback)
     }
 
-    throw e;
+    throw e
   }
 
   /**
@@ -986,7 +993,9 @@ export class Connection {
       return this.reconnector(this)
     }
 
-    throw new Error('LostConnectionException: Lost connection and no reconnector available.')
+    throw new Error(
+      'LostConnectionException: Lost connection and no reconnector available.'
+    )
   }
 
   /**
@@ -996,7 +1005,7 @@ export class Connection {
    */
   reconnectIfMissingConnection() {
     if (isNil(this.ndo)) {
-      this.reconnect();
+      this.reconnect()
     }
   }
 
@@ -1071,7 +1080,7 @@ export class Connection {
    * @return void
    */
   protected event(event) {
-    this.events?.dispatch(event);
+    this.events?.dispatch(event)
   }
 
   // /**
@@ -1334,7 +1343,7 @@ export class Connection {
    * @return string|null
    */
   public getName() {
-    return this.getConfig('name');
+    return this.getConfig('name')
   }
 
   /**
@@ -1343,9 +1352,9 @@ export class Connection {
    * @return string|null
    */
   public getNameWithReadWriteType() {
-    const name = this.getName();
+    const name = this.getName()
 
-    return isEmpty(name) ? null : name;
+    return isEmpty(name) ? null : name
   }
 
   /**
@@ -1365,13 +1374,13 @@ export class Connection {
    */
   protected getConnectionDetails(): Record<string, unknown> {
     return {
-      'driver': this.getDriverName(),
-      'name': this.getNameWithReadWriteType(),
-      'host': this.config.host ?? null,
-      'port': this.config.port ?? null,
-      'database': this.config.database ?? null,
-      'unix_socket': this.config.unix_socket ?? null,
-    };
+      driver: this.getDriverName(),
+      name: this.getNameWithReadWriteType(),
+      host: this.config.host ?? null,
+      port: this.config.port ?? null,
+      database: this.config.database ?? null,
+      unix_socket: this.config.unix_socket ?? null,
+    }
   }
 
   /**
@@ -1380,7 +1389,7 @@ export class Connection {
    * @return string
    */
   public getDriverName() {
-    return this.getConfig('driver');
+    return this.getConfig('driver')
   }
 
   // /**
@@ -1399,7 +1408,7 @@ export class Connection {
    * @return \Illuminate\Database\Query\Grammars\Grammar
    */
   public getQueryGrammar(): Grammar {
-    return this.queryGrammar!;
+    return this.queryGrammar!
   }
 
   // /**
@@ -1444,7 +1453,7 @@ export class Connection {
    * @return \Illuminate\Database\Query\Processors\Processor
    */
   public getPostProcessor() {
-    return this.postProcessor;
+    return this.postProcessor
   }
 
   // /**
@@ -1607,7 +1616,7 @@ export class Connection {
    * @return string
    */
   public getDatabaseName() {
-    return this.database;
+    return this.database
   }
 
   // /**
@@ -1652,7 +1661,7 @@ export class Connection {
    * @return string
    */
   public getTablePrefix(): string {
-    return this.tablePrefix;
+    return this.tablePrefix
   }
 
   // /**

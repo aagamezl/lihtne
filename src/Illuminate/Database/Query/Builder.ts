@@ -1,54 +1,53 @@
-import { Grammar } from "../Query/Grammars/Grammar";
-import { Processor } from "./Processors";
-import { Builder as EloquentBuilder } from "../Eloquent";
-import { Relation } from "../Eloquent/Relations";
-import { Connection } from "../Connection";
-import { Expression } from "./Expression";
-import { IndexHint } from "./IndexHint";
-import { Collection } from "../../Collections";
-import { Arr } from "../../Collections/Arr";
-import { isSet } from "../../Support";
+import { Grammar } from '../Query/Grammars/Grammar'
+import { Processor } from './Processors'
+import { Builder as EloquentBuilder } from '../Eloquent'
+import { Relation } from '../Eloquent/Relations'
+import { Connection } from '../Connection'
+import { Expression } from './Expression'
+import { IndexHint } from './IndexHint'
+import { Collection } from '../../Collections'
+import { Arr } from '../../Collections/Arr'
+import { isSet } from '../../Support'
 
 type Prettify<T> = {
-  [K in keyof T]: T[K];
-} & {};
+  [K in keyof T]: T[K]
+} & {}
 
 export type Bindings = {
-  select: unknown[];
-  from: unknown[];
-  join: unknown[];
-  where: unknown[];
-  groupBy: unknown[];
-  having: unknown[];
-  order: unknown[];
-  union: unknown[];
-  unionOrder: unknown[];
+  select: unknown[]
+  from: unknown[]
+  join: unknown[]
+  where: unknown[]
+  groupBy: unknown[]
+  having: unknown[]
+  order: unknown[]
+  union: unknown[]
+  unionOrder: unknown[]
 }
 
-
-export type Agregate = { function: string; columns: Array<Expression | string> };
+export type Agregate = { function: string; columns: Array<Expression | string> }
 
 export class Builder {
   /**
- * The database connection instance.
- *
- * @var \Illuminate\Database\ConnectionInterface
- */
-  public connection: Connection;
+   * The database connection instance.
+   *
+   * @var \Illuminate\Database\ConnectionInterface
+   */
+  public connection: Connection
 
   /**
    * The database query grammar instance.
    *
    * @var \Illuminate\Database\Query\Grammars\Grammar
    */
-  public grammar: Grammar;
+  public grammar: Grammar
 
   /**
    * The database query post processor instance.
    *
    * @var \Illuminate\Database\Query\Processors\Processor
    */
-  public processor: Processor;
+  public processor: Processor
 
   // /**
   //  * The current query value bindings.
@@ -74,11 +73,11 @@ export class Builder {
     having: [],
     order: [],
     union: [],
-    unionOrder: []
+    unionOrder: [],
   }
 
   // An aggregate function and column to be run.
-  public aggregateProperty: Agregate | null = null;
+  public aggregateProperty: Agregate | null = null
 
   /**
    * The columns that should be returned.
@@ -86,111 +85,111 @@ export class Builder {
    * @var array<string|\Illuminate\Contracts\Database\Query\Expression>|null
    */
   // public columns: Array<string | Expression> | null = null
-  public columns: Array<string | Expression> = [];
+  public columns: Array<string | Expression> = []
 
   /**
    * Indicates if the query returns distinct results.
    *
    * Occasionally contains the columns that should be distinct.
    */
-  public distinctProperty: boolean | any[] = false;
+  public distinctProperty: boolean | any[] = false
 
   /**
    * The table which the query is targeting.
    *
    * @var \Illuminate\Database\Query\Expression|string
    */
-  public fromProperty: Function | Builder | Expression | string = '';
+  public fromProperty: Function | Builder | Expression | string = ''
 
   /**
    * The index hint for the query.
    *
    * @var \Illuminate\Database\Query\IndexHint|null
    */
-  public indexHint: IndexHint | null = null;
+  public indexHint: IndexHint | null = null
 
   /**
    * The table joins for the query.
    *
    * @var array|null
    */
-  public joins: any[] | null = null;
+  public joins: any[] | null = null
 
   /**
    * The where constraints for the query.
    *
    * @var array
    */
-  public wheres = [];
+  public wheres = []
 
   /**
    * The groupings for the query.
    *
    * @var array|null
    */
-  public groups: any[] | null = null;
+  public groups: any[] | null = null
 
   // The having constraints for the query.
-  public havings: any[] | null = null;
+  public havings: any[] | null = null
 
   /**
    * The orderings for the query.
    *
    * @var array|null
    */
-  public orders: any[] | null = null;
+  public orders: any[] | null = null
 
   /**
    * The maximum number of records to return.
    *
    * @var int|null
    */
-  public limitProperty: number | null = null;
+  public limitProperty: number | null = null
 
   /**
    * The maximum number of records to return per group.
    *
    * @var Record<string, any> | null
    */
-  public groupLimitProperty: Record<string, any> | null = null;
+  public groupLimitProperty: Record<string, any> | null = null
 
   /**
    * The number of records to skip.
    *
    * @var int|null
    */
-  public offsetProperty: number | null = null;
+  public offsetProperty: number | null = null
 
   // The query union statements.
-  public unions: any[] | null = null;
+  public unions: any[] | null = null
 
   /**
    * The maximum number of union records to return.
    *
    * @var int|null
    */
-  public unionLimit: number | null = null;
+  public unionLimit: number | null = null
 
   /**
    * The number of union records to skip.
    *
    * @var int|null
    */
-  public unionOffset: number | null = null;
+  public unionOffset: number | null = null
 
   /**
    * The orderings for the union query.
    *
    * @var array|null
    */
-  public unionOrders: any[] | null = null;
+  public unionOrders: any[] | null = null
 
   /**
    * Indicates whether row locking is being used.
    *
    * @var string|bool|null
    */
-  public lockProperty: string | boolean | null = null;
+  public lockProperty: string | boolean | null = null
 
   // /**
   //  * The query execution timeout in seconds.
@@ -200,14 +199,14 @@ export class Builder {
   // public $timeout;
 
   // The callbacks that should be invoked before the query is executed.
-  public beforeQueryCallbacks: Array<(query: Builder) => void> = [];
+  public beforeQueryCallbacks: Array<(query: Builder) => void> = []
 
   /**
    * The callbacks that should be invoked after retrieving data from the database.
    *
    * @var array
    */
-  protected afterQueryCallbacks: Function[] = [];
+  protected afterQueryCallbacks: Function[] = []
 
   // /**
   //  * All of the available clause operators.
@@ -245,11 +244,11 @@ export class Builder {
   public constructor(
     connection: Connection,
     grammar: Grammar,
-    processor: Processor,
+    processor: Processor
   ) {
-    this.connection = connection;
-    this.grammar = grammar ?? connection.getQueryGrammar();
-    this.processor = processor ?? connection.getPostProcessor();
+    this.connection = connection
+    this.grammar = grammar ?? connection.getQueryGrammar()
+    this.processor = processor ?? connection.getPostProcessor()
   }
 
   /**
@@ -260,22 +259,22 @@ export class Builder {
    */
   // public select(columns: string | string[] = ['*']) {
   public select(...columns: string[]) {
-    columns = columns.length === 0 ? ['*'] : columns;
+    columns = columns.length === 0 ? ['*'] : columns
 
-    this.columns = [];
-    this.bindings['select'] = [];
+    this.columns = []
+    this.bindings['select'] = []
 
-    const columnsArray = Array.isArray(columns) ? columns : [columns];
+    const columnsArray = Array.isArray(columns) ? columns : [columns]
 
     for (const [as, column] of Object.entries(columnsArray)) {
       if (typeof as === 'string' && this.isQueryable(column)) {
-        this.selectSub(column, as);
+        this.selectSub(column, as)
       } else {
-        this.columns.push(column);
+        this.columns.push(column)
       }
     }
 
-    return this;
+    return this
   }
 
   /**
@@ -288,11 +287,12 @@ export class Builder {
    * @throws \InvalidArgumentException
    */
   public selectSub(query: any | string, as: string) {
-    const [subQuery, bindings] = this.createSub(query);
+    const [subQuery, bindings] = this.createSub(query)
 
     return this.selectRaw(
-      '(' + subQuery + ') as ' + this.grammar.wrap(as), bindings
-    );
+      '(' + subQuery + ') as ' + this.grammar.wrap(as),
+      bindings
+    )
   }
 
   // /**
@@ -316,13 +316,13 @@ export class Builder {
    * @return $this
    */
   public selectRaw(expression: string, bindings: any[] = []): this {
-    this.addSelect(new Expression(expression));
+    this.addSelect(new Expression(expression))
 
     if (bindings.length > 0) {
-      this.addBinding(bindings, 'select');
+      this.addBinding(bindings, 'select')
     }
 
-    return this;
+    return this
   }
 
   /**
@@ -334,10 +334,16 @@ export class Builder {
    *
    * @throws \InvalidArgumentException
    */
-  public fromSub(query: Function | Builder | EloquentBuilder | string, as: string) {
-    const [subQuery, bindings] = this.createSub(query);
+  public fromSub(
+    query: Function | Builder | EloquentBuilder | string,
+    as: string
+  ) {
+    const [subQuery, bindings] = this.createSub(query)
 
-    return this.fromRaw('(' + subQuery + ') as ' + this.grammar.wrapTable(as!), bindings);
+    return this.fromRaw(
+      '(' + subQuery + ') as ' + this.grammar.wrapTable(as!),
+      bindings
+    )
   }
 
   /**
@@ -348,11 +354,11 @@ export class Builder {
    * @return $this
    */
   public fromRaw(expression: string, bindings: any[] = []) {
-    this.fromProperty = new Expression(expression);
+    this.fromProperty = new Expression(expression)
 
-    this.addBinding(bindings, 'from');
+    this.addBinding(bindings, 'from')
 
-    return this;
+    return this
   }
 
   /**
@@ -366,12 +372,12 @@ export class Builder {
     // query instance to the Closure. This will give the developer a chance to
     // format and work with the query before we cast it to a raw SQL string.
     if (query instanceof Function) {
-      const callback = query;
+      const callback = query
 
-      callback(query = this.forSubQuery());
+      callback((query = this.forSubQuery()))
     }
 
-    return this.parseSub(query);
+    return this.parseSub(query)
   }
 
   /**
@@ -383,16 +389,20 @@ export class Builder {
    * @throws \InvalidArgumentException
    */
   protected parseSub(query: any) {
-    if (query instanceof Builder || query instanceof EloquentBuilder || query instanceof Relation) {
-      query = this.prependDatabaseNameIfCrossDatabaseQuery(query);
+    if (
+      query instanceof Builder ||
+      query instanceof EloquentBuilder ||
+      query instanceof Relation
+    ) {
+      query = this.prependDatabaseNameIfCrossDatabaseQuery(query)
 
-      return [query.toSql(), query.getBindings()];
+      return [query.toSql(), query.getBindings()]
     } else if (typeof query === 'string') {
-      return [query, []];
+      return [query, []]
     } else {
       throw new Error(
         'InvalidArgumentException: A subquery must be a query builder instance, a Closure, or a string.'
-      );
+      )
     }
   }
 
@@ -403,17 +413,18 @@ export class Builder {
    * @return mixed
    */
   protected prependDatabaseNameIfCrossDatabaseQuery(query: any) {
-    if (query.getConnection().getDatabaseName() !==
+    if (
+      query.getConnection().getDatabaseName() !==
       this.getConnection().getDatabaseName()
     ) {
-      const databaseName = query.getConnection().getDatabaseName();
+      const databaseName = query.getConnection().getDatabaseName()
 
       if (!query.from.startsWith(databaseName) && !query.from.includes('.')) {
-        query.from = databaseName + '.' + query.from;
+        query.from = databaseName + '.' + query.from
       }
     }
 
-    return query;
+    return query
   }
 
   /**
@@ -423,25 +434,25 @@ export class Builder {
    * @return $this
    */
   public addSelect(column: any | string[]): this {
-    const columns = Array.isArray(column) ? column : [column];
+    const columns = Array.isArray(column) ? column : [column]
 
     for (const [as, column] of Object.entries(columns)) {
       if (typeof as === 'string' && this.isQueryable(column)) {
         if (this.columns === null) {
-          this.select(this.fromProperty + '.*');
+          this.select(this.fromProperty + '.*')
         }
 
-        this.selectSub(column, as);
+        this.selectSub(column, as)
       } else {
         if (Array.isArray(this.columns) && this.columns.includes(column)) {
-          continue;
+          continue
         }
 
-        this.columns!.push(column);
+        this.columns!.push(column)
       }
     }
 
-    return this;
+    return this
   }
 
   // /**
@@ -502,14 +513,17 @@ export class Builder {
    * @param  string|null  as
    * @return this
    */
-  public from(table: Function | Builder | Expression | string, as: string | null = null) {
+  public from(
+    table: Function | Builder | Expression | string,
+    as: string | null = null
+  ) {
     if (this.isQueryable(table)) {
-      return this.fromSub(table, as!);
+      return this.fromSub(table, as!)
     }
 
-    this.fromProperty = as ? `${table} as ${as}` : table;
+    this.fromProperty = as ? `${table} as ${as}` : table
 
-    return this;
+    return this
   }
 
   // /**
@@ -3275,10 +3289,10 @@ export class Builder {
    */
   public applyBeforeQueryCallbacks(): void {
     for (const callback of this.beforeQueryCallbacks) {
-      callback(this);
+      callback(this)
     }
 
-    this.beforeQueryCallbacks = [];
+    this.beforeQueryCallbacks = []
   }
 
   // /**
@@ -3301,10 +3315,10 @@ export class Builder {
    */
   public applyAfterQueryCallbacks(result: unknown) {
     for (const afterQueryCallback of this.afterQueryCallbacks) {
-      result = afterQueryCallback(result) ?? result;
+      result = afterQueryCallback(result) ?? result
     }
 
-    return result;
+    return result
   }
 
   /**
@@ -3313,9 +3327,9 @@ export class Builder {
    * @return string
    */
   public toSql(): string {
-    this.applyBeforeQueryCallbacks();
+    this.applyBeforeQueryCallbacks()
 
-    return this.grammar.compileSelect(this);
+    return this.grammar.compileSelect(this)
   }
 
   // /**
@@ -3409,19 +3423,21 @@ export class Builder {
   // }
 
   /**
-    * Execute the query as a "select" statement.
-    *
-    * @param  string|\Illuminate\Contracts\Database\Query\Expression|array<string|\Illuminate\Contracts\Database\Query\Expression>  $columns
-    * @return \Illuminate\Support\Collection<int, \stdClass>
-    */
+   * Execute the query as a "select" statement.
+   *
+   * @param  string|\Illuminate\Contracts\Database\Query\Expression|array<string|\Illuminate\Contracts\Database\Query\Expression>  $columns
+   * @return \Illuminate\Support\Collection<int, \stdClass>
+   */
   public get(columns: string | string[] | Expression[] = ['*']) {
-    const items = new Collection(this.onceWithColumns(Arr.wrap(columns), () => {
-      return this.processor.processSelect(this, this.runSelect());
-    }));
+    const items = new Collection(
+      this.onceWithColumns(Arr.wrap(columns), () => {
+        return this.processor.processSelect(this, this.runSelect())
+      })
+    )
 
     return this.applyAfterQueryCallbacks(
       isSet(this.groupLimitProperty) ? this.withoutGroupLimitKeys(items) : items
-    );
+    )
   }
 
   /**
@@ -3430,9 +3446,7 @@ export class Builder {
    * @return array
    */
   protected runSelect() {
-    return this.connection.select(
-      this.toSql(), this.getBindings()
-    );
+    return this.connection.select(this.toSql(), this.getBindings())
   }
 
   /**
@@ -3442,22 +3456,24 @@ export class Builder {
    * @return \Illuminate\Support\Collection
    */
   protected withoutGroupLimitKeys(items: Collection): Collection {
-    const keysToRemove: string[] = [];
+    const keysToRemove: string[] = []
 
     if (typeof this.groupLimitProperty!['column'] === 'string') {
-      const column = this.groupLimitProperty!['column'].split('.').pop()!;
+      const column = this.groupLimitProperty!['column'].split('.').pop()!
 
-      keysToRemove.push('@laravel_group := ' + this.grammar.wrap(column));
-      keysToRemove.push('@laravel_group := ' + this.grammar.wrap('pivot_' + column));
+      keysToRemove.push('@laravel_group := ' + this.grammar.wrap(column))
+      keysToRemove.push(
+        '@laravel_group := ' + this.grammar.wrap('pivot_' + column)
+      )
     }
 
     items.each((item: any) => {
       keysToRemove.forEach((key: string) => {
-        delete item[key];
-      });
-    });
+        delete item[key]
+      })
+    })
 
-    return items;
+    return items
   }
 
   // /**
@@ -3996,18 +4012,21 @@ export class Builder {
    * @param  callable(): TResult  $callback
    * @return TResult
    */
-  protected onceWithColumns<TResult>(columns: Array<string | Expression>, callback: () => TResult): TResult {
-    const original = this.columns;
+  protected onceWithColumns<TResult>(
+    columns: Array<string | Expression>,
+    callback: () => TResult
+  ): TResult {
+    const original = this.columns
 
     if (original.length === 0) {
-      this.columns = columns;
+      this.columns = columns
     }
 
-    const result = callback();
+    const result = callback()
 
-    this.columns = original;
+    this.columns = original
 
-    return result;
+    return result
   }
 
   // /**
@@ -4376,7 +4395,7 @@ export class Builder {
    * @return \Illuminate\Database\Query\Builder
    */
   public newQuery() {
-    return new Builder(this.connection, this.grammar, this.processor);
+    return new Builder(this.connection, this.grammar, this.processor)
   }
 
   /**
@@ -4385,7 +4404,7 @@ export class Builder {
    * @return \Illuminate\Database\Query\Builder
    */
   protected forSubQuery() {
-    return this.newQuery();
+    return this.newQuery()
   }
 
   // /**
@@ -4453,7 +4472,7 @@ export class Builder {
    * @return list<mixed>
    */
   public getBindings(): unknown[] {
-    return Object.values(this.bindings).flat();
+    return Object.values(this.bindings).flat()
   }
 
   // /**
@@ -4472,7 +4491,7 @@ export class Builder {
   //  * }
   //  */
   public getRawBindings() {
-    return this.bindings;
+    return this.bindings
   }
 
   /**
@@ -4486,12 +4505,12 @@ export class Builder {
    */
   public setBindings(bindings: Bindings, type: keyof Bindings = 'where') {
     if (!Object.keys(this.bindings).includes(type)) {
-      throw new Error("InvalidArgumentException: Invalid binding type: " + type);
+      throw new Error('InvalidArgumentException: Invalid binding type: ' + type)
     }
 
-    this.bindings[type].push(bindings);
+    this.bindings[type].push(bindings)
 
-    return this;
+    return this
   }
 
   /**
@@ -4505,16 +4524,16 @@ export class Builder {
    */
   public addBinding(value: any, type: keyof Bindings = 'where') {
     if (!(type in this.bindings)) {
-      throw new Error(`Invalid binding type: ${type}.`);
+      throw new Error(`Invalid binding type: ${type}.`)
     }
 
     if (Array.isArray(value)) {
-      this.bindings[type] = value.map((v) => this.castBinding(v));
+      this.bindings[type] = value.map((v) => this.castBinding(v))
     } else {
-      this.bindings[type].push(this.castBinding(value));
+      this.bindings[type].push(this.castBinding(value))
     }
 
-    return this;
+    return this
   }
 
   /**
@@ -4524,7 +4543,7 @@ export class Builder {
    * @return mixed
    */
   public castBinding(value: any) {
-    return value;
+    return value
   }
 
   // /**
@@ -4584,7 +4603,7 @@ export class Builder {
    * @return \Illuminate\Database\ConnectionInterface
    */
   public getConnection() {
-    return this.connection;
+    return this.connection
   }
 
   // /**
@@ -4605,7 +4624,7 @@ export class Builder {
    * @return \Illuminate\Database\Query\Processors\Processor
    */
   public getProcessor() {
-    return this.processor;
+    return this.processor
   }
 
   /**
@@ -4614,7 +4633,7 @@ export class Builder {
    * @return \Illuminate\Database\Query\Grammars\Grammar
    */
   public getGrammar() {
-    return this.grammar;
+    return this.grammar
   }
 
   // /**
@@ -4636,10 +4655,12 @@ export class Builder {
    * @return {boolean}
    */
   protected isQueryable(value: any): boolean {
-    return value instanceof Builder ||
+    return (
+      value instanceof Builder ||
       value instanceof EloquentBuilder ||
       value instanceof Relation ||
-      value instanceof Function;
+      value instanceof Function
+    )
   }
 
   // /**

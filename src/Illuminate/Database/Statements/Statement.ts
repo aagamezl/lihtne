@@ -1,5 +1,5 @@
-import { CustomException } from "../../Support"
-import { Bindings } from "../Query"
+import { CustomException } from '../../Support'
+import { Bindings } from '../Query'
 
 export type Result = {
   rows: Record<string, unknown>[]
@@ -13,7 +13,7 @@ export class Statement {
    * @protected
    * @type {any}
    */
-  protected result: Result = {rows:[]}
+  protected result: Result = { rows: [] }
 
   /**
    *
@@ -35,7 +35,7 @@ export class Statement {
     throw CustomException('concrete-method', 'execute')
   }
 
-  fetchAll(): Result["rows"] {
+  fetchAll(): Result['rows'] {
     return this.result.rows
   }
 }

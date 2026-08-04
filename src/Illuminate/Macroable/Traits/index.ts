@@ -1,1 +1,1 @@
-export * from "./Macroable";
+export * from './Macroable'

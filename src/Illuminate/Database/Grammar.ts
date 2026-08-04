@@ -1,18 +1,18 @@
-import { Collection } from "../Collections/Collection";
-import { Connection } from "./Connection";
-import { Expression } from "./Query/Expression";
+import { Collection } from '../Collections/Collection'
+import { Connection } from './Connection'
+import { Expression } from './Query/Expression'
 
 export abstract class Grammar {
   //   use Macroable;
 
   // The connection used for escaping values.
-  protected connection;
+  protected connection
 
   /**
    * Create a new grammar instance.
    */
   public constructor(connection: Connection) {
-    this.connection = connection;
+    this.connection = connection
   }
 
   // /**
@@ -33,34 +33,37 @@ export abstract class Grammar {
    * @param  string|null  prefix
    * @return string | number
    */
-  public wrapTable(table: Expression | string, prefix: string | null = null): string | number {
+  public wrapTable(
+    table: Expression | string,
+    prefix: string | null = null
+  ): string | number {
     if (this.isExpression(table)) {
-      return this.getValue(table);
+      return this.getValue(table)
     }
 
-    prefix ??= this.connection.getTablePrefix();
+    prefix ??= this.connection.getTablePrefix()
 
     // If the table being wrapped has an alias we'll need to separate the pieces
     // so we can prefix the table and then wrap each of the segments on their
     // own and then join these both back together using the "as" connector.
     if (String(table).includes(' as ')) {
-      console.log('table: %o', table.toString());
+      console.log('table: %o', table.toString())
 
-      return this.wrapAliasedTable(table, prefix);
+      return this.wrapAliasedTable(table, prefix)
     }
 
     // If the table being wrapped has a custom schema name specified, we need to
     // prefix the last segment as the table name then wrap each segment alone
     // and eventually join them both back together using the dot connector.
     if (String(table).includes('.')) {
-      table = String(table).replace('.' + prefix, '.' + prefix);
+      table = String(table).replace('.' + prefix, '.' + prefix)
 
-      return (new Collection(String(table).split('.')))
+      return new Collection(String(table).split('.'))
         .map(this.wrapValue.bind(this))
-        .implode('.');
+        .implode('.')
     }
 
-    return this.wrapValue(prefix + table);
+    return this.wrapValue(prefix + table)
   }
 
   /**
@@ -71,24 +74,24 @@ export abstract class Grammar {
    */
   public wrap(value: Expression | string): string | number {
     if (this.isExpression(value)) {
-      return this.getValue(value);
+      return this.getValue(value)
     }
 
     // If the value being wrapped has a column alias we will need to separate out
     // the pieces so we can wrap each of the segments of the expression on its
     // own, and then join these both back together using the "as" connector.
     if (value.includes(' as ')) {
-      return this.wrapAliasedValue(value);
+      return this.wrapAliasedValue(value)
     }
 
     // If the given value is a JSON selector we will wrap it differently than a
     // traditional value. We will need to split this path and wrap each part
     // wrapped, etc. Otherwise, we will simply wrap the value as a string.
     if (this.isJsonSelector(value)) {
-      return this.wrapJsonSelector(value);
+      return this.wrapJsonSelector(value)
     }
 
-    return this.wrapSegments(value.split('.'));
+    return this.wrapSegments(value.split('.'))
   }
 
   /**
@@ -98,9 +101,9 @@ export abstract class Grammar {
    * @return string
    */
   protected wrapAliasedValue(value: string): string {
-    const segments = value.split(/\s+as\s+/i);
+    const segments = value.split(/\s+as\s+/i)
 
-    return this.wrap(segments[0]!) + ' as ' + this.wrapValue(segments[1]!);
+    return this.wrap(segments[0]!) + ' as ' + this.wrapValue(segments[1]!)
   }
 
   /**
@@ -110,12 +113,19 @@ export abstract class Grammar {
    * @param  string|null  $prefix
    * @return string
    */
-  protected wrapAliasedTable(value: string, prefix: string | null = null): string {
-    const segments = value.split(/\s+as\s+/i);
+  protected wrapAliasedTable(
+    value: string,
+    prefix: string | null = null
+  ): string {
+    const segments = value.split(/\s+as\s+/i)
 
-    prefix ??= this.connection.getTablePrefix();
+    prefix ??= this.connection.getTablePrefix()
 
-    return this.wrapTable(segments[0]!, prefix) + ' as ' + this.wrapValue(prefix + segments[1]!);
+    return (
+      this.wrapTable(segments[0]!, prefix) +
+      ' as ' +
+      this.wrapValue(prefix + segments[1]!)
+    )
   }
 
   /**
@@ -125,11 +135,13 @@ export abstract class Grammar {
    * @return string
    */
   protected wrapSegments(segments: string[]) {
-    return (new Collection(segments)).map((segment: string, key: number) => {
-      return key == 0 && segments.length > 1
-        ? this.wrapTable(segment)
-        : this.wrapValue(segment);
-    }).implode('.');
+    return new Collection(segments)
+      .map((segment: string, key: number) => {
+        return key == 0 && segments.length > 1
+          ? this.wrapTable(segment)
+          : this.wrapValue(segment)
+      })
+      .implode('.')
   }
 
   /**
@@ -140,10 +152,10 @@ export abstract class Grammar {
    */
   protected wrapValue(value: string): string {
     if (value !== '*') {
-      return '"' + value.replace('"', '""') + '"';
+      return '"' + value.replace('"', '""') + '"'
     }
 
-    return value;
+    return value
   }
 
   /**
@@ -155,7 +167,9 @@ export abstract class Grammar {
    * @throws \RuntimeException
    */
   protected wrapJsonSelector(value: string): string {
-    throw new Error('RuntimeException: This database engine does not support JSON operations.');
+    throw new Error(
+      'RuntimeException: This database engine does not support JSON operations.'
+    )
   }
 
   /**
@@ -165,7 +179,7 @@ export abstract class Grammar {
    * @return bool
    */
   protected isJsonSelector(value: string): boolean {
-    return value.includes('->');
+    return value.includes('->')
   }
 
   /**
@@ -176,7 +190,7 @@ export abstract class Grammar {
    */
   public columnize(columns: Array<Expression | string>): string {
     // return implode(', ', array_map($this->wrap(...), $columns));
-    return columns.map(column => this.wrap(column)).join(', ')
+    return columns.map((column) => this.wrap(column)).join(', ')
   }
 
   // /**
@@ -235,7 +249,7 @@ export abstract class Grammar {
    * @return bool
    */
   public isExpression(value: unknown) {
-    return value instanceof Expression;
+    return value instanceof Expression
   }
 
   /**
@@ -246,10 +260,10 @@ export abstract class Grammar {
    */
   public getValue(expression: Expression | string | number): string | number {
     if (this.isExpression(expression)) {
-      return this.getValue(expression.getValue(this));
+      return this.getValue(expression.getValue(this))
     }
 
-    return expression;
+    return expression
   }
 
   /**
@@ -258,7 +272,7 @@ export abstract class Grammar {
    * @return string
    */
   public getDateFormat(): string {
-    return 'Y-m-d H:i:s';
+    return 'Y-m-d H:i:s'
   }
 
   // /**
