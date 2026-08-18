@@ -1,12 +1,12 @@
 import { CustomException } from '../../Support/helpers'
 import { Statement } from '../Statements'
 
-export default class Driver {
+export class Driver {
   /** @type {string} */
-  dsn
+  protected dsn: string
 
   /** @type {Record<string, unknown>} */
-  options = {}
+  protected options: Record<string, unknown> = {}
 
   /**
    * Creates an instance of Statement.

@@ -7,6 +7,7 @@ import { getConnection } from './getConnection'
 
 export const getBuilder = (connection?: any, grammar?: any, processor?: any) => {
   const connectionInstance = connection ?? getConnection()
+
   return new Builder(
     connectionInstance,
     grammar ?? new Grammar(connectionInstance),

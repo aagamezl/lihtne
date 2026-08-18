@@ -1,4 +1,4 @@
-import { Expression as ExpressionContract } from '../../Contracts/Database/Query/Expression'
+import { type Expression as ExpressionContract } from '../../Contracts/Database/Query/Expression'
 import { Grammar } from '../Grammar'
 
 /**

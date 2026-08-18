@@ -1,5 +1,5 @@
 import { CustomException } from '../../Support'
-import { Bindings } from '../Query'
+import { type Bindings } from '../Query'
 
 export type Result = {
   rows: Record<string, unknown>[]
