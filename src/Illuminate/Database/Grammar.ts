@@ -1,17 +1,18 @@
-import { Connection } from "./Connection";
-import { Expression } from "./Query/Expression";
+import { Collection } from '../Collections/Collection'
+import { Connection } from './Connection'
+import { Expression } from './Query/Expression'
 
 export abstract class Grammar {
   //   use Macroable;
 
   // The connection used for escaping values.
-  protected connection;
+  protected connection
 
   /**
    * Create a new grammar instance.
    */
   public constructor(connection: Connection) {
-    this.connection = connection;
+    this.connection = connection
   }
 
   // /**
@@ -20,7 +21,7 @@ export abstract class Grammar {
   //  * @param  array<\Illuminate\Contracts\Database\Query\Expression|string>  $values
   //  * @return array<string>
   //  */
-  // public function wrapArray(array $values)
+  // public wrapArray(array $values)
   // {
   //     return array_map($this->wrap(...), $values);
   // }
@@ -32,75 +33,78 @@ export abstract class Grammar {
    * @param  string|null  prefix
    * @return string | number
    */
-  public wrapTable(table: Expression | string, prefix: string | null = null): string | number {
+  public wrapTable(
+    table: Expression | string,
+    prefix: string | null = null
+  ): string | number {
     if (this.isExpression(table)) {
-      return this.getValue(table);
+      return this.getValue(table)
     }
 
-    prefix ??= this.connection.getTablePrefix();
+    prefix ??= this.connection.getTablePrefix()
 
     // If the table being wrapped has an alias we'll need to separate the pieces
     // so we can prefix the table and then wrap each of the segments on their
     // own and then join these both back together using the "as" connector.
-    if (table.includes(' as ')) {
-      return this.wrapAliasedTable(table, prefix);
+    if (String(table).includes(' as ')) {
+      console.log('table: %o', table.toString())
+
+      return this.wrapAliasedTable(table, prefix)
     }
 
     // If the table being wrapped has a custom schema name specified, we need to
     // prefix the last segment as the table name then wrap each segment alone
     // and eventually join them both back together using the dot connector.
-    if (table.includes('.')) {
-      table = table.replace('.' + prefix, '.' + prefix);
+    if (String(table).includes('.')) {
+      table = String(table).replace('.' + prefix, '.' + prefix)
 
-      return (new Collection(table.split('.')))
+      return new Collection(String(table).split('.'))
         .map(this.wrapValue.bind(this))
-        .implode('.');
+        .implode('.')
     }
 
-    return this.wrapValue(prefix + table);
+    return this.wrapValue(prefix + table)
   }
 
-  // /**
-  //  * Wrap a value in keyword identifiers.
-  //  *
-  //  * @param  \Illuminate\Contracts\Database\Query\Expression|string  $value
-  //  * @return string
-  //  */
-  // public function wrap($value)
-  // {
-  //     if ($this->isExpression($value)) {
-  //         return $this->getValue($value);
-  //     }
+  /**
+   * Wrap a value in keyword identifiers.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression|string  $value
+   * @return string
+   */
+  public wrap(value: Expression | string): string | number {
+    if (this.isExpression(value)) {
+      return this.getValue(value)
+    }
 
-  //     // If the value being wrapped has a column alias we will need to separate out
-  //     // the pieces so we can wrap each of the segments of the expression on its
-  //     // own, and then join these both back together using the "as" connector.
-  //     if (stripos($value, ' as ') !== false) {
-  //         return $this->wrapAliasedValue($value);
-  //     }
+    // If the value being wrapped has a column alias we will need to separate out
+    // the pieces so we can wrap each of the segments of the expression on its
+    // own, and then join these both back together using the "as" connector.
+    if (value.includes(' as ')) {
+      return this.wrapAliasedValue(value)
+    }
 
-  //     // If the given value is a JSON selector we will wrap it differently than a
-  //     // traditional value. We will need to split this path and wrap each part
-  //     // wrapped, etc. Otherwise, we will simply wrap the value as a string.
-  //     if ($this->isJsonSelector($value)) {
-  //         return $this->wrapJsonSelector($value);
-  //     }
+    // If the given value is a JSON selector we will wrap it differently than a
+    // traditional value. We will need to split this path and wrap each part
+    // wrapped, etc. Otherwise, we will simply wrap the value as a string.
+    if (this.isJsonSelector(value)) {
+      return this.wrapJsonSelector(value)
+    }
 
-  //     return $this->wrapSegments(explode('.', $value));
-  // }
+    return this.wrapSegments(value.split('.'))
+  }
 
-  // /**
-  //  * Wrap a value that has an alias.
-  //  *
-  //  * @param  string  $value
-  //  * @return string
-  //  */
-  // protected function wrapAliasedValue($value)
-  // {
-  //     $segments = preg_split('/\s+as\s+/i', $value);
+  /**
+   * Wrap a value that has an alias.
+   *
+   * @param  string  $value
+   * @return string
+   */
+  protected wrapAliasedValue(value: string): string {
+    const segments = value.split(/\s+as\s+/i)
 
-  //     return $this->wrap($segments[0]).' as '.$this->wrapValue($segments[1]);
-  // }
+    return this.wrap(segments[0]!) + ' as ' + this.wrapValue(segments[1]!)
+  }
 
   /**
    * Wrap a table that has an alias.
@@ -109,28 +113,36 @@ export abstract class Grammar {
    * @param  string|null  $prefix
    * @return string
    */
-  protected wrapAliasedTable(value: string, prefix: string | null = null): string {
-    const segments = value.split(/\s+as\s+/i);
+  protected wrapAliasedTable(
+    value: string,
+    prefix: string | null = null
+  ): string {
+    const segments = value.split(/\s+as\s+/i)
 
-    prefix ??= this.connection.getTablePrefix();
+    prefix ??= this.connection.getTablePrefix()
 
-    return this.wrapTable(segments[0]!, prefix) + ' as ' + this.wrapValue(prefix + segments[1]!);
+    return (
+      this.wrapTable(segments[0]!, prefix) +
+      ' as ' +
+      this.wrapValue(prefix + segments[1]!)
+    )
   }
 
-  // /**
-  //  * Wrap the given value segments.
-  //  *
-  //  * @param  list<string>  $segments
-  //  * @return string
-  //  */
-  // protected function wrapSegments($segments)
-  // {
-  //     return (new Collection($segments))->map(function ($segment, $key) use ($segments) {
-  //         return $key == 0 && count($segments) > 1
-  //             ? $this->wrapTable($segment)
-  //             : $this->wrapValue($segment);
-  //     })->implode('.');
-  // }
+  /**
+   * Wrap the given value segments.
+   *
+   * @param  list<string>  $segments
+   * @return string
+   */
+  protected wrapSegments(segments: string[]) {
+    return new Collection(segments)
+      .map((segment: string, key: number) => {
+        return key == 0 && segments.length > 1
+          ? this.wrapTable(segment)
+          : this.wrapValue(segment)
+      })
+      .implode('.')
+  }
 
   /**
    * Wrap a single string in keyword identifiers.
@@ -140,46 +152,46 @@ export abstract class Grammar {
    */
   protected wrapValue(value: string): string {
     if (value !== '*') {
-      return '"' + value.replace('"', '""') + '"';
+      return '"' + value.replace('"', '""') + '"'
     }
 
-    return value;
+    return value
   }
 
-  // /**
-  //  * Wrap the given JSON selector.
-  //  *
-  //  * @param  string  $value
-  //  * @return string
-  //  *
-  //  * @throws \RuntimeException
-  //  */
-  // protected function wrapJsonSelector($value)
-  // {
-  //     throw new RuntimeException('This database engine does not support JSON operations.');
-  // }
+  /**
+   * Wrap the given JSON selector.
+   *
+   * @param  string  $value
+   * @return string
+   *
+   * @throws \RuntimeException
+   */
+  protected wrapJsonSelector(value: string): string {
+    throw new Error(
+      'RuntimeException: This database engine does not support JSON operations.'
+    )
+  }
 
-  // /**
-  //  * Determine if the given string is a JSON selector.
-  //  *
-  //  * @param  string  $value
-  //  * @return bool
-  //  */
-  // protected function isJsonSelector($value)
-  // {
-  //     return str_contains($value, '->');
-  // }
+  /**
+   * Determine if the given string is a JSON selector.
+   *
+   * @param  string  $value
+   * @return bool
+   */
+  protected isJsonSelector(value: string): boolean {
+    return value.includes('->')
+  }
 
-  // /**
-  //  * Convert an array of column names into a delimited string.
-  //  *
-  //  * @param  array<\Illuminate\Contracts\Database\Query\Expression|string>  $columns
-  //  * @return string
-  //  */
-  // public function columnize(array $columns)
-  // {
-  //     return implode(', ', array_map($this->wrap(...), $columns));
-  // }
+  /**
+   * Convert an array of column names into a delimited string.
+   *
+   * @param  array<\Illuminate\Contracts\Database\Query\Expression|string>  $columns
+   * @return string
+   */
+  public columnize(columns: Array<Expression | string>): string {
+    // return implode(', ', array_map($this->wrap(...), $columns));
+    return columns.map((column) => this.wrap(column)).join(', ')
+  }
 
   // /**
   //  * Create query parameter place-holders for an array.
@@ -187,7 +199,7 @@ export abstract class Grammar {
   //  * @param  array<mixed>  $values
   //  * @return string
   //  */
-  // public function parameterize(array $values)
+  // public parameterize(array $values)
   // {
   //     return implode(', ', array_map($this->parameter(...), $values));
   // }
@@ -198,7 +210,7 @@ export abstract class Grammar {
   //  * @param  mixed  $value
   //  * @return string
   //  */
-  // public function parameter($value)
+  // public parameter($value)
   // {
   //     return $this->isExpression($value) ? $this->getValue($value) : '?';
   // }
@@ -209,7 +221,7 @@ export abstract class Grammar {
   //  * @param  string|array<string>  $value
   //  * @return string
   //  */
-  // public function quoteString($value)
+  // public quoteString($value)
   // {
   //     if (is_array($value)) {
   //         return implode(', ', array_map([$this, __FUNCTION__], $value));
@@ -225,7 +237,7 @@ export abstract class Grammar {
   //  * @param  bool  $binary
   //  * @return string
   //  */
-  // public function escape($value, $binary = false)
+  // public escape($value, $binary = false)
   // {
   //     return $this->connection->escape($value, $binary);
   // }
@@ -237,7 +249,7 @@ export abstract class Grammar {
    * @return bool
    */
   public isExpression(value: unknown) {
-    return value instanceof Expression;
+    return value instanceof Expression
   }
 
   /**
@@ -248,21 +260,20 @@ export abstract class Grammar {
    */
   public getValue(expression: Expression | string | number): string | number {
     if (this.isExpression(expression)) {
-      return this.getValue(expression.getValue(this));
+      return this.getValue(expression.getValue(this))
     }
 
-    return expression;
+    return expression
   }
 
-  // /**
-  //  * Get the format for database stored dates.
-  //  *
-  //  * @return string
-  //  */
-  // public function getDateFormat()
-  // {
-  //     return 'Y-m-d H:i:s';
-  // }
+  /**
+   * Get the format for database stored dates.
+   *
+   * @return string
+   */
+  public getDateFormat(): string {
+    return 'Y-m-d H:i:s'
+  }
 
   // /**
   //  * Get the grammar's table prefix.
@@ -271,7 +282,7 @@ export abstract class Grammar {
   //  *
   //  * @return string
   //  */
-  // public function getTablePrefix()
+  // public getTablePrefix()
   // {
   //     return $this->connection->getTablePrefix();
   // }
@@ -284,7 +295,7 @@ export abstract class Grammar {
   //  * @param  string  $prefix
   //  * @return $this
   //  */
-  // public function setTablePrefix($prefix)
+  // public setTablePrefix($prefix)
   // {
   //     $this->connection->setTablePrefix($prefix);
 

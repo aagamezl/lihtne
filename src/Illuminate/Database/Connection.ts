@@ -714,14 +714,15 @@ export class Connection {
   public prepareBindings(bindings: Bindings) {
     const grammar = this.getQueryGrammar()
 
-    for (const [key, value]: [BindingsKeys, unknown] of typedEntries(bindings)) {
+    // for (const [key, value]: [BindingsKeys, unknown] of typedEntries(bindings)) {
+    for (const [key, value] of typedEntries(bindings)) {
       // We need to transform all instances of DateTimeInterface into the actual
       // date string. Each query grammar maintains its own date string format
       // so we'll just ask the grammar for the format to get from the date.
       if (value instanceof Date) {
         bindings[key] = dateFormat(value, grammar.getDateFormat())
       } else if (typeof value === 'boolean') {
-        bindings[key] = Number(value)
+        bindings[key] = parseInt(value, 10)
       }
     }
 

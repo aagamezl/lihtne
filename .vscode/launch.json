@@ -56,7 +56,7 @@
     // Posted by Alberto S.
     // Retrieved 2026-03-13, License - CC BY-SA 4.0
     {
-      "name": "Jest file",
+      "name": "Debug Jest Test",
       "type": "node",
       "request": "launch",
       "runtimeExecutable": "${workspaceRoot}/node_modules/.bin/jest",

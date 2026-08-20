@@ -3,5 +3,4 @@
  *
  * @mixin \Illuminate\Database\Query\Builder
  */
-export interface Builder {
-}
+export interface Builder {}

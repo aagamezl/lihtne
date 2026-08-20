@@ -1,5 +1,3 @@
-import { type Builder as BuilderContract } from "../../Contracts/Database/Eloquent/Builder";
+import { type Builder as BuilderContract } from '../../Contracts/Database/Eloquent/Builder'
 
-export class Builder implements BuilderContract {
-
-}
+export class Builder implements BuilderContract {}

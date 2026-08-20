@@ -1,5 +1,5 @@
-import { Connection } from "../Connection";
-import { Statement } from "../Statements";
+import { Connection } from '../Connection'
+import { Statement } from '../Statements'
 
 export class StatementPrepared {
   /**
