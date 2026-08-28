@@ -204,16 +204,15 @@ export abstract class Grammar {
   //     return implode(', ', array_map($this->parameter(...), $values));
   // }
 
-  // /**
-  //  * Get the appropriate query parameter place-holder for a value.
-  //  *
-  //  * @param  mixed  $value
-  //  * @return string
-  //  */
-  // public parameter($value)
-  // {
-  //     return $this->isExpression($value) ? $this->getValue($value) : '?';
-  // }
+  /**
+   * Get the appropriate query parameter place-holder for a value.
+   *
+   * @param  mixed  $value
+   * @return string
+   */
+  public parameter(value: unknown) {
+    return this.isExpression(value) ? this.getValue(value) : '?'
+  }
 
   // /**
   //  * Quote the given string literal.

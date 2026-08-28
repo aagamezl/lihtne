@@ -1,7 +1,7 @@
 import { describe, expect, jest, test } from '@jest/globals'
 
 import { getBuilder } from './helpers/getBuilder'
-// import { getMySqlBuilderWithProcessor } from './helpers/getMySqlBuilderWithProcessor'
+import { getMySqlBuilderWithProcessor } from './helpers/getMySqlBuilderWithProcessor'
 import { getConnection } from './helpers/getConnection'
 
 describe('Database Query Builder', () => {
@@ -56,20 +56,20 @@ describe('Database Query Builder', () => {
     expect(connection.select).toHaveBeenCalledTimes(3)
   })
 
-  // test('testBasicMySqlSelect', async () => {
-  //   const builder = getMySqlBuilderWithProcessor()
+  test('testBasicMySqlSelect', async () => {
+    const builder = getMySqlBuilderWithProcessor()
 
-  //   const connection = builder.getConnection()
+    const connection = builder.getConnection()
 
-  //   jest.spyOn(connection, 'select')
-  //     .mockImplementationOnce((sql: string) => {
-  //       expect(sql).toBe('select * from `users`')
+    jest.spyOn(connection, 'select')
+      .mockImplementationOnce((sql: string) => {
+        expect(sql).toBe('select * from `users`')
 
-  //       return Promise.resolve([])
-  //     })
-  //   // connectionMock.expects('select').once()
-  //   //   .withArgs('select * from `users`', [])
+        return Promise.resolve([])
+      })
+    // connectionMock.expects('select').once()
+    //   .withArgs('select * from `users`', [])
 
-  //   await builder.select('*').from('users').get()
-  // })
+    await builder.select('*').from('users').get()
+  })
 })

@@ -13,6 +13,21 @@ type Prettify<T> = {
   [K in keyof T]: T[K]
 } & {}
 
+export type Where = {
+  column?: string | Expression
+  type: string
+  not?: boolean
+  operator?: string
+  value?: unknown
+  boolean: string
+  sql?: string | Expression
+  options?: Options
+  query?: Builder
+  values?: unknown[] | Record<string, unknown>
+  columns?: Array<string | Expression>
+  caseSensitive?: boolean
+}
+
 export type Bindings = {
   select: unknown[]
   from: unknown[]
@@ -193,12 +208,12 @@ export class Builder {
    */
   public lockProperty: string | boolean | null = null
 
-  // /**
-  //  * The query execution timeout in seconds.
-  //  *
-  //  * @var int|null
-  //  */
-  // public $timeout;
+  /**
+   * The query execution timeout in seconds.
+   *
+   * @var int|null
+   */
+  public timeout: number | undefined;
 
   // The callbacks that should be invoked before the query is executed.
   public beforeQueryCallbacks: Array<(query: Builder) => void> = []

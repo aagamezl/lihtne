@@ -6,7 +6,9 @@ import { mix } from '../Support/Traits/use'
 import { Arr, type MapCallback } from './Arr'
 import { iterableValues } from '../Support'
 
-export class Collection extends mix().use(EnumeratesValues, Macroable) {
+export interface Collection extends EnumeratesValues, Macroable {}
+
+export class Collection extends mix().use([EnumeratesValues, Macroable]) {
   /**
    * The items contained in the collection.
    *

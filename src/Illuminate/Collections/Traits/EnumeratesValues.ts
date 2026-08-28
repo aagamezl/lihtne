@@ -1,11 +1,12 @@
 import { isPrimitive } from 'es-toolkit'
 
-import { type Constructor } from '../../Support/Traits/use'
+// import { type Constructor } from '../../Support/Traits/use'
 import { isEnum } from '../../Support'
 import { Arr } from '../Arr'
 
-export const EnumeratesValues = <TBase extends Constructor>(Base: TBase) => {
-  return class extends Base {
+// export const EnumeratesValues = <TBase extends Constructor>(Base: TBase) => {
+//   return class extends Base {
+export class EnumeratesValues {
     //     /**
     //  * Indicates that the object's string representation should be escaped when __toString is invoked.
     //  *
@@ -1155,4 +1156,4 @@ export const EnumeratesValues = <TBase extends Constructor>(Base: TBase) => {
     //     return fn ($value) => $value;
     // }
   }
-}
+// }

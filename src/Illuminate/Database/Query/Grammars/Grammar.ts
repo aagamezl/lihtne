@@ -1,24 +1,27 @@
 import { isNull, upperFirst } from 'es-toolkit'
 
 import { Grammar as BaseGrammar } from '../../Grammar'
-import { type Agregate, type Bindings, Builder } from '../Builder'
+import { type Agregate, type Bindings, Builder, type Where } from '../Builder'
 import { isEmpty } from '../../../Support/helpers'
 import { Expression } from '../Expression'
+import { mixing } from '../../../Support/Traits'
+import { CompilesJsonPaths } from '../../Concerns/CompilesJsonPaths'
 
 export type SelectComponent = {
   name: string
   property: keyof Builder
 }
 
-export class Grammar extends BaseGrammar {
-  // use CompilesJsonPaths;
+export interface Grammar extends BaseGrammar, CompilesJsonPaths { }
 
-  // /**
-  //  * The grammar specific operators.
-  //  *
-  //  * @var array
-  //  */
-  // protected $operators = [];
+// export class Grammar extends BaseGrammar {
+export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) implements Grammar {
+  /**
+   * The grammar specific operators.
+   *
+   * @var array
+   */
+  protected operators: string[] = [];
 
   // /**
   //  * The grammar specific bitwise operators.
@@ -293,21 +296,20 @@ export class Grammar extends BaseGrammar {
   //     return $where['sql'] instanceof Expression ? $where['sql']->getValue($this) : $where['sql'];
   // }
 
-  // /**
-  //  * Compile a basic where clause.
-  //  *
-  //  * @param  \Illuminate\Database\Query\Builder  $query
-  //  * @param  array  $where
-  //  * @return string
-  //  */
-  // protected function whereBasic(Builder $query, $where)
-  // {
-  //     $value = $this->parameter($where['value']);
+  /**
+   * Compile a basic where clause.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $where
+   * @return string
+   */
+  protected whereBasic(query: Builder, where: Where) {
+    const value = this.parameter(where.value);
 
-  //     $operator = str_replace('?', '??', $where['operator']);
+    const operator = where.operator!.replace('?', '??')
 
-  //     return $this->wrap($where['column']).' '.$operator.' '.$value;
-  // }
+    return this.wrap(where.column!) + ' ' + operator + ' ' + value;
+  }
 
   // /**
   //  * Compile a bitwise operator where clause.
@@ -419,29 +421,27 @@ export class Grammar extends BaseGrammar {
   //     return '0 = 1';
   // }
 
-  // /**
-  //  * Compile a "where null" clause.
-  //  *
-  //  * @param  \Illuminate\Database\Query\Builder  $query
-  //  * @param  array  $where
-  //  * @return string
-  //  */
-  // protected function whereNull(Builder $query, $where)
-  // {
-  //     return $this->wrap($where['column']).' is null';
-  // }
+  /**
+   * Compile a "where null" clause.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $where
+   * @return string
+   */
+  protected whereNull(query: Builder, where: Where): string {
+    return this.wrap(where.column!) + ' is null';
+  }
 
-  // /**
-  //  * Compile a "where not null" clause.
-  //  *
-  //  * @param  \Illuminate\Database\Query\Builder  $query
-  //  * @param  array  $where
-  //  * @return string
-  //  */
-  // protected function whereNotNull(Builder $query, $where)
-  // {
-  //     return $this->wrap($where['column']).' is not null';
-  // }
+  /**
+   * Compile a "where not null" clause.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $where
+   * @return string
+   */
+  protected whereNotNull(query: Builder, where: Where): string {
+    return this.wrap(where.column!) + ' is not null';
+  }
 
   // /**
   //  * Compile a "between" where clause.

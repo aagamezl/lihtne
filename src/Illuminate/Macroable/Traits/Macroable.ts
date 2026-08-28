@@ -1,4 +1,4 @@
-import { type Constructor } from '../../Support/Traits/use'
+// import { type Constructor } from '../../Support/Traits/use'
 
 // const Macroable = (superclass: Constructor): Constructor => class extends superclass {
 //   // The registered string macros.
@@ -53,8 +53,9 @@ import { type Constructor } from '../../Support/Traits/use'
 
 type MacroFn = (...args: any[]) => any
 
-export const Macroable = <TBase extends Constructor>(Base: TBase) => {
-  return class extends Base {
+// export const Macroable = <TBase extends Constructor>(Base: TBase) => {
+//   return class extends Base {
+export class Macroable {
     // The registered string macros.
     static macros: Record<string, object | MacroFn> = {}
 
@@ -103,5 +104,5 @@ export const Macroable = <TBase extends Constructor>(Base: TBase) => {
 
       return macro(...parameters)
     }
-  }
+  // }
 }

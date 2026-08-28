@@ -16,15 +16,14 @@ export type QueryLogEntry = {
   time: number
 }
 
+export type Reconnector = (connection: Connection) => unknown;
+
 export class Connection {
   // use DetectsConcurrencyErrors,
   //     DetectsLostConnections,
   //     Concerns\ManagesTransactions,
   //     InteractsWithTime,
   //     Macroable;
-
-  // The active PDO connection.
-  protected ndo: Statement | any; // TODO: verify the real type and remove the any;
 
   /**
    * The active driver connection.
@@ -62,7 +61,7 @@ export class Connection {
    *
    * @var (callable(\Illuminate\Database\Connection): mixed)
    */
-  protected reconnector = () => { };
+  protected reconnector: Reconnector = () => { };
 
   // The query grammar implementation.
   protected queryGrammar: QueryGrammar | undefined = undefined;
@@ -105,12 +104,12 @@ export class Connection {
   //  */
   // protected $transactionsManager;
 
-  // /**
-  //  * Indicates if changes have been made to the database.
-  //  *
-  //  * @var bool
-  //  */
-  // protected $recordsModified = false;
+  /**
+   * Indicates if changes have been made to the database.
+   *
+   * @var bool
+   */
+  protected recordsModified = false;
 
   // /**
   //  * Indicates if the connection should use the "write" PDO connection.
@@ -496,17 +495,16 @@ export class Connection {
     return this.driver
   }
 
-  // /**
-  //  * Run an insert statement against the database.
-  //  *
-  //  * @param  string  $query
-  //  * @param  array  $bindings
-  //  * @return bool
-  //  */
-  // public insert($query, $bindings = [])
-  // {
-  //     return $this->statement($query, $bindings);
-  // }
+  /**
+   * Run an insert statement against the database.
+   *
+   * @param  string  $query
+   * @param  array  $bindings
+   * @return bool
+   */
+  public insert(query: string, bindings: Bindings) {
+    return this.statement(query, bindings);
+  }
 
   // /**
   //  * Run an update statement against the database.
@@ -532,29 +530,28 @@ export class Connection {
   //     return $this->affectingStatement($query, $bindings);
   // }
 
-  // /**
-  //  * Execute an SQL statement and return the boolean result.
-  //  *
-  //  * @param  string  $query
-  //  * @param  array  $bindings
-  //  * @return bool
-  //  */
-  // public statement($query, $bindings = [])
-  // {
-  //     return $this->run($query, $bindings, ($query, $bindings) {
-  //         if ($this->pretending()) {
-  //             return true;
-  //         }
+  /**
+   * Execute an SQL statement and return the boolean result.
+   *
+   * @param  string  $query
+   * @param  array  $bindings
+   * @return bool
+   */
+  public statement(query: string, bindings: Bindings = []) {
+    return this.run(query, bindings, (query, bindings) {
+      if (this.pretending()) {
+        return true;
+      }
 
-  //         $statement = $this->getPdo()->prepare($query);
+      const statement = this.getDriver().prepare(query)
 
-  //         $this->bindValues($statement, $this->prepareBindings($bindings));
+      this.bindValues(statement, this.prepareBindings(bindings));
 
-  //         $this->recordsHaveBeenModified();
+      this.recordsHaveBeenModified();
 
-  //         return $statement->execute();
-  //     });
-  // }
+      return statement.execute();
+    });
+  }
 
   // /**
   //  * Run an SQL statement and get the number of rows affected.
@@ -801,7 +798,7 @@ export class Connection {
     // message to include the bindings with SQL, which will make this exception a
     // lot more helpful to the developer instead of just the database's errors.
     catch (e) {
-      const exceptionType = this.isUniqueConstraintError(e)
+      const exceptionType = this.isUniqueConstraintError(e as Error)
         ? 'UniqueConstraintViolationException'
         : 'QueryException';
 
@@ -995,7 +992,7 @@ export class Connection {
    * @return void
    */
   reconnectIfMissingConnection() {
-    if (isNil(this.ndo)) {
+    if (isNil(this.driver)) {
       this.reconnect();
     }
   }
@@ -1130,16 +1127,15 @@ export class Connection {
   //     return $this->getReadPdo()->quote($value);
   // }
 
-  // /**
-  //  * Escape a boolean value for safe SQL embedding.
-  //  *
-  //  * @param  bool  $value
-  //  * @return string
-  //  */
-  // protected escapeBool($value)
-  // {
-  //     return $value ? '1' : '0';
-  // }
+  /**
+   * Escape a boolean value for safe SQL embedding.
+   *
+   * @param  bool  $value
+   * @return string
+   */
+  protected escapeBool(value: boolean): string {
+    return value ? '1' : '0';
+  }
 
   // /**
   //  * Escape a binary value for safe SQL embedding.
@@ -1154,41 +1150,38 @@ export class Connection {
   //     throw new RuntimeException('The database connection does not support escaping binary values.');
   // }
 
-  // /**
-  //  * Determine if the database connection has modified any database records.
-  //  *
-  //  * @return bool
-  //  */
-  // public hasModifiedRecords()
-  // {
-  //     return $this->recordsModified;
-  // }
+  /**
+   * Determine if the database connection has modified any database records.
+   *
+   * @return bool
+   */
+  public hasModifiedRecords(): boolean {
+    return this.recordsModified;
+  }
 
-  // /**
-  //  * Indicate if any records have been modified.
-  //  *
-  //  * @param  bool  $value
-  //  * @return void
-  //  */
-  // public recordsHaveBeenModified($value = true)
-  // {
-  //     if (! $this->recordsModified) {
-  //         $this->recordsModified = $value;
-  //     }
-  // }
+  /**
+   * Indicate if any records have been modified.
+   *
+   * @param  bool  $value
+   * @return void
+   */
+  public recordsHaveBeenModified(value = true) {
+    if (!this.recordsModified) {
+      this.recordsModified = value;
+    }
+  }
 
-  // /**
-  //  * Set the record modification state.
-  //  *
-  //  * @param  bool  $value
-  //  * @return $this
-  //  */
-  // public setRecordModificationState(bool $value)
-  // {
-  //     $this->recordsModified = $value;
+  /**
+   * Set the record modification state.
+   *
+   * @param  bool  $value
+   * @return $this
+   */
+  public setRecordModificationState(value: boolean) {
+    this.recordsModified = value;
 
-  //     return $this;
-  // }
+    return this;
+  }
 
   // /**
   //  * Reset the record modification state.
@@ -1687,15 +1680,14 @@ export class Connection {
   //     }
   // }
 
-  // /**
-  //  * Get the server version for the connection.
-  //  *
-  //  * @return string
-  //  */
-  // public getServerVersion(): string
-  // {
-  //     return $this->getPdo()->getAttribute(PDO::ATTR_SERVER_VERSION);
-  // }
+  /**
+   * Get the server version for the connection.
+   *
+   * @return string
+   */
+  public getServerVersion(): string {
+    return this.getDriver().getAttribute(Driver.ATTR_SERVER_VERSION)
+  }
 
   // /**
   //  * Register a connection resolver.

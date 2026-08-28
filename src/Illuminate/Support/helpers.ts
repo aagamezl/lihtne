@@ -1,3 +1,24 @@
+/**
+ *
+ * @param {string} str
+ * @returns {string}
+ */
+export const hex2bin = (str: string): string => {
+  // Treat each character's code as a byte (0‑255)
+  let hex = '';
+
+  for (let i = 0; i < str.length; i++) {
+    const code = str.charCodeAt(i);
+    if (code > 255) {
+      throw new Error('Byte value exceeds 255');
+    }
+
+    hex += code.toString(16).padStart(2, '0');
+  }
+
+  return hex;
+}
+
 export const findKey = <TKey, TValue>(
   obj: any,
   callback: ((value: TValue, key: TKey) => boolean) | undefined
@@ -78,4 +99,33 @@ export type Entries<T> = {
 
 export const typedEntries = <T extends object>(obj: T): Entries<T> => {
   return Object.entries(obj) as Entries<T>
+}
+
+/**
+ * The match expression branches evaluation based on an identity check of a
+ * value. Similarly to a switch statement, a match expression has a subject
+ * expression that is compared against multiple alternatives.
+ *
+ */
+export const match = (condition: any, matcher: Record<string, unknown>) => {
+  const regex = /^.*\,?.*$/g
+
+  for (const [key, value] of Object.entries(matcher)) {
+    console.log(key)
+    if (key.match(regex) !== null) {
+      const keyArray = key.split(',')
+      console.log(keyArray)
+      if (keyArray.includes(String(condition))) {
+        return value
+      }
+    } else {
+      return matcher[condition] ?? matcher['default']
+    }
+  }
+
+  if (matcher['default']) {
+    return matcher['default']
+  }
+
+  throw new Error('UnhandledMatchError')
 }
