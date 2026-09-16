@@ -1,0 +1,46 @@
+{
+  "name": "lihtne",
+  "version": "1.0.0",
+  "description": "Lihtne is a Node.js object-relational mapper (ORM) inspired by Laravel Eloquent. Lihtne is a translation of the magnificent ORM that is Laravel Eloquent.",
+  "main": "index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "format": "prettier --write \"src/**/*.ts\" --write \"test/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\" --check \"test/**/*.ts\"",
+    "lint": "Linter not setup yet && exit 0",
+    "prepare": "husky",
+    "start": "node dist/index.js",
+    "test": "NODE_ENV=test NODE_OPTIONS=--experimental-vm-modules jest --coverage --runInBand",
+    "test:watch": "npm run test -- --watch"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aagamezl/lihtne.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/aagamezl/lihtne/issues"
+  },
+  "homepage": "https://github.com/aagamezl/lihtne#readme",
+  "devDependencies": {
+    "@jest/globals": "^30.5.1",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^22.20.3",
+    "commitizen": "^4.3.2",
+    "cz-conventional-changelog": "^3.3.0",
+    "jest": "^30.5.1",
+    "prettier": "^3.9.6",
+    "ts-jest": "^29.4.12",
+    "tsx": "^4.23.13",
+    "typescript": "^6.0.3"
+  },
+  "config": {
+    "commitizen": {
+      "path": "./node_modules/cz-conventional-changelog"
+    }
+  }
+}
