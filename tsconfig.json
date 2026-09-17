@@ -1,56 +1,3 @@
-// {
-//   // Visit https://aka.ms/tsconfig to read more about this file
-//   "compilerOptions": {
-//     // File Layout
-//     // "rootDir": "./src",
-//     "outDir": "./dist",
-
-//     // Environment Settings
-//     // See also https://aka.ms/tsconfig/module
-//     "module": "nodenext",
-//     "moduleResolution": "nodenext",
-//     "target": "esnext",
-//     "lib": ["esnext"],
-//     "types": ["node"],
-//     // and npm install -D @types/node
-
-//     // Other Outputs
-//     "sourceMap": true,
-//     "declaration": true,
-//     "declarationMap": true,
-
-//     // Stricter Typechecking Options
-//     "noUncheckedIndexedAccess": true,
-//     "exactOptionalPropertyTypes": true,
-
-//     // Style Options
-//     "noImplicitReturns": true,
-//     // "noImplicitOverride": true,
-//     // "noUnusedLocals": true,
-//     // "noUnusedParameters": true,
-//     // "noFallthroughCasesInSwitch": true,
-//     // "noPropertyAccessFromIndexSignature": true,
-//     "alwaysStrict": true,
-//     "noImplicitAny": true,
-
-//     // Recommended Options
-//     "strict": true,
-//     "verbatimModuleSyntax": false,
-//     "isolatedModules": true,
-//     "noUncheckedSideEffectImports": true,
-//     "moduleDetection": "force",
-//     "skipLibCheck": true,
-//   },
-//   "include": [
-//     "src/**/*",
-//     "test/**/*"
-//   ],
-//   "exclude": [
-//     "node_modules",
-//     "dist"
-//   ]
-// }
-
 {
   // Visit https://aka.ms/tsconfig to read more about this file
   "compilerOptions": {
@@ -65,7 +12,7 @@
       "esnext"
     ],
     "types": [
-      "node"
+      "node",
     ],
     // Other Outputs
     "sourceMap": true,
