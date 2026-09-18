@@ -1,2 +1,2 @@
-export * from './Expression'
 export * from './Builder'
+export * from './Expression'

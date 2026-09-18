@@ -1,5 +1,6 @@
+import type { Connection } from './Connection'
+
 import { Collection } from '../Collections/Collection'
-import { Connection } from './Connection'
 import { Expression } from './Query/Expression'
 
 export abstract class Grammar {
@@ -11,7 +12,7 @@ export abstract class Grammar {
   /**
    * Create a new grammar instance.
    */
-  public constructor(connection: Connection) {
+  public constructor (connection: Connection) {
     this.connection = connection
   }
 
@@ -22,7 +23,7 @@ export abstract class Grammar {
    * @param  string|null  prefix
    * @return string | number
    */
-  public wrapTable(
+  public wrapTable (
     table: Expression | string,
     prefix: string | null = null
   ): string | number {
@@ -61,7 +62,7 @@ export abstract class Grammar {
    * @param  \Illuminate\Contracts\Database\Query\Expression|string  $value
    * @return string
    */
-  public wrap(value: Expression | string): string | number {
+  public wrap (value: Expression | string): string | number {
     if (this.isExpression(value)) {
       return this.getValue(value)
     }
@@ -89,7 +90,7 @@ export abstract class Grammar {
    * @param  string  $value
    * @return string
    */
-  protected wrapAliasedValue(value: string): string {
+  protected wrapAliasedValue (value: string): string {
     const segments = value.split(/\s+as\s+/i)
 
     return this.wrap(segments[0]!) + ' as ' + this.wrapValue(segments[1]!)
@@ -102,7 +103,7 @@ export abstract class Grammar {
    * @param  string|null  $prefix
    * @return string
    */
-  protected wrapAliasedTable(
+  protected wrapAliasedTable (
     value: string,
     prefix: string | null = null
   ): string {
@@ -123,7 +124,7 @@ export abstract class Grammar {
    * @param  list<string>  $segments
    * @return string
    */
-  protected wrapSegments(segments: string[]) {
+  protected wrapSegments (segments: string[]) {
     return new Collection(segments)
       .map((segment: string, key: number) => {
         return key == 0 && segments.length > 1
@@ -139,7 +140,7 @@ export abstract class Grammar {
    * @param  string  value
    * @return string
    */
-  protected wrapValue(value: string): string {
+  protected wrapValue (value: string): string {
     if (value !== '*') {
       return '"' + value.replace('"', '""') + '"'
     }
@@ -155,7 +156,8 @@ export abstract class Grammar {
    *
    * @throws \RuntimeException
    */
-  protected wrapJsonSelector(value: string): string {
+  // @ts-ignore expected error must be implemented in concrete class
+  protected wrapJsonSelector (value: string): string {
     throw new Error(
       'RuntimeException: This database engine does not support JSON operations.'
     )
@@ -167,7 +169,7 @@ export abstract class Grammar {
    * @param  string  $value
    * @return bool
    */
-  protected isJsonSelector(value: string): boolean {
+  protected isJsonSelector (value: string): boolean {
     return value.includes('->')
   }
 
@@ -177,7 +179,7 @@ export abstract class Grammar {
    * @param  array<\Illuminate\Contracts\Database\Query\Expression|string>  $columns
    * @return string
    */
-  public columnize(columns: Array<Expression | string>): string {
+  public columnize (columns: Array<Expression | string>): string {
     // return implode(', ', array_map($this->wrap(...), $columns));
     return columns.map((column) => this.wrap(column)).join(', ')
   }
@@ -188,7 +190,7 @@ export abstract class Grammar {
    * @param  mixed  $value
    * @return string
    */
-  public parameter(value: unknown) {
+  public parameter (value: unknown) {
     return this.isExpression(value) ? this.getValue(value) : '?'
   }
 
@@ -198,7 +200,7 @@ export abstract class Grammar {
    * @param  mixed  $value
    * @return bool
    */
-  public isExpression(value: unknown) {
+  public isExpression (value: unknown) {
     return value instanceof Expression
   }
 
@@ -208,7 +210,7 @@ export abstract class Grammar {
    * @param {Expression | string | number} expression - The expression to transform.
    * @returns {string | number} - The transformed value.
    */
-  public getValue(expression: Expression | string | number): string | number {
+  public getValue (expression: Expression | string | number): string | number {
     if (this.isExpression(expression)) {
       return this.getValue(expression.getValue(this))
     }
@@ -221,7 +223,7 @@ export abstract class Grammar {
    *
    * @return string
    */
-  public getDateFormat(): string {
+  public getDateFormat (): string {
     return 'Y-m-d H:i:s'
   }
 }

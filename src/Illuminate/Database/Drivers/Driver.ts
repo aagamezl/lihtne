@@ -26,7 +26,8 @@ export class Driver {
    * @param {number} attribute
    * @returns {any}
    */
-  getAttribute (attribute: string | number) {
+  // @ts-ignore expected error must be implemented in concrete class
+  public getAttribute (attribute: string | number) {
     return new Error(`RuntimeException: Implement 'getAttribute' method on concrete class.`)
   }
 
@@ -36,7 +37,8 @@ export class Driver {
    * @returns {Statement}
    * @throws {Error}
    */
-  prepare (query: string) {
+  // @ts-ignore expected error must be implemented in concrete class
+  public prepare (query: string) {
     return new Error(`RuntimeException: Implement 'prepare' method on concrete class.`)
   }
 }

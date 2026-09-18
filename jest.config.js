@@ -1,19 +1,15 @@
 /** @type {import("jest").Config} **/
 export default {
-  preset: 'ts-jest',
+  preset: 'ts-jest/presets/default-esm',
   testEnvironment: 'node',
   testPathIgnorePatterns: ['/build/', '/dist/', '/node_modules/'],
-  // testRegex: ['spec\\.[jt]s$'],
   testMatch: ['**/test/**/*.spec.ts'],
-  extensionsToTreatAsEsm: ['.ts'],
-  globals: {
-    'ts-jest': {
-      useESM: true
-    }
-  },
   transform: {
-    '^.+\\.ts?$': ['ts-jest', {
-      useESM: true
+    '^.+\\.m?tsx?$': ['ts-jest', {
+      useESM: true,
+      tsconfig: {
+        esModuleInterop: true
+      }
     }]
   }
 }

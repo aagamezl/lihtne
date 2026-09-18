@@ -63,13 +63,13 @@ export class Connection {
     this.useDefaultPostProcessor()
   }
 
-    /**
+  /**
    * Get the table prefix for the connection.
    *
    * @return string
    */
-  public getTablePrefix(): string {
-    return this.tablePrefix;
+  public getTablePrefix (): string {
+    return this.tablePrefix
   }
 
   /**

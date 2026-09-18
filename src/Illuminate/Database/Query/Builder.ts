@@ -1,9 +1,9 @@
 import type { Connection } from '../Connection'
 import type { Grammar } from '../Query/Grammars/Grammar'
 import type { Processor } from './Processors'
+
 import { Builder as EloquentBuilder } from '../Eloquent'
 import { Relation } from '../Eloquent/Relations'
-
 import { Expression } from './Expression'
 
 export type Bindings = {
@@ -114,7 +114,7 @@ export class Builder {
    *
    * @throws \InvalidArgumentException
    */
-  public selectSub (query: unknown | string, as: string) {
+  public selectSub (query: Function | Builder | EloquentBuilder | Relation | string, as: string) {
     const [subQuery, bindings] = this.createSub(query)
 
     return this.selectRaw(
@@ -135,6 +135,62 @@ export class Builder {
     if (bindings.length > 0) {
       this.addBinding(bindings, 'select')
     }
+
+    return this
+  }
+
+  /**
+ * Set the table which the query is targeting.
+ *
+ * @param  \Closure|\Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder<*>|\Illuminate\Contracts\Database\Query\Expression|string  table
+ * @param  string|null  as
+ * @return this
+ */
+  public from (
+    table: Function | Builder | EloquentBuilder | string,
+    as: string | null = null
+  ) {
+    if (this.isQueryable(table)) {
+      return this.fromSub(table, as!)
+    }
+
+    this.fromProperty = as ? `${table} as ${as}` : table
+
+    return this
+  }
+
+  /**
+   * Makes "from" fetch from a subquery.
+   *
+   * @param  \Closure|\Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder<*>|string  query
+   * @param  string  as
+   * @return this
+   *
+   * @throws \InvalidArgumentException
+   */
+  public fromSub (
+    query: Function | Builder | EloquentBuilder | string,
+    as: string
+  ) {
+    const [subQuery, bindings] = this.createSub(query)
+
+    return this.fromRaw(
+      '(' + subQuery + ') as ' + this.grammar.wrapTable(as!),
+      bindings
+    )
+  }
+
+  /**
+   * Add a raw "from" clause to the query.
+   *
+   * @param  string  $expression
+   * @param  mixed  $bindings
+   * @return $this
+   */
+  public fromRaw (expression: string, bindings: any[] = []) {
+    this.fromProperty = new Expression(expression)
+
+    this.addBinding(bindings, 'from')
 
     return this
   }
@@ -206,7 +262,9 @@ export class Builder {
    * @param  \Closure|\Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder<*>|string  $query
    * @return array
    */
-  protected createSub (query: unknown | string) {
+  protected createSub (
+    query: Function | Builder | EloquentBuilder | Relation | string
+  ): [string, unknown[]] {
     // If the given query is a Closure, we will execute it while passing in a new
     // query instance to the Closure. This will give the developer a chance to
     // format and work with the query before we cast it to a raw SQL string.
@@ -245,15 +303,18 @@ export class Builder {
    *
    * @throws \InvalidArgumentException
    */
-  protected parseSub (query: Builder | EloquentBuilder | Relation | string) {
+  protected parseSub (
+    query: Builder | EloquentBuilder | Relation | string
+  ): [string, unknown[]] {
     if (
       query instanceof Builder ||
       query instanceof EloquentBuilder ||
       query instanceof Relation
     ) {
       query = this.prependDatabaseNameIfCrossDatabaseQuery(query)
+      const builder = this.toBaseQuery(query)
 
-      return [query.toSql(), query.getBindings()]
+      return [builder.toSql(), builder.getBindings()]
     } else if (typeof query === 'string') {
       return [query, []]
     } else {
@@ -261,6 +322,15 @@ export class Builder {
         'InvalidArgumentException: A subquery must be a query builder instance, a Closure, or a string.'
       )
     }
+  }
+
+  /**
+   * Get the SQL representation of the query.
+   *
+   * @return string
+   */
+  public toSql (): string {
+    return this.grammar.compileSelect(this)
   }
 
   /**
@@ -273,24 +343,38 @@ export class Builder {
   }
 
   /**
+   * Get the base query builder instance from a subquery.
+   *
+   * @param  \Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder<*>|\Illuminate\Database\Eloquent\Relations\Relation  query
+   * @return \Illuminate\Database\Query\Builder
+   */
+  protected toBaseQuery (query: Builder | EloquentBuilder | Relation): Builder {
+    return query instanceof Builder ? query : query.toBase()
+  }
+
+  /**
    * Prepend the database name if the given query is on another database.
    *
    * @param  mixed  query
    * @return mixed
    */
-  protected prependDatabaseNameIfCrossDatabaseQuery (query: Builder/*  | EloquentBuilder | Relation */) {
+  protected prependDatabaseNameIfCrossDatabaseQuery<
+    T extends Builder | EloquentBuilder | Relation
+  >(query: T): T {
+    const builder = this.toBaseQuery(query)
+
     if (
-      query.getConnection().getDatabaseName() !==
+      builder.getConnection().getDatabaseName() !==
       this.getConnection().getDatabaseName()
     ) {
-      const databaseName = query.getConnection().getDatabaseName()
+      const databaseName = builder.getConnection().getDatabaseName()
 
       if (
-        typeof query.fromProperty === 'string' &&
-        !query.fromProperty.startsWith(databaseName) &&
-        !query.fromProperty.includes('.')
+        typeof builder.fromProperty === 'string' &&
+        !builder.fromProperty.startsWith(databaseName) &&
+        !builder.fromProperty.includes('.')
       ) {
-        query.fromProperty = databaseName + '.' + query.fromProperty
+        builder.fromProperty = databaseName + '.' + builder.fromProperty
       }
     }
 

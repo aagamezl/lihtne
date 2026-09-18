@@ -18,7 +18,8 @@ export class Expression implements ExpressionContract {
    * @param  {Grammar}  grammar
    * @return {string | number}
    */
-  getValue (grammar: Grammar): string | number {
+  // @ts-ignore expected error
+  public getValue (grammar: Grammar): string | number {
     return this.value
   }
 }

@@ -10,7 +10,7 @@
     "lint:fix": "eslint --fix",
     "prepare": "husky",
     "start": "node dist/index.js",
-    "test": "NODE_ENV=test NODE_OPTIONS=--experimental-vm-modules jest --coverage --runInBand",
+    "test": "NODE_ENV=test NODE_OPTIONS='--experimental-vm-modules --disable-warning=ExperimentalWarning' jest --coverage --runInBand",
     "test:watch": "npm run test -- --watch",
     "typecheck": "tsc --noEmit"
   },
