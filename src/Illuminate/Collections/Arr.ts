@@ -5,6 +5,7 @@ import {
   isPlainObject,
   isString
 } from 'es-toolkit'
+import { get } from 'es-toolkit/compat'
 
 import { findKey, isEmpty, isNumeric, value } from '../Support'
 import { Collection } from './Collection'
@@ -18,20 +19,44 @@ export type MapCallback = (
 
 export class Arr {
   /**
- * If the given value is not an array and not null, wrap it in one.
- *
- * @template TKey of array-key = array-key
- * @template TValue
- *
- * @param  array<TKey, TValue>|TValue|null  $value
- * @return ($value is null ? array{} : ($value is array ? array<TKey, TValue> : array{TValue}))
- */
+   * If the given value is not an array and not null, wrap it in one.
+   *
+   * @template TKey of array-key = array-key
+   * @template TValue
+   *
+   * @param  array<TKey, TValue>|TValue|null  $value
+   * @return ($value is null ? array{} : ($value is array ? array<TKey, TValue> : array{TValue}))
+   */
   public static wrap<TValue>(value: TValue | TValue[]): Iterable<TValue> {
     if (isNil(value)) {
       return []
     }
 
     return Array.isArray(value) ? value : [value]
+  }
+
+  /**
+   * Get an item from an array using "dot" notation.
+   *
+   * @param  {Record<string, any>}  array
+   * @param  {string|number|undefined}  key
+   * @param  {any}  defaultValue
+   * @return {unknown}
+   */
+  static get(
+    array: Record<string, unknown>,
+    key?: string | number,
+    defaultValue?: unknown
+  ) {
+    if (key === undefined) {
+      return array
+    }
+
+    if (Object.values(array).includes(key)) {
+      return array[key]
+    }
+
+    return get(array, key, defaultValue)
   }
 
   /**

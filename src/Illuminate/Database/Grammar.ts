@@ -127,7 +127,7 @@ export abstract class Grammar {
   protected wrapSegments (segments: string[]) {
     return new Collection(segments)
       .map((segment: string, key: number) => {
-        return key == 0 && segments.length > 1
+        return key === 0 && segments.length > 1
           ? this.wrapTable(segment)
           : this.wrapValue(segment)
       })
@@ -156,7 +156,8 @@ export abstract class Grammar {
    *
    * @throws \RuntimeException
    */
-  // @ts-ignore expected error must be implemented in concrete class
+  // @ts-expect-error expected error must be implemented in concrete class
+  // @eslint-disable-next-line @typescript-eslint/no-unused-vars
   protected wrapJsonSelector (value: string): string {
     throw new Error(
       'RuntimeException: This database engine does not support JSON operations.'
@@ -180,7 +181,6 @@ export abstract class Grammar {
    * @return string
    */
   public columnize (columns: Array<Expression | string>): string {
-    // return implode(', ', array_map($this->wrap(...), $columns));
     return columns.map((column) => this.wrap(column)).join(', ')
   }
 

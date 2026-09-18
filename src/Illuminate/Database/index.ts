@@ -2,4 +2,7 @@
 export * from './Concerns'
 export * from './Connection'
 export * from './Drivers'
+export * from './Events'
 export * from './Grammar'
+export * from './Statements'
+export * from './DetectsLostConnections'

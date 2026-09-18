@@ -80,6 +80,15 @@ export class Builder {
   }
 
   /**
+   * Get the database query processor instance.
+   *
+   * @return \Illuminate\Database\Query\Processors\Processor
+   */
+  public getProcessor (): Processor {
+    return this.processor
+  }
+
+  /**
    * Set the columns to be selected.
    *
    * @param  mixed  $columns
