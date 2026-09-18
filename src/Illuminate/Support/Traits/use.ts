@@ -1,5 +1,5 @@
-export type Constructor<T = object> = abstract new (
-  ...args: unknown[]
+export type Constructor<T = any> = abstract new (
+  ...args: never[]
 ) => T
 
 export type Mixing = {
