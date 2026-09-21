@@ -23,7 +23,7 @@ export abstract class Grammar {
    * @param  bool  $binary
    * @return string
    */
-  public escape (value: string | number | boolean | null, binary: boolean = false) {
+  public escape (value: string | number | boolean | null, binary: boolean = false): string {
     return this.connection.escape(value, binary)
   }
 

@@ -14,7 +14,7 @@ export class PostgresGrammar extends Grammar {
   * @param  array  $columns
   * @return string|null
   */
-  protected compileColumns (
+  protected override compileColumns (
     query: Builder,
     columns: Array<Expression | string>
   ): string | null | undefined {
@@ -22,7 +22,7 @@ export class PostgresGrammar extends Grammar {
     // compiler handle the building of the select clauses, as it will need some
     // more syntax that is best handled by that function to keep things neat.
     if (!isNil(query.aggregateProperty)) {
-      return
+      return ''
     }
 
     let select: string

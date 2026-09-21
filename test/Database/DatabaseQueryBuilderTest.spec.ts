@@ -20,7 +20,7 @@ describe('Database Query Builder', () => {
 
     jest
       .spyOn(processor, 'processSelect')
-      .mockImplementation(() => ({}))
+      .mockImplementation(() => [])
 
     jest.spyOn(connection, 'select')
       .mockImplementationOnce((sql: string) => {
@@ -39,19 +39,19 @@ describe('Database Query Builder', () => {
         return Promise.resolve([])
       })
 
-    builder.from('users').get()
+    await builder.from('users').get()
     expect(builder.columns).toEqual([])
 
-    builder.from('users').get(['foo', 'bar'])
+    await builder.from('users').get(['foo', 'bar'])
     expect(builder.columns).toEqual([])
 
-    builder.from('users').get('baz')
+    await builder.from('users').get('baz')
     expect(builder.columns).toEqual([])
 
     expect(builder.toSql()).toBe('select * from "users"')
     expect(builder.columns).toEqual([])
 
-    expect(connection.select).toHaveBeenCalledTimes(3)
+    expect(processor.processSelect).toHaveBeenCalledTimes(3)
   })
 
   test('testBasicMySqlSelect', async () => {

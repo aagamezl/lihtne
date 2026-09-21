@@ -62,4 +62,32 @@ export class EnumeratesValues {
   public useAsCallable (value: unknown): value is Function {
     return typeof value === 'function'
   }
+
+  /**
+   * Execute a callback over each item.
+   *
+   * @param  callable(TValue, TKey): mixed  $callback
+   * @return $this
+   */
+  public each (callback: (item: unknown, key: string | number) => unknown): this {
+    const items = (this as { items?: Iterable<unknown> }).items ?? []
+
+    if (Array.isArray(items)) {
+      for (const [key, item] of items.entries()) {
+        if (callback(item, key) === false) {
+          break
+        }
+      }
+
+      return this
+    }
+
+    for (const [key, item] of Object.entries(Object(items))) {
+      if (callback(item, key) === false) {
+        break
+      }
+    }
+
+    return this
+  }
 }

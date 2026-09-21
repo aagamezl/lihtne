@@ -10,11 +10,11 @@ import { DetectsLostConnections } from './DetectsLostConnections'
 import { type Driver } from './Drivers/Driver'
 import { QueryExecuted, StatementPrepared } from './Events'
 import { type Grammar } from './Grammar'
-import { type Bindings, Processor, Grammar as QueryGrammar } from './Query'
+import { type BindingValues, Processor, Grammar as QueryGrammar } from './Query'
 
 export type QueryLogEntry = {
   query: string
-  bindings: unknown[]
+  bindings: BindingValues
   time: number
 }
 
@@ -147,7 +147,7 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
    *
    * @throws \RuntimeException
    */
-  public escape (value: string | number | boolean | undefined | null, binary: boolean = false) {
+  public escape (value: string | number | boolean | undefined | null, binary: boolean = false): string {
     if (isNil(value) === true) {
       return 'null'
     } else if (binary) {
@@ -212,7 +212,7 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
    *
    * @throws \RuntimeException
    */
-  protected escapeBinary (value: string | number | boolean) {
+  protected escapeBinary (value: string | number | boolean): string {
     throw new Error('RuntimeException: The database connection does not support escaping binary values.')
   }
 
@@ -225,9 +225,9 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
    */
   async select (
     query: string,
-    bindings: Bindings
+    bindings: BindingValues
   ): Promise<Record<string, unknown>[]> {
-    return await this.run(query, bindings, (query: string, bindings: Bindings) => {
+    return await this.run(query, bindings, (query: string, bindings: BindingValues) => {
       if (this.pretending()) {
         return []
       }
@@ -270,7 +270,7 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
    */
   protected async run (
     query: string,
-    bindings: Bindings,
+    bindings: BindingValues,
     callback: Function
   ): Promise<Record<string, unknown>[]> {
     for (const beforeExecutingCallback of this.beforeExecutingCallbacks) {
@@ -324,7 +324,7 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
   protected handleQueryException (
     e: Error,
     query: string,
-    bindings: Bindings,
+    bindings: BindingValues,
     callback: Function
   ) {
     if (this.transactions >= 1) {
@@ -361,7 +361,7 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
    * @param  float|null  time
    * @return void
    */
-  public logQuery (query: string, bindings: unknown[], time: number) {
+  public logQuery (query: string, bindings: BindingValues, time: number) {
     this.totalQueryDurationProperty += time ?? 0.0
 
     this.event(new QueryExecuted(query, bindings, time, this))
@@ -404,7 +404,7 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
   protected tryAgainIfCausedByLostConnection (
     e: Error,
     query: string,
-    bindings: Bindings,
+    bindings: BindingValues,
     callback: Function
   ) {
     if (this.causedByLostConnection(e.cause as Error)) {
@@ -428,7 +428,7 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
    */
   protected async runQueryCallback (
     query: string,
-    bindings: Bindings,
+    bindings: BindingValues,
     callback: Function
   ) {
     // To execute the statement, we'll simply call the callback, which will actually
@@ -474,7 +474,7 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
    * @param  array  bindings
    * @return array
    */
-  public prepareBindings (bindings: Bindings) {
+  public prepareBindings (bindings: BindingValues) {
     const grammar = this.getQueryGrammar()
 
     for (const [key, value] of bindings.entries()) {
@@ -511,7 +511,7 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
     * @param  array  bindings
     * @return void
     */
-  public bindValues (statement: Statement, bindings: Bindings) {
+  public bindValues (statement: Statement, bindings: BindingValues) {
     for (const [key, value] of Object.entries(bindings)) {
       statement.bindValue(typeof key === 'string' ? key : Number(key) + 1, value)
     }

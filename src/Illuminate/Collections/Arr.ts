@@ -27,7 +27,7 @@ export class Arr {
    * @param  array<TKey, TValue>|TValue|null  $value
    * @return ($value is null ? array{} : ($value is array ? array<TKey, TValue> : array{TValue}))
    */
-  public static wrap<TValue>(value: TValue | TValue[]): Iterable<TValue> {
+  public static wrap<TValue>(value: TValue | TValue[] | null = null): TValue[] {
     if (isNil(value)) {
       return []
     }

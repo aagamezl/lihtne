@@ -1,12 +1,14 @@
-export type Constructor<T = unknown> = abstract new (
+export type Constructor<T = object> = abstract new (
   ...args: never[]
 ) => T
 
-export type Mixing<TCtor extends Constructor = Constructor> = {
+type DefaultMixinCtor = new () => object
+
+export type Mixing<TCtor extends Constructor = DefaultMixinCtor> = {
   useTrait: (constructors: Constructor[]) => TCtor
 }
 
-export const mixing = <TCtor extends Constructor>(
+export const mixing = <TCtor extends Constructor = DefaultMixinCtor>(
   derivedCtor: TCtor = class { } as unknown as TCtor
 ): Mixing<TCtor> => {
   return {

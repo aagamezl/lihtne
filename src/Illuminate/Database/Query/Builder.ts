@@ -12,21 +12,63 @@ type Prettify<T> = {
   [K in keyof T]: T[K]
 } & {}
 
+export type BindingValue =
+  | string |
+  number |
+  // | bigint
+  boolean |
+  // | Date
+  // | Buffer
+  // | Uint8Array
+  null
+
+export type BindingValues = BindingValue[]
+
 export type Bindings = {
-  select: unknown[]
-  from: unknown[]
-  join: unknown[]
-  where: unknown[]
-  groupBy: unknown[]
-  having: unknown[]
-  order: unknown[]
-  union: unknown[]
-  unionOrder: unknown[]
+  select: BindingValues
+  from: BindingValues
+  join: BindingValues
+  where: BindingValues
+  groupBy: BindingValues
+  having: BindingValues
+  order: BindingValues
+  union: BindingValues
+  unionOrder: BindingValues
+}
+
+export type Having = {
+  type: string
+  column?: string | Expression
+  operator?: string
+  value?: string
+  boolean: string
+  sql?: string
+  values?: string[]
+  not?: boolean
+  query: Builder
+}
+
+export type Order = {
+  column?: string | Expression
+  direction?: string
+  type?: string
+  sql: string | Expression
+  values?: BindingValues
+}
+
+export type Union = {
+  all: boolean
+  query: Builder
 }
 
 export type BindingsKeys = Prettify<keyof Bindings>
 
 export type Agregate = { function: string; columns: Array<Expression | string> }
+
+export type GroupLimit = {
+  value: number
+  column: string
+}
 
 export class Builder {
   /**
@@ -37,21 +79,7 @@ export class Builder {
   public connection: Connection
 
   // An aggregate function and column to be run.
-  public aggregateProperty: Agregate | null = null
-
-  /**
-   * The database query grammar instance.
-   *
-   * @var \Illuminate\Database\Query\Grammars\Grammar
-   */
-  public grammar: Grammar
-
-  /**
-   * The query execution timeout in seconds.
-   *
-   * @var int|null
-   */
-  public timeout: number | undefined
+  public aggregateProperty: Agregate | undefined = undefined
 
   /**
    * The database query post processor instance.
@@ -62,7 +90,6 @@ export class Builder {
 
   // The query union statements.
   public unions: any[] | null = null
-
 
   /**
    * The table which the query is targeting.
@@ -83,21 +110,45 @@ export class Builder {
    *
    * @var int|null
    */
-  public limitProperty: number | null = null
+  public limitProperty: number | undefined = undefined
 
   /**
    * The maximum number of records to return per group.
    *
-   * @var Record<string, any> | null
+   * @var {value: number, column: string} | null
    */
-  public groupLimitProperty: Record<string, any> | null = null
+  public groupLimitProperty: GroupLimit | undefined = undefined
 
   /**
    * The number of records to skip.
    *
    * @var int|null
    */
-  public offsetProperty: number | null = null
+  public offsetProperty: number | undefined = undefined
+
+  // The having constraints for the query.
+  public havings: Having[] = []
+
+  /**
+   * The maximum number of union records to return.
+   *
+   * @var int|null
+   */
+  public unionLimit: number | null = null
+
+  /**
+   * The number of union records to skip.
+   *
+   * @var int|null
+   */
+  public unionOffset: number | null = null
+
+  /**
+   * The orderings for the union query.
+   *
+   * @var array|null
+   */
+  public unionOrders: Order[] | null = null
 
   /**
    * The columns that should be returned.
@@ -124,6 +175,13 @@ export class Builder {
     union: [],
     unionOrder: []
   }
+
+  /**
+   * The database query grammar instance.
+   *
+   * @var \Illuminate\Database\Query\Grammars\Grammar
+   */
+  public grammar: Grammar
 
   /**
    * Create a new query builder instance.
@@ -189,15 +247,53 @@ export class Builder {
   }
 
   /**
+   * Get the raw array of bindings.
+   *
+   * @return array{
+   *      select: list<mixed>,
+   *      from: list<mixed>,
+   *      join: list<mixed>,
+   *      where: list<mixed>,
+   *      groupBy: list<mixed>,
+   *      having: list<mixed>,
+   *      order: list<mixed>,
+   *      union: list<mixed>,
+   *      unionOrder: list<mixed>,
+   * }
+   */
+  public getRawBindings (): Bindings {
+    return this.bindings
+  }
+
+  /**
+   * Set the bindings on the query builder.
+   *
+   * @param  list<mixed>  $bindings
+   * @param  "select"|"from"|"join"|"where"|"groupBy"|"having"|"order"|"union"|"unionOrder"  $type
+   * @return $this
+   *
+   * @throws \InvalidArgumentException
+   */
+  public setBindings (bindings: BindingValues, type: keyof Bindings = 'where'): this {
+    if (!Object.keys(this.bindings).includes(type)) {
+      throw new Error(`InvalidArgumentException: Invalid binding type: ${type}.`)
+    }
+
+    this.bindings[type] = bindings
+
+    return this
+  }
+
+  /**
  * Execute the query as a "select" statement.
  *
  * @param  string|\Illuminate\Contracts\Database\Query\Expression|array<string|\Illuminate\Contracts\Database\Query\Expression>  $columns
  * @return \Illuminate\Support\Collection<int, \stdClass>
  */
-  public async get (columns: string | string[] | Expression[] = ['*']): Promise<Collection> {
+  public async get (columns: string | Expression | Array<string | Expression> = ['*']): Promise<Collection> {
     const items = new Collection(
-      await this.onceWithColumns(Arr.wrap(columns), () => {
-        return this.processor.processSelect(this, this.runSelect())
+      await this.onceWithColumns(Arr.wrap(columns), async () => {
+        return this.processor.processSelect(this, await this.runSelect())
       })
     )
 
@@ -211,7 +307,7 @@ export class Builder {
  *
  * @return array
  */
-  protected runSelect () {
+  protected runSelect (): Promise<Record<string, unknown>[]> {
     return this.connection.select(this.toSql(), this.getBindings())
   }
 
@@ -243,12 +339,21 @@ export class Builder {
   }
 
   /**
+   * Get the query grammar instance.
+   *
+   * @return \Illuminate\Database\Query\Grammars\Grammar
+   */
+  public getGrammar (): Grammar {
+    return this.grammar
+  }
+
+  /**
    * Invoke the "after query" modification callbacks.
    *
    * @param  mixed  result
    * @return mixed
    */
-  public applyAfterQueryCallbacks (result: unknown) {
+  public applyAfterQueryCallbacks<TResult>(result: TResult): TResult {
     for (const afterQueryCallback of this.afterQueryCallbacks) {
       result = afterQueryCallback(result) ?? result
     }
@@ -383,7 +488,7 @@ export class Builder {
    *
    * @throws \InvalidArgumentException
    */
-  public addBinding (value: any, type: keyof Bindings = 'where') {
+  public addBinding (value: BindingValue | BindingValues, type: keyof Bindings = 'where') {
     if (!(type in this.bindings)) {
       throw new Error(`Invalid binding type: ${type}.`)
     }
@@ -403,7 +508,7 @@ export class Builder {
  * @param  mixed  $value
  * @return mixed
  */
-  public castBinding (value: any) {
+  public castBinding (value: BindingValue): BindingValue {
     return value
   }
 
@@ -443,7 +548,7 @@ export class Builder {
    */
   protected createSub (
     query: Function | Builder | EloquentBuilder | Relation | string
-  ): [string, unknown[]] {
+  ): [string, BindingValues] {
     // If the given query is a Closure, we will execute it while passing in a new
     // query instance to the Closure. This will give the developer a chance to
     // format and work with the query before we cast it to a raw SQL string.
@@ -484,7 +589,7 @@ export class Builder {
    */
   protected parseSub (
     query: Builder | EloquentBuilder | Relation | string
-  ): [string, unknown[]] {
+  ): [string, BindingValues] {
     if (
       query instanceof Builder ||
       query instanceof EloquentBuilder ||
@@ -517,7 +622,7 @@ export class Builder {
    *
    * @return list<mixed>
    */
-  public getBindings (): unknown[] {
+  public getBindings (): BindingValues {
     return Object.values(this.bindings).flat()
   }
 

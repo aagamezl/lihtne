@@ -1,11 +1,11 @@
-import type { Bindings } from '../Query'
+import type { BindingValue, BindingValues } from '../Query'
 
 export type Result = {
   rows: Record<string, unknown>[]
 }
 
 export class Statement {
-  protected bindings: Record<string, unknown> = {}
+  protected bindings: Record<string, BindingValue> = {}
 
   /**
    * @protected
@@ -19,7 +19,7 @@ export class Statement {
   * @param {*} value
   * @return {boolean}
   */
-  public bindValue (param: string | number, value: unknown): boolean {
+  public bindValue (param: string | number, value: BindingValue): boolean {
     try {
       this.bindings[param] = value
 
@@ -30,7 +30,7 @@ export class Statement {
   }
 
   // @ts-expect-error expected error must be implemented in concrete class
-  public execute (params?: Bindings) {
+  public execute (params?: BindingValues) {
     throw new Error(
       `RuntimeException: Implement execute method on concrete class.`
     )

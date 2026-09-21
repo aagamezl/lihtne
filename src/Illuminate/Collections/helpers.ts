@@ -95,3 +95,33 @@ const isIterable = (value: unknown): value is Iterable<unknown> => {
     typeof (value as any)[Symbol.iterator] === 'function'
   )
 }
+
+/**
+ * Get the first element of an array. Useful for method chaining.
+ *
+ * @param  {any}  value
+ * @return {unknown}
+ */
+export const head = (value: unknown[] | Record<string, unknown>): unknown => {
+  return Array.isArray(value) ? value[0] : Array.from(Object.values(value))[0]
+}
+
+/**
+ * Get the last element from an array.
+ *
+ * @param  {Array}  array
+ * @return {*}
+ */
+export const last = (array: unknown[]): unknown => {
+  return end(array)
+}
+
+/**
+ * Get the last element of an array. Useful for method chaining.
+ *
+ * @param  {any}  array
+ * @return {any}
+ */
+export const end = (array: unknown[]): unknown => {
+  return array[array.length - 1]
+}

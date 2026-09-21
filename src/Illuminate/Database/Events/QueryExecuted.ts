@@ -1,5 +1,5 @@
 import { type Connection } from '../Connection'
-import { type Bindings } from '../Query'
+import { type BindingValues } from '../Query'
 
 export class QueryExecuted {
   /**
@@ -14,7 +14,7 @@ export class QueryExecuted {
    *
    * @var array
    */
-  public bindings: Bindings
+  public bindings: BindingValues
 
   /**
    * The number of milliseconds it took to execute the query.
@@ -47,7 +47,7 @@ export class QueryExecuted {
    */
   constructor (
     sql: string,
-    bindings: Bindings,
+    bindings: BindingValues,
     time: number = 0,
     connection: Connection
   ) {
