@@ -1,15 +1,14 @@
 import { Processor } from '../../../src/Illuminate/Database/Query'
 import { Builder } from '../../../src/Illuminate/Database/Query/Builder'
 import { Grammar } from '../../../src/Illuminate/Database/Query/Grammars/Grammar'
-// import Processor from '../../../src/Illuminate/Database/Query/Processors/Processor.ts'
 import { getConnection } from './getConnection'
 
-export const getBuilder = (connection?: unknown, grammar?: unknown, processor?: unknown) => {
-  const connectionInstance = connection ?? getConnection()
+export const getBuilder = (prefix: string = ''): Builder => {
+  const connection = getConnection(prefix)
 
   return new Builder(
-    connectionInstance,
-    grammar ?? new Grammar(connectionInstance),
-    processor ?? new Processor()
+    connection,
+    new Grammar(connection),
+    new Processor()
   )
 }

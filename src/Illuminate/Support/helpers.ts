@@ -44,6 +44,26 @@ export const typedEntries = <T extends object>(obj: T): Entries<T> => {
 }
 
 /**
+ * Make a string's first character uppercase
+ *
+ * @param  {string}  value
+ * @return {string}
+ */
+export const ucfirst = (value: string): string => {
+  return value.charAt(0).toUpperCase() + value.slice(1)
+}
+
+/**
+ * Determine if a value is set, mimicking PHP's isset().
+ *
+ * Returns false for undefined and null, and true for any other value,
+ * including falsy ones such as false, 0, '' and [].
+ */
+export const isValueSet = <T>(value: T | null | undefined): value is T => {
+  return value !== undefined && value !== null
+}
+
+/**
  *
  * @param {string} str
  * @returns {string}

@@ -17,6 +17,17 @@ export abstract class Grammar {
   }
 
   /**
+   * Escapes a value for safe SQL embedding.
+   *
+   * @param  string|float|int|bool|null  $value
+   * @param  bool  $binary
+   * @return string
+   */
+  public escape (value: string | number | boolean | null, binary: boolean = false) {
+    return this.connection.escape(value, binary)
+  }
+
+  /**
    * Wrap a table in keyword identifiers.
    *
    * @param  \Illuminate\Contracts\Database\Query\Expression|string  table

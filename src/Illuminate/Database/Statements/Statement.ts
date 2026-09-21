@@ -36,7 +36,7 @@ export class Statement {
     )
   }
 
-  public fetchAll(): Result['rows'] {
+  public fetchAll (): Result['rows'] {
     return this.result.rows
   }
 }

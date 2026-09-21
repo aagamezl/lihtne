@@ -2,9 +2,15 @@ import type { Connection } from '../Connection'
 import type { Grammar } from '../Query/Grammars/Grammar'
 import type { Processor } from './Processors'
 
+import { Arr, Collection } from '../../Collections'
+import { isSet } from '../../Support'
 import { Builder as EloquentBuilder } from '../Eloquent'
 import { Relation } from '../Eloquent/Relations'
 import { Expression } from './Expression'
+
+type Prettify<T> = {
+  [K in keyof T]: T[K]
+} & {}
 
 export type Bindings = {
   select: unknown[]
@@ -18,6 +24,10 @@ export type Bindings = {
   unionOrder: unknown[]
 }
 
+export type BindingsKeys = Prettify<keyof Bindings>
+
+export type Agregate = { function: string; columns: Array<Expression | string> }
+
 export class Builder {
   /**
    * The database connection instance.
@@ -25,6 +35,9 @@ export class Builder {
    * @var \Illuminate\Database\ConnectionInterface
    */
   public connection: Connection
+
+  // An aggregate function and column to be run.
+  public aggregateProperty: Agregate | null = null
 
   /**
    * The database query grammar instance.
@@ -34,11 +47,22 @@ export class Builder {
   public grammar: Grammar
 
   /**
+   * The query execution timeout in seconds.
+   *
+   * @var int|null
+   */
+  public timeout: number | undefined
+
+  /**
    * The database query post processor instance.
    *
    * @var \Illuminate\Database\Query\Processors\Processor
    */
   public processor: Processor
+
+  // The query union statements.
+  public unions: any[] | null = null
+
 
   /**
    * The table which the query is targeting.
@@ -48,11 +72,46 @@ export class Builder {
   public fromProperty: Function | Builder | Expression | string = ''
 
   /**
+   * The callbacks that should be invoked after retrieving data from the database.
+   *
+   * @var array
+   */
+  protected afterQueryCallbacks: Function[] = []
+
+  /**
+   * The maximum number of records to return.
+   *
+   * @var int|null
+   */
+  public limitProperty: number | null = null
+
+  /**
+   * The maximum number of records to return per group.
+   *
+   * @var Record<string, any> | null
+   */
+  public groupLimitProperty: Record<string, any> | null = null
+
+  /**
+   * The number of records to skip.
+   *
+   * @var int|null
+   */
+  public offsetProperty: number | null = null
+
+  /**
    * The columns that should be returned.
    *
    * @var array<string|\Illuminate\Contracts\Database\Query\Expression>|null
    */
   public columns: Array<string | Expression> = []
+
+  /**
+ * Indicates if the query returns distinct results.
+ *
+ * Occasionally contains the columns that should be distinct.
+ */
+  public distinctProperty: boolean | Array<Expression | string> = false
 
   public bindings: Bindings = {
     select: [],
@@ -77,6 +136,21 @@ export class Builder {
     this.connection = connection
     this.grammar = grammar ?? connection.getQueryGrammar()
     this.processor = processor ?? connection.getPostProcessor()
+  }
+
+  /**
+   * Force the query to only return distinct results.
+   *
+   * @param  {string[]}  columns
+   * @return {this}
+   */
+  public distinct (...columns: string[]): this {
+    if (columns.length > 0) {
+      this.distinctProperty = Array.isArray(columns[0]) || typeof columns[0] === 'boolean' ? columns[0] : columns
+    } else {
+      this.distinctProperty = true
+    }
+    return this
   }
 
   /**
@@ -112,6 +186,102 @@ export class Builder {
     }
 
     return this
+  }
+
+  /**
+ * Execute the query as a "select" statement.
+ *
+ * @param  string|\Illuminate\Contracts\Database\Query\Expression|array<string|\Illuminate\Contracts\Database\Query\Expression>  $columns
+ * @return \Illuminate\Support\Collection<int, \stdClass>
+ */
+  public async get (columns: string | string[] | Expression[] = ['*']): Promise<Collection> {
+    const items = new Collection(
+      await this.onceWithColumns(Arr.wrap(columns), () => {
+        return this.processor.processSelect(this, this.runSelect())
+      })
+    )
+
+    return this.applyAfterQueryCallbacks(
+      isSet(this.groupLimitProperty) ? this.withoutGroupLimitKeys(items) : items
+    )
+  }
+
+  /**
+ * Run the query as a "select" statement against the connection.
+ *
+ * @return array
+ */
+  protected runSelect () {
+    return this.connection.select(this.toSql(), this.getBindings())
+  }
+
+  /**
+   * Remove the group limit keys from the results in the collection.
+   *
+   * @param  \Illuminate\Support\Collection  $items
+   * @return \Illuminate\Support\Collection
+   */
+  protected withoutGroupLimitKeys (items: Collection): Collection {
+    const keysToRemove: string[] = []
+
+    if (typeof this.groupLimitProperty!.column === 'string') {
+      const column = this.groupLimitProperty!.column.split('.').pop()!
+
+      keysToRemove.push('@laravel_group := ' + this.grammar.wrap(column))
+      keysToRemove.push(
+        '@laravel_group := ' + this.grammar.wrap('pivot_' + column)
+      )
+    }
+
+    items.each((item: any) => {
+      keysToRemove.forEach((key: string) => {
+        delete item[key]
+      })
+    })
+
+    return items
+  }
+
+  /**
+   * Invoke the "after query" modification callbacks.
+   *
+   * @param  mixed  result
+   * @return mixed
+   */
+  public applyAfterQueryCallbacks (result: unknown) {
+    for (const afterQueryCallback of this.afterQueryCallbacks) {
+      result = afterQueryCallback(result) ?? result
+    }
+
+    return result
+  }
+
+  /**
+   * Execute the given callback while selecting the given columns.
+   *
+   * After running the callback, the columns are reset to the original value.
+   *
+   * @template TResult
+   *
+   * @param  array<string|\Illuminate\Contracts\Database\Query\Expression>  $columns
+   * @param  callable(): TResult  $callback
+   * @return TResult
+   */
+  protected onceWithColumns<TResult>(
+    columns: Array<string | Expression>,
+    callback: () => TResult
+  ): TResult {
+    const original = this.columns
+
+    if (original.length === 0) {
+      this.columns = columns
+    }
+
+    const result = callback()
+
+    this.columns = original
+
+    return result
   }
 
   /**

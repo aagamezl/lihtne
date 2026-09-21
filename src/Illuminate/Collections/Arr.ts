@@ -43,7 +43,7 @@ export class Arr {
    * @param  {any}  defaultValue
    * @return {unknown}
    */
-  static get(
+  static get (
     array: Record<string, unknown>,
     key?: string | number,
     defaultValue?: unknown

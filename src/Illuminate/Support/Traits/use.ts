@@ -1,4 +1,4 @@
-export type Constructor<T = any> = abstract new (
+export type Constructor<T = unknown> = abstract new (
   ...args: never[]
 ) => T
 

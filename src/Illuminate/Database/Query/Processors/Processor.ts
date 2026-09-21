@@ -8,7 +8,7 @@ export class Processor {
  * @param  array  $results
  * @return array
  */
-  public processSelect (query: Builder, results: Record<string, any>) {
+  public processSelect (query: Builder, results: Record<string, unknown>[]): Record<string, unknown>[] {
     return results
   }
 }

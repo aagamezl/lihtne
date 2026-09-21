@@ -1,16 +1,16 @@
-import { isNil } from 'es-toolkit'
 import { dateFormat } from '@devnetic/utils'
+import { isNil } from 'es-toolkit'
 
 import type { Dispatcher } from '../Contracts'
 import type { Statement } from './Statements'
 
+import { Arr } from '../Collections'
+import { mixing } from '../Support'
+import { DetectsLostConnections } from './DetectsLostConnections'
 import { type Driver } from './Drivers/Driver'
 import { QueryExecuted, StatementPrepared } from './Events'
 import { type Grammar } from './Grammar'
-import { Processor, Grammar as QueryGrammar, type Bindings } from './Query'
-import { mixing } from '../Support'
-import { DetectsLostConnections } from './DetectsLostConnections'
-import { Arr } from '../Collections'
+import { type Bindings, Processor, Grammar as QueryGrammar } from './Query'
 
 export type QueryLogEntry = {
   query: string
@@ -19,9 +19,9 @@ export type QueryLogEntry = {
 }
 
 export type ConnectionConfig = Record<string, unknown>
-export type Reconnector = (connection: Connection) => unknown;
+export type Reconnector = (connection: Connection) => unknown
 
-export interface Connection extends DetectsLostConnections {}
+export interface Connection extends DetectsLostConnections { }
 
 export class Connection extends mixing().useTrait([DetectsLostConnections]) {
   // The query grammar implementation.
@@ -66,42 +66,42 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
     *
     * @var (\Closure(string, array, \Illuminate\Database\Connection): mixed)[]
     */
-  protected beforeExecutingCallbacks: Function[] = [];
+  protected beforeExecutingCallbacks: Function[] = []
 
   /**
     * The number of active transactions.
     *
     * @var number
     */
-  protected transactions = 0;
+  protected transactions = 0
 
   /**
    * The duration of all executed queries in milliseconds.
    *
    * @var {Number}
    */
-  protected totalQueryDurationProperty = 0.0;
+  protected totalQueryDurationProperty = 0.0
 
   /**
    * The reconnector instance for the connection.
    *
    * @var (callable(\Illuminate\Database\Connection): mixed)
    */
-  protected reconnector: Reconnector = () => { };
+  protected reconnector: Reconnector = () => { }
 
   /**
    * Indicates whether queries are being logged.
    *
    * @var bool
    */
-  protected loggingQueries = false;
+  protected loggingQueries = false
 
   /**
    * All of the queries run against the connection.
    *
    * @var QueryLogEntry[]
    */
-  protected queryLog: QueryLogEntry[] = [];
+  protected queryLog: QueryLogEntry[] = []
 
   /**
    * Create a new database connection instance.
@@ -111,7 +111,7 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
    * @param  string  $tablePrefix
    * @param  array  $config
    */
-  constructor(
+  constructor (
     driver: Driver,
     database: string = '',
     tablePrefix: string = '',
@@ -139,13 +139,91 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
   }
 
   /**
+   * Escape a value for safe SQL embedding.
+   *
+   * @param  string|float|int|bool|null  $value
+   * @param  bool  $binary
+   * @return string
+   *
+   * @throws \RuntimeException
+   */
+  public escape (value: string | number | boolean | undefined | null, binary: boolean = false) {
+    if (isNil(value) === true) {
+      return 'null'
+    } else if (binary) {
+      return this.escapeBinary(value)
+    } else if (typeof value === 'number') {
+      return String(value)
+    } else if (typeof value === 'boolean') {
+      return this.escapeBool(value)
+    } else if (Array.isArray(value)) {
+      throw new Error('RuntimeException: The database connection does not support escaping arrays.')
+    } else {
+      if (value.includes('\0')) {
+        throw new Error('RuntimeException: Strings with null bytes cannot be escaped. Use the binary escape option.')
+      }
+
+      if (value.isWellFormed() === false) {
+        throw new Error('RuntimeException: Strings with invalid UTF-8 byte sequences cannot be escaped.')
+      }
+
+      return this.escapeString(value)
+    }
+  }
+
+  /**
+   * Escape a string value for safe SQL embedding.
+   *
+   * @protected
+   * @param  string  value
+   * @return {string}
+   */
+  protected escapeString (value: string): string {
+    return this.quote(value)
+  }
+
+  /**
+ *
+ * @param {string} value
+ * @returns {string}
+ */
+  protected quote (value: string): string {
+    // Escape special characters within the input string
+    const escapedString = value.replace(/'/g, "''")
+
+    return `'${escapedString}'`
+  }
+
+  /**
+   * Escape a boolean value for safe SQL embedding.
+   *
+   * @param  bool  $value
+   * @return string
+   */
+  protected escapeBool (value: boolean): string {
+    return value ? '1' : '0'
+  }
+
+  /**
+   * Escape a binary value for safe SQL embedding.
+   *
+   * @param  string  $value
+   * @return string
+   *
+   * @throws \RuntimeException
+   */
+  protected escapeBinary (value: string | number | boolean) {
+    throw new Error('RuntimeException: The database connection does not support escaping binary values.')
+  }
+
+  /**
    * Run a select statement against the database.
    *
    * @param  string  $query
    * @param  array  $bindings
    * @return array
    */
-  async select(
+  async select (
     query: string,
     bindings: Bindings
   ): Promise<Record<string, unknown>[]> {
@@ -171,6 +249,16 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
   }
 
   /**
+   * Determine if the given database exception was caused by a unique constraint violation.
+   *
+   * @param  \Exception  $exception
+   * @return bool
+   */
+  protected isUniqueConstraintError (exception: Error) {
+    return false
+  }
+
+  /**
    * Run a SQL statement and log its execution context.
    *
    * @param  string  query
@@ -180,7 +268,7 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
    *
    * @throws \Illuminate\Database\QueryException
    */
-  protected async run(
+  protected async run (
     query: string,
     bindings: Bindings,
     callback: Function
@@ -189,29 +277,27 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
       await beforeExecutingCallback(query, bindings, this)
     }
 
-    this.reconnectIfMissingConnection();
+    this.reconnectIfMissingConnection()
 
-    const start = Date.now();
+    const start = Date.now()
 
-    let result;
+    let result
 
     // Here we will run this query. If an exception occurs we'll determine if it was
     // caused by a connection that has been lost. If that is the cause, we'll try
     // to re-establish connection and re-run the query with a fresh connection.
     try {
-      result = this.runQueryCallback(query, bindings, callback);
+      result = this.runQueryCallback(query, bindings, callback)
     } catch (e) {
-      result = this.handleQueryException(e as Error, query, bindings, callback);
+      result = this.handleQueryException(e as Error, query, bindings, callback)
     }
 
     // Once we have run the query we will calculate the time that it took to run and
     // then log the query, bindings, and execution time so we will report them on
     // the event that the developer needs them. We'll log time in milliseconds.
-    this.logQuery(
-      query, bindings, this.getElapsedTime(start)
-    );
+    this.logQuery(query, bindings, this.getElapsedTime(start))
 
-    return result;
+    return result
   }
 
   /**
@@ -220,7 +306,7 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
    * @param  float  $start
    * @return float
    */
-  protected getElapsedTime(start: number): number {
+  protected getElapsedTime (start: number): number {
     return Number(Math.round((Date.now() - start) * 1000).toPrecision(2))
   }
 
@@ -235,19 +321,17 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
    *
    * @throws \Illuminate\Database\QueryException
    */
-  protected handleQueryException(
+  protected handleQueryException (
     e: Error,
     query: string,
     bindings: Bindings,
     callback: Function
   ) {
     if (this.transactions >= 1) {
-      throw e;
+      throw e
     }
 
-    return this.tryAgainIfCausedByLostConnection(
-      e, query, bindings, callback
-    );
+    return this.tryAgainIfCausedByLostConnection(e, query, bindings, callback)
   }
 
   /**
@@ -255,8 +339,8 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
    *
    * @return string|null
    */
-  public getName() {
-    return this.getConfig('name');
+  public getName () {
+    return this.getConfig('name')
   }
 
   /**
@@ -265,7 +349,7 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
    * @param  [string]  option
    * @return unknown
    */
-  public getConfig(option?: string) {
+  public getConfig (option?: string) {
     return Arr.get(this.config, option)
   }
 
@@ -277,14 +361,14 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
    * @param  float|null  time
    * @return void
    */
-  public logQuery(query: string, bindings: unknown[], time: number) {
-    this.totalQueryDurationProperty += time ?? 0.0;
+  public logQuery (query: string, bindings: unknown[], time: number) {
+    this.totalQueryDurationProperty += time ?? 0.0
 
-    this.event(new QueryExecuted(query, bindings, time, this));
+    this.event(new QueryExecuted(query, bindings, time, this))
 
     query = this.pretendingProperty === true
       ? this.queryGrammar?.substituteBindingsIntoRawSql(query, bindings) ?? query
-      : query;
+      : query
 
     if (this.loggingQueries) {
       this.queryLog.push({ query, bindings, time })
@@ -298,7 +382,7 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
    *
    * @throws \Illuminate\Database\LostConnectionException
    */
-  reconnect() {
+  reconnect () {
     if (typeof this.reconnector === 'function') {
       return this.reconnector(this)
     }
@@ -317,19 +401,19 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
     *
     * @throws \Illuminate\Database\QueryException
     */
-  protected tryAgainIfCausedByLostConnection(
+  protected tryAgainIfCausedByLostConnection (
     e: Error,
     query: string,
     bindings: Bindings,
     callback: Function
   ) {
     if (this.causedByLostConnection(e.cause as Error)) {
-      this.reconnect();
+      this.reconnect()
 
-      return this.runQueryCallback(query, bindings, callback);
+      return this.runQueryCallback(query, bindings, callback)
     }
 
-    throw e;
+    throw e
   }
 
   /**
@@ -342,7 +426,7 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
    *
    * @throws \Illuminate\Database\QueryException
    */
-  protected async runQueryCallback(
+  protected async runQueryCallback (
     query: string,
     bindings: Bindings,
     callback: Function
@@ -355,14 +439,13 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
 
       return result
     }
-
     // If an exception occurs when attempting to run a query, we'll format the error
     // message to include the bindings with SQL, which will make this exception a
     // lot more helpful to the developer instead of just the database's errors.
     catch (e) {
       const exceptionType = this.isUniqueConstraintError(e as Error)
         ? 'UniqueConstraintViolationException'
-        : 'QueryException';
+        : 'QueryException'
 
       throw new Error(`${exceptionType}: ${JSON.stringify({
         name: this.getNameWithReadWriteType(),
@@ -370,7 +453,7 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
         bindings: this.prepareBindings(bindings),
         e,
         connectionDetails: this.getConnectionDetails()
-      })}`);
+      })}`)
     }
   }
 
@@ -379,9 +462,9 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
    *
    * @return void
    */
-  reconnectIfMissingConnection() {
+  reconnectIfMissingConnection () {
     if (isNil(this.driver)) {
-      this.reconnect();
+      this.reconnect()
     }
   }
 
@@ -391,7 +474,7 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
    * @param  array  bindings
    * @return array
    */
-  public prepareBindings(bindings: Bindings) {
+  public prepareBindings (bindings: Bindings) {
     const grammar = this.getQueryGrammar()
 
     for (const [key, value] of bindings.entries()) {
@@ -413,7 +496,7 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
     *
     * @return {Driver}
     */
-  getDriver() {
+  getDriver () {
     if (typeof this.driver === 'function') {
       return this.driver()
     }
@@ -428,7 +511,7 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
     * @param  array  bindings
     * @return void
     */
-  public bindValues(statement: Statement, bindings: Bindings) {
+  public bindValues (statement: Statement, bindings: Bindings) {
     for (const [key, value] of Object.entries(bindings)) {
       statement.bindValue(typeof key === 'string' ? key : Number(key) + 1, value)
     }
@@ -440,7 +523,7 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
     * @param  mixed  event
     * @return void
     */
-  protected event(event: any) {
+  protected event (event: any) {
     this.events?.dispatch(event)
   }
 
@@ -450,7 +533,7 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
     * @param  \PDOStatement  statement
     * @return \PDOStatement
     */
-  protected prepared(statement: Statement): Statement {
+  protected prepared (statement: Statement): Statement {
     this.event(new StatementPrepared(this, statement))
 
     return statement
@@ -461,7 +544,7 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
    *
    * @return bool
    */
-  pretending() {
+  pretending () {
     return this.pretendingProperty === true
   }
 
@@ -470,7 +553,7 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
    *
    * @return string
    */
-  public getTablePrefix(): string {
+  public getTablePrefix (): string {
     return this.tablePrefix
   }
 
@@ -479,7 +562,7 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
    *
    * @return \Illuminate\Database\Query\Grammars\Grammar
    */
-  public getQueryGrammar(): Grammar {
+  public getQueryGrammar (): Grammar {
     return this.queryGrammar!
   }
 
@@ -488,7 +571,7 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
    *
    * @return \Illuminate\Database\Query\Processors\Processor
    */
-  public getPostProcessor() {
+  public getPostProcessor () {
     return this.postProcessor
   }
 
@@ -497,7 +580,7 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
    *
    * @return string
    */
-  public getDatabaseName() {
+  public getDatabaseName () {
     return this.database
   }
 
@@ -506,7 +589,7 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
  *
  * @return void
  */
-  public useDefaultQueryGrammar() {
+  public useDefaultQueryGrammar () {
     this.queryGrammar = this.getDefaultQueryGrammar()
   }
 
@@ -515,7 +598,7 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
    *
    * @return \Illuminate\Database\Query\Grammars\Grammar
    */
-  protected getDefaultQueryGrammar() {
+  protected getDefaultQueryGrammar () {
     return new QueryGrammar(this)
   }
 
@@ -524,7 +607,7 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
  *
  * @return void
  */
-  public useDefaultPostProcessor() {
+  public useDefaultPostProcessor () {
     this.postProcessor = this.getDefaultPostProcessor()
   }
 
@@ -533,7 +616,7 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
  *
  * @return \Illuminate\Database\Query\Processors\Processor
  */
-  protected getDefaultPostProcessor() {
+  protected getDefaultPostProcessor () {
     return new Processor()
   }
 }

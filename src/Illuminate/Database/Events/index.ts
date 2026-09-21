@@ -1,2 +1,2 @@
-export * from './StatementPrepared'
 export * from './QueryExecuted'
+export * from './StatementPrepared'

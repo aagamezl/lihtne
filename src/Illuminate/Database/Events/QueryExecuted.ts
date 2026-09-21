@@ -45,7 +45,7 @@ export class QueryExecuted {
    * @param  {number|null}  time
    * @param  {Connection}  connection
    */
-  constructor(
+  constructor (
     sql: string,
     bindings: Bindings,
     time: number = 0,
