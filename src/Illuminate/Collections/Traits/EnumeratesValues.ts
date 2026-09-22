@@ -1,7 +1,8 @@
-import { isPrimitive } from 'es-toolkit'
+import { isPlainObject, isPrimitive } from 'es-toolkit'
 
 import { isEnum } from '../../Support'
 import { Arr } from '../Arr'
+import { Collection } from '../Collection'
 export class EnumeratesValues {
   /**
  * The methods that can be proxied.
@@ -41,16 +42,31 @@ export class EnumeratesValues {
     'when'
   ]
 
+  protected entries: boolean = false
+
   /**
    * Results array of items from Collection or Arrayable.
    *
    * @param  mixed  $items
    * @return array<TKey, TValue>
    */
-  public getArrayableItems<TValue>(items: unknown): Iterable<TValue> {
-    return isPrimitive(items) || isEnum(items)
-      ? Arr.wrap<TValue>(items as TValue)
-      : Arr.from(items)
+  public getArrayableItems/* <TValue> */(items: unknown)/* : Iterable<TValue> */ {
+    // return isPrimitive(items) || isEnum(items)
+    //   ? Arr.wrap<TValue>(items as TValue)
+    //   : Arr.from(items)
+    if (Array.isArray(items)/*  || items instanceof Map */) {
+      return items
+    } else if (items instanceof Collection) {
+      return items.all()
+    } else if (isPlainObject(items)) {
+      this.entries = true
+      // return Object.entries(items)
+      return items
+    } else if (items === undefined) {
+      return []
+    }
+
+    return [items]
   }
 
   /**

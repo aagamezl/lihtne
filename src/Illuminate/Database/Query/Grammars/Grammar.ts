@@ -1,28 +1,44 @@
-import { isTruthy } from '@devnetic/utils'
+import { isTruthy, trim } from '@devnetic/utils'
 
-import type { Agregate, BindingValues, Builder, Having, Order, Union } from '../Builder'
+import type { Agregate, BindingValues, Builder, Having, Order, Union, WhereClause } from '../Builder'
 
 import { Collection } from '../../../Collections'
 import { head, last } from '../../../Collections/helpers'
-import { isEmpty, isValueSet, ucfirst } from '../../../Support'
+import { isEmpty, isValueSet, type Prettify, ucfirst } from '../../../Support'
 import { mixing } from '../../../Support/Traits'
 import { CompilesJsonPaths } from '../../Concerns/CompilesJsonPaths'
 import { Grammar as BaseGrammar } from '../../Grammar'
 import { type Expression } from '../Expression'
+import type { JoinClause } from '../JoinClause'
+import { JoinLateralClause } from '../JoinLateralClause'
 
 /**
  * Array representing the select components for a query.
  */
-type SelectComponent = {
-  /**
-   * The name of the select component.
-   */
-  name: string
-  /**
-   * The property associated with the select component.
-   */
+
+
+export type SelectComponentName =
+  | 'aggregate'
+  | 'columns'
+  | 'from'
+  | 'indexHint'
+  | 'joins'
+  | 'wheres'
+  | 'groups'
+  | 'havings'
+  | 'orders'
+  | 'limit'
+  | 'offset'
+  | 'lock'
+
+export type CompilerMethod = `compile${Capitalize<string & Exclude<SelectComponentName, 'indexHint'>>}`
+
+export type SelectComponent = {
+  name: SelectComponentName
   property: string
 }
+
+export type SelectComponents = Array<Prettify<SelectComponent>>
 
 export interface Grammar extends BaseGrammar, CompilesJsonPaths { }
 
@@ -32,7 +48,7 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    *
    * @type {SelectComponent[]}
    */
-  selectComponents: SelectComponent[] = [
+  selectComponents: SelectComponents = [
     { name: 'aggregate', property: 'aggregateProperty' },
     { name: 'columns', property: 'columns' },
     { name: 'from', property: 'fromProperty' },
@@ -48,12 +64,28 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
   ]
 
   /**
+   * The grammar specific operators.
+   *
+   * @var array
+   */
+  protected operators: string[] = [];
+
+  /**
+   * Get the grammar specific operators.
+   *
+   * @return array
+   */
+  public getOperators(): string[] {
+    return this.operators;
+  }
+
+  /**
  * Compile a select query into SQL.
  *
  * @param  \Illuminate\Database\Query\Builder  $query
  * @return string
  */
-  public compileSelect (query: Builder): string {
+  public compileSelect(query: Builder): string {
     if ((query.unions || query.havings) && query.aggregateProperty) {
       return this.compileUnionAggregate(query)
     }
@@ -98,7 +130,7 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    * @param  \Illuminate\Database\Query\Builder  $query
    * @return string
    */
-  protected compileGroupLimit (query: Builder): string {
+  protected compileGroupLimit(query: Builder): string {
     const selectBindings = [...query.getRawBindings().select, ...query.getRawBindings().order]
 
     query.setBindings(selectBindings, 'select')
@@ -144,7 +176,7 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    * @param  string  $orders
    * @return string
    */
-  protected compileRowNumber (partition: string, orders: string): string {
+  protected compileRowNumber(partition: string, orders: string): string {
     const over = String('partition by ' + this.wrap(partition) + ' ' + orders).trim()
 
     return ', row_number() over (' + over + ') as ' + this.wrap('laravel_row')
@@ -156,7 +188,7 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    * @param  \Illuminate\Database\Query\Builder  $query
    * @return string
    */
-  protected compileUnionAggregate (query: Builder): string {
+  protected compileUnionAggregate(query: Builder): string {
     const sql = this.compileAggregate(query, query.aggregateProperty!)
 
     query.aggregateProperty = undefined
@@ -170,7 +202,7 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    * @param  \Illuminate\Database\Query\Builder  $query
    * @return string
    */
-  protected compileUnions (query: Builder): string {
+  protected compileUnions(query: Builder): string {
     let sql = ''
 
     for (const union of query.unions!) {
@@ -199,7 +231,7 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    * @param  array  $orders
    * @return string
    */
-  protected compileOrders (query: Builder, orders: Order[]): string {
+  protected compileOrders(query: Builder, orders: Order[]): string {
     if (!isEmpty(orders)) {
       return 'order by ' + this.compileOrdersToArray(query, orders).join(', ')
     }
@@ -213,7 +245,7 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    * @param  array  $order
    * @return string
    */
-  protected compileInOrderOf (order: Order): string {
+  protected compileInOrderOf(order: Order): string {
     const column = this.wrap(order.column ?? '')
 
     const cases = []
@@ -232,7 +264,7 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    * @param  array  $orders
    * @return array
    */
-  protected compileOrdersToArray (query: Builder, orders: Order[]): string[] {
+  protected compileOrdersToArray(query: Builder, orders: Order[]): string[] {
     return orders.map((order) => {
       if (isValueSet(order.sql) && this.isExpression(order.sql)) {
         return String(order.sql.getValue(query.getGrammar()))
@@ -252,7 +284,7 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    * @param  array  $union
    * @return string
    */
-  protected compileUnion (union: Union): string {
+  protected compileUnion(union: Union): string {
     const conjunction = union.all ? ' union all ' : ' union '
 
     return conjunction + this.wrapUnion(union.query.toSql())
@@ -264,7 +296,7 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    * @param  string  $sql
    * @return string
    */
-  protected wrapUnion (sql: string) {
+  protected wrapUnion(sql: string) {
     return '(' + sql + ')'
   }
 
@@ -274,7 +306,7 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    * @param  Record<string, any>  segments
    * @return string
    */
-  protected concatenate (segments: Record<string, string>): string {
+  protected concatenate(segments: Record<string, string>): string {
     return Object.values(segments)
       .filter((value: string) => value !== '')
       .join(' ')
@@ -287,7 +319,7 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    * @param  array  $columns
    * @return string|null
    */
-  protected compileColumns (
+  protected compileColumns(
     query: Builder,
     columns: Array<Expression | string>
   ): string | null | undefined {
@@ -316,7 +348,7 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    * @param  array{function: string, columns: array<\Illuminate\Contracts\Database\Query\Expression|string>}  $aggregate
    * @return string
    */
-  protected compileAggregate (query: Builder, aggregate: Agregate): string {
+  protected compileAggregate(query: Builder, aggregate: Agregate): string {
     let column = this.columnize(aggregate.columns)
 
     // If the query has a "distinct" constraint and we're not asking for all columns
@@ -338,7 +370,7 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    * @param  {number}  limit
    * @return {string}
    */
-  compileLimit (query: Builder, limit: number): string {
+  protected compileLimit(query: Builder, limit: number): string {
     return `limit ${typeof limit === 'number' ? limit : parseInt(limit, 10)}`
   }
 
@@ -349,7 +381,7 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    * @param  int  $offset
    * @return string
    */
-  protected compileOffset (query: Builder, offset: number): string {
+  protected compileOffset(query: Builder, offset: number): string {
     return 'offset ' + (typeof offset === 'number' ? offset : parseInt(offset, 10))
   }
 
@@ -359,12 +391,12 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    * @param  \Illuminate\Database\Query\Builder  query
    * @return array
    */
-  protected compileComponents (query: Builder) {
-    const sql: Record<string, string> = {}
+  protected compileComponents(query: Builder): Partial<Record<SelectComponentName, string>> {
+    const sql: Partial<Record<SelectComponentName, string>> = {}
 
     for (const { name, property } of this.selectComponents) {
       if (this.isExecutable(query, property)) {
-        const method = 'compile' + ucfirst(name)
+        const method = `compile${ucfirst(name)}` as CompilerMethod
 
         // console.log('method: %o', method);
 
@@ -375,7 +407,7 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
     return sql
   }
 
-  protected isExecutable (query: Builder, property: string): boolean {
+  protected isExecutable(query: Builder, property: string): boolean {
     const subject = Reflect.get(query, property)
 
     if (subject === undefined || subject === '') {
@@ -395,7 +427,7 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    * @param  \Illuminate\Database\Query\Builder  $query
    * @return string
    */
-  protected compileHavings (query: Builder): string {
+  protected compileHavings(query: Builder): string {
     // return 'having ' + this.removeLeadingBoolean((new Collection(query.havings)).map((having: Having) => having.boolean + ' ' + this.compileHaving(having)).join(' '))
     return 'having ' + this.removeLeadingBoolean(new Collection(query.havings).map((/** @type {Having} */having) => {
       return having.boolean + ' ' + this.compileHaving(having)
@@ -408,7 +440,7 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    * @param  string  $value
    * @return string
    */
-  protected removeLeadingBoolean (value: string): string {
+  protected removeLeadingBoolean(value: string): string {
     return value.replace(/and |or /i, '')
   }
 
@@ -418,7 +450,7 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    * @param  {Having}  having
    * @return {string}
    */
-  compileHaving (having: Having): string {
+  protected compileHaving(having: Having): string {
     // If the having clause is "raw", we can just return the clause straight away
     // without doing any more processing on it. Otherwise, we will compile the
     // clause into SQL based on the components that make it up from builder.
@@ -443,12 +475,101 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
   }
 
   /**
+   * Compile the "join" portions of the query.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $joins
+   * @return string
+   */
+  protected compileJoins(query: Builder, joins: JoinClause[]): string {
+    return (new Collection(joins)).map((join: JoinClause) => {
+      const table = this.wrapTable(join.table)
+
+      const nestedJoins = join.joins.length === 0 ? '' : ' ' + this.compileJoins(query, join.joins)
+
+      const tableAndNestedJoins = join.joins.length === 0 ? table : '(' + table + nestedJoins + ')'
+
+      if (join instanceof JoinLateralClause) {
+        return this.compileJoinLateral(join, String(tableAndNestedJoins))
+      }
+
+      const joinWord = (join.type === 'straight_join' && this.supportsStraightJoins()) ? '' : ' join'
+
+      return String(`${join.type}${joinWord} ${tableAndNestedJoins} ${this.compileWheres($join)}`).trim()
+    }).implode(' ')
+  }
+
+  /**
+   * Compile the "where" portions of the query.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @return string
+   */
+  public compileWheres(query: Builder): string {
+    // Each type of where clause has its own compiler function, which is responsible
+    // for actually creating the where clauses SQL. This helps keep the code nice
+    // and maintainable since each clause has a very small method that it uses.
+    if (!query.wheres) {
+      return ''
+    }
+
+    const sql = this.compileWheresToArray(query)
+
+    // If we actually have some where clauses, we will strip off the first boolean
+    // operator, which is added by the query builders for convenience so we can
+    // avoid checking for the first clauses in each of the compilers methods.
+    if (sql.length > 0) {
+      return this.concatenateWhereClauses(query, sql)
+    }
+
+    return ''
+  }
+
+  /**
+   * Get an array of all the where clauses for the query.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @return array
+   */
+  protected compileWheresToArray(query: Builder): string[] {
+    const collection = new Collection<WhereClause[]>(query.wheres)
+    return collection
+      .map((where: WhereClause) => where.boolean + ' ' + this[`where${where.type}`](query, where))
+      .all()
+  }
+
+
+  /**
+   * Determine if the grammar supports straight joins.
+   *
+   * @return bool
+   *
+   * @throws \RuntimeException
+   */
+  protected supportsStraightJoins(): boolean {
+    throw new Error('RuntimeException: This database engine does not support straight joins.');
+  }
+
+  /**
+   * Compile a "lateral join" clause.
+   *
+   * @param  \Illuminate\Database\Query\JoinLateralClause  $join
+   * @param  string  $expression
+   * @return string
+   *
+   * @throws \RuntimeException
+   */
+  public compileJoinLateral(join: JoinLateralClause, expression: string): string {
+    throw new Error('RuntimeException: This database engine does not support lateral joins.');
+  }
+
+  /**
    * Compile a nested having clause.
    *
    * @param  {Having}  having
    * @return {string}
    */
-  compileNestedHavings (having: Having): string {
+  protected compileNestedHavings(having: Having): string {
     return '(' + this.compileHavings(having.query).substring(7) + ')'
   }
 
@@ -458,7 +579,7 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    * @param  {Having}  having
    * @return {string}
    */
-  compileBasicHaving (having: Having): string {
+  protected compileBasicHaving(having: Having): string {
     const column = this.wrap(having.column ?? '')
 
     const parameter = this.parameter(having.value)
@@ -472,7 +593,7 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    * @param  array  $having
    * @return string
    */
-  protected compileHavingBetween (having: Having): string {
+  protected compileHavingBetween(having: Having): string {
     const between = having.not ? 'not between' : 'between'
 
     const column = this.wrap(having.column ?? '')
@@ -490,7 +611,7 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    * @param  array  $having
    * @return string
    */
-  protected compileHavingNull (having: Having): string {
+  protected compileHavingNull(having: Having): string {
     const column = this.wrap(having.column ?? '')
 
     return column + ' is null'
@@ -502,7 +623,7 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    * @param  array  $having
    * @return string
    */
-  protected compileHavingNotNull (having: Having): string {
+  protected compileHavingNotNull(having: Having): string {
     const column = this.wrap(having.column ?? '')
 
     return column + ' is not null'
@@ -514,7 +635,7 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    * @param  array  $having
    * @return string
    */
-  protected compileHavingBit (having: Having): string {
+  protected compileHavingBit(having: Having): string {
     const column = this.wrap(having.column ?? '')
 
     const parameter = this.parameter(having.value ?? '')
@@ -528,7 +649,7 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    * @param  array  $having
    * @return string
    */
-  protected compileHavingExpression (having: Having): string {
+  protected compileHavingExpression(having: Having): string {
     if (this.isExpression(having.column)) {
       return String(having.column.getValue(this))
     }
@@ -543,7 +664,7 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    * @param  string  $table
    * @return string
    */
-  protected compileFrom (query: Builder, table: string): string {
+  protected compileFrom(query: Builder, table: string): string {
     return 'from ' + this.wrapTable(table)
   }
 
@@ -554,16 +675,16 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
  * @param  array  bindings
  * @return string
  */
-  public substituteBindingsIntoRawSql (sql: string, bindings: BindingValues): string {
+  public substituteBindingsIntoRawSql(sql: string, bindings: BindingValues): string {
     bindings = bindings.map((value) => this.escape(value))
 
     let query = ''
 
     let isStringLiteral = false
 
-    for (let i = 0; i < sql.length; i++) {
+    for (let i = 0, length = sql.length; i < length; i++) {
       const char = sql[i]
-      const nextChar = sql[i + 1] ?? null
+      const nextChar = sql[i + 1] ?? ''
 
       // Single quotes can be escaped as '' according to the SQL standard while
       // MySQL uses \'. Postgres has operators like ?| that must get encoded

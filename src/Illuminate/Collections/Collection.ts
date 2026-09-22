@@ -14,7 +14,8 @@ export class Collection<TValue = unknown, TKey = string | number> extends mixing
    * @var array<TKey, TValue>
    */
   // protected items: Record<string, unknown> | unknown[] = {}
-  protected items: Iterable<TValue> = []
+  protected items: Iterable<TValue> | Record<string, TValue>
+
   /**
    * Create a new collection.
    *
@@ -23,7 +24,7 @@ export class Collection<TValue = unknown, TKey = string | number> extends mixing
   public constructor (items: TValue | TValue[] | Record<string, TValue> = []) {
     super()
 
-    this.items = this.getArrayableItems<TValue>(items)
+    this.items = this.getArrayableItems/* <TValue> */(items)
   }
 
   /**
@@ -55,8 +56,9 @@ export class Collection<TValue = unknown, TKey = string | number> extends mixing
    *
    * @return array<TKey, TValue>
    */
-  public all (): Iterable<unknown> | Collection {
+  public all ()/* : Iterable<unknown> | Collection */ {
     return this.items
+    // return this.entries ? Object.entries(this.items) : Array.from(this.items)
   }
 
   /**

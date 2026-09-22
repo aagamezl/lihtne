@@ -121,6 +121,24 @@ describe('Database Query Builder', () => {
     expect('select distinct on ("foo") "foo", "bar" from "users"').toBe(builder.toSql())
   })
 
+  test('testBasicAlias', () => {
+    const builder = getBuilder()
+    builder.select('foo as bar').from('users')
+    expect(builder.toSql()).toBe('select "foo" as "bar" from "users"')
+  })
+
+  test('testAliasWithPrefix', () => {
+    const builder = getBuilder('prefix_')
+    builder.select('*').from('users as people')
+    expect(builder.toSql()).toBe('select * from "prefix_users" as "prefix_people"')
+  })
+
+  test('testJoinAliasesWithPrefix', () => {
+    const builder = getBuilder('prefix_')
+    builder.select('*').from('services').join('translations AS t', 't.item_id', '=', 'services.id')
+    expect(builder.toSql()).toBe('select * from "prefix_services" inner join "prefix_translations" as "prefix_t" on "prefix_t"."item_id" = "prefix_services"."id"')
+  })
+
   test('', () => {
   })
 })

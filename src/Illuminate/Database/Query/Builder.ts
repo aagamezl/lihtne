@@ -3,17 +3,14 @@ import type { Grammar } from '../Query/Grammars/Grammar'
 import type { Processor } from './Processors'
 
 import { Arr, Collection } from '../../Collections'
-import { isSet } from '../../Support'
+import { isSet, value, type Prettify } from '../../Support'
 import { Builder as EloquentBuilder } from '../Eloquent'
 import { Relation } from '../Eloquent/Relations'
 import { Expression } from './Expression'
-
-type Prettify<T> = {
-  [K in keyof T]: T[K]
-} & {}
+import { JoinClause } from './JoinClause'
 
 export type BindingValue =
-  | string |
+  string |
   number |
   // | bigint
   boolean |
@@ -23,6 +20,28 @@ export type BindingValue =
   null
 
 export type BindingValues = BindingValue[]
+
+export type WhereOptions = {
+  expanded: boolean
+  language: string
+  mode: string
+}
+
+export type WhereClause = {
+  column?: string | Expression
+  first?: string | Expression | Array<Expression | string>
+  second?: string | Expression | undefined
+  type: string
+  not?: boolean
+  operator?: string | undefined
+  value?: unknown
+  boolean: string
+  sql?: string | Expression
+  options?: WhereOptions
+  query?: Builder
+  values?: unknown[] | Record<string, unknown>
+  columns?: (string | Expression)[]
+}
 
 export type Bindings = {
   select: BindingValues
@@ -92,11 +111,18 @@ export class Builder {
   public unions: any[] | null = null
 
   /**
+   * The table joins for the query.
+   *
+   * @var JoinClause[]
+   */
+  public joins: JoinClause[] = [];
+
+  /**
    * The table which the query is targeting.
    *
-   * @var \Illuminate\Database\Query\Expression|string
+   * @var \Closure|\Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder<*>|\Illuminate\Contracts\Database\Query\Expression|string
    */
-  public fromProperty: Function | Builder | Expression | string = ''
+  public fromProperty: Function | Builder | EloquentBuilder | Expression | string = ''
 
   /**
    * The callbacks that should be invoked after retrieving data from the database.
@@ -111,6 +137,27 @@ export class Builder {
    * @var int|null
    */
   public limitProperty: number | undefined = undefined
+
+  /**
+   * All of the available clause operators.
+   *
+   * @var string[]
+   */
+  public operators = [
+    '=', '<', '>', '<=', '>=', '<>', '!=', '<=>',
+    'like', 'like binary', 'not like', 'ilike',
+    '&', '|', '^', '<<', '>>', '&~', 'is', 'is not',
+    'rlike', 'not rlike', 'regexp', 'not regexp',
+    '~', '~*', '!~', '!~*', 'similar to',
+    'not similar to', 'not ilike', '~~*', '!~~*',
+  ]
+
+  /**
+   * The where constraints for the query.
+   *
+   * @var array
+   */
+  public wheres: WhereClause[] = [];
 
   /**
    * The maximum number of records to return per group.
@@ -186,7 +233,7 @@ export class Builder {
   /**
    * Create a new query builder instance.
    */
-  public constructor (
+  public constructor(
     connection: Connection,
     grammar: Grammar,
     processor: Processor
@@ -197,12 +244,186 @@ export class Builder {
   }
 
   /**
+   * Add a "join" clause to the query.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression|string  $table
+   * @param  \Closure|\Illuminate\Contracts\Database\Query\Expression|string  $first
+   * @param  string|null  $operator
+   * @param  \Illuminate\Contracts\Database\Query\Expression|string|null  $second
+   * @param  string  $type
+   * @param  bool  $where
+   * @return $this
+   */
+  public join(
+    table: string | Expression,
+    first: Function | Expression | string,
+    operator: string | undefined = undefined,
+    second: string | Expression | undefined = undefined,
+    type: string = 'inner',
+    where: boolean = false
+  ): this {
+    const join = this.newJoinClause(this, type, table);
+
+    // If the first "column" of the join is really a Closure instance the developer
+    // is trying to build a join with a complex "on" clause containing more than
+    // one condition, so we'll add the join and call a Closure with the query.
+    if (first instanceof Function) {
+      first(join);
+
+      this.joins.push(join);
+
+      this.addBinding(join.getBindings(), 'join');
+    }
+
+    // If the column is simply a string, we can assume the join simply has a basic
+    // "on" clause with a single condition. So we will just build the join with
+    // this simple join clauses attached to it. There is not a join callback.
+    else {
+      const method: string = where ? 'where' : 'on';
+
+      this.joins.push(join[method](first, operator, second));
+
+      this.addBinding(join.getBindings(), 'join');
+    }
+
+    return this;
+  }
+
+  /**
+   * Add a "where" clause comparing two columns to the query.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression|string|array  $first
+   * @param  string|null  $operator
+   * @param  string|null  $second
+   * @param  string|null  $boolean
+   * @return $this
+   */
+  public whereColumn(first: Expression | string | Array<Expression | string>, operator: string | undefined = undefined, second: string | Expression | undefined = undefined, boolean: string = 'and'): this {
+    // If the column is an array, we will assume it is an array of key-value pairs
+    // and can add them each as a where clause. We will maintain the boolean we
+    // received when the method was called and pass it into the nested where.
+    if (Array.isArray(first)) {
+      return this.addArrayOfWheres(first, boolean, 'whereColumn');
+    }
+
+    // If the given operator is not found in the list of valid operators we will
+    // assume that the developer is just short-cutting the '=' operators and
+    // we will set the operators to '=' and set the values appropriately.
+    if (this.invalidOperator(operator)) {
+      [second, operator] = [operator, '='];
+    }
+
+    // Finally, we will add this where clause into this array of clauses that we
+    // are building for the query. All of them will be compiled via a grammar
+    // once the query is about to be executed and run against the database.
+    const type = 'Column';
+
+    this.wheres.push({
+      type,
+      first,
+      operator,
+      second,
+      boolean,
+    });
+
+    return this;
+  }
+
+  /**
+   * Determine if the given operator is supported.
+   *
+   * @param  string  $operator
+   * @return bool
+   */
+  protected invalidOperator(operator: string | undefined): boolean {
+    return typeof operator !== 'string'
+      || (!this.operators.includes(operator!.toLowerCase())
+        && !this.grammar.getOperators().includes(operator.toLowerCase()))
+  }
+
+  /**
+   * Add an array of "where" clauses to the query.
+   *
+   * @param  array  $column
+   * @param  string  $boolean
+   * @param  string  $method
+   * @return $this
+   */
+  protected addArrayOfWheres(column: Array<Expression | string>, boolean: string, method: string = 'where'): this {
+    return this.whereNested((query: Builder) => {
+      for (const [key, value] of Object.entries(column)) {
+        if (typeof key === 'number' && Array.isArray(value)) {
+          query[method](...value, boolean);
+        } else {
+          query[method](key, '=', value, boolean);
+        }
+      }
+    }, boolean);
+  }
+
+  /**
+   * Add a nested "where" statement to the query.
+   *
+   * @param  string  $boolean
+   * @return $this
+   */
+  public whereNested(callback: Function, boolean: string = 'and'): this {
+    const query = this.forNestedWhere();
+    callback(query);
+
+    return this.addNestedWhereQuery(query, boolean);
+  }
+
+  /**
+   * Create a new query instance for nested where condition.
+   *
+   * @return \Illuminate\Database\Query\Builder
+   */
+  public forNestedWhere(): Builder {
+    return this.newQuery().from(this.fromProperty);
+  }
+
+  /**
+   * Add another query builder as a nested where to the query builder.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  string  $boolean
+   * @return $this
+   */
+  public addNestedWhereQuery(query: Builder, boolean: string = 'and'): this {
+    if (query.wheres.length > 0) {
+      const type = 'Nested';
+
+      this.wheres.push({ type, query, boolean });
+
+      this.addBinding(query.getRawBindings()['where'], 'where');
+    }
+
+    return this;
+  }
+
+  /**
+   * Get a new "join" clause.
+   *
+   * @param  string  $type
+   * @param  \Illuminate\Contracts\Database\Query\Expression|string  $table
+   * @return \Illuminate\Database\Query\JoinClause
+   */
+  protected newJoinClause(
+    parentQuery: Builder,
+    type: string,
+    table: Expression | string
+  ): JoinClause {
+    return new JoinClause(parentQuery, type, table)
+  }
+
+  /**
    * Force the query to only return distinct results.
    *
    * @param  {string[]}  columns
    * @return {this}
    */
-  public distinct (...columns: string[]): this {
+  public distinct(...columns: string[]): this {
     if (columns.length > 0) {
       this.distinctProperty = Array.isArray(columns[0]) || typeof columns[0] === 'boolean' ? columns[0] : columns
     } else {
@@ -216,7 +437,7 @@ export class Builder {
    *
    * @return \Illuminate\Database\Query\Processors\Processor
    */
-  public getProcessor (): Processor {
+  public getProcessor(): Processor {
     return this.processor
   }
 
@@ -227,7 +448,7 @@ export class Builder {
    * @return $this
    */
   // public select(columns: string | string[] = ['*']) {
-  public select (...columns: string[]) {
+  public select(...columns: string[]) {
     columns = columns.length === 0 ? ['*'] : columns
 
     this.columns = []
@@ -261,7 +482,7 @@ export class Builder {
    *      unionOrder: list<mixed>,
    * }
    */
-  public getRawBindings (): Bindings {
+  public getRawBindings(): Bindings {
     return this.bindings
   }
 
@@ -274,7 +495,7 @@ export class Builder {
    *
    * @throws \InvalidArgumentException
    */
-  public setBindings (bindings: BindingValues, type: keyof Bindings = 'where'): this {
+  public setBindings(bindings: BindingValues, type: keyof Bindings = 'where'): this {
     if (!Object.keys(this.bindings).includes(type)) {
       throw new Error(`InvalidArgumentException: Invalid binding type: ${type}.`)
     }
@@ -290,7 +511,7 @@ export class Builder {
  * @param  string|\Illuminate\Contracts\Database\Query\Expression|array<string|\Illuminate\Contracts\Database\Query\Expression>  $columns
  * @return \Illuminate\Support\Collection<int, \stdClass>
  */
-  public async get (columns: string | Expression | Array<string | Expression> = ['*']): Promise<Collection> {
+  public async get(columns: string | Expression | Array<string | Expression> = ['*']): Promise<Collection> {
     const items = new Collection(
       await this.onceWithColumns(Arr.wrap(columns), async () => {
         return this.processor.processSelect(this, await this.runSelect())
@@ -307,7 +528,7 @@ export class Builder {
  *
  * @return array
  */
-  protected runSelect (): Promise<Record<string, unknown>[]> {
+  protected runSelect(): Promise<Record<string, unknown>[]> {
     return this.connection.select(this.toSql(), this.getBindings())
   }
 
@@ -317,7 +538,7 @@ export class Builder {
    * @param  \Illuminate\Support\Collection  $items
    * @return \Illuminate\Support\Collection
    */
-  protected withoutGroupLimitKeys (items: Collection): Collection {
+  protected withoutGroupLimitKeys(items: Collection): Collection {
     const keysToRemove: string[] = []
 
     if (typeof this.groupLimitProperty!.column === 'string') {
@@ -343,7 +564,7 @@ export class Builder {
    *
    * @return \Illuminate\Database\Query\Grammars\Grammar
    */
-  public getGrammar (): Grammar {
+  public getGrammar(): Grammar {
     return this.grammar
   }
 
@@ -398,7 +619,7 @@ export class Builder {
    *
    * @throws \InvalidArgumentException
    */
-  public selectSub (query: Function | Builder | EloquentBuilder | Relation | string, as: string) {
+  public selectSub(query: Function | Builder | EloquentBuilder | Relation | string, as: string) {
     const [subQuery, bindings] = this.createSub(query)
 
     return this.selectRaw(
@@ -413,7 +634,7 @@ export class Builder {
    * @param  string  $expression
    * @return $this
    */
-  public selectRaw (expression: string, bindings: any[] = []): this {
+  public selectRaw(expression: string, bindings: any[] = []): this {
     this.addSelect(new Expression(expression))
 
     if (bindings.length > 0) {
@@ -430,8 +651,8 @@ export class Builder {
  * @param  string|null  as
  * @return this
  */
-  public from (
-    table: Function | Builder | EloquentBuilder | string,
+  public from(
+    table: Function | Builder | EloquentBuilder | Expression | string,
     as: string | null = null
   ) {
     if (this.isQueryable(table)) {
@@ -452,8 +673,8 @@ export class Builder {
    *
    * @throws \InvalidArgumentException
    */
-  public fromSub (
-    query: Function | Builder | EloquentBuilder | string,
+  public fromSub(
+    query: Function | Builder | EloquentBuilder | Expression | string,
     as: string
   ) {
     const [subQuery, bindings] = this.createSub(query)
@@ -471,7 +692,7 @@ export class Builder {
    * @param  mixed  $bindings
    * @return $this
    */
-  public fromRaw (expression: string, bindings: any[] = []) {
+  public fromRaw(expression: string, bindings: any[] = []) {
     this.fromProperty = new Expression(expression)
 
     this.addBinding(bindings, 'from')
@@ -488,7 +709,7 @@ export class Builder {
    *
    * @throws \InvalidArgumentException
    */
-  public addBinding (value: BindingValue | BindingValues, type: keyof Bindings = 'where') {
+  public addBinding(value: BindingValue | BindingValues, type: keyof Bindings = 'where') {
     if (!(type in this.bindings)) {
       throw new Error(`Invalid binding type: ${type}.`)
     }
@@ -508,7 +729,7 @@ export class Builder {
  * @param  mixed  $value
  * @return mixed
  */
-  public castBinding (value: BindingValue): BindingValue {
+  public castBinding(value: BindingValue): BindingValue {
     return value
   }
 
@@ -518,7 +739,7 @@ export class Builder {
    * @param  mixed  $column
    * @return $this
    */
-  public addSelect (column: any | string[]): this {
+  public addSelect(column: any | string[]): this {
     const columns = Array.isArray(column) ? column : [column]
 
     for (const [as, column] of Object.entries(columns)) {
@@ -546,8 +767,8 @@ export class Builder {
    * @param  \Closure|\Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder<*>|string  $query
    * @return array
    */
-  protected createSub (
-    query: Function | Builder | EloquentBuilder | Relation | string
+  protected createSub(
+    query: Function | Builder | EloquentBuilder | Relation | Expression | string
   ): [string, BindingValues] {
     // If the given query is a Closure, we will execute it while passing in a new
     // query instance to the Closure. This will give the developer a chance to
@@ -566,7 +787,7 @@ export class Builder {
    *
    * @return \Illuminate\Database\Query\Builder
    */
-  protected forSubQuery () {
+  protected forSubQuery() {
     return this.newQuery()
   }
 
@@ -575,7 +796,7 @@ export class Builder {
    *
    * @return \Illuminate\Database\Query\Builder
    */
-  public newQuery () {
+  public newQuery() {
     return new Builder(this.connection, this.grammar, this.processor)
   }
 
@@ -587,8 +808,8 @@ export class Builder {
    *
    * @throws \InvalidArgumentException
    */
-  protected parseSub (
-    query: Builder | EloquentBuilder | Relation | string
+  protected parseSub(
+    query: Builder | EloquentBuilder | Relation | Expression | string
   ): [string, BindingValues] {
     if (
       query instanceof Builder ||
@@ -613,7 +834,7 @@ export class Builder {
    *
    * @return string
    */
-  public toSql (): string {
+  public toSql(): string {
     return this.grammar.compileSelect(this)
   }
 
@@ -622,7 +843,7 @@ export class Builder {
    *
    * @return list<mixed>
    */
-  public getBindings (): BindingValues {
+  public getBindings(): BindingValues {
     return Object.values(this.bindings).flat()
   }
 
@@ -632,7 +853,7 @@ export class Builder {
    * @param  \Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder<*>|\Illuminate\Database\Eloquent\Relations\Relation  query
    * @return \Illuminate\Database\Query\Builder
    */
-  protected toBaseQuery (query: Builder | EloquentBuilder | Relation): Builder {
+  protected toBaseQuery(query: Builder | EloquentBuilder | Relation): Builder {
     return query instanceof Builder ? query : query.toBase()
   }
 
@@ -670,7 +891,7 @@ export class Builder {
    *
    * @return \Illuminate\Database\ConnectionInterface
    */
-  public getConnection () {
+  public getConnection() {
     return this.connection
   }
 
@@ -680,7 +901,7 @@ export class Builder {
    * @param  {any}  value
    * @return {boolean}
    */
-  protected isQueryable (value: unknown): boolean {
+  protected isQueryable(value: unknown): boolean {
     return (
       value instanceof Builder ||
       value instanceof EloquentBuilder ||
