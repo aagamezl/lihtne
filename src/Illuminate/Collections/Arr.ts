@@ -10,6 +10,7 @@ import { get } from 'es-toolkit/compat'
 import { findKey, isEmpty, isNumeric, value } from '../Support'
 import { Collection } from './Collection'
 import { dataGet } from './helpers'
+import { Dictionary } from './types'
 
 export type MapCallback = (
   value: any,
@@ -183,10 +184,10 @@ export class Arr {
  * @param  TFirstDefault|(\Closure(): TFirstDefault)  $default
  * @return TValue|TFirstDefault
  */
-  public static first<TValue, TKey>(
-    array: Iterable<TValue>,
+  public static first<TValue, TKey, TDefault>(
+    array: Iterable<TValue> | Dictionary<TValue>,
     callback?: (value: TValue, key: TKey) => boolean,
-    defaultVal?: () => TValue
+    defaultVal?: TDefault | (() => TDefault)
   ): TValue | (() => TValue) {
     if (isNull(callback)) {
       if (isEmpty(array)) {
