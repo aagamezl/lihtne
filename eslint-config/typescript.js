@@ -36,9 +36,12 @@ export default tseslint.config({
 
     // Standard-with-typescript's opinionated additions, kept intentionally
     // small — extend this file as you need stricter checks.
+    // separate-type-imports: `import type` is erased. Inline
+    // `import { type X }` is emitted as `import {}`, which still
+    // evaluates the module and reintroduces circular-init failures.
     '@typescript-eslint/consistent-type-imports': [
       'error',
-      { prefer: 'type-imports', fixStyle: 'inline-type-imports' }
+      { prefer: 'type-imports', fixStyle: 'separate-type-imports' }
     ],
     '@typescript-eslint/no-explicit-any': 'warn',
     '@typescript-eslint/no-non-null-assertion': 'warn'

@@ -1,3 +1,4 @@
+import { isNumeric } from '../Support/helpers'
 import { type ArrayableInput, type Dictionary, isArrayable, resolveDefault } from './types'
 
 const DOT_SEPARATOR = '.'
@@ -16,19 +17,33 @@ const DOT_SEPARATOR = '.'
  */
 export class Arr {
   /**
-   * Narrow a runtime object key (always a `string`, per `Object.keys()` /
-   * `Object.entries()`) back to the caller's declared key type.
-   *
-   * This is the one place in the port where a cast is unavoidable:
-   * JavaScript object keys are always strings at runtime, so no type guard
-   * can *prove* a given string is a `TKey` — the caller's generic
-   * parameter is a compile-time-only contract with no runtime tag to
-   * check against. Centralizing the cast here, instead of scattering
-   * `as TKey` through every method that walks object keys, keeps every
-   * other method in this file free of casts.
+   * PHP array keys are integers for lists; `Object.entries()` only yields
+   * strings. Match legacy `Arr::map()` by coercing numeric string keys.
    */
-  private static toKey<TKey extends PropertyKey>(key: string): TKey {
-    return key as unknown as TKey
+  private static iterationKey<TKey extends PropertyKey>(key: string): TKey {
+    return (isNumeric(key) ? Number(key) : key) as unknown as TKey
+  }
+
+  /**
+   * True when dictionary keys are dense `0..n-1`, like a PHP list array.
+   */
+  static isList<TValue>(dictionary: Dictionary<TValue>): boolean {
+    const keys = Object.keys(dictionary)
+
+    for (let index = 0; index < keys.length; index += 1) {
+      if (keys[index] !== String(index)) {
+        return false
+      }
+    }
+
+    return true
+  }
+
+  /**
+   * Ordered values for a list-shaped dictionary (same order as PHP `array_values`).
+   */
+  static listValues<TValue>(dictionary: Dictionary<TValue>): TValue[] {
+    return Object.values(dictionary)
   }
 
   /**
@@ -39,7 +54,7 @@ export class Arr {
    * arrays and plain (non-null) objects as "accessible", mirroring how
    * PHP arrays serve as both lists and dictionaries.
    */
-  static accessible(value: unknown): value is unknown[] | Dictionary<unknown> {
+  static accessible (value: unknown): value is unknown[] | Dictionary<unknown> {
     if (Array.isArray(value)) {
       return true
     }
@@ -103,7 +118,7 @@ export class Arr {
    * arrays (an index within `[0, length)` counts as existing, matching
    * PHP's `array_key_exists` for lists).
    */
-  static exists(array: unknown[] | Dictionary<unknown>, key: PropertyKey): boolean {
+  static exists (array: unknown[] | Dictionary<unknown>, key: PropertyKey): boolean {
     if (Array.isArray(array)) {
       const index = Number(key)
 
@@ -145,7 +160,7 @@ export class Arr {
     }
 
     for (const [key, value] of entries) {
-      if (callback(value, Arr.toKey<TKey>(key))) {
+      if (callback(value, Arr.iterationKey<TKey>(key))) {
         return value
       }
     }
@@ -272,7 +287,7 @@ export class Arr {
     const result: Dictionary<TMapped> = {}
 
     for (const [key, value] of Object.entries(array)) {
-      result[key] = callback(value, Arr.toKey<TKey>(key))
+      result[key] = callback(value, Arr.iterationKey<TKey>(key))
     }
 
     return result
@@ -410,7 +425,7 @@ export class Arr {
    * isset($target->{$segment})` branch — a plain-object property read
    * distinct from the array-accessible branch handled just above it.
    */
-  private static isPlainObjectWithProperty(
+  private static isPlainObjectWithProperty (
     value: unknown,
     property: string
   ): value is Dictionary<unknown> {

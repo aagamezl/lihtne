@@ -2,15 +2,18 @@ import { dateFormat } from '@devnetic/utils'
 import { isNil } from 'es-toolkit'
 
 import type { Dispatcher } from '../Contracts'
+import type { Driver } from './Drivers/Driver'
+import type { Grammar } from './Grammar'
+import type { BindingValues } from './Query/Builder'
 import type { Statement } from './Statements'
 
 import { Arr } from '../Collections'
 import { mixing } from '../Support'
 import { DetectsLostConnections } from './DetectsLostConnections'
-import { type Driver } from './Drivers/Driver'
 import { QueryExecuted, StatementPrepared } from './Events'
-import { type Grammar } from './Grammar'
-import { type BindingValues, Processor, Grammar as QueryGrammar } from './Query'
+import { Grammar as QueryGrammar } from './Query/Grammars/Grammar'
+import { Processor } from './Query/Processors/Processor'
+// import { type BindingValues, Processor, Grammar as QueryGrammar } from './Query/index-backup'
 
 export type QueryLogEntry = {
   query: string

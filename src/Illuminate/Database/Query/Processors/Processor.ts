@@ -1,4 +1,4 @@
-import { type Builder } from '../Builder'
+import type { Builder } from '../Builder'
 
 export class Processor {
   /**

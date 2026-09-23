@@ -50,7 +50,7 @@ export class EnumeratesValues {
    * @param  mixed  $items
    * @return array<TKey, TValue>
    */
-  public getArrayableItems/* <TValue> */(items: unknown)/* : Iterable<TValue> */ {
+  public getArrayableItems /* <TValue> */(items: unknown)/* : Iterable<TValue> */ {
     // return isPrimitive(items) || isEnum(items)
     //   ? Arr.wrap<TValue>(items as TValue)
     //   : Arr.from(items)

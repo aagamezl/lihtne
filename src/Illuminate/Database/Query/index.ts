@@ -1,4 +1,6 @@
 export * from './Builder'
 export * from './Expression'
 export * from './Grammars'
+export * from './JoinClause'
+export * from './JoinLateralClause'
 export * from './Processors'

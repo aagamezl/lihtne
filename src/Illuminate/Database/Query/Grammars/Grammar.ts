@@ -1,6 +1,7 @@
 import { isTruthy, trim } from '@devnetic/utils'
 
 import type { Agregate, BindingValues, Builder, Having, Order, Union, WhereClause } from '../Builder'
+import type { Expression } from '../Expression'
 
 import { Collection } from '../../../Collections'
 import { head, last } from '../../../Collections/helpers'
@@ -8,28 +9,26 @@ import { isEmpty, isValueSet, type Prettify, ucfirst } from '../../../Support'
 import { mixing } from '../../../Support/Traits'
 import { CompilesJsonPaths } from '../../Concerns/CompilesJsonPaths'
 import { Grammar as BaseGrammar } from '../../Grammar'
-import { type Expression } from '../Expression'
-import type { JoinClause } from '../JoinClause'
+import { JoinClause } from '../JoinClause'
 import { JoinLateralClause } from '../JoinLateralClause'
 
 /**
  * Array representing the select components for a query.
  */
 
-
 export type SelectComponentName =
-  | 'aggregate'
-  | 'columns'
-  | 'from'
-  | 'indexHint'
-  | 'joins'
-  | 'wheres'
-  | 'groups'
-  | 'havings'
-  | 'orders'
-  | 'limit'
-  | 'offset'
-  | 'lock'
+  | 'aggregate' |
+  'columns' |
+  'from' |
+  'indexHint' |
+  'joins' |
+  'wheres' |
+  'groups' |
+  'havings' |
+  'orders' |
+  'limit' |
+  'offset' |
+  'lock'
 
 export type CompilerMethod = `compile${Capitalize<string & Exclude<SelectComponentName, 'indexHint'>>}`
 
@@ -64,11 +63,18 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
   ]
 
   /**
+     * The grammar specific bitwise operators.
+     *
+     * @var array
+     */
+  protected bitwiseOperators: string[] = []
+
+  /**
    * The grammar specific operators.
    *
    * @var array
    */
-  protected operators: string[] = [];
+  protected operators: string[] = []
 
   /**
    * Get the grammar specific operators.
@@ -76,7 +82,7 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    * @return array
    */
   public getOperators(): string[] {
-    return this.operators;
+    return this.operators
   }
 
   /**
@@ -495,7 +501,7 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
 
       const joinWord = (join.type === 'straight_join' && this.supportsStraightJoins()) ? '' : ' join'
 
-      return String(`${join.type}${joinWord} ${tableAndNestedJoins} ${this.compileWheres($join)}`).trim()
+      return String(`${join.type}${joinWord} ${tableAndNestedJoins} ${this.compileWheres(join)}`).trim()
     }).implode(' ')
   }
 
@@ -526,6 +532,21 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
   }
 
   /**
+ * Compile a basic where clause.
+ *
+ * @param  \Illuminate\Database\Query\Builder  $query
+ * @param  array  $where
+ * @return string
+ */
+  protected whereBasic(query: Builder, where: WhereClause): string {
+    const value = this.parameter(where.value);
+
+    const operator = where.operator?.replace('?', '??') ?? '';
+
+    return this.wrap(where.column ?? '') + ' ' + operator + ' ' + value;
+  }
+
+  /**
    * Get an array of all the where clauses for the query.
    *
    * @param  \Illuminate\Database\Query\Builder  $query
@@ -533,11 +554,40 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    */
   protected compileWheresToArray(query: Builder): string[] {
     const collection = new Collection<WhereClause[]>(query.wheres)
+
     return collection
-      .map((where: WhereClause) => where.boolean + ' ' + this[`where${where.type}`](query, where))
+      .map((where: WhereClause) => {
+        // console.log(`where${where.type}`)
+        return where.boolean + ' ' + this[`where${where.type}`](query, where)
+      })
       .all()
   }
 
+  /**
+   * Compile a "where column" clause.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $where
+   * @return string
+   */
+  protected whereColumn(query: Builder, where: WhereClause): string {
+    const operator = (where.operator ?? '').replace('?', '??')
+
+    return this.wrap(where.first ?? '') + ' ' + operator + ' ' + this.wrap(where.second ?? '')
+  }
+
+  /**
+   * Concatenate the where clauses into a single string.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $sql
+   * @return string
+   */
+  protected concatenateWhereClauses(query: Builder, sql: string[]): string {
+    const conjunction = query instanceof JoinClause ? 'on' : 'where'
+
+    return conjunction + ' ' + this.removeLeadingBoolean(sql.join(' '))
+  }
 
   /**
    * Determine if the grammar supports straight joins.
@@ -547,7 +597,7 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    * @throws \RuntimeException
    */
   protected supportsStraightJoins(): boolean {
-    throw new Error('RuntimeException: This database engine does not support straight joins.');
+    throw new Error('RuntimeException: This database engine does not support straight joins.')
   }
 
   /**
@@ -560,7 +610,7 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    * @throws \RuntimeException
    */
   public compileJoinLateral(join: JoinLateralClause, expression: string): string {
-    throw new Error('RuntimeException: This database engine does not support lateral joins.');
+    throw new Error('RuntimeException: This database engine does not support lateral joins.')
   }
 
   /**
@@ -706,5 +756,14 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
     }
 
     return query
+  }
+
+  /**
+ * Get the grammar specific bitwise operators.
+ *
+ * @return array
+ */
+  public getBitwiseOperators(): string[] {
+    return this.bitwiseOperators
   }
 }

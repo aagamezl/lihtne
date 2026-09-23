@@ -1,5 +1,5 @@
-import { type Connection } from '../Connection'
-import { type BindingValues } from '../Query'
+import type { Connection } from '../Connection'
+import type { BindingValues } from '../Query'
 
 export class QueryExecuted {
   /**

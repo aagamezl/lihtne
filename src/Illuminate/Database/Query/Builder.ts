@@ -1,13 +1,19 @@
+import { isNil } from 'es-toolkit'
+
 import type { Connection } from '../Connection'
 import type { Grammar } from '../Query/Grammars/Grammar'
+import type { JoinClause } from './JoinClause'
 import type { Processor } from './Processors'
 
 import { Arr, Collection } from '../../Collections'
-import { isSet, value, type Prettify } from '../../Support'
+import { head } from '../../Collections/helpers'
+import { isSet, mixing, type Prettify, value } from '../../Support'
+// import { registry } from './internal'
+import { resolveClass } from '../../Support/class-registry'
+import { BuildsQueries } from '../Concerns'
 import { Builder as EloquentBuilder } from '../Eloquent'
 import { Relation } from '../Eloquent/Relations'
 import { Expression } from './Expression'
-import { JoinClause } from './JoinClause'
 
 export type BindingValue =
   string |
@@ -89,7 +95,9 @@ export type GroupLimit = {
   column: string
 }
 
-export class Builder {
+export interface Builder extends BuildsQueries { }
+
+export class Builder extends mixing(BuildsQueries).useTrait([BuildsQueries]) {
   /**
    * The database connection instance.
    *
@@ -115,7 +123,7 @@ export class Builder {
    *
    * @var JoinClause[]
    */
-  public joins: JoinClause[] = [];
+  public joins: JoinClause[] = []
 
   /**
    * The table which the query is targeting.
@@ -139,25 +147,11 @@ export class Builder {
   public limitProperty: number | undefined = undefined
 
   /**
-   * All of the available clause operators.
-   *
-   * @var string[]
-   */
-  public operators = [
-    '=', '<', '>', '<=', '>=', '<>', '!=', '<=>',
-    'like', 'like binary', 'not like', 'ilike',
-    '&', '|', '^', '<<', '>>', '&~', 'is', 'is not',
-    'rlike', 'not rlike', 'regexp', 'not regexp',
-    '~', '~*', '!~', '!~*', 'similar to',
-    'not similar to', 'not ilike', '~~*', '!~~*',
-  ]
-
-  /**
    * The where constraints for the query.
    *
    * @var array
    */
-  public wheres: WhereClause[] = [];
+  public wheres: WhereClause[] = []
 
   /**
    * The maximum number of records to return per group.
@@ -189,6 +183,29 @@ export class Builder {
    * @var int|null
    */
   public unionOffset: number | null = null
+
+  /**
+   * All of the available clause operators.
+   *
+   * @var string[]
+   */
+  public operators = [
+    '=', '<', '>', '<=', '>=', '<>', '!=', '<=>',
+    'like', 'like binary', 'not like', 'ilike',
+    '&', '|', '^', '<<', '>>', '&~', 'is', 'is not',
+    'rlike', 'not rlike', 'regexp', 'not regexp',
+    '~', '~*', '!~', '!~*', 'similar to',
+    'not similar to', 'not ilike', '~~*', '!~~*'
+  ]
+
+  /**
+   * All of the available bitwise operators.
+   *
+   * @var string[]
+   */
+  public bitwiseOperators = [
+    '&', '|', '^', '<<', '>>', '&~'
+  ]
 
   /**
    * The orderings for the union query.
@@ -238,6 +255,8 @@ export class Builder {
     grammar: Grammar,
     processor: Processor
   ) {
+    super()
+
     this.connection = connection
     this.grammar = grammar ?? connection.getQueryGrammar()
     this.processor = processor ?? connection.getPostProcessor()
@@ -262,31 +281,31 @@ export class Builder {
     type: string = 'inner',
     where: boolean = false
   ): this {
-    const join = this.newJoinClause(this, type, table);
+    const join = this.newJoinClause(this, type, table)
 
     // If the first "column" of the join is really a Closure instance the developer
     // is trying to build a join with a complex "on" clause containing more than
     // one condition, so we'll add the join and call a Closure with the query.
     if (first instanceof Function) {
-      first(join);
+      first(join)
 
-      this.joins.push(join);
+      this.joins.push(join)
 
-      this.addBinding(join.getBindings(), 'join');
+      this.addBinding(join.getBindings(), 'join')
     }
 
     // If the column is simply a string, we can assume the join simply has a basic
     // "on" clause with a single condition. So we will just build the join with
     // this simple join clauses attached to it. There is not a join callback.
     else {
-      const method: string = where ? 'where' : 'on';
+      const method: string = where ? 'where' : 'on'
 
-      this.joins.push(join[method](first, operator, second));
+      this.joins.push(join[method](first, operator, second))
 
-      this.addBinding(join.getBindings(), 'join');
+      this.addBinding(join.getBindings(), 'join')
     }
 
-    return this;
+    return this
   }
 
   /**
@@ -303,30 +322,30 @@ export class Builder {
     // and can add them each as a where clause. We will maintain the boolean we
     // received when the method was called and pass it into the nested where.
     if (Array.isArray(first)) {
-      return this.addArrayOfWheres(first, boolean, 'whereColumn');
+      return this.addArrayOfWheres(first, boolean, 'whereColumn')
     }
 
     // If the given operator is not found in the list of valid operators we will
     // assume that the developer is just short-cutting the '=' operators and
     // we will set the operators to '=' and set the values appropriately.
     if (this.invalidOperator(operator)) {
-      [second, operator] = [operator, '='];
+      [second, operator] = [operator, '=']
     }
 
     // Finally, we will add this where clause into this array of clauses that we
     // are building for the query. All of them will be compiled via a grammar
     // once the query is about to be executed and run against the database.
-    const type = 'Column';
+    const type = 'Column'
 
     this.wheres.push({
       type,
       first,
       operator,
       second,
-      boolean,
-    });
+      boolean
+    })
 
-    return this;
+    return this
   }
 
   /**
@@ -336,9 +355,9 @@ export class Builder {
    * @return bool
    */
   protected invalidOperator(operator: string | undefined): boolean {
-    return typeof operator !== 'string'
-      || (!this.operators.includes(operator!.toLowerCase())
-        && !this.grammar.getOperators().includes(operator.toLowerCase()))
+    return typeof operator !== 'string' ||
+      (!this.operators.includes(operator!.toLowerCase()) &&
+        !this.grammar.getOperators().includes(operator.toLowerCase()))
   }
 
   /**
@@ -353,12 +372,12 @@ export class Builder {
     return this.whereNested((query: Builder) => {
       for (const [key, value] of Object.entries(column)) {
         if (typeof key === 'number' && Array.isArray(value)) {
-          query[method](...value, boolean);
+          query[method](...value, boolean)
         } else {
-          query[method](key, '=', value, boolean);
+          query[method](key, '=', value, boolean)
         }
       }
-    }, boolean);
+    }, boolean)
   }
 
   /**
@@ -368,10 +387,10 @@ export class Builder {
    * @return $this
    */
   public whereNested(callback: Function, boolean: string = 'and'): this {
-    const query = this.forNestedWhere();
-    callback(query);
+    const query = this.forNestedWhere()
+    callback(query)
 
-    return this.addNestedWhereQuery(query, boolean);
+    return this.addNestedWhereQuery(query, boolean)
   }
 
   /**
@@ -380,7 +399,7 @@ export class Builder {
    * @return \Illuminate\Database\Query\Builder
    */
   public forNestedWhere(): Builder {
-    return this.newQuery().from(this.fromProperty);
+    return this.newQuery().from(this.fromProperty)
   }
 
   /**
@@ -392,14 +411,14 @@ export class Builder {
    */
   public addNestedWhereQuery(query: Builder, boolean: string = 'and'): this {
     if (query.wheres.length > 0) {
-      const type = 'Nested';
+      const type = 'Nested'
 
-      this.wheres.push({ type, query, boolean });
+      this.wheres.push({ type, query, boolean })
 
-      this.addBinding(query.getRawBindings()['where'], 'where');
+      this.addBinding(query.getRawBindings().where, 'where')
     }
 
-    return this;
+    return this
   }
 
   /**
@@ -414,7 +433,12 @@ export class Builder {
     type: string,
     table: Expression | string
   ): JoinClause {
-    return new JoinClause(parentQuery, type, table)
+    // return new (registry.get('JoinClause'))(parentQuery, type, table)
+    // return new JoinClause(parentQuery, type, table)
+
+    const JoinClauseCtor = resolveClass<JoinClause>('JoinClause')
+
+    return new JoinClauseCtor(parentQuery, type, table)
   }
 
   /**
@@ -908,5 +932,216 @@ export class Builder {
       value instanceof Relation ||
       value instanceof Function
     )
+  }
+
+  /**
+ * Add a basic "where" clause to the query.
+ *
+ * @param  \Closure|string|array|\Illuminate\Contracts\Database\Query\Expression  $column
+ * @param  mixed  $operator
+ * @param  mixed  $value
+ * @param  string  $boolean
+ * @return $this
+ */
+  public where(column: Expression | string | Array<Expression | string> | Function, operator: string | undefined = undefined, value: unknown | undefined = undefined, boolean: string = 'and'): this {
+    if (column instanceof Expression) {
+      const type = 'Expression'
+
+      this.wheres.push({ type, column, boolean })
+
+      return this
+    }
+
+    // If the column is an array, we will assume it is an array of key-value pairs
+    // and can add them each as a where clause. We will maintain the boolean we
+    // received when the method was called and pass it into the nested where.
+    if (Array.isArray(column)) {
+      return this.addArrayOfWheres(column, boolean)
+    }
+
+    // Here we will make some assumptions about the operator. If only 2 values are
+    // passed to the method, we will assume that the operator is an equals sign
+    // and keep going. Otherwise, we'll require the operator to be passed in.
+    [value, operator] = this.prepareValueAndOperator(value, operator, arguments.length === 2)
+
+    // If the column is actually a Closure instance, we will assume the developer
+    // wants to begin a nested where statement which is wrapped in parentheses.
+    // We will add that Closure to the query and return back out immediately.
+    if (column instanceof Function && operator === undefined) {
+      return this.whereNested(column, boolean)
+    }
+
+    // If the column is a Closure instance and there is an operator value, we will
+    // assume the developer wants to run a subquery and then compare the result
+    // of that subquery with the given value that was provided to the method.
+    if (this.isQueryable(column) && operator !== undefined) {
+      const [sub, bindings] = this.createSub(column)
+
+      return this.addBinding(bindings, 'where')
+        .where(new Expression('(' + sub + ')'), operator, value, boolean)
+    }
+
+    // If the given operator is not found in the list of valid operators we will
+    // assume that the developer is just short-cutting the '=' operators and
+    // we will set the operators to '=' and set the values appropriately.
+    if (this.invalidOperator(operator)) {
+      [value, operator] = [operator, '=']
+    }
+
+    // If the value is a Closure, it means the developer is performing an entire
+    // sub-select within the query and we will need to compile the sub-select
+    // within the where clause to get the appropriate query record results.
+    if (this.isQueryable(value)) {
+      return this.whereSub(column, operator, value, boolean)
+    }
+
+    // If the value is "null", we will just assume the developer wants to add a
+    // where null clause to the query. So, we will allow a short-cut here to
+    // that method for convenience so the developer doesn't have to check.
+    if (isNil(value)) {
+      return this.whereNull(column, boolean, !['=', '<=>'].includes(operator!))
+    }
+
+    let type = 'Basic'
+
+    const columnString = (column instanceof Expression)
+      ? this.grammar.getValue(column)
+      : column
+
+    // If the column is making a JSON reference we'll check to see if the value
+    // is a boolean. If it is, we'll add the raw boolean string as an actual
+    // value to the query to ensure this is properly handled by the query.
+    if (String(columnString).includes('->') && typeof value === 'boolean') {
+      value = new Expression(value ? 'true' : 'false')
+
+      if (typeof column === 'string') {
+        type = 'JsonBoolean'
+      }
+    }
+
+    if (this.isBitwiseOperator(operator)) {
+      type = 'Bitwise'
+    }
+
+    if (operator === '<=>') {
+      type = 'NullSafeEquals'
+    }
+
+    // Now that we are working with just a simple query we can put the elements
+    // in our array and add the query binding to our array of bindings that
+    // will be bound to each SQL statements when it is finally executed.
+    this.wheres.push({ type, column, operator, value, boolean })
+
+    if (!(value instanceof Expression)) {
+      this.addBinding(this.flattenValue(value), 'where')
+    }
+
+    return this
+  }
+
+  /**
+   * Prepare the value and operator for a where clause.
+   *
+   * @param  string  $value
+   * @param  string  $operator
+   * @param  bool  $useDefault
+   * @return array
+   *
+   * @throws \InvalidArgumentException
+   */
+  public prepareValueAndOperator(value: unknown, operator: string, useDefault: boolean = false): [unknown, string] {
+    if (useDefault) {
+      return [operator, '=']
+    }
+
+    if (this.invalidOperatorAndValue(operator, value)) {
+      throw new Error('Illegal operator and value combination.')
+    }
+
+    return [value, operator]
+  }
+
+  /**
+   * Determine if the given operator and value combination is legal.
+   *
+   * Prevents using Null values with invalid operators.
+   *
+   * @param  string  $operator
+   * @param  mixed  $value
+   * @return bool
+   */
+  protected invalidOperatorAndValue(operator: string, value: unknown): boolean {
+    return isNil(value) && this.operators.includes(operator) &&
+      !['=', '<=>', '<>', '!='].includes(operator)
+  }
+
+  /**
+   * Get a scalar type value from an unknown type of input.
+   *
+   * @param  mixed  $value
+   * @return mixed
+   */
+  protected flattenValue(value: unknown): unknown {
+    return Array.isArray(value) ? head(Arr.flatten(value)) : value
+  }
+
+  /**
+   * Add a full sub-select to the query.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
+   * @param  string  $operator
+   * @param  \Closure|\Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder<*>  $callback
+   * @param  string  $boolean
+   * @return $this
+   */
+  protected whereSub(column: Expression | string, operator: string, callback: Function | Builder | EloquentBuilder, boolean: string): this {
+    const type = 'Sub'
+
+    let query: Builder | EloquentBuilder
+
+    if (callback instanceof Function) {
+      // Once we have the query instance we can simply execute it so it can add all
+      // of the sub-select's conditions to itself, and then we can cache it off
+      // in the array of where clauses for the "main" parent query instance.
+      query = this.forSubQuery()
+      callback(query)
+    } else {
+      query = callback instanceof EloquentBuilder ? callback.toBase() : callback
+    }
+
+    this.wheres.push({ type, column, operator, query, boolean })
+
+    this.addBinding(query.getBindings(), 'where')
+
+    return this
+  }
+
+  /**
+   * Determine if the operator is a bitwise operator.
+   *
+   * @param  string  $operator
+   * @return bool
+   */
+  protected isBitwiseOperator(operator: string): boolean {
+    return this.bitwiseOperators.includes(operator.toLowerCase()) ||
+      this.grammar.getBitwiseOperators().includes(operator.toLowerCase())
+  }
+
+  /**
+ * Add a "where null" clause to the query.
+ *
+ * @param  string|array|\Illuminate\Contracts\Database\Query\Expression  $columns
+ * @param  string  $boolean
+ * @param  bool  $not
+ * @return $this
+ */
+  public whereNull(columns: Expression | string | Array<Expression | string>, boolean: string = 'and', not: boolean = false): this {
+    const type = not ? 'NotNull' : 'Null'
+
+    for (const column of Arr.wrap(columns)) {
+      this.wheres.push({ type, column, boolean })
+    }
+
+    return this
   }
 }

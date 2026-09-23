@@ -1,6 +1,9 @@
+import { isPlainObject } from 'es-toolkit'
+
+import type { ArrayableInput, Dictionary } from './types'
+
 import { Arr } from './ArrNew'
 import { EnumeratesValues } from './EnumeratesValues'
-import { ArrayableInput, Dictionary } from './types'
 
 const EMPTY_GLUE = ''
 
@@ -38,16 +41,24 @@ export class Collection<TKey extends PropertyKey, TValue> extends EnumeratesValu
    * always builds a plain `Collection` — faithful for this port's scope,
    * since no subclassing is exercised here.
    */
-  protected newInstance (items: ArrayableInput<TKey, TValue> = []): Collection<TKey, TValue> {
-    return new Collection<TKey, TValue>(items)
+  protected newInstance<TNewValue = TValue> (
+    items: ArrayableInput<TKey, TNewValue> = []
+  ): Collection<TKey, TNewValue> {
+    return new Collection<TKey, TNewValue>(items)
   }
 
   /**
    * Get all of the items in the collection.
    *
-   * Mirrors `Collection::all()`.
+   * Mirrors `Collection::all()`. List-shaped collections (dense numeric
+   * keys) return a real array so callers can use `.length` / `.join()`.
+   * Associative collections keep the underlying dictionary.
    */
-  all (): Dictionary<TValue> {
+  all (): Dictionary<TValue> | TValue[] {
+    if (Arr.isList(this.items)) {
+      return Arr.listValues(this.items)
+    }
+
     return this.items
   }
 
@@ -95,20 +106,19 @@ export class Collection<TKey extends PropertyKey, TValue> extends EnumeratesValu
    */
   implode (value?: string | ((item: TValue, key: TKey) => unknown), glue?: string): string {
     if (typeof value === 'function') {
-      const mapped = this.map(value)
-
-      return Object.values(mapped.all()).join(glue ?? EMPTY_GLUE)
+      return this.joinAll(this.map(value).all(), glue ?? EMPTY_GLUE)
     }
 
     const first = this.first()
 
-    if (this.isPlainArrayOrObject(first)) {
-      const plucked = this.pluck<unknown>(value)
-
-      return Object.values(plucked.all()).join(glue ?? EMPTY_GLUE)
+    if (
+      Array.isArray(first) ||
+      (isPlainObject(first) && !(first instanceof String))
+    ) {
+      return this.joinAll(this.pluck<unknown>(value as string).all(), glue ?? EMPTY_GLUE)
     }
 
-    return Object.values(this.items).join(value ?? EMPTY_GLUE)
+    return this.joinAll(this.items, value ?? EMPTY_GLUE)
   }
 
   /**
@@ -119,7 +129,7 @@ export class Collection<TKey extends PropertyKey, TValue> extends EnumeratesValu
   map<TMapped> (callback: (value: TValue, key: TKey) => TMapped): Collection<TKey, TMapped> {
     const mapped = Arr.map<TKey, TValue, TMapped>(this.items, callback)
 
-    return new Collection<TKey, TMapped>(mapped)
+    return this.newInstance<TMapped>(mapped)
   }
 
   /**
@@ -137,161 +147,14 @@ export class Collection<TKey extends PropertyKey, TValue> extends EnumeratesValu
   }
 
   /**
-   * Narrow helper used only to keep `implode()` readable: approximates
-   * PHP's `is_array($first) || (is_object($first) && ! $first instanceof
-   * Stringable)` check.
+   * Join collection contents whether `all()` returned a list or dictionary.
    */
-  private isPlainArrayOrObject (value: unknown): boolean {
-    if (value === null || typeof value !== 'object') {
-      return false
-    }
+  private joinAll (
+    items: Dictionary<unknown> | unknown[] | Dictionary<TValue> | TValue[],
+    glue: string
+  ): string {
+    const values = Array.isArray(items) ? items : Object.values(items)
 
-    if (Array.isArray(value)) {
-      return true
-    }
-
-    const hasCustomToString = typeof (value as { toString?: unknown }).toString === 'function' &&
-      (value as { toString: () => string }).toString !== Object.prototype.toString
-
-    return !hasCustomToString
+    return values.join(glue)
   }
 }
-
-// import { isPlainObject, isPrimitive } from 'es-toolkit'
-// import type { MapCallback } from './Arr'
-
-// // export type CollectionItems = Array<any> | Record<string, unknown>
-// export type CollectionItems = Array<unknown> | CollectionNew | Record<string, unknown>
-
-// // export class CollectionNew<T> extends Array<T> {
-// export class CollectionNew<TValue = any, TKey = any> {
-//   protected items: Array<TValue>
-
-
-//   constructor(items: TValue) {
-//     this.items = this.getArrayableItems(items)
-//   }
-
-//   /**
-//   * Results array of items from Collection or Arrayable.
-//   *
-//   * @param  {*}  items
-//   * @return {Array}
-//   */
-//   protected getArrayableItems(items: TValue): Array<TValue> {
-//     // if (Array.isArray(items)) {
-//     //   return items
-//     // } else if (items instanceof CollectionNew) {
-//     //   return items.all()
-//     // } else if (isPlainObject(items)) {
-//     //   return [items]
-//     // } else if (items === undefined) {
-//     //   return []
-//     // }
-
-//     // return [items]
-//     if (isPrimitive(items) || isPlainObject(items) || typeof items === 'object') {
-//       return [items]
-//     }
-
-//     if (Array.isArray(items)) {
-//       return items
-//     }
-
-//     return [items]
-//   }
-
-//   public all(): Array<unknown> | CollectionNew {
-//     return this.items
-//   }
-
-//   public first(
-//     callback?: (value: TValue, key: TKey) => boolean,
-//     defaultValue?: unknown
-//   ) {
-//     if (callback === undefined) {
-//       if (this.items.length === 0) {
-//         return defaultValue
-//       }
-
-//       return this.items.at(0)
-//     }
-
-//     const item = this.items.find((value, key) => {
-//       return callback(value, key as TKey)
-//     })
-
-//     return item ?? defaultValue
-//     // if (callback !== undefined) {
-
-//     //   return item ?? [defaultValue]
-//     // }
-
-//     // return this.items.at(0)
-
-//     // return [defaultValue]
-//   }
-
-//   /**
-//  * Create a new instance of the collection.
-//  *
-//  * @param  \Illuminate\Contracts\Support\Arrayable<TKey, TValue>|iterable<TKey, TValue>|null  items
-//  * @return static
-//  */
-//   protected newInstance<T>(items: T[] = []): CollectionNew<T> {
-//     return new CollectionNew<T>(items as T)
-//   }
-
-//   public count(): number {
-//     return this.items.length
-//   }
-
-//   protected useAsCallable(value: unknown) {
-//     return typeof value !== 'string' && typeof value === 'function'
-//   }
-
-//  public map (callback: Function): CollectionNew {
-//    return this.newInstance(this.items.map((value, index) => callback(value, index)))
-//   }
-
-//   public implode(value?: MapCallback, glue?: string) {
-//     if (this.useAsCallable(value)) {
-//       return this.map(value).all().join(glue ?? '')
-//     }
-
-//     const first = this.first()
-
-//     if (Array.isArray(first) || (isPlainObject(first) && typeof first !== 'string')) {
-//       return this.pluck(value).all().join(glue ?? '')
-//     }
-
-//     return this.items.join(value ?? '')
-//   }
-
-//   public pluck<T extends object>(
-//     items: T[],
-//     valuePath?: string,
-//     keyPath?: string
-//   ): CollectionNew {
-//     function getByPath<T extends object, R = unknown>(obj: T, path: string): R {
-//       return path.split('.').reduce<any>((acc, key) => acc?.[key], obj);
-//     }
-
-//     if (!keyPath) {
-//       // Simple pluck: return array of values
-//       return items.map(item => getByPath(item, valuePath));
-//     }
-
-//     // Keyed pluck: return object keyed by keyPath
-//     const result: Record<string | number, any> = {};
-
-//     for (const item of items) {
-//       const key = getByPath(item, keyPath);
-//       const value = getByPath(item, valuePath);
-
-//       result[key as any] = value;
-//     }
-
-//     return this.newInstance(result);
-//   }
-// }

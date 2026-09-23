@@ -1,5 +1,5 @@
-import { type Expression as ExpressionContract } from '../../Contracts/Database/Query/Expression'
-import { type Grammar } from '../Grammar'
+import type { Expression as ExpressionContract } from '../../Contracts/Database/Query/Expression'
+import type { Grammar } from '../Grammar'
 
 /**
  * @template TValue of string|int|float

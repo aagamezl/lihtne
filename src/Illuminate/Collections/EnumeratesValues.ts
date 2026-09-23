@@ -25,7 +25,7 @@ export class EnumeratesValues<TKey extends PropertyKey, TValue> {
    */
   protected items: Dictionary<TValue>
 
-  constructor(items: Dictionary<TValue> = {}) {
+  constructor (items: Dictionary<TValue> = {}) {
     this.items = items
   }
 
@@ -36,7 +36,7 @@ export class EnumeratesValues<TKey extends PropertyKey, TValue> {
    * underlying items, in insertion order) and stops early if the
    * callback returns exactly `false`, matching PHP's `=== false` check.
    */
-  each(callback: (value: TValue, key: TKey) => unknown): this {
+  each (callback: (value: TValue, key: TKey) => unknown): this {
     for (const [key, value] of Object.entries(this.items)) {
       const result = callback(value, EnumeratesValues.toKey<TKey>(key))
 
@@ -71,7 +71,7 @@ export class EnumeratesValues<TKey extends PropertyKey, TValue> {
    * is normalized via `Arr.from()`. TypeScript has no `UnitEnum`
    * equivalent, so that branch is omitted.
    */
-  protected getArrayableItems(items: ArrayableInput<TKey, TValue> | TValue): Dictionary<TValue> {
+  protected getArrayableItems (items: ArrayableInput<TKey, TValue> | TValue): Dictionary<TValue> {
     if (this.isScalarLike(items)) {
       const wrapped = Arr.wrap(items)
       const result: Dictionary<TValue> = {}
@@ -94,7 +94,7 @@ export class EnumeratesValues<TKey extends PropertyKey, TValue> {
    * itself be a valid PHP callable (a function name); in TypeScript the
    * equivalent distinction is simply "is this a function".
    */
-  protected useAsCallable(value: unknown): value is (...args: never[]) => unknown {
+  protected useAsCallable (value: unknown): value is (...args: never[]) => unknown {
     return typeof value !== 'string' && typeof value === 'function'
   }
 
@@ -103,7 +103,7 @@ export class EnumeratesValues<TKey extends PropertyKey, TValue> {
    * reports whether a value is one of PHP's "scalar" types (or null),
    * i.e. not an array/object/Arrayable that `Arr.from()` should handle.
    */
-  private isScalarLike(
+  private isScalarLike (
     value: ArrayableInput<TKey, TValue> | TValue
   ): value is TValue | null | undefined {
     if (value === null || value === undefined) {

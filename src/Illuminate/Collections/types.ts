@@ -35,19 +35,19 @@ export type Dictionary<TValue> = Record<string, TValue>
  * plain record/dictionary, or something Arrayable.
  */
 export type ArrayableInput<TKey extends PropertyKey, TValue> =
-  | TValue[]
-  | Dictionary<TValue>
-  | Arrayable<TKey, TValue>
-  | Iterable<TValue>
-  | null
-  | undefined
+  | TValue[] |
+  Dictionary<TValue> |
+  Arrayable<TKey, TValue> |
+  Iterable<TValue> |
+  null |
+  undefined
 
 /**
  * Type guard for the Arrayable contract, used in place of `instanceof`
  * checks against an interface (interfaces have no runtime representation
  * in TypeScript, so this checks for the `toArray` method shape instead).
  */
-export function isArrayable<TKey extends PropertyKey, TValue>(
+export function isArrayable<TKey extends PropertyKey, TValue> (
   value: unknown
 ): value is Arrayable<TKey, TValue> {
   if (value === null || typeof value !== 'object') {
@@ -74,7 +74,7 @@ export type ItemCallback<TKey extends PropertyKey, TValue, TReturn> = (
  * result; otherwise return the value itself. Used for lazily-evaluated
  * `$default` arguments throughout Arr.
  */
-export function resolveDefault<TValue>(
+export function resolveDefault<TValue> (
   value: TValue | (() => TValue)
 ): TValue {
   if (typeof value === 'function') {

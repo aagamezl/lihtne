@@ -1,6 +1,4 @@
-import { Processor } from '../../../src/Illuminate/Database/Query'
-import { Builder } from '../../../src/Illuminate/Database/Query/Builder'
-import { Grammar } from '../../../src/Illuminate/Database/Query/Grammars/Grammar'
+import { Builder, Grammar, Processor } from '../../../src/Illuminate/Database/Query'
 import { getConnection } from './getConnection'
 
 export const getBuilder = (prefix: string = ''): Builder => {

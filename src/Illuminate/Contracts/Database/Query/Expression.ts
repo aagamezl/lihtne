@@ -1,4 +1,4 @@
-import { type Grammar } from '../../../Database'
+import type { Grammar } from '../../../Database'
 
 export interface Expression {
   /**

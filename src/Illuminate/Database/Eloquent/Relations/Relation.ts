@@ -1,6 +1,5 @@
+import type { Builder as BuilderContract } from '../../../Contracts'
 import type { Builder as EloquentBuilder } from '../Builder'
-
-import { type Builder as BuilderContract } from '../../../Contracts'
 
 export abstract class Relation implements BuilderContract {
   /**

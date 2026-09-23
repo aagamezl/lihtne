@@ -1,9 +1,12 @@
-// import type { Constructor } from '../../Support'
 import type { Connection } from '../Connection'
-import { Builder } from './Builder'
 import type { Expression } from './Expression'
 import type { Grammar } from './Grammars'
 import type { Processor } from './Processors'
+
+// import type { Constructor } from '../../Support'
+import { registerClass } from '../../Support/class-registry'
+import { Builder } from './Builder'
+// import { registry } from './internal'
 
 type BuilderConstructor = new (
   connection: Connection,
@@ -61,7 +64,7 @@ export class JoinClause extends Builder {
    * @param  string  type
    * @param  string  table
    */
-  public constructor(parentQuery: Builder, type: string, table: Expression | string) {
+  public constructor (parentQuery: Builder, type: string, table: Expression | string) {
     super(
       parentQuery.getConnection(),
       parentQuery.getGrammar(),
@@ -74,7 +77,6 @@ export class JoinClause extends Builder {
     this.parentGrammar = parentQuery.getGrammar()
     this.parentProcessor = parentQuery.getProcessor()
     this.parentConnection = parentQuery.getConnection()
-
   }
 
   /**
@@ -97,7 +99,7 @@ export class JoinClause extends Builder {
    *
    * @throws \InvalidArgumentException
    */
-  public on(
+  public on (
     first: Function | Expression | string,
     operator: string | undefined = undefined,
     second: string | Expression | undefined = undefined,
@@ -118,7 +120,7 @@ export class JoinClause extends Builder {
    * @param  \Illuminate\Contracts\Database\Query\Expression|string|null  $second
    * @return \Illuminate\Database\Query\JoinClause
    */
-  public orOn(
+  public orOn (
     first: Function | Expression | string,
     operator: string | undefined = undefined,
     second: string | Expression | undefined = undefined
@@ -131,8 +133,8 @@ export class JoinClause extends Builder {
  *
  * @return \Illuminate\Database\Query\JoinClause
  */
-  public override newQuery(): JoinClause {
-    return new JoinClause(this.newParentQuery(), this.type, this.table);
+  public override newQuery (): JoinClause {
+    return new JoinClause(this.newParentQuery(), this.type, this.table)
   }
 
   /**
@@ -140,8 +142,8 @@ export class JoinClause extends Builder {
    *
    * @return \Illuminate\Database\Query\Builder
    */
-  protected override forSubQuery(): Builder {
-    return this.newParentQuery().newQuery();
+  protected override forSubQuery (): Builder {
+    return this.newParentQuery().newQuery()
   }
 
   /**
@@ -149,7 +151,7 @@ export class JoinClause extends Builder {
    *
    * @return \Illuminate\Database\Query\Builder
    */
-  protected newParentQuery(): Builder {
+  protected newParentQuery (): Builder {
     return new this.parentClass(
       this.parentConnection,
       this.parentGrammar,
@@ -157,3 +159,5 @@ export class JoinClause extends Builder {
     )
   }
 }
+
+registerClass('JoinClause', JoinClause)

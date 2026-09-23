@@ -4,7 +4,7 @@ export type Entries<T> = {
 
 export type Prettify<T> = {
   [K in keyof T]: Prettify<T[K]>;
-} & {};
+} & {}
 
 export const isEmpty = (value: unknown): boolean => {
   return value === undefined || value === 0 || value === false || value === null

@@ -1,129 +1,160 @@
 import { isPlainObject } from 'es-toolkit'
 
-import { Macroable } from '../Macroable/Traits/Macroable'
-import { mixing } from '../Support/Traits/use'
-import { Arr, type MapCallback } from './Arr'
-import { EnumeratesValues } from './Traits/EnumeratesValues'
+import type { ArrayableInput, Dictionary } from './types'
 
-export interface Collection<TValue = unknown, TKey = string | number> extends EnumeratesValues, Macroable { }
+import { Arr } from './ArrNew'
+import { EnumeratesValues } from './EnumeratesValues'
 
-export class Collection<TValue = unknown, TKey = string | number> extends mixing().useTrait([EnumeratesValues, Macroable]) {
-  /**
-   * The items contained in the collection.
-   *
-   * @var array<TKey, TValue>
-   */
-  // protected items: Record<string, unknown> | unknown[] = {}
-  protected items: Iterable<TValue> | Record<string, TValue>
+const EMPTY_GLUE = ''
 
+/**
+ * TypeScript port of `Illuminate\Support\Collection`.
+ *
+ * Only the subset of methods requested for this port is implemented:
+ * the constructor, `map`, `all`, `implode`, `pluck`, and `first`.
+ *
+ * Laravel's `Collection` mixes in `EnumeratesValues` via `use
+ * EnumeratesValues;`. Since the trait system itself is out of scope for
+ * this port, `Collection` instead extends the `EnumeratesValues` base
+ * class to obtain `each`, `getArrayableItems`, and `useAsCallable`.
+ */
+export class Collection<TKey extends PropertyKey, TValue> extends EnumeratesValues<TKey, TValue> {
   /**
    * Create a new collection.
    *
-   * @param  \Illuminate\Contracts\Support\Arrayable<TKey, TValue>|iterable<TKey, TValue>|null  $items
+   * Mirrors `Collection::__construct()`: normalizes whatever was passed
+   * in through `getArrayableItems()` before storing it.
    */
-  public constructor (items: TValue | TValue[] | Record<string, TValue> = []) {
-    super()
+  constructor (items: ArrayableInput<TKey, TValue> = []) {
+    super({})
 
-    this.items = this.getArrayableItems/* <TValue> */(items)
+    this.items = this.getArrayableItems(items)
   }
 
   /**
    * Create a new instance of the collection.
    *
-   * @param  \Illuminate\Contracts\Support\Arrayable<TKey, TValue>|iterable<TKey, TValue>|null  $items
-   * @return static
+   * Mirrors the protected `Collection::newInstance()`, used internally
+   * wherever PHP would call `new static($items)` to preserve the
+   * concrete subclass. TypeScript has no `static::class` equivalent that
+   * works generically across subclasses without reflection, so this
+   * always builds a plain `Collection` — faithful for this port's scope,
+   * since no subclassing is exercised here.
    */
-  protected newInstance<TNewValue = TValue>(
-    items: TNewValue | TNewValue[] | Record<string, TNewValue> = []
-  ): Collection<TNewValue> {
-    return new Collection<TNewValue>(items)
-  }
-
-  /**
-   * Run a map over each of the items.
-   *
-   * @template TMapValue
-   *
-   * @param  callable(TValue, TKey): TMapValue  $callback
-   * @return static<TKey, TMapValue>
-   */
-  public map (callback: MapCallback): Collection {
-    return this.newInstance(Arr.map(this.items, callback))
+  protected newInstance<TNewValue = TValue> (
+    items: ArrayableInput<TKey, TNewValue> = []
+  ): Collection<TKey, TNewValue> {
+    return new Collection<TKey, TNewValue>(items)
   }
 
   /**
    * Get all of the items in the collection.
    *
-   * @return array<TKey, TValue>
+   * Mirrors `Collection::all()`. List-shaped collections (dense numeric
+   * keys) return a real array so callers can use `.length` / `.join()`.
+   * Associative collections keep the underlying dictionary.
    */
-  public all ()/* : Iterable<unknown> | Collection */ {
+  all (): Dictionary<TValue> | TValue[] {
+    if (Arr.isList(this.items)) {
+      return Arr.listValues(this.items)
+    }
+
     return this.items
-    // return this.entries ? Object.entries(this.items) : Array.from(this.items)
   }
 
   /**
- * Concatenate values of a given key as a string.
- *
- * @param  (callable(TValue, TKey): mixed)|string|null  $value
- * @param  string|null  $glue
- * @return string
- */
-  public implode (value?: MapCallback | string | number, glue?: string): string {
-    // if (this.useAsCallable(value)) {
-    //   return Object.values(this.map(value).all()).join(glue ?? '')
-    // }
+   * Get the first item from the collection passing the given truth test.
+   *
+   * Mirrors `Collection::first()`, which delegates straight to
+   * `Arr::first()` over the collection's underlying items.
+   */
+  first<TDefault = undefined> (
+    callback?: (value: TValue, key: TKey) => boolean,
+    defaultValue?: TDefault | (() => TDefault)
+  ): TValue | TDefault | undefined {
+    return Arr.first<TValue, TKey, TDefault>(this.items, callback, defaultValue)
+  }
 
-    // const first = this.first<unknown, string>()
-
-    // if (
-    //   Array.isArray(first) ||
-    //   (isPlainObject(first) && typeof first !== 'string')
-    // ) {
-    //   return this.pluck(value).all().join(glue ?? '')
-    // }
-
-    // return Object.values(this.items).join((value as string) ?? '')
-
-    if (this.useAsCallable(value)) {
-      return Object.values(this.map(value).all()).join(glue ?? '')
+  /**
+   * Concatenate values of a given key as a string.
+   *
+   * Mirrors `Collection::implode()`:
+   *
+   *   if ($this->useAsCallable($value)) {
+   *       return implode($glue ?? '', $this->map($value)->all());
+   *   }
+   *
+   *   $first = $this->first();
+   *
+   *   if (is_array($first) || (is_object($first) && ! $first instanceof Stringable)) {
+   *       return implode($glue ?? '', $this->pluck($value)->all());
+   *   }
+   *
+   *   return implode($value ?? '', $this->items);
+   *
+   * TypeScript has no `Stringable` interface distinct from "has a
+   * `toString` other than the default `Object.prototype.toString`", so
+   * that check is approximated: plain objects/arrays are treated as
+   * needing `pluck()`, while primitives (and values with a custom
+   * `toString`) are joined directly.
+   *
+   * `implode`'s `value` parameter is a plain `string | function` union
+   * here (narrower than `EnumeratesValues.useAsCallable`'s general
+   * "any non-string callable" check), so a native `typeof value ===
+   * 'function'` check narrows both branches without needing that helper
+   * or a cast back to the specific callback shape.
+   */
+  implode (value?: string | ((item: TValue, key: TKey) => unknown), glue?: string): string {
+    if (typeof value === 'function') {
+      return this.joinAll(this.map(value).all(), glue ?? EMPTY_GLUE)
     }
 
     const first = this.first()
 
-    if (Array.isArray(first) || (isPlainObject(first) && !(first instanceof String))) {
-      return Object.values(this.pluck(value).all()).join(glue ?? '')
+    if (
+      Array.isArray(first) ||
+      (isPlainObject(first) && !(first instanceof String))
+    ) {
+      return this.joinAll(this.pluck<unknown>(value as string).all(), glue ?? EMPTY_GLUE)
     }
 
-    return Object.values(this.items).join((value as string) ?? '')
+    return this.joinAll(this.items, value ?? EMPTY_GLUE)
+  }
+
+  /**
+   * Run a map over each of the items.
+   *
+   * Mirrors `Collection::map()`, which delegates to `Arr::map()`.
+   */
+  map<TMapped> (callback: (value: TValue, key: TKey) => TMapped): Collection<TKey, TMapped> {
+    const mapped = Arr.map<TKey, TValue, TMapped>(this.items, callback)
+
+    return this.newInstance<TMapped>(mapped)
   }
 
   /**
    * Get the values of a given key.
    *
-   * @param  \Closure|string|int|array<array-key, string>|null  $value
-   * @param  \Closure|string|null  $key
-   * @return static<array-key, mixed>
+   * Mirrors `Collection::pluck()`, which delegates to `Arr::pluck()`.
    */
-  public pluck (
-    value?: Function | string | number | unknown[],
-    key?: Function | string | unknown[]
-  ): Collection {
-    return this.newInstance(Arr.pluck(this.items, value, key))
+  pluck<TPlucked> (
+    value: string | string[] | ((item: TValue) => TPlucked),
+    key?: string | string[] | ((item: TValue) => PropertyKey) | null
+  ): Collection<PropertyKey, TPlucked | undefined> {
+    const plucked = Arr.pluck<TValue, TPlucked>(Object.values(this.items), value, key)
+
+    return new Collection<PropertyKey, TPlucked | undefined>(plucked)
   }
 
   /**
- * Get the first item from the collection passing the given truth test.
- *
- * @template TFirstDefault
- *
- * @param  (callable(TValue, TKey): bool)|null  $callback
- * @param  TFirstDefault|(\Closure(): TFirstDefault)  $default
- * @return TValue|TFirstDefault
- */
-  public first (
-    callback?: (value: TValue, key: TKey) => boolean,
-    defaultValue?: any
-  ) {
-    return Arr.first<TValue, TKey>(this.items, callback, defaultValue)
+   * Join collection contents whether `all()` returned a list or dictionary.
+   */
+  private joinAll (
+    items: Dictionary<unknown> | unknown[] | Dictionary<TValue> | TValue[],
+    glue: string
+  ): string {
+    const values = Array.isArray(items) ? items : Object.values(items)
+
+    return values.join(glue)
   }
 }

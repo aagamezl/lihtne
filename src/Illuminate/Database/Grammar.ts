@@ -47,9 +47,7 @@ export abstract class Grammar {
     // If the table being wrapped has an alias we'll need to separate the pieces
     // so we can prefix the table and then wrap each of the segments on their
     // own and then join these both back together using the "as" connector.
-    if (String(table).includes(' as ')) {
-      console.log('table: %o', table.toString())
-
+    if (/\s+as\s+/i.test(String(table))) {
       return this.wrapAliasedTable(table, prefix)
     }
 

@@ -1,5 +1,7 @@
 import { describe, expect, jest, test } from '@jest/globals'
 
+import type { Builder } from '../../src/Illuminate/Database/Query'
+
 import { getBuilder } from './helpers/getBuilder'
 import { getMySqlBuilderWithProcessor } from './helpers/getMySqlBuilderWithProcessor'
 import { getPostgresBuilder } from './helpers/getPostgresBuilder'
@@ -137,6 +139,84 @@ describe('Database Query Builder', () => {
     const builder = getBuilder('prefix_')
     builder.select('*').from('services').join('translations AS t', 't.item_id', '=', 'services.id')
     expect(builder.toSql()).toBe('select * from "prefix_services" inner join "prefix_translations" as "prefix_t" on "prefix_t"."item_id" = "prefix_services"."id"')
+  })
+
+  test('testBasicTableWrapping', () => {
+    const builder = getBuilder()
+    builder.select('*').from('public.users')
+    expect(builder.toSql()).toBe('select * from "public"."users"')
+  })
+
+  test('testWhenCallback', () => {
+    const callback = (query: Builder, condition: boolean) => {
+      expect(condition).toBe(true)
+
+      query.where('id', '=', 1)
+    }
+
+    let builder = getBuilder()
+    builder.select('*').from('users').when(true, callback).where('email', 'foo')
+    expect(builder.toSql()).toBe('select * from "users" where "id" = ? and "email" = ?')
+
+    builder = getBuilder()
+    builder.select('*').from('users').when(false, callback).where('email', 'foo')
+    expect(builder.toSql()).toBe('select * from "users" where "email" = ?')
+  })
+
+  test('testWhenCallbackWithReturn', () => {
+    const callback = (query: Builder, condition: boolean) => {
+      expect(condition).toBe(true);
+
+      return query.where('id', '=', 1);
+    };
+
+    let builder = getBuilder();
+    builder.select('*').from('users').when(true, callback).where('email', 'foo');
+    expect(builder.toSql()).toBe('select * from "users" where "id" = ? and "email" = ?');
+
+    builder = getBuilder();
+    builder.select('*').from('users').when(false, callback).where('email', 'foo');
+    expect(builder.toSql()).toBe('select * from "users" where "email" = ?');
+  })
+
+  test('testWhenCallbackWithDefault', () => {
+    const callback = (query: Builder, condition: string | number) => {
+      expect(condition).toBe('truthy');
+
+      query.where('id', '=', 1);
+    };
+
+    const defaultValue = (query: Builder, condition: string | number) => {
+      expect(condition).toBe(0);
+
+      query.where('id', '=', 2);
+    };
+
+    let builder = getBuilder();
+    builder.select('*').from('users').when('truthy', callback, defaultValue).where('email', 'foo');
+    expect(builder.toSql()).toBe('select * from "users" where "id" = ? and "email" = ?');
+    expect(builder.getBindings()).toEqual([1, 'foo']);
+
+    builder = getBuilder();
+    builder.select('*').from('users').when(0, callback, defaultValue).where('email', 'foo');
+    expect(builder.toSql()).toBe('select * from "users" where "id" = ? and "email" = ?');
+    expect(builder.getBindings()).toEqual([2, 'foo']);
+  })
+
+  test('testUnlessCallback', () => {
+    const callback = (query: Builder, condition: boolean) => {
+      expect(condition).toBe(false);
+
+      query.where('id', '=', 1);
+    };
+
+    let builder = getBuilder();
+    builder.select('*').from('users').unless(false, callback).where('email', 'foo');
+    expect(builder.toSql()).toBe('select * from "users" where "id" = ? and "email" = ?');
+
+    builder = getBuilder();
+    builder.select('*').from('users').unless(true, callback).where('email', 'foo');
+    expect(builder.toSql()).toBe('select * from "users" where "email" = ?');
   })
 
   test('', () => {

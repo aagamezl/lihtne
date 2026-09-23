@@ -1,5 +1,5 @@
-import { type Connection } from '../Connection'
-import { type Statement } from '../Statements'
+import type { Connection } from '../Connection'
+import type { Statement } from '../Statements'
 
 export class StatementPrepared {
   /**

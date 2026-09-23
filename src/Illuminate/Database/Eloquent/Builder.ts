@@ -1,6 +1,7 @@
-import { type Builder as BuilderContract } from '../../Contracts/Database/Eloquent/Builder'
+import type { Builder as BuilderContract } from '../../Contracts/Database/Eloquent/Builder'
+import type { Builder as QueryBuilder } from '../Query/Builder'
+
 import { instanceProxy } from '../../Support/Proxies/InstanceProxy'
-import { type Builder as QueryBuilder } from '../Query/Builder'
 
 /**
  * @mixin \Illuminate\Database\Query\Builder
