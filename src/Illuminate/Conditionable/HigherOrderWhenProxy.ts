@@ -27,7 +27,7 @@ export class HigherOrderWhenProxy<TTarget> {
    *
    * @var bool
    */
-  protected negateConditionOnCapture: boolean = false
+  protected negateConditionOnCaptureProperty: boolean = false
 
   public constructor (target: TTarget) {
     this.target = target
@@ -37,6 +37,17 @@ export class HigherOrderWhenProxy<TTarget> {
 
   public condition (value: boolean): this {
     [this.conditionProperty, this.hasCondition] = [value, true]
+
+    return this
+  }
+
+  /**
+   * Indicate that the condition should be negated.
+   *
+   * @return $this
+   */
+  public negateConditionOnCapture (): this {
+    this.negateConditionOnCaptureProperty = true
 
     return this
   }

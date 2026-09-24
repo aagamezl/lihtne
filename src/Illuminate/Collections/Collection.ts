@@ -2,7 +2,7 @@ import { isPlainObject } from 'es-toolkit'
 
 import type { ArrayableInput, Dictionary } from './types'
 
-import { Arr } from './ArrNew'
+import { Arr } from './Arr'
 import { EnumeratesValues } from './EnumeratesValues'
 
 const EMPTY_GLUE = ''
@@ -41,7 +41,7 @@ export class Collection<TKey extends PropertyKey, TValue> extends EnumeratesValu
    * always builds a plain `Collection` — faithful for this port's scope,
    * since no subclassing is exercised here.
    */
-  protected newInstance<TNewValue = TValue> (
+  protected newInstance<TNewValue = TValue>(
     items: ArrayableInput<TKey, TNewValue> = []
   ): Collection<TKey, TNewValue> {
     return new Collection<TKey, TNewValue>(items)
@@ -63,12 +63,21 @@ export class Collection<TKey extends PropertyKey, TValue> extends EnumeratesValu
   }
 
   /**
+   * Collapse the collection of items into a single array.
+   *
+   * @return static<int, mixed>
+   */
+  public collapse (): Collection<TKey, TValue> {
+    return this.newInstance(Arr.collapse(Object.values(this.items)))
+  }
+
+  /**
    * Get the first item from the collection passing the given truth test.
    *
    * Mirrors `Collection::first()`, which delegates straight to
    * `Arr::first()` over the collection's underlying items.
    */
-  first<TDefault = undefined> (
+  first<TDefault = undefined>(
     callback?: (value: TValue, key: TKey) => boolean,
     defaultValue?: TDefault | (() => TDefault)
   ): TValue | TDefault | undefined {
@@ -126,7 +135,7 @@ export class Collection<TKey extends PropertyKey, TValue> extends EnumeratesValu
    *
    * Mirrors `Collection::map()`, which delegates to `Arr::map()`.
    */
-  map<TMapped> (callback: (value: TValue, key: TKey) => TMapped): Collection<TKey, TMapped> {
+  map<TMapped>(callback: (value: TValue, key: TKey) => TMapped): Collection<TKey, TMapped> {
     const mapped = Arr.map<TKey, TValue, TMapped>(this.items, callback)
 
     return this.newInstance<TMapped>(mapped)
@@ -137,7 +146,7 @@ export class Collection<TKey extends PropertyKey, TValue> extends EnumeratesValu
    *
    * Mirrors `Collection::pluck()`, which delegates to `Arr::pluck()`.
    */
-  pluck<TPlucked> (
+  pluck<TPlucked>(
     value: string | string[] | ((item: TValue) => TPlucked),
     key?: string | string[] | ((item: TValue) => PropertyKey) | null
   ): Collection<PropertyKey, TPlucked | undefined> {

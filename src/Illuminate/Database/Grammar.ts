@@ -135,7 +135,7 @@ export abstract class Grammar {
    */
   protected wrapSegments (segments: string[]) {
     return new Collection(segments)
-      .map((segment: string, key: number) => {
+      .map((segment: string, key: PropertyKey) => {
         return key === 0 && segments.length > 1
           ? this.wrapTable(segment)
           : this.wrapValue(segment)

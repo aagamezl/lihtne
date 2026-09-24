@@ -17,7 +17,7 @@ import { JoinLateralClause } from '../JoinLateralClause'
  */
 
 export type SelectComponentName =
-  | 'aggregate' |
+  'aggregate' |
   'columns' |
   'from' |
   'indexHint' |
@@ -539,11 +539,11 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
  * @return string
  */
   protected whereBasic(query: Builder, where: WhereClause): string {
-    const value = this.parameter(where.value);
+    const value = this.parameter(where.value)
 
-    const operator = where.operator?.replace('?', '??') ?? '';
+    const operator = where.operator?.replace('?', '??') ?? ''
 
-    return this.wrap(where.column ?? '') + ' ' + operator + ' ' + value;
+    return this.wrap(where.column ?? '') + ' ' + operator + ' ' + value
   }
 
   /**
@@ -561,6 +561,129 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
         return where.boolean + ' ' + this[`where${where.type}`](query, where)
       })
       .all()
+  }
+
+  /**
+   * Compile a "where null" clause.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $where
+   * @return string
+   */
+  protected whereNull(query: Builder, where: WhereClause): string {
+    return this.wrap(where.column ?? '') + ' is null';
+  }
+
+  /**
+   * Compile a "where null safe equals" clause.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $where
+   * @return string
+   */
+  protected whereNullSafeEquals(query: Builder, where: WhereClause): string {
+    return this.wrap(where.column ?? '') + ' is not distinct from ' + this.parameter(where.value);
+  }
+
+  /**
+   * Compile a "where like" clause.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $where
+   * @return string
+   *
+   * @throws \RuntimeException
+   */
+  protected whereLike(query: Builder, where: WhereClause): string {
+    if (where.caseSensitive) {
+      throw new Error('RuntimeException: This database engine does not support case sensitive like operations.');
+    }
+
+    where.operator = where.not ? 'not like' : 'like';
+
+    return this.whereBasic(query, where);
+  }
+
+  /**
+   * Compile a "where binary" clause.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $where
+   * @return string
+   *
+   * @throws \RuntimeException
+   */
+  protected whereBinary(query: Builder, where: WhereClause): string {
+    throw new Error('RuntimeException: This database engine does not support binary comparison operations.')
+  }
+
+  /**
+   * Compile a "where date" clause.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $where
+   * @return string
+   */
+  protected whereDate(query: Builder, where: WhereClause): string {
+    return this.dateBasedWhere('date', query, where)
+  }
+
+  /**
+   * Compile a "where time" clause.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $where
+   * @return string
+   */
+  protected whereTime(query: Builder, where: WhereClause): string {
+    return this.dateBasedWhere('time', query, where)
+  }
+
+  /**
+   * Compile a "where month" clause.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $where
+   * @return string
+   */
+  protected whereMonth(query: Builder, where: WhereClause): string {
+    return this.dateBasedWhere('month', query, where)
+  }
+
+  /**
+   * Compile a "where year" clause.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $where
+   * @return string
+   */
+  protected whereYear(query: Builder, where: WhereClause): string {
+    return this.dateBasedWhere('year', query, where)
+  }
+
+  /**
+   * Compile a date based where clause.
+   *
+   * @param  string  $type
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $where
+   * @return string
+   */
+  protected dateBasedWhere(type: string, query: Builder, where: WhereClause): string {
+    const value = this.parameter(where.value)
+
+    return type + '(' + this.wrap(where.column) + ') ' + where.operator + ' ' + value
+  }
+
+  /**
+   * Compile a "where day" clause.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $where
+   * @return string
+   */
+  protected whereDay(query: Builder, where: WhereClause): string {
+    return this.dateBasedWhere('day', query, where)
   }
 
   /**

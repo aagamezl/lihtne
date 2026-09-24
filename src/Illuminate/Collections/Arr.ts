@@ -1,4 +1,5 @@
 import { isNumeric } from '../Support/helpers'
+import { Collection } from './Collection'
 import { type ArrayableInput, type Dictionary, isArrayable, resolveDefault } from './types'
 
 const DOT_SEPARATOR = '.'
@@ -37,6 +38,35 @@ export class Arr {
     }
 
     return true
+  }
+
+  /**
+   * Flatten a multi-dimensional array into a single level.
+   *
+   * @param  iterable  $array
+   * @param  int  $depth
+   * @return array
+   */
+  static flatten (array: Iterable<unknown>, depth: number = Infinity): unknown[] {
+    const result: unknown[] = []
+
+    for (let item of array) {
+      item = item instanceof Collection ? item.all() : item
+
+      if (!Array.isArray(item)) {
+        result.push(item)
+      } else {
+        const values = depth === 1
+          ? Object.values(item)
+          : Arr.flatten(item, depth - 1)
+
+        for (const value of values) {
+          result.push(value)
+        }
+      }
+    }
+
+    return result
   }
 
   /**

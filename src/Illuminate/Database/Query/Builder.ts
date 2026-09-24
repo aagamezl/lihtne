@@ -1,5 +1,7 @@
+import { dateFormat } from '@devnetic/utils'
 import { isNil } from 'es-toolkit'
 
+import type { Scalar } from '../../Support/types'
 import type { Connection } from '../Connection'
 import type { Grammar } from '../Query/Grammars/Grammar'
 import type { JoinClause } from './JoinClause'
@@ -11,6 +13,7 @@ import { isSet, mixing, type Prettify, value } from '../../Support'
 // import { registry } from './internal'
 import { resolveClass } from '../../Support/class-registry'
 import { BuildsQueries } from '../Concerns'
+import { BuildsWhereDateClauses } from '../Concerns/BuildsWhereDateClauses'
 import { Builder as EloquentBuilder } from '../Eloquent'
 import { Relation } from '../Eloquent/Relations'
 import { Expression } from './Expression'
@@ -34,6 +37,7 @@ export type WhereOptions = {
 }
 
 export type WhereClause = {
+  caseSensitive?: boolean
   column?: string | Expression
   first?: string | Expression | Array<Expression | string>
   second?: string | Expression | undefined
@@ -95,9 +99,9 @@ export type GroupLimit = {
   column: string
 }
 
-export interface Builder extends BuildsQueries { }
+export interface Builder extends BuildsQueries, BuildsWhereDateClauses { }
 
-export class Builder extends mixing(BuildsQueries).useTrait([BuildsQueries]) {
+export class Builder extends mixing(BuildsQueries).useTrait([BuildsWhereDateClauses, BuildsQueries]) {
   /**
    * The database connection instance.
    *
@@ -213,6 +217,13 @@ export class Builder extends mixing(BuildsQueries).useTrait([BuildsQueries]) {
    * @var array|null
    */
   public unionOrders: Order[] | null = null
+
+  /**
+     * Indicates whether row locking is being used.
+     *
+     * @var string|bool|null
+     */
+  public lockProperty: string | boolean | undefined = undefined
 
   /**
    * The columns that should be returned.
@@ -439,6 +450,133 @@ export class Builder extends mixing(BuildsQueries).useTrait([BuildsQueries]) {
     const JoinClauseCtor = resolveClass<JoinClause>('JoinClause')
 
     return new JoinClauseCtor(parentQuery, type, table)
+  }
+
+  /**
+   * Add a "where like" clause to the query.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
+   * @param  string  $value
+   * @param  bool  $caseSensitive
+   * @param  string  $boolean
+   * @param  bool  $not
+   * @return $this
+   */
+  public whereLike(
+    column: Expression | string,
+    value: string,
+    caseSensitive: boolean = false,
+    boolean: string = 'and', not: boolean = false
+  ): this {
+    const type: string = 'Like';
+
+    this.wheres.push({ type, column, value, caseSensitive, boolean, not })
+
+    if (this.grammar.prepareWhereLikeBinding) {
+      value = this.grammar.prepareWhereLikeBinding(value, caseSensitive);
+    }
+
+    this.addBinding(value);
+
+    return this;
+  }
+
+  /**
+   * Add a "where null safe equals" clause to the query.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
+   * @param  mixed  $value
+   * @param  string  $boolean
+   * @return $this
+   */
+  public whereNullSafeEquals(
+    column: Expression | string,
+    value: unknown,
+    boolean: string = 'and'
+  ): this {
+    const type: string = 'NullSafeEquals';
+
+    this.wheres.push({ type, column, value, boolean });
+
+    if (!(value instanceof Expression)) {
+      this.addBinding(this.flattenValue(value), 'where');
+    }
+
+    return this;
+  }
+
+  /**
+   * Add an "or where null safe equals" clause to the query.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
+   * @param  mixed  $value
+   * @return $this
+   */
+  public orWhereNullSafeEquals(
+    column: Expression | string,
+    value: unknown
+  ): this {
+    return this.whereNullSafeEquals(column, value, 'or');
+  }
+
+  /**
+   * Get the default key name of the table.
+   *
+   * @return string
+   */
+  protected defaultKeyName(): string {
+    return 'id';
+  }
+
+
+  /**
+   * Add an "or where like" clause to the query.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
+   * @param  string  $value
+   * @param  bool  $caseSensitive
+   * @return $this
+   */
+  public orWhereLike(
+    column: Expression | string,
+    value: string,
+    caseSensitive: boolean = false
+  ): this {
+    return this.whereLike(column, value, caseSensitive, 'or', false);
+  }
+
+  /**
+   * Add a "where not like" clause to the query.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
+   * @param  string  $value
+   * @param  bool  $caseSensitive
+   * @param  string  $boolean
+   * @return $this
+   */
+  public whereNotLike(
+    column: Expression | string,
+    value: string,
+    caseSensitive: boolean = false,
+    boolean: string = 'and'
+  ): this {
+    return this.whereLike(column, value, caseSensitive, boolean, true);
+  }
+
+  /**
+   * Add an "or where not like" clause to the query.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
+   * @param  string  $value
+   * @param  bool  $caseSensitive
+   * @return $this
+   */
+  public orWhereNotLike(
+    column: Expression | string,
+    value: string,
+    caseSensitive: boolean = false
+  ): this {
+    return this.whereNotLike(column, value, caseSensitive, 'or');
   }
 
   /**
@@ -748,11 +886,73 @@ export class Builder extends mixing(BuildsQueries).useTrait([BuildsQueries]) {
   }
 
   /**
- * Cast the given binding value.
- *
- * @param  mixed  $value
- * @return mixed
- */
+   * Add a "where binary" clause to the query.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
+   * @param  string  $value
+   * @param  string  $boolean
+   * @param  bool  $not
+   * @return $this
+   */
+  public whereBinary(
+    column: string | Expression,
+    value: string,
+    boolean: string = 'and',
+    not: boolean = false
+  ) {
+    const type = 'Binary'
+
+    this.wheres.push({ type, column, value, boolean, not })
+
+    this.addBinding(value)
+
+    return this
+  }
+
+  /**
+   * Add an "or where binary" clause to the query.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
+   * @param  string  $value
+   * @return $this
+   */
+  public orWhereBinary(column: string | Expression, value: string) {
+    return this.whereBinary(column, value, 'or')
+  }
+
+  /**
+   * Add a "where not binary" clause to the query.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
+   * @param  string  $value
+   * @param  string  $boolean
+   * @return $this
+   */
+  public whereNotBinary(
+    column: string | Expression,
+    value: string,
+    boolean: string = 'and'
+  ) {
+    return this.whereBinary(column, value, boolean, true)
+  }
+
+  /**
+   * Add an "or where not binary" clause to the query.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
+   * @param  string  $value
+   * @return $this
+   */
+  public orWhereNotBinary(column: string | Expression, value: string) {
+    return this.whereNotBinary(column, value, 'or')
+  }
+
+  /**
+   * Cast the given binding value.
+   *
+   * @param  mixed  $value
+   * @return mixed
+   */
   public castBinding(value: BindingValue): BindingValue {
     return value
   }
@@ -943,7 +1143,12 @@ export class Builder extends mixing(BuildsQueries).useTrait([BuildsQueries]) {
  * @param  string  $boolean
  * @return $this
  */
-  public where(column: Expression | string | Array<Expression | string> | Function, operator: string | undefined = undefined, value: unknown | undefined = undefined, boolean: string = 'and'): this {
+  public where(
+    column: Expression | Scalar | Array<Expression | Scalar> | Function,
+    operator: Scalar | Scalar[] | undefined = undefined,
+    value: Scalar | Array<Scalar | Scalar[]> | undefined = undefined,
+    boolean: 'and' | 'or' = 'and'
+  ): this {
     if (column instanceof Expression) {
       const type = 'Expression'
 
@@ -1062,6 +1267,30 @@ export class Builder extends mixing(BuildsQueries).useTrait([BuildsQueries]) {
   }
 
   /**
+   * Add a basic "where not" clause to the query.
+   *
+   * @param  \Closure|string|array|\Illuminate\Contracts\Database\Query\Expression  $column
+   * @param  mixed  $operator
+   * @param  mixed  $value
+   * @param  string  $boolean
+   * @return $this
+   */
+  public whereNot(
+    column: Expression | string | Array<Expression | string> | Function,
+    operator?: string,
+    value?: unknown,
+    boolean: string = 'and'
+  ): this {
+    if (Array.isArray(column)) {
+      return this.whereNested((query: Builder) => {
+        query.where(column, operator, value, boolean)
+      }, boolean + ' not')
+    }
+
+    return this.where(column, operator, value, boolean + ' not')
+  }
+
+  /**
    * Determine if the given operator and value combination is legal.
    *
    * Prevents using Null values with invalid operators.
@@ -1073,6 +1302,298 @@ export class Builder extends mixing(BuildsQueries).useTrait([BuildsQueries]) {
   protected invalidOperatorAndValue(operator: string, value: unknown): boolean {
     return isNil(value) && this.operators.includes(operator) &&
       !['=', '<=>', '<>', '!='].includes(operator)
+  }
+
+  /**
+   * Add a date based (year, month, day, time) statement to the query.
+   *
+   * @param  string  $type
+   * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
+   * @param  string  $operator
+   * @param  mixed  $value
+   * @param  string  $boolean
+   * @return $this
+   */
+  protected addDateBasedWhere(
+    type: string,
+    column: Expression | string,
+    operator: string,
+    value: unknown,
+    boolean: 'and' | 'or' = 'and'
+  ): this {
+    this.wheres.push({ column, type, boolean, operator, value })
+
+    if (!(value instanceof Expression)) {
+      this.addBinding(value, 'where')
+    }
+
+    return this
+  }
+
+  /**
+ * Add a "where month" statement to the query.
+ *
+ * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
+ * @param  \DateTimeInterface|string|int|null  $operator
+ * @param  \DateTimeInterface|string|int|null  $value
+ * @param  string  $boolean
+ * @return $this
+ */
+  public whereMonth(
+    column: Expression | string,
+    operator: Scalar | Scalar[] | Expression | undefined = undefined,
+    value: Scalar | Array<Scalar | Scalar[]> | undefined = undefined,
+    boolean: 'and' | 'or' = 'and'
+  ): this {
+    [value, operator] = this.prepareValueAndOperator(value, operator, arguments.length === 2)
+
+    // If the given operator is not found in the list of valid operators we will
+    // assume that the developer is just short-cutting the '=' operators and
+    // we will set the operators to '=' and set the values appropriately.
+    if (this.invalidOperator(operator)) {
+      [value, operator] = [operator, '=']
+    }
+
+    value = this.flattenValue(value)
+
+    if (value instanceof Date) {
+      // value = dateFormat(value, 'm');
+      parseInt(String(value.getMonth() + 1).padStart(2, '0'), 10)
+    }
+
+    if (!(value instanceof Expression)) {
+      value = parseInt(String(value).padStart(2, '0'), 10)
+    }
+
+    return this.addDateBasedWhere('Month', column, operator, value, boolean)
+  }
+
+  /**
+ * Add a "where year" statement to the query.
+ *
+ * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
+ * @param  \DateTimeInterface|string|int|null  $operator
+ * @param  \DateTimeInterface|string|int|null  $value
+ * @param  string  $boolean
+ * @return $this
+ */
+  public whereYear(
+    column: Expression | string,
+    operator: Scalar | Scalar[] | Expression | undefined = undefined,
+    value: Scalar | Array<Scalar | Scalar[]> | undefined = undefined,
+    boolean: 'and' | 'or' = 'and'
+  ): this {
+    [value, operator] = this.prepareValueAndOperator(value, operator, arguments.length === 2)
+
+    // If the given operator is not found in the list of valid operators we will
+    // assume that the developer is just short-cutting the '=' operators and
+    // we will set the operators to '=' and set the values appropriately.
+    if (this.invalidOperator(operator)) {
+      [value, operator] = [operator, '=']
+    }
+
+    value = this.flattenValue(value)
+
+    if (value instanceof Date) {
+      // value = dateFormat(value, 'Y');
+      String(value.getFullYear())
+    }
+
+    return this.addDateBasedWhere('Year', column, operator, value, boolean)
+  }
+
+  /**
+   * Add an "or where date" statement to the query.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
+   * @param  \DateTimeInterface|string|null  $operator
+   * @param  \DateTimeInterface|string|null  $value
+   * @return $this
+   */
+  public orWhereDate(
+    column: Expression | string,
+    operator: Scalar | Scalar[] | undefined = undefined,
+    value: Scalar | Array<Scalar | Scalar[]> | undefined = undefined
+  ): this {
+    [value, operator] = this.prepareValueAndOperator(value, operator, arguments.length === 2)
+
+    return this.whereDate(column, operator, value, 'or')
+  }
+
+  /**
+   * Add a "where time" statement to the query.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
+   * @param  \DateTimeInterface|string|null  $operator
+   * @param  \DateTimeInterface|string|null  $value
+   * @param  string  $boolean
+   * @return $this
+   */
+  public whereTime(
+    column: Expression | string,
+    operator: Scalar | Scalar[] | Expression | undefined = undefined,
+    value: Scalar | Array<Scalar | Scalar[]> | undefined = undefined,
+    boolean: 'and' | 'or' = 'and'
+  ): this {
+    [value, operator] = this.prepareValueAndOperator(value, operator, arguments.length === 2)
+
+    // If the given operator is not found in the list of valid operators we will
+    // assume that the developer is just short-cutting the '=' operators and
+    // we will set the operators to '=' and set the values appropriately.
+    if (this.invalidOperator(operator)) {
+      [value, operator] = [operator, '=']
+    }
+
+    value = this.flattenValue(value)
+
+    if (value instanceof Date) {
+      value = dateFormat(value, 'H:i:s')
+    }
+
+    return this.addDateBasedWhere('Time', column, operator, value, boolean)
+  }
+
+  /**
+   * Add an "or where time" statement to the query.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
+   * @param  \DateTimeInterface|string|null  $operator
+   * @param  \DateTimeInterface|string|null  $value
+   * @return $this
+   */
+  public orWhereTime(
+    column: Expression | string,
+    operator: Scalar | Scalar[] | Expression | undefined = undefined,
+    value: Scalar | Array<Scalar | Scalar[]> | undefined = undefined
+  ): this {
+    [value, operator] = this.prepareValueAndOperator(value, operator, arguments.length === 2)
+
+    return this.whereTime(column, operator, value, 'or')
+  }
+
+  /**
+   * Add an "or where day" statement to the query.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
+   * @param  \DateTimeInterface|string|int|null  $operator
+   * @param  \DateTimeInterface|string|int|null  $value
+   * @return $this
+   */
+  public orWhereDay(
+    column: Expression | string,
+    operator: Scalar | Scalar[] | undefined = undefined,
+    value: Scalar | Array<Scalar | Scalar[]> | undefined = undefined
+  ): this {
+    [value, operator] = this.prepareValueAndOperator(value, operator, arguments.length === 2)
+
+    return this.whereDay(column, operator, value, 'or')
+  }
+
+  /**
+   * Add an "or where month" statement to the query.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
+   * @param  \DateTimeInterface|string|int|null  $operator
+   * @param  \DateTimeInterface|string|int|null  $value
+   * @return $this
+   */
+  public orWhereMonth(
+    column: Expression | string,
+    operator: Scalar | Scalar[] | undefined = undefined,
+    value: Scalar | Array<Scalar | Scalar[]> | undefined = undefined
+  ): this {
+    [value, operator] = this.prepareValueAndOperator(value, operator, arguments.length === 2)
+
+    return this.whereMonth(column, operator, value, 'or')
+  }
+
+  /**
+   * Add an "or where year" statement to the query.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
+   * @param  \DateTimeInterface|string|int|null  $operator
+   * @param  \DateTimeInterface|string|int|null  $value
+   * @return $this
+   */
+  public orWhereYear(
+    column: Expression | string,
+    operator: Scalar | Scalar[] | undefined = undefined,
+    value: Scalar | Array<Scalar | Scalar[]> | undefined = undefined
+  ): this {
+    [value, operator] = this.prepareValueAndOperator(value, operator, arguments.length === 2)
+
+    return this.whereYear(column, operator, value, 'or')
+  }
+
+  /**
+   * Add a "where day" statement to the query.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
+   * @param  \DateTimeInterface|string|int|null  $operator
+   * @param  \DateTimeInterface|string|int|null  $value
+   * @param  string  $boolean
+   * @return $this
+   */
+  public whereDay(
+    column: Expression | string,
+    operator: Scalar | Scalar[] | Expression | undefined = undefined,
+    value: Scalar | Array<Scalar | Scalar[]> | undefined = undefined,
+    boolean: 'and' | 'or' = 'and'
+  ): this {
+    [value, operator] = this.prepareValueAndOperator(value, operator, arguments.length === 2)
+
+    // If the given operator is not found in the list of valid operators we will
+    // assume that the developer is just short-cutting the '=' operators and
+    // we will set the operators to '=' and set the values appropriately.
+    if (this.invalidOperator(operator)) {
+      [value, operator] = [operator, '=']
+    }
+
+    value = this.flattenValue(value)
+
+    if (value instanceof Date) {
+      // value = dateFormat(value, 'd');
+      value = parseInt(String(value.getDate()).padStart(2, '0'), 10)
+    }
+
+    if (!(value instanceof Expression)) {
+      value = parseInt(String(value).padStart(2, '0'), 10)
+    }
+
+    return this.addDateBasedWhere('Day', column, operator, value, boolean)
+  }
+
+  /**
+   * Add a "where date" statement to the query.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
+   * @param  \DateTimeInterface|string|null  $operator
+   * @param  \DateTimeInterface|string|null  $value
+   * @param  string  $boolean
+   * @return $this
+   */
+  public whereDate(
+    column: Expression | string,
+    operator: Scalar | Scalar[] | Expression | undefined = undefined,
+    value: Scalar | Array<Scalar | Scalar[]> | undefined = undefined,
+    boolean: 'and' | 'or' = 'and'
+  ): this {
+    [value, operator] = this.prepareValueAndOperator(value, operator, arguments.length === 2)
+
+    // If the given operator is not found in the list of valid operators we will
+    // assume that the developer is just short-cutting the '=' operators and
+    // we will set the operators to '=' and set the values appropriately.
+    if (this.invalidOperator(operator)) {
+      [value, operator] = [operator, '=']
+    }
+
+    value = this.flattenValue(value)
+
+    if (value instanceof Date) {
+      value = dateFormat(value, 'Y-m-d')
+    }
+
+    return this.addDateBasedWhere('Date', column, operator, value, boolean)
   }
 
   /**
