@@ -1,18 +1,34 @@
 import { isNil } from 'es-toolkit'
 
+import type { ArrayableInput } from './types'
+
 import { isObject, isSet, value } from '../Support'
 import { Arr } from './Arr'
 import { Collection } from './Collection'
 
 /**
-    /**
-     * Get an item from an array or object using "dot" notation.
-     *
-     * @param  mixed  $target
-     * @param  string|array|int|null  $key
-     * @param  mixed  $default
-     * @return mixed
-     */
+ * Create a collection from the given value.
+ *
+ * @template TKey of array-key
+ * @template TValue
+ *
+ * @param  \Illuminate\Contracts\Support\Arrayable<TKey, TValue>|iterable<TKey, TValue>|null  $value
+ * @return \Illuminate\Support\Collection<TKey, TValue>
+ */
+export const collect = <TKey extends PropertyKey, TValue>(
+  value?: ArrayableInput<TKey, TValue> | undefined
+): Collection<TKey, TValue> => {
+  return new Collection(value)
+}
+
+/**
+ * Get an item from an array or object using "dot" notation.
+ *
+ * @param  mixed  $target
+ * @param  string|array|int|null  $key
+ * @param  mixed  $default
+ * @return mixed
+ */
 export const dataGet = (
   target: unknown,
   key?: string | Iterable<unknown> | number | null,
@@ -30,7 +46,7 @@ export const dataGet = (
 
   for (let segment of explodedKey) {
     if (segment === '*') {
-      let values: Iterable<unknown> | Collection
+      let values: Iterable<unknown> | Collection<PropertyKey, unknown>
 
       if (target instanceof Collection) {
         values = target.all()

@@ -111,7 +111,7 @@ describe('CollectionNew', () => {
   })
 
   test('implode treats String objects like scalars', () => {
-    const boxed = new Collection([new String('a'), new String('b')])
+    const boxed = new Collection([String('a'), String('b')])
 
     expect(boxed.implode('-')).toBe('a-b')
   })

@@ -1,14 +1,14 @@
-import { isTruthy, trim } from '@devnetic/utils'
+import { isTruthy, pascalCase } from '@devnetic/utils'
 
 import type { Agregate, BindingValues, Builder, Having, Order, Union, WhereClause } from '../Builder'
-import type { Expression } from '../Expression'
 
-import { Collection } from '../../../Collections'
+import { Arr, Collection } from '../../../Collections'
 import { head, last } from '../../../Collections/helpers'
-import { isEmpty, isValueSet, type Prettify, ucfirst } from '../../../Support'
+import { isEmpty, isValueSet, type Prettify } from '../../../Support'
 import { mixing } from '../../../Support/Traits'
 import { CompilesJsonPaths } from '../../Concerns/CompilesJsonPaths'
 import { Grammar as BaseGrammar } from '../../Grammar'
+import { Expression } from '../Expression'
 import { JoinClause } from '../JoinClause'
 import { JoinLateralClause } from '../JoinLateralClause'
 
@@ -402,9 +402,7 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
 
     for (const { name, property } of this.selectComponents) {
       if (this.isExecutable(query, property)) {
-        const method = `compile${ucfirst(name)}` as CompilerMethod
-
-        // console.log('method: %o', method);
+        const method = `compile${pascalCase(name)}` as CompilerMethod
 
         sql[name] = this[method](query, query[property as keyof Builder])
       }
@@ -547,6 +545,23 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
   }
 
   /**
+   * Compile a "between" where clause.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $where
+   * @return string
+   */
+  protected whereBetween(query: Builder, where: WhereClause): string {
+    const between = where.not ? 'not between' : 'between'
+
+    const min = this.parameter(Array.isArray(where.values) ? Arr.first(where.values) : where.values[0])
+
+    const max = this.parameter(Array.isArray(where.values) ? Arr.last(where.values) : where.values[1])
+
+    return this.wrap(where.column ?? '') + ' ' + between + ' ' + min + ' and ' + max
+  }
+
+  /**
    * Get an array of all the where clauses for the query.
    *
    * @param  \Illuminate\Database\Query\Builder  $query
@@ -558,9 +573,141 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
     return collection
       .map((where: WhereClause) => {
         // console.log(`where${where.type}`)
-        return where.boolean + ' ' + this[`where${where.type}`](query, where)
+        return where.boolean + ' ' + this[`where${pascalCase(where.type)}` as CompilerMethod](query, where)
       })
       .all()
+  }
+
+  /**
+   * Compile a "where not null" clause.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $where
+   * @return string
+   */
+  protected whereNotNull(query: Builder, where: WhereClause): string {
+    return this.wrap(where.column ?? '') + ' is not null';
+  }
+
+  /**
+   * Compile a "where fulltext" clause.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $where
+   * @return string
+   *
+   * @throws \RuntimeException
+   */
+  public whereFulltext(query: Builder, where: WhereClause): string {
+    throw new Error('RuntimeException: This database engine does not support fulltext search operations.')
+  }
+
+  /**
+   * Compile a nested where clause.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $where
+   * @return string
+   */
+  protected whereNested(query: Builder, where: WhereClause): string {
+    // Here we will calculate what portion of the string we need to remove. If this
+    // is a join clause query, we need to remove the "on" portion of the SQL and
+    // if it is a normal query we need to take the leading "where" of queries.
+    const offset = where.query instanceof JoinClause ? 3 : 6;
+
+    return '(' + this.compileWheres(where.query).substring(offset) + ')'
+  }
+
+  /**
+   * Compile a "where not in raw" clause.
+   *
+   * For safety, whereIntegerInRaw ensures this method is only used with integer values.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $where
+   * @return string
+   */
+  protected whereNotInRaw(query: Builder, where: WhereClause): string {
+    if (where.values.length > 0) {
+      return this.wrap(where.column) + ' not in (' + where.values.join(', ') + ')'
+    }
+
+    return '1 = 1'
+  }
+
+  /**
+   * Compile a "where in raw" clause.
+   *
+   * For safety, whereIntegerInRaw ensures this method is only used with integer values.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $where
+   * @return string
+   */
+  protected whereInRaw(query: Builder, where: WhereClause): string {
+    if (where.values.length > 0) {
+      return this.wrap(where.column) + ' in (' + where.values.join(', ') + ')'
+    }
+
+    return '0 = 1'
+  }
+
+  /**
+   * Compile a "where in" clause.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $where
+   * @return string
+   */
+  protected whereIn(query: Builder, where: WhereClause): string {
+    if (where.values.length > 0) {
+      return this.wrap(where.column) + ' in (' + this.parameterize(where.values) + ')'
+    }
+
+    return '0 = 1'
+  }
+
+  /**
+   * Compile a "where not in" clause.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $where
+   * @return string
+   */
+  protected whereNotIn(query: Builder, where: WhereClause): string {
+    if (where.values.length > 0) {
+      return this.wrap(where.column) + ' not in (' + this.parameterize(where.values) + ')'
+    }
+
+    return '1 = 1'
+  }
+
+  /**
+   * Compile a raw where clause.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $where
+   * @return string
+   */
+  protected whereRaw(query: Builder, where: WhereClause): string {
+    return where.sql instanceof Expression ? where.sql.getValue(this) : where.sql
+  }
+
+  /**
+   * Compile a "value between" where clause.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $where
+   * @return string
+   */
+  protected whereValueBetween(query: Builder, where: WhereClause): string {
+    const between = where.not ? 'not between' : 'between'
+
+    const min = this.wrap(Array.isArray(where.columns) ? Arr.first(where.columns) : where.columns[0])
+
+    const max = this.wrap(Array.isArray(where.columns) ? Arr.last(where.columns) : where.columns[1])
+
+    return this.parameter(where.value) + ' ' + between + ' ' + min + ' and ' + max
   }
 
   /**
@@ -571,7 +718,7 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    * @return string
    */
   protected whereNull(query: Builder, where: WhereClause): string {
-    return this.wrap(where.column ?? '') + ' is null';
+    return this.wrap(where.column ?? '') + ' is null'
   }
 
   /**
@@ -582,7 +729,7 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    * @return string
    */
   protected whereNullSafeEquals(query: Builder, where: WhereClause): string {
-    return this.wrap(where.column ?? '') + ' is not distinct from ' + this.parameter(where.value);
+    return this.wrap(where.column ?? '') + ' is not distinct from ' + this.parameter(where.value)
   }
 
   /**
@@ -596,12 +743,12 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    */
   protected whereLike(query: Builder, where: WhereClause): string {
     if (where.caseSensitive) {
-      throw new Error('RuntimeException: This database engine does not support case sensitive like operations.');
+      throw new Error('RuntimeException: This database engine does not support case sensitive like operations.')
     }
 
-    where.operator = where.not ? 'not like' : 'like';
+    where.operator = where.not ? 'not like' : 'like'
 
-    return this.whereBasic(query, where);
+    return this.whereBasic(query, where)
   }
 
   /**
@@ -659,6 +806,23 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    */
   protected whereYear(query: Builder, where: WhereClause): string {
     return this.dateBasedWhere('year', query, where)
+  }
+
+  /**
+   * Compile a "between" where clause.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $where
+   * @return string
+   */
+  protected whereBetweenColumns(query: Builder, where: WhereClause): string {
+    const between = where.not ? 'not between' : 'between'
+
+    const min = this.wrap(Array.isArray(where.values) ? Arr.first(where.values) : where.values[0])
+
+    const max = this.wrap(Array.isArray(where.values) ? Arr.last(where.values) : where.values[1])
+
+    return this.wrap(where.column ?? '') + ' ' + between + ' ' + min + ' and ' + max
   }
 
   /**

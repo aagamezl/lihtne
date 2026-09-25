@@ -30,6 +30,24 @@ export class EnumeratesValues<TKey extends PropertyKey, TValue> {
   }
 
   /**
+   * Create a collection of all elements that do not pass a given truth test.
+   *
+   * @param  (callable(TValue, TKey): bool)|bool|TValue  $callback
+   * @return static
+   */
+  public reject (
+    callback: (value: TValue, key: TKey) => boolean | TValue = true
+  ): this {
+    const useAsCallable = this.useAsCallable(callback)
+
+    return this.filter((value, key) => {
+      return useAsCallable
+        ? !callback(value, key)
+        : value !== callback
+    })
+  }
+
+  /**
    * Execute a callback over each item.
    *
    * Mirrors `EnumeratesValues::each()`. Iterates `$this` (i.e. the

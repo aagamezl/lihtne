@@ -41,24 +41,59 @@ export class Arr {
   }
 
   /**
+   * Filter the array using the given callback.
+   *
+   * @template TKey of array-key
+   * @template TValue
+   *
+   * @param  array<TKey, TValue>  $array
+   * @param  callable(TValue, TKey): bool  $callback
+   * @return array<TKey, TValue>
+   */
+  public static where<TKey extends PropertyKey, TValue>(
+    array: Array<TValue>,
+    callback: (value: TValue, key: TKey) => boolean
+  ): TValue[] {
+    return array.filter((value, key) => callback(value, key))
+  }
+
+  /**
    * Flatten a multi-dimensional array into a single level.
    *
    * @param  iterable  $array
    * @param  int  $depth
    * @return array
    */
+  /**
+   * Plain `{}` dictionaries mirror PHP associative arrays for flattening.
+   */
+  private static shouldFlattenAsArray (value: unknown): value is unknown[] | Dictionary<unknown> {
+    if (Array.isArray(value)) {
+      return true
+    }
+
+    if (value === null || typeof value !== 'object') {
+      return false
+    }
+
+    if (value instanceof Collection || value instanceof Date) {
+      return false
+    }
+
+    return value.constructor === Object
+  }
+
   static flatten (array: Iterable<unknown>, depth: number = Infinity): unknown[] {
     const result: unknown[] = []
 
     for (let item of array) {
       item = item instanceof Collection ? item.all() : item
 
-      if (!Array.isArray(item)) {
+      if (!Arr.shouldFlattenAsArray(item)) {
         result.push(item)
       } else {
-        const values = depth === 1
-          ? Object.values(item)
-          : Arr.flatten(item, depth - 1)
+        const nested = Array.isArray(item) ? item : Object.values(item)
+        const values = depth === 1 ? nested : Arr.flatten(nested, depth - 1)
 
         for (const value of values) {
           result.push(value)
@@ -321,6 +356,36 @@ export class Arr {
     }
 
     return result
+  }
+
+  /**
+   * Return the last element in an array passing a given truth test.
+   *
+   * @template TKey
+   * @template TValue
+   * @template TLastDefault
+   *
+   * @param  iterable<TKey, TValue>  $array
+   * @param  (callable(TValue, TKey): bool)|null  $callback
+   * @param  TLastDefault|(\Closure(): TLastDefault)  $default
+   * @return TValue|TLastDefault
+   */
+  public static last<TValue, TKey extends PropertyKey, TDefault = undefined>(
+    array: ArrayableInput<TKey, TValue>,
+    callback?: (value: TValue, key: TKey) => boolean,
+    defaultValue?: TDefault | (() => TDefault)
+  ): TValue | TDefault | undefined {
+    if (array === null) {
+      return resolveDefault(defaultValue)
+    }
+
+    const normalized = Arr.from<TKey, TValue>(array)
+
+    if (callback === undefined) {
+      return Object.values(normalized).length === 0 ? resolveDefault(defaultValue) : Object.values(normalized)[Object.values(normalized).length - 1]
+    }
+
+    return Arr.first<TValue, TKey, TDefault>(Object.values(normalized).reverse(), callback, defaultValue)
   }
 
   /**

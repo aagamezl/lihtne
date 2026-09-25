@@ -42,7 +42,7 @@ export class SqlServerGrammar extends Grammar {
    * @param  array  $where
    * @return string
    */
-  protected override whereDate(query: Builder, where: WhereClause): string {
+  protected override whereDate (query: Builder, where: WhereClause): string {
     const value = this.parameter(where.value)
 
     return 'cast(' + this.wrap(where.column) + ' as date) ' + where.operator + ' ' + value
@@ -55,7 +55,7 @@ export class SqlServerGrammar extends Grammar {
    * @param  array  $where
    * @return string
    */
-  protected override whereTime(query: Builder, where: WhereClause): string {
+  protected override whereTime (query: Builder, where: WhereClause): string {
     const value = this.parameter(where.value)
 
     return 'cast(' + this.wrap(where.column) + ' as time) ' + where.operator + ' ' + value
@@ -67,7 +67,7 @@ export class SqlServerGrammar extends Grammar {
    * @param  \Illuminate\Database\Query\Builder  $query
    * @return string
    */
-  public override compileSelect(query: Builder): string {
+  public override compileSelect (query: Builder): string {
     // An order by clause is required for SQL Server offset to function...
     if (query.offsetProperty && query.ordersProperty.length === 0) {
       query.ordersProperty.push({ sql: '(SELECT 0)' })
@@ -83,7 +83,7 @@ export class SqlServerGrammar extends Grammar {
    * @param  array  $columns
    * @return string|null
    */
-  protected override compileColumns(query: Builder, columns: Array<Expression | string>): string | null | undefined {
+  protected override compileColumns (query: Builder, columns: Array<Expression | string>): string | null | undefined {
     if (query.aggregateProperty !== undefined) {
       return
     }
@@ -107,7 +107,7 @@ export class SqlServerGrammar extends Grammar {
    * @param  string  $table
    * @return string
    */
-  protected override compileFrom(query: Builder, table: string): string {
+  protected override compileFrom (query: Builder, table: string): string {
     const from = super.compileFrom(query, table)
 
     if (typeof query.lockProperty === 'string') {
@@ -128,7 +128,7 @@ export class SqlServerGrammar extends Grammar {
    * @param  int  $offset
    * @return string
    */
-  protected override compileOffset(query: Builder, offset: number): string {
+  protected override compileOffset (query: Builder, offset: number): string {
     offset = Number(offset)
 
     if (offset) {
@@ -145,7 +145,7 @@ export class SqlServerGrammar extends Grammar {
    * @param  bool|string  $value
    * @return string
    */
-  protected compileLock(query: Builder, value: boolean | string): string {
+  protected compileLock (query: Builder, value: boolean | string): string {
     return ''
   }
 
@@ -155,7 +155,7 @@ export class SqlServerGrammar extends Grammar {
    * @param  string  $value
    * @return string
    */
-  protected override wrapValue(value: string): string {
+  protected override wrapValue (value: string): string {
     return value === '*' ? value : '[' + value.replace(']', ']]') + ']'
   }
 
@@ -166,7 +166,7 @@ export class SqlServerGrammar extends Grammar {
    * @param  string|null  $prefix
    * @return string
    */
-  public override wrapTable(table: Expression | string, prefix: string | null = null): string {
+  public override wrapTable (table: Expression | string, prefix: string | null = null): string {
     if (!this.isExpression(table)) {
       return this.wrapTableValuedFunction(super.wrapTable(table, prefix))
     }
@@ -181,8 +181,8 @@ export class SqlServerGrammar extends Grammar {
    * @param  array  $where
    * @return string
    */
-  protected override whereNullSafeEquals(query: Builder, where: WhereClause): string {
-    return 'exists (select ' + this.wrap(where.column ?? '') + ' intersect select ' + this.parameter(where.value) + ')';
+  protected override whereNullSafeEquals (query: Builder, where: WhereClause): string {
+    return 'exists (select ' + this.wrap(where.column ?? '') + ' intersect select ' + this.parameter(where.value) + ')'
   }
 
   /**
@@ -191,7 +191,7 @@ export class SqlServerGrammar extends Grammar {
    * @param  string  $table
    * @return string
    */
-  protected wrapTableValuedFunction(table: string): string {
+  protected wrapTableValuedFunction (table: string): string {
     if (new RegExp('^(.+?)(\\(.*?\\))]$').test(table)) {
       return table.replace(new RegExp('^(.+?)(\\(.*?\\))]$'), '$1]$2')
     }

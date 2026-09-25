@@ -39,7 +39,7 @@ export const iterableValues = <TValue>(
   return Array.isArray(value) ? value : Object.values(value)
 }
 
-export const value = (value: any, ...args: any[]) => {
+export const value = (value: unknown, ...args: unknown[]): unknown => {
   return value instanceof Function ? value(...args) : value
 }
 

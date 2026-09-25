@@ -130,7 +130,7 @@ export class BuildsWhereDateClauses {
    * @param  array|string  $columns
    * @return $this
    */
-  public whereTodayOrBefore (columns: Array<string | Expression>) {
+  public whereTodayOrBefore (columns: string | Array<string | Expression>) {
     return this.whereTodayBeforeOrAfter(columns, '<=', 'and')
   }
 
@@ -180,7 +180,7 @@ export class BuildsWhereDateClauses {
    * @param  array|string  $columns
    * @return $this
    */
-  public orWhereTodayOrBefore (columns: Array<string | Expression>) {
+  public orWhereTodayOrBefore (columns: string | Array<string | Expression>) {
     return this.whereTodayBeforeOrAfter(columns, '<=', 'or')
   }
 
@@ -190,7 +190,7 @@ export class BuildsWhereDateClauses {
    * @param  array|string  $columns
    * @return $this
    */
-  public orWhereAfterToday (columns: Array<string | Expression>) {
+  public orWhereAfterToday (columns: string | Array<string | Expression>) {
     return this.whereTodayBeforeOrAfter(columns, '>', 'or')
   }
 
@@ -200,7 +200,7 @@ export class BuildsWhereDateClauses {
    * @param  array|string  $columns
    * @return $this
    */
-  public orWhereTodayOrAfter (columns: Array<string | Expression>) {
+  public orWhereTodayOrAfter (columns: string | Array<string | Expression>) {
     return this.whereTodayBeforeOrAfter(columns, '>=', 'or')
   }
 
@@ -212,7 +212,11 @@ export class BuildsWhereDateClauses {
    * @param  string  $boolean
    * @return $this
    */
-  protected whereTodayBeforeOrAfter (columns: Array<string | Expression>, operator: string, boolean: string) {
+  protected whereTodayBeforeOrAfter (
+    columns: string | Array<string | Expression>,
+    operator: string,
+    boolean: string
+  ) {
     const value = new Date().toISOString().split('T')[0]
 
     for (const column of Arr.wrap(columns)) {

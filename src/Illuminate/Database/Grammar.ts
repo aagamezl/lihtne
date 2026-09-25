@@ -144,6 +144,16 @@ export abstract class Grammar {
   }
 
   /**
+   * Create query parameter place-holders for an array.
+   *
+   * @param  array<mixed>  $values
+   * @return string
+   */
+  public parameterize (values: unknown[]): string {
+    return values.map((value) => this.parameter(value)).join(', ')
+  }
+
+  /**
    * Wrap a single string in keyword identifiers.
    *
    * @param  string  value

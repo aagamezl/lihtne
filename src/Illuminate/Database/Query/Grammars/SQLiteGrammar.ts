@@ -21,7 +21,7 @@ export class SQLiteGrammar extends Grammar {
    * @param  bool|string  $value
    * @return string
    */
-  protected compileLock(query: Builder, value: boolean | string): string {
+  protected compileLock (query: Builder, value: boolean | string): string {
     return ''
   }
 
@@ -31,7 +31,7 @@ export class SQLiteGrammar extends Grammar {
    * @param  string  $sql
    * @return string
    */
-  protected override wrapUnion(sql: string): string {
+  protected override wrapUnion (sql: string): string {
     return `select * from (${sql})`
   }
 
@@ -42,7 +42,7 @@ export class SQLiteGrammar extends Grammar {
  * @param  array  $where
  * @return string
  */
-  protected whereNullSafeEquals(query: Builder, where: WhereClause): string {
+  protected whereNullSafeEquals (query: Builder, where: WhereClause): string {
     return this.wrap(where.column ?? '') + ' is ' + this.parameter(where.value)
   }
 
@@ -53,7 +53,7 @@ export class SQLiteGrammar extends Grammar {
    * @param  array  $where
    * @return string
    */
-  protected override whereDate(query: Builder, where: WhereClause): string {
+  protected override whereDate (query: Builder, where: WhereClause): string {
     return this.dateBasedWhere('%Y-%m-%d', query, where)
   }
 
@@ -64,7 +64,7 @@ export class SQLiteGrammar extends Grammar {
    * @param  array  $where
    * @return string
    */
-  protected override whereDay(query: Builder, where: WhereClause): string {
+  protected override whereDay (query: Builder, where: WhereClause): string {
     return this.dateBasedWhere('%d', query, where)
   }
 
@@ -75,7 +75,7 @@ export class SQLiteGrammar extends Grammar {
    * @param  array  $where
    * @return string
    */
-  protected override whereMonth(query: Builder, where: WhereClause): string {
+  protected override whereMonth (query: Builder, where: WhereClause): string {
     return this.dateBasedWhere('%m', query, where)
   }
 
@@ -86,7 +86,7 @@ export class SQLiteGrammar extends Grammar {
    * @param  array  $where
    * @return string
    */
-  protected override whereYear(query: Builder, where: WhereClause): string {
+  protected override whereYear (query: Builder, where: WhereClause): string {
     return this.dateBasedWhere('%Y', query, where)
   }
 
@@ -97,7 +97,7 @@ export class SQLiteGrammar extends Grammar {
    * @param  bool  $caseSensitive
    * @return string
    */
-  public prepareWhereLikeBinding(value: string, caseSensitive: boolean): string {
+  public prepareWhereLikeBinding (value: string, caseSensitive: boolean): string {
     if (!caseSensitive) {
       return value
     }
@@ -116,13 +116,13 @@ export class SQLiteGrammar extends Grammar {
    * @param  array  $where
    * @return string
    */
-  protected whereLike(query: Builder, where: WhereClause): string {
+  protected whereLike (query: Builder, where: WhereClause): string {
     if (where.caseSensitive == false) {
-      return super.whereLike(query, where);
+      return super.whereLike(query, where)
     }
-    where.operator = where.not ? 'not glob' : 'glob';
+    where.operator = where.not ? 'not glob' : 'glob'
 
-    return this.whereBasic(query, where);
+    return this.whereBasic(query, where)
   }
 
   /**
@@ -132,7 +132,7 @@ export class SQLiteGrammar extends Grammar {
    * @param  array  $where
    * @return string
    */
-  protected override whereTime(query: Builder, where: WhereClause): string {
+  protected override whereTime (query: Builder, where: WhereClause): string {
     return this.dateBasedWhere('%H:%M:%S', query, where)
   }
 
@@ -144,7 +144,7 @@ export class SQLiteGrammar extends Grammar {
  * @param  array  $where
  * @return string
  */
-  protected override dateBasedWhere(type: string, query: Builder, where: WhereClause): string {
+  protected override dateBasedWhere (type: string, query: Builder, where: WhereClause): string {
     const value = this.parameter(where.value)
 
     return `strftime('${type}', ${this.wrap(where.column ?? '')}) ${where.operator} cast(${value} as text)`

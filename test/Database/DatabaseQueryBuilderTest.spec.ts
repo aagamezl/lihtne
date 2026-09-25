@@ -2,15 +2,18 @@ import { describe, expect, jest, test } from '@jest/globals'
 
 import type { Builder } from '../../src/Illuminate/Database/Query'
 
+import { collect } from '../../src/Illuminate/Collections/helpers'
 import { Expression as Raw } from '../../src/Illuminate/Database/Query/Expression'
-import { Str } from '../../src/Illuminate/Support'
+import { Carbon, DateInterval, DatePeriod, Str } from '../../src/Illuminate/Support'
 import { getBuilder } from './helpers/getBuilder'
 import { getMariaDbBuilder } from './helpers/getMariaDbBuilder'
 import { getMySqlBuilder } from './helpers/getMySqlBuilder'
 import { getMySqlBuilderWithProcessor } from './helpers/getMySqlBuilderWithProcessor'
+import { getPostgresBuilderWithProcessor } from './helpers/getPostgresBuilderWithProcessor'
 import { getPostgresBuilder } from './helpers/getPostgresBuilder'
 import { getSQLiteBuilder } from './helpers/getSQLiteBuilder'
 import { getSqlServerBuilder } from './helpers/getSqlServerBuilder'
+import { Bar } from '../../tests/Database/Fixtures/Enums/Bar'
 
 describe('Database Query Builder', () => {
   test('testBasicSelect', () => {
@@ -1116,285 +1119,896 @@ describe('Database Query Builder', () => {
   })
 
   test('testWhereLikeClauseSqlite', () => {
-    let builder = getSQLiteBuilder();
-    builder.select('*').from('users').whereLike('id', '1');
+    let builder = getSQLiteBuilder()
+    builder.select('*').from('users').whereLike('id', '1')
     expect(builder.toSql()).toBe('select * from "users" where "id" like ?')
     expect(builder.getBindings()).toEqual(['1'])
 
-    builder = getSQLiteBuilder();
-    builder.select('*').from('users').whereLike('id', '1', true);
+    builder = getSQLiteBuilder()
+    builder.select('*').from('users').whereLike('id', '1', true)
     expect(builder.toSql()).toBe('select * from "users" where "id" glob ?')
     expect(builder.getBindings()).toEqual(['1'])
 
-    builder = getSQLiteBuilder();
-    builder.select('*').from('users').whereLike('description', 'Hell* _orld?%', true);
+    builder = getSQLiteBuilder()
+    builder.select('*').from('users').whereLike('description', 'Hell* _orld?%', true)
     expect(builder.toSql()).toBe('select * from "users" where "description" glob ?')
     expect(builder.getBindings()).toEqual(['Hell[*] ?orld[?]*'])
 
-    builder = getSQLiteBuilder();
-    builder.select('*').from('users').whereNotLike('id', '1');
+    builder = getSQLiteBuilder()
+    builder.select('*').from('users').whereNotLike('id', '1')
     expect(builder.toSql()).toBe('select * from "users" where "id" not like ?')
     expect(builder.getBindings()).toEqual(['1'])
 
-    builder = getSQLiteBuilder();
-    builder.select('*').from('users').whereNotLike('description', 'Hell* _orld?%', true);
+    builder = getSQLiteBuilder()
+    builder.select('*').from('users').whereNotLike('description', 'Hell* _orld?%', true)
     expect(builder.toSql()).toBe('select * from "users" where "description" not glob ?')
     expect(builder.getBindings()).toEqual(['Hell[*] ?orld[?]*'])
 
-    builder = getSQLiteBuilder();
-    builder.select('*').from('users').whereLike('name', 'John%', true).whereNotLike('name', '%Doe%', true);
+    builder = getSQLiteBuilder()
+    builder.select('*').from('users').whereLike('name', 'John%', true).whereNotLike('name', '%Doe%', true)
     expect(builder.toSql()).toBe('select * from "users" where "name" glob ? and "name" not glob ?')
     expect(builder.getBindings()).toEqual(['John*', '*Doe*'])
 
-    builder = getSQLiteBuilder();
-    builder.select('*').from('users').whereLike('name', 'John%').orWhereLike('name', 'Jane%', true);
+    builder = getSQLiteBuilder()
+    builder.select('*').from('users').whereLike('name', 'John%').orWhereLike('name', 'Jane%', true)
     expect(builder.toSql()).toBe('select * from "users" where "name" like ? or "name" glob ?')
     expect(builder.getBindings()).toEqual(['John%', 'Jane*'])
   })
 
   test('testWhereLikeClauseSqlServer', () => {
-    let builder = getSqlServerBuilder();
-    builder.select('*').from('users').whereLike('id', '1');
+    let builder = getSqlServerBuilder()
+    builder.select('*').from('users').whereLike('id', '1')
     expect(builder.toSql()).toBe('select * from [users] where [id] like ?')
     expect(builder.getBindings()).toEqual(['1'])
 
-    builder = getSqlServerBuilder();
-    builder.select('*').from('users').whereLike('id', '1').orWhereLike('id', '2');
+    builder = getSqlServerBuilder()
+    builder.select('*').from('users').whereLike('id', '1').orWhereLike('id', '2')
     expect(builder.toSql()).toBe('select * from [users] where [id] like ? or [id] like ?')
     expect(builder.getBindings()).toEqual(['1', '2'])
 
-    builder = getSqlServerBuilder();
-    builder.select('*').from('users').whereNotLike('id', '1');
+    builder = getSqlServerBuilder()
+    builder.select('*').from('users').whereNotLike('id', '1')
     expect(builder.toSql()).toBe('select * from [users] where [id] not like ?')
     expect(builder.getBindings()).toEqual(['1'])
   })
 
   test('testWhereDateSqlite', () => {
-    let builder = getSQLiteBuilder();
-    builder.select('*').from('users').whereDate('created_at', '=', '2015-12-21');
+    let builder = getSQLiteBuilder()
+    builder.select('*').from('users').whereDate('created_at', '=', '2015-12-21')
     expect(builder.toSql()).toBe('select * from "users" where strftime(\'%Y-%m-%d\', "created_at") = cast(? as text)')
     expect(builder.getBindings()).toEqual(['2015-12-21'])
 
-    builder = getSQLiteBuilder();
-    builder.select('*').from('users').whereDate('created_at', new Raw('NOW()'));
+    builder = getSQLiteBuilder()
+    builder.select('*').from('users').whereDate('created_at', new Raw('NOW()'))
     expect(builder.toSql()).toBe('select * from "users" where strftime(\'%Y-%m-%d\', "created_at") = cast(NOW() as text)')
   })
 
   test('testWhereDaySqlite', () => {
-    const builder = getSQLiteBuilder();
-    builder.select('*').from('users').whereDay('created_at', '=', 1);
+    const builder = getSQLiteBuilder()
+    builder.select('*').from('users').whereDay('created_at', '=', 1)
     expect(builder.toSql()).toBe('select * from "users" where strftime(\'%d\', "created_at") = cast(? as text)')
     expect(builder.getBindings()).toEqual([1])
   })
 
   test('testWhereMonthSqlite', () => {
-    const builder = getSQLiteBuilder();
-    builder.select('*').from('users').whereMonth('created_at', '=', 5);
+    const builder = getSQLiteBuilder()
+    builder.select('*').from('users').whereMonth('created_at', '=', 5)
     expect(builder.toSql()).toBe('select * from "users" where strftime(\'%m\', "created_at") = cast(? as text)')
     expect(builder.getBindings()).toEqual([5])
   })
 
   test('testWhereYearSqlite', () => {
-    const builder = getSQLiteBuilder();
-    builder.select('*').from('users').whereYear('created_at', '=', 2014);
+    const builder = getSQLiteBuilder()
+    builder.select('*').from('users').whereYear('created_at', '=', 2014)
     expect(builder.toSql()).toBe('select * from "users" where strftime(\'%Y\', "created_at") = cast(? as text)')
     expect(builder.getBindings()).toEqual([2014])
   })
 
   test('testWhereTimeSqlite', () => {
-    const builder = getSQLiteBuilder();
-    builder.select('*').from('users').whereTime('created_at', '>=', '22:00');
+    const builder = getSQLiteBuilder()
+    builder.select('*').from('users').whereTime('created_at', '>=', '22:00')
     expect(builder.toSql()).toBe('select * from "users" where strftime(\'%H:%M:%S\', "created_at") >= cast(? as text)')
     expect(builder.getBindings()).toEqual(['22:00'])
   })
 
   test('testWhereTimeOperatorOptionalSqlite', () => {
-    const builder = getSQLiteBuilder();
-    builder.select('*').from('users').whereTime('created_at', '22:00');
+    const builder = getSQLiteBuilder()
+    builder.select('*').from('users').whereTime('created_at', '22:00')
     expect(builder.toSql()).toBe('select * from "users" where strftime(\'%H:%M:%S\', "created_at") = cast(? as text)')
     expect(builder.getBindings()).toEqual(['22:00'])
   })
 
   test('testWhereDateSqlServer', () => {
-    let builder = getSqlServerBuilder();
-    builder.select('*').from('users').whereDate('created_at', '=', '2015-12-21');
+    let builder = getSqlServerBuilder()
+    builder.select('*').from('users').whereDate('created_at', '=', '2015-12-21')
     expect(builder.toSql()).toBe('select * from [users] where cast([created_at] as date) = ?')
     expect(builder.getBindings()).toEqual(['2015-12-21'])
 
-    builder = getSqlServerBuilder();
-    builder.select('*').from('users').whereDate('created_at', new Raw('NOW()'));
+    builder = getSqlServerBuilder()
+    builder.select('*').from('users').whereDate('created_at', new Raw('NOW()'))
     expect(builder.toSql()).toBe('select * from [users] where cast([created_at] as date) = NOW()')
   })
 
   test('testWhereDaySqlServer', () => {
-    let builder = getSqlServerBuilder();
-    builder.select('*').from('users').whereDay('created_at', '=', 1);
+    const builder = getSqlServerBuilder()
+    builder.select('*').from('users').whereDay('created_at', '=', 1)
     expect(builder.toSql()).toBe('select * from [users] where day([created_at]) = ?')
     expect(builder.getBindings()).toEqual([1])
   })
 
   test('testWhereMonthSqlServer', () => {
-    const builder = getSqlServerBuilder();
-    builder.select('*').from('users').whereMonth('created_at', '=', 5);
+    const builder = getSqlServerBuilder()
+    builder.select('*').from('users').whereMonth('created_at', '=', 5)
     expect(builder.toSql()).toBe('select * from [users] where month([created_at]) = ?')
     expect(builder.getBindings()).toEqual([5])
   })
 
   test('testWhereYearSqlServer', () => {
-    const builder = getSqlServerBuilder();
-    builder.select('*').from('users').whereYear('created_at', '=', 2014);
+    const builder = getSqlServerBuilder()
+    builder.select('*').from('users').whereYear('created_at', '=', 2014)
     expect(builder.toSql()).toBe('select * from [users] where year([created_at]) = ?')
     expect(builder.getBindings()).toEqual([2014])
   })
 
   test('testWhereNullSafeEquals', () => {
-    let builder = getBuilder();
-    builder.select('*').from('users').whereNullSafeEquals('foo', 'bar');
+    let builder = getBuilder()
+    builder.select('*').from('users').whereNullSafeEquals('foo', 'bar')
     expect(builder.toSql()).toBe('select * from "users" where "foo" is not distinct from ?')
     expect(builder.getBindings()).toEqual(['bar'])
 
-    builder = getBuilder();
-    builder.select('*').from('users').whereNullSafeEquals('foo', 'bar').whereNullSafeEquals('baz', 'qux');
+    builder = getBuilder()
+    builder.select('*').from('users').whereNullSafeEquals('foo', 'bar').whereNullSafeEquals('baz', 'qux')
     expect(builder.toSql()).toBe('select * from "users" where "foo" is not distinct from ? and "baz" is not distinct from ?')
     expect(builder.getBindings()).toEqual(['bar', 'qux'])
   })
 
   test('testOrWhereNullSafeEquals', () => {
-    const builder = getBuilder();
-    builder.select('*').from('users').where('foo', 'bar').orWhereNullSafeEquals('baz', 'qux');
+    const builder = getBuilder()
+    builder.select('*').from('users').where('foo', 'bar').orWhereNullSafeEquals('baz', 'qux')
     expect(builder.toSql()).toBe('select * from "users" where "foo" = ? or "baz" is not distinct from ?')
     expect(builder.getBindings()).toEqual(['bar', 'qux'])
   })
 
   test('testWhereNullSafeEqualsViaNullSafeOperator', () => {
-    const builder = getBuilder();
-    builder.select('*').from('users').where('foo', '<=>', 'bar');
+    const builder = getBuilder()
+    builder.select('*').from('users').where('foo', '<=>', 'bar')
     expect(builder.toSql()).toBe('select * from "users" where "foo" is not distinct from ?')
     expect(builder.getBindings()).toEqual(['bar'])
   })
 
   test('testWhereNullSafeEqualsWithNullViaOperator', () => {
-    const builder = getBuilder();
-    builder.select('*').from('users').where('foo', '<=>', null);
+    const builder = getBuilder()
+    builder.select('*').from('users').where('foo', '<=>', null)
     expect(builder.toSql()).toBe('select * from "users" where "foo" is null')
   })
 
   test('testWhereNullSafeEqualsMySql', () => {
-    let builder = getMySqlBuilder();
-    builder.select('*').from('users').whereNullSafeEquals('foo', 'bar');
+    let builder = getMySqlBuilder()
+    builder.select('*').from('users').whereNullSafeEquals('foo', 'bar')
     expect(builder.toSql()).toBe('select * from `users` where `foo` <=> ?')
     expect(builder.getBindings()).toEqual(['bar'])
 
-    builder = getMySqlBuilder();
-    builder.select('*').from('users').where('foo', '<=>', 'bar');
+    builder = getMySqlBuilder()
+    builder.select('*').from('users').where('foo', '<=>', 'bar')
     expect(builder.toSql()).toBe('select * from `users` where `foo` <=> ?')
     expect(builder.getBindings()).toEqual(['bar'])
   })
 
   test('testWhereNullSafeEqualsSQLite', () => {
-    let builder = getSQLiteBuilder();
-    builder.select('*').from('users').whereNullSafeEquals('foo', 'bar');
+    let builder = getSQLiteBuilder()
+    builder.select('*').from('users').whereNullSafeEquals('foo', 'bar')
     expect(builder.toSql()).toBe('select * from "users" where "foo" is ?')
     expect(builder.getBindings()).toEqual(['bar'])
 
-    builder = getSQLiteBuilder();
-    builder.select('*').from('users').where('foo', '<=>', 'bar');
+    builder = getSQLiteBuilder()
+    builder.select('*').from('users').where('foo', '<=>', 'bar')
     expect(builder.toSql()).toBe('select * from "users" where "foo" is ?')
     expect(builder.getBindings()).toEqual(['bar'])
   })
 
   test('testWhereNullSafeEqualsPostgres', () => {
-    let builder = getPostgresBuilder();
-    builder.select('*').from('users').whereNullSafeEquals('foo', 'bar');
+    let builder = getPostgresBuilder()
+    builder.select('*').from('users').whereNullSafeEquals('foo', 'bar')
     expect(builder.toSql()).toBe('select * from "users" where "foo" is not distinct from ?')
     expect(builder.getBindings()).toEqual(['bar'])
 
-    builder = getPostgresBuilder();
-    builder.select('*').from('users').where('foo', '<=>', 'bar');
+    builder = getPostgresBuilder()
+    builder.select('*').from('users').where('foo', '<=>', 'bar')
     expect(builder.toSql()).toBe('select * from "users" where "foo" is not distinct from ?')
     expect(builder.getBindings()).toEqual(['bar'])
   })
 
   test('testWhereNullSafeEqualsSqlServer', () => {
-    let builder = getSqlServerBuilder();
-    builder.select('*').from('users').whereNullSafeEquals('foo', 'bar');
+    let builder = getSqlServerBuilder()
+    builder.select('*').from('users').whereNullSafeEquals('foo', 'bar')
     expect(builder.toSql()).toBe('select * from [users] where exists (select [foo] intersect select ?)')
     expect(builder.getBindings()).toEqual(['bar'])
 
-    builder = getSqlServerBuilder();
-    builder.select('*').from('users').where('foo', '<=>', 'bar');
+    builder = getSqlServerBuilder()
+    builder.select('*').from('users').where('foo', '<=>', 'bar')
     expect(builder.toSql()).toBe('select * from [users] where exists (select [foo] intersect select ?)')
     expect(builder.getBindings()).toEqual(['bar'])
   })
 
   test('testWhereBetweens', () => {
-    let builder = getBuilder();
-    builder.select('*').from('users').whereBetween('id', [1, 2]);
+    let builder = getBuilder()
+    builder.select('*').from('users').whereBetween('id', [1, 2])
     expect(builder.toSql()).toBe('select * from "users" where "id" between ? and ?')
     expect(builder.getBindings()).toEqual([1, 2])
 
-    builder = getBuilder();
-    builder.select('*').from('users').whereBetween('id', [[1, 2, 3]]);
+    builder = getBuilder()
+    builder.select('*').from('users').whereBetween('id', [[1, 2, 3]])
     expect(builder.toSql()).toBe('select * from "users" where "id" between ? and ?')
     expect(builder.getBindings()).toEqual([1, 2])
 
-    builder = getBuilder();
-    builder.select('*').from('users').whereBetween('id', [[1], [2, 3]]);
+    builder = getBuilder()
+    builder.select('*').from('users').whereBetween('id', [[1], [2, 3]])
     expect(builder.toSql()).toBe('select * from "users" where "id" between ? and ?')
     expect(builder.getBindings()).toEqual([1, 2])
 
-    builder = getBuilder();
-    builder.select('*').from('users').whereNotBetween('id', [1, 2]);
+    builder = getBuilder()
+    builder.select('*').from('users').whereNotBetween('id', [1, 2])
     expect(builder.toSql()).toBe('select * from "users" where "id" not between ? and ?')
     expect(builder.getBindings()).toEqual([1, 2])
 
-    builder = getBuilder();
-    builder.select('*').from('users').whereBetween('id', [new Raw(1), new Raw(2)]);
+    builder = getBuilder()
+    builder.select('*').from('users').whereBetween('id', [new Raw(1), new Raw(2)])
     expect(builder.toSql()).toBe('select * from "users" where "id" between 1 and 2')
     expect(builder.getBindings()).toEqual([])
 
-    builder = getBuilder();
-    let period = new DatePeriod(new Date(), new DateInterval('P1D'), new Date());
-    builder.select('*').from('users').whereBetween('created_at', period);
+    builder = getBuilder()
+    const today = Carbon.today().toDate()
+    const tomorrow = Carbon.now().addDay().startOfDay().toDate()
+    let period = new DatePeriod(today, new DateInterval('P1D'), tomorrow)
+    builder.select('*').from('users').whereBetween('created_at', period)
     expect(builder.toSql()).toBe('select * from "users" where "created_at" between ? and ?')
-    expect(builder.getBindings()).toEqual([Carbon:: today(), Carbon:: now() -> addDay() -> startOfDay()])
+    expect(builder.getBindings()).toEqual([today, tomorrow])
 
     // custom long carbon period date
-    builder = getBuilder();
-    const period = new DatePeriod(new Date(), new DateInterval('P1M'), new Date());
-    builder.select('*').from('users').whereBetween('created_at', period);
+    builder = getBuilder()
+    const nextMonth = Carbon.now().addMonth().startOfDay().toDate()
+    period = new DatePeriod(today, new DateInterval('P1M'), nextMonth)
+    builder.select('*').from('users').whereBetween('created_at', period)
     expect(builder.toSql()).toBe('select * from "users" where "created_at" between ? and ?')
-    expect(builder.getBindings()).toEqual([Carbon:: today(), Carbon:: now() -> addMonth() -> startOfDay()])
+    expect(builder.getBindings()).toEqual([today, nextMonth])
 
     // DatePeriod with end date
-    builder = getBuilder();
-    period = new DatePeriod(new Date(), new DateInterval('P1D'), new Date(Date.now() + 5 * 24 * 60 * 60 * 1000));
-    builder.select('*').from('users').whereBetween('created_at', period);
+    builder = getBuilder()
+    const fiveDays = Carbon.now().addDays(5).startOfDay().toDate()
+    period = new DatePeriod(today, new DateInterval('P1D'), fiveDays)
+    builder.select('*').from('users').whereBetween('created_at', period)
     expect(builder.toSql()).toBe('select * from "users" where "created_at" between ? and ?')
-    expect(builder.getBindings()).toEqual([Carbon:: today(), Carbon:: now() -> addDays(5) -> startOfDay()])
+    expect(builder.getBindings()).toEqual([today, fiveDays])
 
     // DatePeriod with recurrence count (no end date)
-    builder = getBuilder();
-    period = new DatePeriod(new Date(), new DateInterval('P1D'), 5);
-    builder.select('*').from('users').whereBetween('created_at', period);
+    builder = getBuilder()
+    period = new DatePeriod(today, new DateInterval('P1D'), 5)
+    builder.select('*').from('users').whereBetween('created_at', period)
     expect(builder.toSql()).toBe('select * from "users" where "created_at" between ? and ?')
-    expect(builder.getBindings()).toEqual([new Date(), new Date(Date.now() + 5 * 24 * 60 * 60 * 1000)])
+    expect(builder.getBindings()).toEqual([today, fiveDays])
 
-    builder = getBuilder();
-    builder.select('*').from('users').whereBetween('id', collect([1, 2]));
+    builder = getBuilder()
+    builder.select('*').from('users').whereBetween('id', collect<number, number>([1, 2]))
     expect(builder.toSql()).toBe('select * from "users" where "id" between ? and ?')
     expect(builder.getBindings()).toEqual([1, 2])
 
-    const subqueryBuilder = getBuilder();
-    subqueryBuilder.select('id').from('posts').where('status', 'published').orderByDesc('created_at').limit(1);
-    builder = getBuilder();
-    builder.select('*').from('users').whereBetween(subqueryBuilder, collect([1, 2]));
+    const subqueryBuilder = getBuilder()
+    subqueryBuilder.select('id').from('posts').where('status', 'published').orderByDesc('created_at').limit(1)
+    builder = getBuilder()
+    builder.select('*').from('users').whereBetween(subqueryBuilder, collect([1, 2]))
     expect(builder.toSql()).toBe('select * from "users" where (select "id" from "posts" where "status" = ? order by "created_at" desc limit 1) between ? and ?')
     expect(builder.getBindings()).toEqual(['published', 1, 2])
   })
 
+  test('testOrWhereBetween', () => {
+    let builder = getBuilder()
+    builder.select('*').from('users').where('id', '=', 1).orWhereBetween('id', [3, 5]);
+    expect(builder.toSql()).toBe('select * from "users" where "id" = ? or "id" between ? and ?')
+    expect(builder.getBindings()).toEqual([1, 3, 5])
 
-  // test('', () => {
+    expect(builder.toSql()).toBe('select * from "users" where "id" = ? or "id" between ? and ?')
+    expect(builder.getBindings()).toEqual([1, 3, 5])
 
-  // })
+    builder = getBuilder()
+    builder.select('*').from('users').where('id', '=', 1).orWhereBetween('id', [[3, 4, 5]]);
+    expect(builder.toSql()).toBe('select * from "users" where "id" = ? or "id" between ? and ?')
+    expect(builder.getBindings()).toEqual([1, 3, 4])
+
+    builder = getBuilder()
+    builder.select('*').from('users').where('id', '=', 1).orWhereBetween('id', [[3, 5]]);
+    expect(builder.toSql()).toBe('select * from "users" where "id" = ? or "id" between ? and ?')
+    expect(builder.getBindings()).toEqual([1, 3, 5])
+
+    builder = getBuilder()
+    builder.select('*').from('users').where('id', '=', 1).orWhereBetween('id', [[4], [6, 8]]);
+    expect(builder.toSql()).toBe('select * from "users" where "id" = ? or "id" between ? and ?')
+    expect(builder.getBindings()).toEqual([1, 4, 6])
+
+    builder = getBuilder()
+    builder.select('*').from('users').where('id', '=', 1).orWhereBetween('id', collect([3, 4]));
+    expect(builder.toSql()).toBe('select * from "users" where "id" = ? or "id" between ? and ?')
+    expect(builder.getBindings()).toEqual([1, 3, 4])
+
+    builder = getBuilder()
+    builder.select('*').from('users').where('id', '=', 1).orWhereBetween('id', [new Raw(3), new Raw(4)]);
+    expect(builder.toSql()).toBe('select * from "users" where "id" = ? or "id" between 3 and 4')
+    expect(builder.getBindings()).toEqual([1])
+  })
+
+  test('testOrWhereNotBetween', () => {
+    let builder = getBuilder()
+    builder.select('*').from('users').where('id', '=', 1).orWhereNotBetween('id', [3, 5]);
+    expect(builder.toSql()).toBe('select * from "users" where "id" = ? or "id" not between ? and ?')
+    expect(builder.getBindings()).toEqual([1, 3, 5])
+
+    builder = getBuilder()
+    builder.select('*').from('users').where('id', '=', 1).orWhereNotBetween('id', [3, 5]);
+    expect(builder.toSql()).toBe('select * from "users" where "id" = ? or "id" not between ? and ?')
+    expect(builder.getBindings()).toEqual([1, 3, 5])
+
+    builder = getBuilder()
+    builder.select('*').from('users').where('id', '=', 1).orWhereNotBetween('id', [[3, 5]]);
+    expect(builder.toSql()).toBe('select * from "users" where "id" = ? or "id" not between ? and ?')
+    expect(builder.getBindings()).toEqual([1, 3, 5])
+
+    builder = getBuilder()
+    builder.select('*').from('users').where('id', '=', 1).orWhereNotBetween('id', [[4], [6, 8]]);
+    expect(builder.toSql()).toBe('select * from "users" where "id" = ? or "id" not between ? and ?')
+    expect(builder.getBindings()).toEqual([1, 4, 6])
+
+    builder = getBuilder()
+    builder.select('*').from('users').where('id', '=', 1).orWhereNotBetween('id', collect([3, 4]));
+    expect(builder.toSql()).toBe('select * from "users" where "id" = ? or "id" not between ? and ?')
+    expect(builder.getBindings()).toEqual([1, 3, 4])
+
+    builder = getBuilder()
+    builder.select('*').from('users').where('id', '=', 1).orWhereNotBetween('id', [new Raw(3), new Raw(4)]);
+    expect(builder.toSql()).toBe('select * from "users" where "id" = ? or "id" not between 3 and 4')
+    expect(builder.getBindings()).toEqual([1])
+  })
+
+  test('testWhereBetweenColumns', () => {
+    let builder = getBuilder()
+    builder.select('*').from('users').whereBetweenColumns('id', ['users.created_at', 'users.updated_at']);
+    expect(builder.toSql()).toBe('select * from "users" where "id" between "users"."created_at" and "users"."updated_at"')
+    expect(builder.getBindings()).toEqual([])
+
+    builder = getBuilder()
+    builder.select('*').from('users').whereNotBetweenColumns('id', ['created_at', 'updated_at']);
+    expect(builder.toSql()).toBe('select * from "users" where "id" not between "created_at" and "updated_at"')
+    expect(builder.getBindings()).toEqual([])
+
+    builder = getBuilder()
+    builder.select('*').from('users').whereBetweenColumns('id', [new Raw(1), new Raw(2)]);
+    expect(builder.toSql()).toBe('select * from "users" where "id" between 1 and 2')
+    expect(builder.getBindings()).toEqual([])
+
+    const subqueryBuilder = getBuilder()
+    subqueryBuilder.select('created_at').from('posts').where('status', 'published').orderByDesc('created_at').limit(1)
+    builder = getBuilder()
+    builder.select('*').from('users').whereBetweenColumns(subqueryBuilder, ['created_at', 'updated_at']);
+    expect(builder.toSql()).toBe('select * from "users" where (select "created_at" from "posts" where "status" = ? order by "created_at" desc limit 1) between "created_at" and "updated_at"')
+    expect(builder.getBindings()).toEqual(['published'])
+  })
+
+  test('testOrWhereBetweenColumns', () => {
+    let builder = getBuilder()
+    builder.select('*').from('users').where('id', 2).orWhereBetweenColumns('id', ['users.created_at', 'users.updated_at']);
+    expect(builder.toSql()).toBe('select * from "users" where "id" = ? or "id" between "users"."created_at" and "users"."updated_at"')
+    expect(builder.getBindings()).toEqual([2])
+
+    builder = getBuilder()
+    builder.select('*').from('users').where('id', 2).orWhereBetweenColumns('id', ['created_at', 'updated_at']);
+    expect(builder.toSql()).toBe('select * from "users" where "id" = ? or "id" between "created_at" and "updated_at"')
+    expect(builder.getBindings()).toEqual([2])
+
+    builder = getBuilder()
+    builder.select('*').from('users').where('id', 2).orWhereBetweenColumns('id', [new Raw(1), new Raw(2)]);
+    expect(builder.toSql()).toBe('select * from "users" where "id" = ? or "id" between 1 and 2')
+    expect(builder.getBindings()).toEqual([2])
+  })
+
+  test('testOrWhereNotBetweenColumns', () => {
+    let builder = getBuilder();
+    builder.select('*').from('users').where('id', 2).orWhereNotBetweenColumns('id', ['users.created_at', 'users.updated_at']);
+    expect(builder.toSql()).toBe('select * from "users" where "id" = ? or "id" not between "users"."created_at" and "users"."updated_at"')
+    expect(builder.getBindings()).toEqual([2])
+
+    builder = getBuilder();
+    builder.select('*').from('users').where('id', 2).orWhereNotBetweenColumns('id', ['created_at', 'updated_at']);
+    expect(builder.toSql()).toBe('select * from "users" where "id" = ? or "id" not between "created_at" and "updated_at"')
+    expect(builder.getBindings()).toEqual([2])
+
+    builder = getBuilder();
+    builder.select('*').from('users').where('id', 2).orWhereNotBetweenColumns('id', [new Raw(1), new Raw(2)]);
+    expect(builder.toSql()).toBe('select * from "users" where "id" = ? or "id" not between 1 and 2')
+    expect(builder.getBindings()).toEqual([2])
+  })
+
+  test('testWhereValueBetween', () => {
+    let builder = getBuilder();
+    builder.select('*').from('users').whereValueBetween('2020-01-01 19:30:00', ['created_at', 'updated_at']);
+    expect(builder.toSql()).toBe('select * from "users" where ? between "created_at" and "updated_at"')
+    expect(builder.getBindings()).toEqual(['2020-01-01 19:30:00'])
+
+    builder = getBuilder();
+    builder.select('*').from('users').whereValueBetween('2020-01-01 19:30:00', ['created_at', 'updated_at']);
+    expect(builder.toSql()).toBe('select * from "users" where ? between "created_at" and "updated_at"')
+    expect(builder.getBindings()).toEqual(['2020-01-01 19:30:00'])
+
+    builder = getBuilder();
+    builder.select('*').from('users').whereValueBetween('2020-01-01 19:30:00', [new Raw(1), new Raw(2)]);
+    expect(builder.toSql()).toBe('select * from "users" where ? between 1 and 2')
+    expect(builder.getBindings()).toEqual(['2020-01-01 19:30:00'])
+
+    builder = getBuilder();
+    builder.select('*').from('users').whereValueBetween(new Raw(1), ['created_at', 'updated_at']);
+    expect(builder.toSql()).toBe('select * from "users" where 1 between "created_at" and "updated_at"')
+    expect(builder.getBindings()).toEqual([])
+  })
+
+  test('testOrWhereValueBetween', () => {
+    let builder = getBuilder();
+    builder.select('*').from('users').where('id', 2).orWhereValueBetween('2020-01-01 19:30:00', ['created_at', 'updated_at']);
+    expect(builder.toSql()).toBe('select * from "users" where "id" = ? or ? between "created_at" and "updated_at"')
+    expect(builder.getBindings()).toEqual([2, '2020-01-01 19:30:00'])
+
+    builder = getBuilder();
+    builder.select('*').from('users').where('id', 2).orWhereValueBetween('2020-01-01 19:30:00', ['created_at', 'updated_at']);
+    expect(builder.toSql()).toBe('select * from "users" where "id" = ? or ? between "created_at" and "updated_at"')
+    expect(builder.getBindings()).toEqual([2, '2020-01-01 19:30:00'])
+
+    builder = getBuilder();
+    builder.select('*').from('users').where('id', 2).orWhereValueBetween('2020-01-01 19:30:00', [new Raw(1), new Raw(2)]);
+    expect(builder.toSql()).toBe('select * from "users" where "id" = ? or ? between 1 and 2')
+    expect(builder.getBindings()).toEqual([2, '2020-01-01 19:30:00'])
+
+    builder = getBuilder();
+    builder.select('*').from('users').where('id', 2).orWhereValueBetween(new Raw(1), ['created_at', 'updated_at']);
+    expect(builder.toSql()).toBe('select * from "users" where "id" = ? or 1 between "created_at" and "updated_at"')
+    expect(builder.getBindings()).toEqual([2])
+  })
+
+  test('testWhereValueNotBetween', () => {
+    let builder = getBuilder();
+    builder.select('*').from('users').whereValueNotBetween('2020-01-01 19:30:00', ['created_at', 'updated_at']);
+    expect(builder.toSql()).toBe('select * from "users" where ? not between "created_at" and "updated_at"')
+    expect(builder.getBindings()).toEqual(['2020-01-01 19:30:00'])
+
+    builder = getBuilder();
+    builder.select('*').from('users').whereValueNotBetween('2020-01-01 19:30:00', ['created_at', 'updated_at']);
+    expect(builder.toSql()).toBe('select * from "users" where ? not between "created_at" and "updated_at"')
+    expect(builder.getBindings()).toEqual(['2020-01-01 19:30:00'])
+
+    builder = getBuilder();
+    builder.select('*').from('users').whereValueNotBetween('2020-01-01 19:30:00', [new Raw(1), new Raw(2)]);
+    expect(builder.toSql()).toBe('select * from "users" where ? not between 1 and 2')
+    expect(builder.getBindings()).toEqual(['2020-01-01 19:30:00'])
+
+    builder = getBuilder();
+    builder.select('*').from('users').whereValueNotBetween(new Raw(1), ['created_at', 'updated_at']);
+    expect(builder.toSql()).toBe('select * from "users" where 1 not between "created_at" and "updated_at"')
+    expect(builder.getBindings()).toEqual([])
+  })
+
+  test('testOrWhereValueNotBetween', () => {
+    let builder = getBuilder();
+    builder.select('*').from('users').where('id', 2).orWhereValueNotBetween('2020-01-01 19:30:00', ['created_at', 'updated_at']);
+    expect(builder.toSql()).toBe('select * from "users" where "id" = ? or ? not between "created_at" and "updated_at"')
+    expect(builder.getBindings()).toEqual([2, '2020-01-01 19:30:00'])
+
+    builder = getBuilder();
+    builder.select('*').from('users').where('id', 2).orWhereValueNotBetween('2020-01-01 19:30:00', ['created_at', 'updated_at']);
+    expect(builder.toSql()).toBe('select * from "users" where "id" = ? or ? not between "created_at" and "updated_at"')
+    expect(builder.getBindings()).toEqual([2, '2020-01-01 19:30:00'])
+
+    builder = getBuilder();
+    builder.select('*').from('users').where('id', 2).orWhereValueNotBetween('2020-01-01 19:30:00', [new Raw(1), new Raw(2)]);
+    expect(builder.toSql()).toBe('select * from "users" where "id" = ? or ? not between 1 and 2')
+    expect(builder.getBindings()).toEqual([2, '2020-01-01 19:30:00'])
+
+    builder = getBuilder();
+    builder.select('*').from('users').where('id', 2).orWhereValueNotBetween(new Raw(1), ['created_at', 'updated_at']);
+    expect(builder.toSql()).toBe('select * from "users" where "id" = ? or 1 not between "created_at" and "updated_at"')
+    expect(builder.getBindings()).toEqual([2])
+  })
+
+  test('testBasicOrWheres', () => {
+    const builder = getBuilder();
+    builder.select('*').from('users').where('id', '=', 1).orWhere('email', '=', 'foo');
+    expect(builder.toSql()).toBe('select * from "users" where "id" = ? or "email" = ?')
+    expect(builder.getBindings()).toEqual([1, 'foo'])
+  })
+
+  test('testBasicOrWhereNot', () => {
+    const builder = getBuilder();
+    builder.select('*').from('users').orWhereNot('name', 'foo').orWhereNot('name', '<>', 'bar');
+    expect(builder.toSql()).toBe('select * from "users" where not "name" = ? or not "name" <> ?')
+    expect(builder.getBindings()).toEqual(['foo', 'bar'])
+  })
+
+  test('testRawWheres', () => {
+    const builder = getBuilder();
+    builder.select('*').from('users').whereRaw('id = ? or email = ?', [1, 'foo']);
+    expect(builder.toSql()).toBe('select * from "users" where id = ? or email = ?')
+    expect(builder.getBindings()).toEqual([1, 'foo'])
+  })
+
+  test('testRawOrWheres', () => {
+    const builder = getBuilder();
+    builder.select('*').from('users').where('id', '=', 1).orWhereRaw('email = ?', ['foo']);
+    expect(builder.toSql()).toBe('select * from "users" where "id" = ? or email = ?')
+    expect(builder.getBindings()).toEqual([1, 'foo'])
+  })
+
+  test('testBasicWhereIns', () => {
+    let builder = getBuilder();
+    builder.select('*').from('users').whereIn('id', [1, 2, 3]);
+    expect(builder.toSql()).toBe('select * from "users" where "id" in (?, ?, ?)')
+    expect(builder.getBindings()).toEqual([1, 2, 3])
+
+    // associative arrays as values:
+    builder = getBuilder();
+    builder.select('*').from('users').whereIn('id', [
+      { issue: 45582 },
+      { id: 2 },
+      3,
+    ]);
+    expect(builder.toSql()).toBe('select * from "users" where "id" in (?, ?, ?)')
+    expect(builder.getBindings()).toEqual([45582, 2, 3])
+
+    // can accept some nested arrays as values.
+    builder = getBuilder();
+    builder.select('*').from('users').whereIn('id', [
+      { issue: 45582 },
+      { id: 2 },
+      [3],
+    ]);
+    expect(builder.toSql()).toBe('select * from "users" where "id" in (?, ?, ?)')
+    expect(builder.getBindings()).toEqual([45582, 2, 3])
+
+    builder = getBuilder();
+    builder.select('*').from('users').where('id', '=', 1).orWhereIn('id', [1, 2, 3]);
+    expect(builder.toSql()).toBe('select * from "users" where "id" = ? or "id" in (?, ?, ?)')
+    expect(builder.getBindings()).toEqual([1, 1, 2, 3])
+  })
+
+  test('testBasicWhereInsException', () => {
+    expect(() => {
+      getBuilder().select('*').from('users').whereIn('id', [
+        { a: 1, b: 1 },
+        { c: 2 },
+        [3],
+      ]);
+    }).toThrow('InvalidArgumentException: Nested arrays may not be passed to whereIn method.');
+  })
+
+  test('testBasicWhereNotIns', () => {
+    let builder = getBuilder();
+    builder.select('*').from('users').whereNotIn('id', [1, 2, 3]);
+    expect(builder.toSql()).toBe('select * from "users" where "id" not in (?, ?, ?)')
+    expect(builder.getBindings()).toEqual([1, 2, 3])
+
+    builder = getBuilder();
+    builder.select('*').from('users').where('id', '=', 1).orWhereNotIn('id', [1, 2, 3]);
+    expect(builder.toSql()).toBe('select * from "users" where "id" = ? or "id" not in (?, ?, ?)')
+    expect(builder.getBindings()).toEqual([1, 1, 2, 3])
+  })
+
+  test('testRawWhereIns', () => {
+    let builder = getBuilder();
+    builder.select('*').from('users').whereIn('id', [new Raw(1)]);
+    expect(builder.toSql()).toBe('select * from "users" where "id" in (1)')
+    expect(builder.getBindings()).toEqual([1])
+
+    builder = getBuilder();
+    builder.select('*').from('users').where('id', '=', 1).orWhereIn('id', [new Raw(1)]);
+    expect(builder.toSql()).toBe('select * from "users" where "id" = ? or "id" in (1)')
+    expect(builder.getBindings()).toEqual([1])
+  })
+
+  test('testEmptyWhereIns', () => {
+    let builder = getBuilder();
+    builder.select('*').from('users').whereIn('id', []);
+    expect(builder.toSql()).toBe('select * from "users" where 0 = 1')
+    expect(builder.getBindings()).toEqual([])
+
+    builder = getBuilder();
+    builder.select('*').from('users').where('id', '=', 1).orWhereIn('id', []);
+    expect(builder.toSql()).toBe('select * from "users" where "id" = ? or 0 = 1')
+    expect(builder.getBindings()).toEqual([1])
+  })
+
+  test('testEmptyWhereNotIns', () => {
+    let builder = getBuilder();
+    builder.select('*').from('users').whereNotIn('id', []);
+    expect(builder.toSql()).toBe('select * from "users" where 1 = 1')
+    expect(builder.getBindings()).toEqual([])
+
+    builder = getBuilder();
+    builder.select('*').from('users').where('id', '=', 1).orWhereNotIn('id', []);
+    expect(builder.toSql()).toBe('select * from "users" where "id" = ? or 1 = 1')
+    expect(builder.getBindings()).toEqual([1])
+  })
+
+  test('testWhereIntegerInRaw', () => {
+    let builder = getBuilder();
+    builder.select('*').from('users').whereIntegerInRaw('id', [
+      '1a', 2, Bar.FOO,
+    ]);
+    expect(builder.toSql()).toBe('select * from "users" where "id" in (1, 2, 5)')
+    expect(builder.getBindings()).toEqual([])
+
+    builder = getBuilder();
+    builder.select('*').from('users').whereIntegerInRaw('id', [
+      { 'id': '1a' },
+      { 'id': 2 },
+      { 'any': '3' },
+      { 'id': Bar.FOO },
+    ]);
+    expect(builder.toSql()).toBe('select * from "users" where "id" in (1, 2, 3, 5)')
+    expect(builder.getBindings()).toEqual([])
+  })
+
+  test('testOrWhereIntegerInRaw', () => {
+    const builder = getBuilder();
+    builder.select('*').from('users').where('id', '=', 1).orWhereIntegerInRaw('id', ['1a', 2]);
+    expect(builder.toSql()).toBe('select * from "users" where "id" = ? or "id" in (1, 2)')
+    expect(builder.getBindings()).toEqual([1])
+  })
+
+  test('testWhereIntegerNotInRaw', () => {
+    const builder = getBuilder();
+    builder.select('*').from('users').whereIntegerNotInRaw('id', ['1a', 2]);
+    expect(builder.toSql()).toBe('select * from "users" where "id" not in (1, 2)');
+    expect(builder.getBindings()).toEqual([]);
+  })
+
+  test('testOrWhereIntegerNotInRaw', () => {
+    const builder = getBuilder();
+    builder.select('*').from('users').where('id', '=', 1).orWhereIntegerNotInRaw('id', ['1a', 2]);
+    expect(builder.toSql()).toBe('select * from "users" where "id" = ? or "id" not in (1, 2)');
+    expect(builder.getBindings()).toEqual([1]);
+  })
+
+  test('testEmptyWhereIntegerInRaw', () => {
+    const builder = getBuilder();
+    builder.select('*').from('users').whereIntegerInRaw('id', []);
+    expect(builder.toSql()).toBe('select * from "users" where 0 = 1');
+    expect(builder.getBindings()).toEqual([]);
+  })
+
+  test('testEmptyWhereIntegerNotInRaw', () => {
+    const builder = getBuilder();
+    builder.select('*').from('users').whereIntegerNotInRaw('id', []);
+    expect(builder.toSql()).toBe('select * from "users" where 1 = 1');
+    expect(builder.getBindings()).toEqual([]);
+  })
+
+  test('testBasicWhereColumn', () => {
+    let builder = getBuilder();
+    builder.select('*').from('users').whereColumn('first_name', 'last_name').orWhereColumn('first_name', 'middle_name');
+    expect(builder.toSql()).toBe('select * from "users" where "first_name" = "last_name" or "first_name" = "middle_name"');
+    expect(builder.getBindings()).toEqual([]);
+
+    builder = getBuilder();
+    builder.select('*').from('users').whereColumn('updated_at', '>', 'created_at');
+    expect(builder.toSql()).toBe('select * from "users" where "updated_at" > "created_at"');
+    expect(builder.getBindings()).toEqual([]);
+  })
+
+  test('testArrayWhereColumn', () => {
+    const conditions = [
+      ['first_name', 'last_name'],
+      ['updated_at', '>', 'created_at'],
+    ];
+    const builder = getBuilder();
+    builder.select('*').from('users').whereColumn(conditions);
+    expect(builder.toSql()).toBe('select * from "users" where ("first_name" = "last_name" and "updated_at" > "created_at")');
+    expect(builder.getBindings()).toEqual([]);
+  })
+
+  test('testWhereFulltextMySql', () => {
+    let builder = getMySqlBuilderWithProcessor();
+    builder.select('*').from('users').whereFullText('body', 'Hello World');
+    expect(builder.toSql()).toBe('select * from `users` where match (`body`) against (? in natural language mode)');
+    expect(builder.getBindings()).toEqual(['Hello World']);
+
+    builder = getMySqlBuilderWithProcessor();
+    builder.select('*').from('users').whereFullText('body', 'Hello World', { expanded: true });
+    expect(builder.toSql()).toBe('select * from `users` where match (`body`) against (? in natural language mode with query expansion)');
+    expect(builder.getBindings()).toEqual(['Hello World']);
+
+    builder = getMySqlBuilderWithProcessor();
+    builder.select('*').from('users').whereFullText('body', '+Hello -World', { mode: 'boolean' });
+    expect(builder.toSql()).toBe('select * from `users` where match (`body`) against (? in boolean mode)');
+    expect(builder.getBindings()).toEqual(['+Hello -World']);
+
+    builder = getMySqlBuilderWithProcessor();
+    builder.select('*').from('users').whereFullText('body', '+Hello -World', { mode: 'boolean', expanded: true });
+    expect(builder.toSql()).toBe('select * from `users` where match (`body`) against (? in boolean mode)');
+    expect(builder.getBindings()).toEqual(['+Hello -World']);
+
+    builder = getMySqlBuilderWithProcessor();
+    builder.select('*').from('users').whereFullText(['body', 'title'], 'Car,Plane');
+    expect(builder.toSql()).toBe('select * from `users` where match (`body`, `title`) against (? in natural language mode)');
+    expect(builder.getBindings()).toEqual(['Car,Plane']);
+  })
+
+  test('testWhereFulltextPostgres', () => {
+    let builder = getPostgresBuilderWithProcessor();
+    builder.select('*').from('users').whereFullText('body', 'Hello World');
+    expect(builder.toSql()).toBe('select * from "users" where (to_tsvector(\'english\', "body")) @@ plainto_tsquery(\'english\', ?)');
+    expect(builder.getBindings()).toEqual(['Hello World']);
+
+    builder = getPostgresBuilderWithProcessor();
+    builder.select('*').from('users').whereFullText('body', 'Hello World', { language: 'simple' });
+    expect(builder.toSql()).toBe('select * from "users" where (to_tsvector(\'simple\', "body")) @@ plainto_tsquery(\'simple\', ?)');
+    expect(builder.getBindings()).toEqual(['Hello World']);
+
+    builder = getPostgresBuilderWithProcessor();
+    builder.select('*').from('users').whereFullText('body', 'Hello World', { mode: 'plain' });
+    expect(builder.toSql()).toBe('select * from "users" where (to_tsvector(\'english\', "body")) @@ plainto_tsquery(\'english\', ?)');
+    expect(builder.getBindings()).toEqual(['Hello World']);
+
+    builder = getPostgresBuilderWithProcessor();
+    builder.select('*').from('users').whereFullText('body', 'Hello World', { mode: 'phrase' });
+    expect(builder.toSql()).toBe('select * from "users" where (to_tsvector(\'english\', "body")) @@ phraseto_tsquery(\'english\', ?)');
+    expect(builder.getBindings()).toEqual(['Hello World']);
+
+    builder = getPostgresBuilderWithProcessor();
+    builder.select('*').from('users').whereFullText('body', '+Hello -World', { mode: 'websearch' });
+    expect(builder.toSql()).toBe('select * from "users" where (to_tsvector(\'english\', "body")) @@ websearch_to_tsquery(\'english\', ?)');
+    expect(builder.getBindings()).toEqual(['+Hello -World']);
+
+    builder = getPostgresBuilderWithProcessor();
+    builder.select('*').from('users').whereFullText('body', 'Hello World', { language: 'simple', mode: 'plain' });
+    expect(builder.toSql()).toBe('select * from "users" where (to_tsvector(\'simple\', "body")) @@ plainto_tsquery(\'simple\', ?)');
+    expect(builder.getBindings()).toEqual(['Hello World']);
+
+    builder = getPostgresBuilderWithProcessor();
+    builder.select('*').from('users').whereFullText(['body', 'title'], 'Car Plane');
+    expect(builder.toSql()).toBe('select * from "users" where (to_tsvector(\'english\', "body") || to_tsvector(\'english\', "title")) @@ plainto_tsquery(\'english\', ?)');
+    expect(builder.getBindings()).toEqual(['Car Plane']);
+
+    builder = getPostgresBuilderWithProcessor();
+    builder.select('*').from('users').whereFullText(['body', 'title'], 'Air | Plan:* -Car', { mode: 'raw' });
+    expect(builder.toSql()).toBe('select * from "users" where (to_tsvector(\'english\', "body") || to_tsvector(\'english\', "title")) @@ to_tsquery(\'english\', ?)');
+    expect(builder.getBindings()).toEqual(['Air | Plan:* -Car']);
+
+    builder = getPostgresBuilderWithProcessor();
+    builder.select('*').from('users').whereFullText('search_vector', 'Hello World', { vector: true });
+    expect(builder.toSql()).toBe('select * from "users" where ("search_vector") @@ plainto_tsquery(\'english\', ?)');
+    expect(builder.getBindings()).toEqual(['Hello World']);
+
+    builder = getPostgresBuilderWithProcessor();
+    builder.select('*').from('users').whereFullText('search_vector_nl', 'Hello World', { vector: true, language: 'dutch' });
+    expect(builder.toSql()).toBe('select * from "users" where ("search_vector_nl") @@ plainto_tsquery(\'dutch\', ?)');
+    expect(builder.getBindings()).toEqual(['Hello World']);
+
+    builder = getPostgresBuilderWithProcessor();
+    builder.select('*').from('users').whereFullText('search_vector', '+Hello -World', { vector: true, mode: 'websearch' });
+    expect(builder.toSql()).toBe('select * from "users" where ("search_vector") @@ websearch_to_tsquery(\'english\', ?)');
+    expect(builder.getBindings()).toEqual(['+Hello -World']);
+
+    builder = getPostgresBuilderWithProcessor();
+    builder.select('*').from('users').whereFullText(['tsv_title', 'tsv_body'], 'Car Plane', { vector: true });
+    expect(builder.toSql()).toBe('select * from "users" where ("tsv_title" || "tsv_body") @@ plainto_tsquery(\'english\', ?)');
+    expect(builder.getBindings()).toEqual(['Car Plane']);
+  })
+
+  test('testWhereAll', () => {
+    let builder = getBuilder();
+    builder.select('*').from('users').whereAll(['last_name', 'email'], '%Otwell%');
+    expect(builder.toSql()).toBe('select * from "users" where ("last_name" = ? and "email" = ?)');
+    expect(builder.getBindings()).toEqual(['%Otwell%', '%Otwell%']);
+
+    builder = getBuilder();
+    builder.select('*').from('users').whereAll(['last_name', 'email'], 'not like', '%Otwell%');
+    expect(builder.toSql()).toBe('select * from "users" where ("last_name" not like ? and "email" not like ?)');
+    expect(builder.getBindings()).toEqual(['%Otwell%', '%Otwell%']);
+
+    builder = getBuilder();
+    builder.select('*').from('users').whereAll([
+      (query: Builder) => query.where('last_name', 'like', '%Otwell%'),
+      (query: Builder) => query.where('email', 'like', '%Otwell%'),
+    ]);
+    expect(builder.toSql()).toBe('select * from "users" where (("last_name" like ?) and ("email" like ?))');
+    expect(builder.getBindings()).toEqual(['%Otwell%', '%Otwell%']);
+  })
+
+  test('testOrWhereAll', () => {
+    let builder = getBuilder();
+    builder.select('*').from('users').where('first_name', 'like', '%Taylor%').orWhereAll(['last_name', 'email'], 'like', '%Otwell%');
+    expect(builder.toSql()).toBe('select * from "users" where "first_name" like ? or ("last_name" like ? and "email" like ?)');
+    expect(builder.getBindings()).toEqual(['%Taylor%', '%Otwell%', '%Otwell%']);
+
+    builder = getBuilder();
+    builder.select('*').from('users').where('first_name', 'like', '%Taylor%').whereAll(['last_name', 'email'], 'like', '%Otwell%', 'or');
+    expect(builder.toSql()).toBe('select * from "users" where "first_name" like ? or ("last_name" like ? and "email" like ?)');
+    expect(builder.getBindings()).toEqual(['%Taylor%', '%Otwell%', '%Otwell%']);
+
+    builder = getBuilder();
+    builder.select('*').from('users').where('first_name', 'like', '%Taylor%').orWhereAll(['last_name', 'email'], '%Otwell%');
+    expect(builder.toSql()).toBe('select * from "users" where "first_name" like ? or ("last_name" = ? and "email" = ?)');
+    expect(builder.getBindings()).toEqual(['%Taylor%', '%Otwell%', '%Otwell%']);
+
+    builder = getBuilder();
+    builder.select('*').from('users').where('first_name', 'like', '%Taylor%').orWhereAll([
+      (query: Builder) => query.where('last_name', 'like', '%Otwell%'),
+      (query: Builder) => query.where('email', 'like', '%Otwell%'),
+    ]);
+    expect(builder.toSql()).toBe('select * from "users" where "first_name" like ? or (("last_name" like ?) and ("email" like ?))');
+    expect(builder.getBindings()).toEqual(['%Taylor%', '%Otwell%', '%Otwell%']);
+  })
+
+  test('testWhereAny', () => {
+    let builder = getBuilder();
+    builder.select('*').from('users').whereAny(['last_name', 'email'], 'like', '%Otwell%');
+    expect(builder.toSql()).toBe('select * from "users" where ("last_name" like ? or "email" like ?)');
+    expect(builder.getBindings()).toEqual(['%Otwell%', '%Otwell%']);
+
+    builder = getBuilder();
+    builder.select('*').from('users').whereAny(['last_name', 'email'], '%Otwell%');
+    expect(builder.toSql()).toBe('select * from "users" where ("last_name" = ? or "email" = ?)');
+    expect(builder.getBindings()).toEqual(['%Otwell%', '%Otwell%']);
+
+    builder = getBuilder();
+    builder.select('*').from('users').whereAny([
+      (query: Builder) => query.where('last_name', 'like', '%Otwell%'),
+      (query: Builder) => query.where('email', 'like', '%Otwell%'),
+    ]);
+    expect(builder.toSql()).toBe('select * from "users" where (("last_name" like ?) or ("email" like ?))');
+    expect(builder.getBindings()).toEqual(['%Otwell%', '%Otwell%']);
+  })
+
+  test('testOrWhereAny', () => {
+    let builder = getBuilder();
+    builder.select('*').from('users').where('first_name', 'like', '%Taylor%').orWhereAny(['last_name', 'email'], 'like', '%Otwell%');
+    expect(builder.toSql()).toBe('select * from "users" where "first_name" like ? or ("last_name" like ? or "email" like ?)');
+    expect(builder.getBindings()).toEqual(['%Taylor%', '%Otwell%', '%Otwell%']);
+
+    builder = getBuilder();
+    builder.select('*').from('users').where('first_name', 'like', '%Taylor%').whereAny(['last_name', 'email'], 'like', '%Otwell%', 'or');
+    expect(builder.toSql()).toBe('select * from "users" where "first_name" like ? or ("last_name" like ? or "email" like ?)');
+    expect(builder.getBindings()).toEqual(['%Taylor%', '%Otwell%', '%Otwell%']);
+
+    builder = getBuilder();
+    builder.select('*').from('users').where('first_name', 'like', '%Taylor%').orWhereAny(['last_name', 'email'], '%Otwell%');
+    expect(builder.toSql()).toBe('select * from "users" where "first_name" like ? or ("last_name" = ? or "email" = ?)');
+    expect(builder.getBindings()).toEqual(['%Taylor%', '%Otwell%', '%Otwell%']);
+
+    builder = getBuilder();
+    builder.select('*').from('users').where('first_name', 'like', '%Taylor%').orWhereAny([
+      (query: Builder) => query.where('last_name', 'like', '%Otwell%'),
+      (query: Builder) => query.where('email', 'like', '%Otwell%'),
+    ]);
+    expect(builder.toSql()).toBe('select * from "users" where "first_name" like ? or (("last_name" like ?) or ("email" like ?))');
+    expect(builder.getBindings()).toEqual(['%Taylor%', '%Otwell%', '%Otwell%']);
+  })
+
+  test('testWhereNone', () => {
+    let builder = getBuilder();
+    builder.select('*').from('users').whereNone(['last_name', 'email'], 'like', '%Otwell%');
+    expect(builder.toSql()).toBe('select * from "users" where not ("last_name" like ? or "email" like ?)');
+    expect(builder.getBindings()).toEqual(['%Otwell%', '%Otwell%']);
+
+    builder = getBuilder();
+    builder.select('*').from('users').whereNone(['last_name', 'email'], 'Otwell');
+    expect(builder.toSql()).toBe('select * from "users" where not ("last_name" = ? or "email" = ?)');
+    expect(builder.getBindings()).toEqual(['Otwell', 'Otwell']);
+
+    builder = getBuilder();
+    builder.select('*').from('users').where('first_name', 'like', '%Taylor%').whereNone(['last_name', 'email'], 'like', '%Otwell%');
+    expect(builder.toSql()).toBe('select * from "users" where "first_name" like ? and not ("last_name" like ? or "email" like ?)', builder.toSql());
+    expect(builder.getBindings()).toEqual(['%Taylor%', '%Otwell%', '%Otwell%']);
+
+    builder = getBuilder();
+    builder.select('*').from('users').whereNone([
+      (query: Builder) => query.where('last_name', 'like', '%Otwell%'),
+      (query: Builder) => query.where('email', 'like', '%Otwell%'),
+    ]);
+    expect(builder.toSql()).toBe('select * from "users" where not (("last_name" like ?) or ("email" like ?))');
+    expect(builder.getBindings()).toEqual(['%Otwell%', '%Otwell%']);
+  })
 })

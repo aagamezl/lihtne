@@ -53,6 +53,7 @@
     }
   },
   "dependencies": {
-    "@devnetic/utils": "^2.2.0"
+    "@devnetic/utils": "^2.2.0",
+    "dayjs": "^1.11.23"
   }
 }

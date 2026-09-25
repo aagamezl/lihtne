@@ -8,14 +8,17 @@ import type { JoinClause } from './JoinClause'
 import type { Processor } from './Processors'
 
 import { Arr, Collection } from '../../Collections'
-import { head } from '../../Collections/helpers'
-import { isSet, mixing, type Prettify, value } from '../../Support'
+import { enumValue } from '../../Collections/functions'
+import { end, head } from '../../Collections/helpers'
+import { DatePeriod, isSet, mixing, type Prettify, value } from '../../Support'
+import { isNumeric } from '../../Support/helpers'
 // import { registry } from './internal'
 import { resolveClass } from '../../Support/class-registry'
 import { BuildsQueries } from '../Concerns'
 import { BuildsWhereDateClauses } from '../Concerns/BuildsWhereDateClauses'
 import { Builder as EloquentBuilder } from '../Eloquent'
 import { Relation } from '../Eloquent/Relations'
+import { SortDirection } from './Enums/SortDirection'
 import { Expression } from './Expression'
 
 export type BindingValue =
@@ -26,14 +29,16 @@ export type BindingValue =
   // | Date
   // | Buffer
   // | Uint8Array
-  null
+  null |
+  Expression
 
 export type BindingValues = BindingValue[]
 
 export type WhereOptions = {
-  expanded: boolean
-  language: string
-  mode: string
+  expanded?: boolean
+  language?: string
+  mode?: string
+  vector?: boolean
 }
 
 export type WhereClause = {
@@ -120,7 +125,7 @@ export class Builder extends mixing(BuildsQueries).useTrait([BuildsWhereDateClau
   public processor: Processor
 
   // The query union statements.
-  public unions: any[] | null = null
+  public unions: Union[] | undefined = undefined
 
   /**
    * The table joins for the query.
@@ -216,7 +221,9 @@ export class Builder extends mixing(BuildsQueries).useTrait([BuildsWhereDateClau
    *
    * @var array|null
    */
-  public unionOrders: Order[] | null = null
+  public orders: Order[] = []
+
+  public unionOrders: Order[] | undefined = undefined
 
   /**
      * Indicates whether row locking is being used.
@@ -382,7 +389,7 @@ export class Builder extends mixing(BuildsQueries).useTrait([BuildsWhereDateClau
   protected addArrayOfWheres(column: Array<Expression | string>, boolean: string, method: string = 'where'): this {
     return this.whereNested((query: Builder) => {
       for (const [key, value] of Object.entries(column)) {
-        if (typeof key === 'number' && Array.isArray(value)) {
+        if (isNumeric(key) && Array.isArray(value)) {
           query[method](...value, boolean)
         } else {
           query[method](key, '=', value, boolean)
@@ -466,19 +473,20 @@ export class Builder extends mixing(BuildsQueries).useTrait([BuildsWhereDateClau
     column: Expression | string,
     value: string,
     caseSensitive: boolean = false,
-    boolean: string = 'and', not: boolean = false
+    boolean: string = 'and',
+    not: boolean = false
   ): this {
-    const type: string = 'Like';
+    const type: string = 'Like'
 
     this.wheres.push({ type, column, value, caseSensitive, boolean, not })
 
     if (this.grammar.prepareWhereLikeBinding) {
-      value = this.grammar.prepareWhereLikeBinding(value, caseSensitive);
+      value = this.grammar.prepareWhereLikeBinding(value, caseSensitive)
     }
 
-    this.addBinding(value);
+    this.addBinding(value)
 
-    return this;
+    return this
   }
 
   /**
@@ -494,15 +502,15 @@ export class Builder extends mixing(BuildsQueries).useTrait([BuildsWhereDateClau
     value: unknown,
     boolean: string = 'and'
   ): this {
-    const type: string = 'NullSafeEquals';
+    const type: string = 'NullSafeEquals'
 
-    this.wheres.push({ type, column, value, boolean });
+    this.wheres.push({ type, column, value, boolean })
 
     if (!(value instanceof Expression)) {
-      this.addBinding(this.flattenValue(value), 'where');
+      this.addBinding(this.flattenValue(value), 'where')
     }
 
-    return this;
+    return this
   }
 
   /**
@@ -516,7 +524,7 @@ export class Builder extends mixing(BuildsQueries).useTrait([BuildsWhereDateClau
     column: Expression | string,
     value: unknown
   ): this {
-    return this.whereNullSafeEquals(column, value, 'or');
+    return this.whereNullSafeEquals(column, value, 'or')
   }
 
   /**
@@ -525,9 +533,8 @@ export class Builder extends mixing(BuildsQueries).useTrait([BuildsWhereDateClau
    * @return string
    */
   protected defaultKeyName(): string {
-    return 'id';
+    return 'id'
   }
-
 
   /**
    * Add an "or where like" clause to the query.
@@ -542,7 +549,7 @@ export class Builder extends mixing(BuildsQueries).useTrait([BuildsWhereDateClau
     value: string,
     caseSensitive: boolean = false
   ): this {
-    return this.whereLike(column, value, caseSensitive, 'or', false);
+    return this.whereLike(column, value, caseSensitive, 'or', false)
   }
 
   /**
@@ -560,7 +567,7 @@ export class Builder extends mixing(BuildsQueries).useTrait([BuildsWhereDateClau
     caseSensitive: boolean = false,
     boolean: string = 'and'
   ): this {
-    return this.whereLike(column, value, caseSensitive, boolean, true);
+    return this.whereLike(column, value, caseSensitive, boolean, true)
   }
 
   /**
@@ -576,7 +583,7 @@ export class Builder extends mixing(BuildsQueries).useTrait([BuildsWhereDateClau
     value: string,
     caseSensitive: boolean = false
   ): this {
-    return this.whereNotLike(column, value, caseSensitive, 'or');
+    return this.whereNotLike(column, value, caseSensitive, 'or')
   }
 
   /**
@@ -731,6 +738,58 @@ export class Builder extends mixing(BuildsQueries).useTrait([BuildsWhereDateClau
   }
 
   /**
+   * Add an "or where between" statement to the query.
+   *
+   * @param  \Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder<*>|\Illuminate\Contracts\Database\Query\Expression|string  $column
+   * @return $this
+   */
+  public orWhereBetween(
+    column: Expression | string,
+    values: Iterable<unknown>
+  ): this {
+    return this.whereBetween(column, values, 'or')
+  }
+
+  /**
+   * Add an "or where between" statement using columns to the query.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
+   * @return $this
+   */
+  public orWhereBetweenColumns(
+    column: Expression | string,
+    values: Array<unknown>
+  ): this {
+    return this.whereBetweenColumns(column, values, 'or')
+  }
+
+  /**
+   * Add a "where between" statement using columns to the query.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
+   * @param  string  $boolean
+   * @param  bool  $not
+   * @return $this
+   */
+  public whereBetweenColumns(
+    column: Expression | string,
+    values: Array<unknown>,
+    boolean: string = 'and',
+    not: boolean = false
+  ): this {
+    const type = 'betweenColumns'
+
+    if (this.isQueryable(column)) {
+      const [sub, bindings] = this.createSub(column)
+
+      return this.addBinding(bindings, 'where').whereBetweenColumns(new Expression('(' + sub + ')'), values, boolean, not)
+    }
+
+    this.wheres.push({ type, column, values, boolean, not })
+    return this
+  }
+
+  /**
    * Invoke the "after query" modification callbacks.
    *
    * @param  mixed  result
@@ -773,6 +832,62 @@ export class Builder extends mixing(BuildsQueries).useTrait([BuildsWhereDateClau
   }
 
   /**
+   * Add a "where not between" statement to the query.
+   *
+   * @param  \Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder<*>|\Illuminate\Contracts\Database\Query\Expression|string  $column
+   * @param  string  $boolean
+   * @return $this
+   */
+  public whereNotBetween(
+    column: Expression | string,
+    values: Iterable<unknown>,
+    boolean: string = 'and'
+  ): this {
+    return this.whereBetween(column, values, boolean, true)
+  }
+
+  /**
+   * Add a "where not between" statement using columns to the query.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
+   * @param  string  $boolean
+   * @return $this
+   */
+  public whereNotBetweenColumns(
+    column: Expression | string,
+    values: Array<unknown>,
+    boolean: string = 'and'
+  ): this {
+    return this.whereBetweenColumns(column, values, boolean, true)
+  }
+
+  /**
+   * Add an "or where not between" statement to the query.
+   *
+   * @param  \Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder<*>|\Illuminate\Contracts\Database\Query\Expression|string  $column
+   * @return $this
+   */
+  public orWhereNotBetween(
+    column: Expression | string,
+    values: Iterable<unknown>
+  ): this {
+    return this.whereNotBetween(column, values, 'or')
+  }
+
+  /**
+   * Add an "or where not between" statement using columns to the query.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
+   * @return $this
+   */
+  public orWhereNotBetweenColumns(
+    column: Expression | string,
+    values: Array<unknown>
+  ): this {
+    return this.whereNotBetweenColumns(column, values, 'or')
+  }
+
+  /**
    * Add a subselect expression to the query.
    *
    * @param  \Closure|\Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder<*>|string  $query
@@ -781,13 +896,113 @@ export class Builder extends mixing(BuildsQueries).useTrait([BuildsWhereDateClau
    *
    * @throws \InvalidArgumentException
    */
-  public selectSub(query: Function | Builder | EloquentBuilder | Relation | string, as: string) {
+  public selectSub(
+    query: Function | Builder | EloquentBuilder | Relation | string,
+    as: string
+  ): this {
     const [subQuery, bindings] = this.createSub(query)
 
     return this.selectRaw(
       '(' + subQuery + ') as ' + this.grammar.wrap(as),
       bindings
     )
+  }
+
+  /**
+   * Add an "order by" clause to the query.
+   *
+   * @param  \Closure|\Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder<*>|\Illuminate\Contracts\Database\Query\Expression|string  $column
+   * @param  SortDirection|'asc'|'desc'  $direction
+   * @return $this
+   *
+   * @throws \InvalidArgumentException
+   */
+  public orderBy(column: Expression | string, direction: SortDirection = SortDirection.Ascending): this {
+    if (this.isQueryable(column)) {
+      const [query, bindings] = this.createSub(column)
+
+      column = new Expression('(' + query + ')')
+
+      this.addBinding(bindings, this.unions ? 'unionOrder' : 'order')
+    }
+
+    // switch (direction) {
+    //   case SortDirection.Ascending:
+    //     direction = 'asc';
+    //     break;
+    //   case SortDirection.Descending:
+    //     direction = 'desc';
+    //     break;
+    //   default:
+    //     throw new Error('Order direction must be a SortDirection, "asc" or "desc".');
+    // }
+
+    this[this.unions?.length > 0 ? 'unionOrders' : 'orders'].push({
+      column,
+      direction
+    })
+
+    return this
+  }
+
+  /**
+   * Add a descending "order by" clause to the query.
+   *
+   * @param  \Closure|\Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder<*>|\Illuminate\Contracts\Database\Query\Expression|string  $column
+   * @return $this
+   */
+  public orderByDesc(column: Expression | string): this {
+    return this.orderBy(column, SortDirection.Descending)
+  }
+
+  /**
+   * Alias to set the "offset" value of the query.
+   *
+   * @param  int  $value
+   * @return $this
+   */
+  public skip(value: number): this {
+    return this.offset(value)
+  }
+
+  /**
+   * Set the "offset" value of the query.
+   *
+   * @param  int  $value
+   * @return $this
+   */
+  public offset(value: number): this {
+    const property = this.unions?.length > 0 ? 'unionOffset' : 'offset'
+
+    this[property] = Math.max(0, parseInt(value.toString()))
+
+    return this
+  }
+
+  /**
+   * Alias to set the "limit" value of the query.
+   *
+   * @param  int  $value
+   * @return $this
+   */
+  public take(value: number): this {
+    return this.limit(value)
+  }
+
+  /**
+   * Set the "limit" value of the query.
+   *
+   * @param  int  $value
+   * @return $this
+   */
+  public limit(value: number): this {
+    const property = this.unions?.length > 0 ? 'unionLimit' : 'limitProperty'
+
+    if (value >= 0) {
+      this[property] = value !== undefined ? parseInt(value.toString()) : undefined
+    }
+
+    return this
   }
 
   /**
@@ -877,7 +1092,10 @@ export class Builder extends mixing(BuildsQueries).useTrait([BuildsWhereDateClau
     }
 
     if (Array.isArray(value)) {
-      this.bindings[type] = value.map((v) => this.castBinding(v))
+      this.bindings[type] = [
+        ...this.bindings[type],
+        ...value.map((v) => this.castBinding(v))
+      ]
     } else {
       this.bindings[type].push(this.castBinding(value))
     }
@@ -1054,6 +1272,30 @@ export class Builder extends mixing(BuildsQueries).useTrait([BuildsWhereDateClau
   }
 
   /**
+   * Resolve the start and end dates from a DatePeriod.
+   *
+   * @param  \DatePeriod  $period
+   * @return array{\DateTimeInterface, \DateTimeInterface}
+   */
+  protected resolveDatePeriodBounds(period: DatePeriod): [Date, Date] {
+    const start = period.getStartDate()
+    let end = period.getEndDate()
+
+    if (end === null) {
+      end = new Date(start.getTime())
+
+      const recurrences = period.getRecurrences() ?? 0
+      const interval = period.getDateInterval()
+
+      for (let i = 0; i < recurrences; i++) {
+        end = interval.addTo(end)
+      }
+    }
+
+    return [start, end]
+  }
+
+  /**
    * Get the SQL representation of the query.
    *
    * @return string
@@ -1068,7 +1310,7 @@ export class Builder extends mixing(BuildsQueries).useTrait([BuildsWhereDateClau
    * @return list<mixed>
    */
   public getBindings(): BindingValues {
-    return Object.values(this.bindings).flat()
+    return Arr.flatten(Object.values(this.bindings)) as BindingValues
   }
 
   /**
@@ -1331,14 +1573,64 @@ export class Builder extends mixing(BuildsQueries).useTrait([BuildsWhereDateClau
   }
 
   /**
- * Add a "where month" statement to the query.
- *
- * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
- * @param  \DateTimeInterface|string|int|null  $operator
- * @param  \DateTimeInterface|string|int|null  $value
- * @param  string  $boolean
- * @return $this
- */
+   * Add a "where between" statement to the query.
+   *
+   * @param  \Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder<*>|\Illuminate\Contracts\Database\Query\Expression|string  $column
+   * @param  string  $boolean
+   * @param  bool  $not
+   * @return $this
+   */
+  public whereBetween(
+    column: Expression | string | Function | Builder | EloquentBuilder,
+    values: Iterable<Expression | string> | DatePeriod | Collection<PropertyKey, unknown>,
+    boolean: 'and' | 'or' = 'and',
+    not: boolean = false
+  ): this {
+    const type = 'between'
+
+    if (this.isQueryable(column)) {
+      const [sub, bindings] = this.createSub(column)
+
+      return this.addBinding(bindings, 'where')
+        .whereBetween(new Expression('(' + sub + ')'), values, boolean, not)
+    }
+
+    if (values instanceof DatePeriod) {
+      values = this.resolveDatePeriodBounds(values)
+    }
+
+    this.wheres.push({ type, column, values, boolean, not })
+
+    this.addBinding(this.cleanBindings(Arr.flatten(values)).slice(0, 2), 'where')
+
+    return this
+  }
+
+  /**
+   * Remove all of the expressions from a list of bindings.
+   *
+   * @param  array<mixed>  $bindings
+   * @return list<mixed>
+   */
+  public cleanBindings(bindings: BindingValues, includeExpressions = false): BindingValues {
+    return (new Collection(bindings))
+      .reject((binding: BindingValue) => binding instanceof Expression && !includeExpressions)
+      .map((binding: BindingValue) => binding instanceof Expression
+        ? this.castBinding(binding.getValue(this.grammar) as BindingValue)
+        : this.castBinding(binding))
+      .values()
+      .all()
+  }
+
+  /**
+   * Add a "where month" statement to the query.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
+   * @param  \DateTimeInterface|string|int|null  $operator
+   * @param  \DateTimeInterface|string|int|null  $value
+   * @param  string  $boolean
+   * @return $this
+   */
   public whereMonth(
     column: Expression | string,
     operator: Scalar | Scalar[] | Expression | undefined = undefined,
@@ -1575,7 +1867,7 @@ export class Builder extends mixing(BuildsQueries).useTrait([BuildsWhereDateClau
   public whereDate(
     column: Expression | string,
     operator: Scalar | Scalar[] | Expression | undefined = undefined,
-    value: Scalar | Array<Scalar | Scalar[]> | undefined = undefined,
+    value: Scalar | Array<Scalar | Scalar[]> | Expression | undefined = undefined,
     boolean: 'and' | 'or' = 'and'
   ): this {
     [value, operator] = this.prepareValueAndOperator(value, operator, arguments.length === 2)
@@ -1594,6 +1886,454 @@ export class Builder extends mixing(BuildsQueries).useTrait([BuildsWhereDateClau
     }
 
     return this.addDateBasedWhere('Date', column, operator, value, boolean)
+  }
+
+  /**
+   * Add a "where between columns" statement using a value to the query.
+   *
+   * @param  mixed  $value
+   * @param  array{\Illuminate\Contracts\Database\Query\Expression|string, \Illuminate\Contracts\Database\Query\Expression|string}  $columns
+   * @param  string  $boolean
+   * @param  bool  $not
+   * @return $this
+   */
+  public whereValueBetween(
+    value: unknown,
+    columns: Array<Expression | string>,
+    boolean: 'and' | 'or' = 'and',
+    not: boolean = false
+  ): this {
+    const type = 'valueBetween'
+
+    this.wheres.push({ type, value, columns, boolean, not })
+
+    if (!(value instanceof Expression)) {
+      this.addBinding(value, 'where')
+    }
+
+    return this
+  }
+
+  /**
+   * Add a "where not between columns" statement using a value to the query.
+   *
+   * @param  mixed  $value
+   * @param  array{\Illuminate\Contracts\Database\Query\Expression|string, \Illuminate\Contracts\Database\Query\Expression|string}  $columns
+   * @param  string  $boolean
+   * @return $this
+   */
+  public whereValueNotBetween(value: unknown, columns: Array<Expression | string>, boolean: 'and' | 'or' = 'and'): this {
+    return this.whereValueBetween(value, columns, boolean, true)
+  }
+
+  /**
+   * Add an "or where not between columns" statement using a value to the query.
+   *
+   * @param  mixed  $value
+   * @param  array{\Illuminate\Contracts\Database\Query\Expression|string, \Illuminate\Contracts\Database\Query\Expression|string}  $columns
+   * @return $this
+   */
+  public orWhereValueNotBetween(value: unknown, columns: Array<Expression | string>): this {
+    return this.whereValueNotBetween(value, columns, 'or')
+  }
+
+  /**
+   * Add an "or where not null" clause to the query.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
+   * @return $this
+   */
+  public orWhereNotNull(column: Expression | string): this {
+    return this.whereNotNull(column, 'or')
+  }
+
+  /**
+   * Add a "where not null" clause to the query.
+   *
+   * @param  string|array|\Illuminate\Contracts\Database\Query\Expression  $columns
+   * @param  string  $boolean
+   * @return $this
+   */
+  public whereNotNull(
+    columns: Expression | string | Array<Expression | string>,
+    boolean: 'and' | 'or' = 'and'
+  ): this {
+    return this.whereNull(columns, boolean, true)
+  }
+
+  /**
+   * Add a raw "or where" clause to the query.
+   *
+   * @param  literal-string  $sql
+   * @param  mixed  $bindings
+   * @return $this
+   */
+  public orWhereRaw(sql: string, bindings: unknown[] = []): this {
+    return this.whereRaw(sql, bindings, 'or')
+  }
+
+  /**
+   * Add a raw "where" clause to the query.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression|literal-string  $sql
+   * @param  mixed  $bindings
+   * @param  string  $boolean
+   * @return $this
+   */
+  public whereRaw(sql: string, bindings: unknown[] = [], boolean: 'and' | 'or' = 'and'): this {
+    this.wheres.push({ type: 'raw', sql, boolean })
+
+    this.addBinding(bindings, 'where')
+
+    return this
+  }
+
+  /**
+   * Add a "where in" clause to the query.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
+   * @param  mixed  $values
+   * @param  string  $boolean
+   * @param  bool  $not
+   * @return $this
+   *
+   * @throws \InvalidArgumentException
+   */
+  public whereIn(column: Expression | string, values: unknown[], boolean: 'and' | 'or' = 'and', not: boolean = false): this {
+    const type = not ? 'NotIn' : 'In'
+    let subquery = false
+
+    // If the value is a query builder instance we will assume the developer wants to
+    // look for any values that exist within this given query. So, we will add the
+    // query accordingly so that this query is properly executed when it is run.
+    if (this.isQueryable(values)) {
+      const [query, bindings] = this.createSub(values)
+
+      values = [new Expression(query)]
+      subquery = true
+
+      this.addBinding(bindings, 'where')
+    }
+
+    // Next, if the value is Arrayable we need to cast it to its raw array form so we
+    // have the underlying array value instead of an Arrayable object which is not
+    // able to be added as a binding, etc. We will then add to the wheres array.
+    // if (values instanceof Arrayable) {
+    //   values = values.toArray();
+    // }
+
+    this.wheres.push({ type, column, values, boolean })
+
+    if (values.length !== Arr.flatten(values, 1).length) {
+      throw new Error('InvalidArgumentException: Nested arrays may not be passed to whereIn method.')
+    }
+
+    // Finally, we'll add a binding for each value unless that value is an expression
+    // in which case we will just skip over it since it will be the query as a raw
+    // string and not as a parameterized place-holder to be replaced by the PDO.
+    this.addBinding(this.cleanBindings(values, !subquery && this.wheres.length === 1), 'where')
+
+    return this
+  }
+
+  /**
+   * Add a "where not in" clause to the query.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
+   * @param  mixed  $values
+   * @param  string  $boolean
+   * @return $this
+   */
+  public whereNotIn(
+    column: Expression | string,
+    values: unknown[],
+    boolean: 'and' | 'or' = 'and'
+  ): this {
+    return this.whereIn(column, values, boolean, true)
+  }
+
+  /**
+   * Add a "where in raw" clause for integer values to the query.
+   *
+   * @param  string  $column
+   * @param  \Illuminate\Contracts\Support\Arrayable|array  $values
+   * @param  string  $boolean
+   * @param  bool  $not
+   * @return $this
+   */
+  public whereIntegerInRaw(
+    column: Expression | string,
+    values: unknown[],
+    boolean: 'and' | 'or' = 'and',
+    not: boolean = false
+  ): this {
+    const type = not ? 'NotInRaw' : 'InRaw'
+
+    values = Arr.flatten(values)
+
+    values = values.map((value) => Number.parseInt(String(enumValue(value)), 10))
+
+    this.wheres.push({ type, column, values, boolean })
+
+    return this
+  }
+
+  /**
+   * Add an "or where not in raw" clause for integer values to the query.
+   *
+   * @param  string  $column
+   * @param  \Illuminate\Contracts\Support\Arrayable|array  $values
+   * @return $this
+   */
+  public orWhereIntegerNotInRaw(
+    column: Expression | string,
+    values: unknown[]
+  ): this {
+    return this.whereIntegerNotInRaw(column, values, 'or')
+  }
+
+  /**
+   * Add an "or where" clause comparing two columns to the query.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression|string|array  $first
+   * @param  string|null  $operator
+   * @param  string|null  $second
+   * @return $this
+   */
+  public orWhereColumn(
+    first: Expression | string | Array<Expression | string>,
+    operator: string | undefined = undefined,
+    second: string | Expression | undefined = undefined
+  ): this {
+    return this.whereColumn(first, operator, second, 'or')
+  }
+
+  /**
+   * Add a "where fulltext" clause to the query.
+   *
+   * @param  string|string[]  $columns
+   * @param  string  $value
+   * @param  string  $boolean
+   * @return $this
+   */
+  public whereFullText(
+    columns: string | Array<string>,
+    value: string,
+    options: WhereOptions = {},
+    boolean: 'and' | 'or' = 'and'
+  ): this {
+    const type = 'Fulltext'
+
+    columns = Array.isArray(columns) ? columns : [columns]
+
+    this.wheres.push({ type, columns, value, options, boolean })
+
+    this.addBinding(value)
+
+    return this
+  }
+
+  /**
+   * Add an "or where fulltext" clause to the query.
+   *
+   * @param  string|string[]  $columns
+   * @param  string  $value
+   * @return $this
+   */
+  public orWhereFullText(
+    columns: string | Array<string>,
+    value: string,
+    options: WhereOptions = {}
+  ): this {
+    return this.whereFullText(columns, value, options, 'or')
+  }
+
+  /**
+   * Add a "where" clause to the query for multiple columns with "and" conditions between them.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression[]|\Closure[]|string[]  $columns
+   * @param  mixed  $operator
+   * @param  mixed  $value
+   * @param  string  $boolean
+   * @return $this
+   */
+  public whereAll(columns: Expression | string | Array<Expression | string>, operator: Scalar | Scalar[] | Expression | undefined = undefined, value: Scalar | Array<Scalar | Scalar[]> | Expression | undefined = undefined, boolean: 'and' | 'or' = 'and'): this {
+    [value, operator] = this.prepareValueAndOperator(
+      value, operator, arguments.length === 2
+    )
+
+    this.whereNested((query: Builder) => {
+      for (const column of columns) {
+        query.where(column, operator, value, 'and')
+      }
+    }, boolean)
+
+    return this
+  }
+
+  /**
+   * Add an "or where" clause to the query for multiple columns with "and" conditions between them.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression[]|\Closure[]|string[]  $columns
+   * @param  mixed  $operator
+   * @param  mixed  $value
+   * @return $this
+   */
+  public orWhereAll(columns: Expression | string | Array<Expression | string>, operator: Scalar | Scalar[] | Expression | undefined = undefined, value: Scalar | Array<Scalar | Scalar[]> | Expression | undefined = undefined): this {
+    return this.whereAll(columns, operator, value, 'or')
+  }
+
+  /**
+   * Add a "where" clause to the query for multiple columns with "or" conditions between them.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression[]|\Closure[]|string[]  $columns
+   * @param  mixed  $operator
+   * @param  mixed  $value
+   * @param  string  $boolean
+   * @return $this
+   */
+  public whereAny(columns: Expression | string | Array<Expression | string>, operator: Scalar | Scalar[] | Expression | undefined = undefined, value: Scalar | Array<Scalar | Scalar[]> | Expression | undefined = undefined, boolean: 'and' | 'or' = 'and'): this {
+    [value, operator] = this.prepareValueAndOperator(
+      value, operator, arguments.length === 2
+    );
+
+    this.whereNested((query: Builder) => {
+      for (const column of columns) {
+        query.where(column, operator, value, 'or')
+      }
+    }, boolean)
+
+    return this
+  }
+
+  /**
+   * Add an "or where" clause to the query for multiple columns with "or" conditions between them.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression[]|\Closure[]|string[]  $columns
+   * @param  mixed  $operator
+   * @param  mixed  $value
+   * @return $this
+   */
+  public orWhereAny(columns: Expression | string | Array<Expression | string>, operator: Scalar | Scalar[] | Expression | undefined = undefined, value: Scalar | Array<Scalar | Scalar[]> | Expression | undefined = undefined): this {
+    return this.whereAny(columns, operator, value, 'or')
+  }
+
+  /**
+   * Add a "where not" clause to the query for multiple columns where none of the conditions should be true.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression[]|\Closure[]|string[]  $columns
+   * @param  mixed  $operator
+   * @param  mixed  $value
+   * @param  string  $boolean
+   * @return $this
+   */
+  public whereNone(columns: Expression | string | Array<Expression | string>, operator: Scalar | Scalar[] | Expression | undefined = undefined, value: Scalar | Array<Scalar | Scalar[]> | Expression | undefined = undefined, boolean: 'and' | 'or' = 'and'): this {
+    return this.whereAny(columns, operator, value, boolean + ' not')
+  }
+
+  /**
+   * Add an "or where not" clause to the query for multiple columns where none of the conditions should be true.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression[]|\Closure[]|string[]  $columns
+   * @param  mixed  $operator
+   * @param  mixed  $value
+   * @return $this
+   */
+  public orWhereNone(columns: Expression | string | Array<Expression | string>, operator: Scalar | Scalar[] | Expression | undefined = undefined, value: Scalar | Array<Scalar | Scalar[]> | Expression | undefined = undefined): this {
+    return this.whereNone(columns, operator, value, 'or')
+  }
+
+  /**
+   * Add an "or where in raw" clause for integer values to the query.
+   *
+   * @param  string  $column
+   * @param  \Illuminate\Contracts\Support\Arrayable|array  $values
+   * @return $this
+   */
+  public orWhereIntegerInRaw(column: Expression | string, values: unknown[]): this {
+    return this.whereIntegerInRaw(column, values, 'or')
+  }
+
+  /**
+   * Add a "where not in raw" clause for integer values to the query.
+   *
+   * @param  string  $column
+   * @param  \Illuminate\Contracts\Support\Arrayable|array  $values
+   * @param  string  $boolean
+   * @return $this
+   */
+  public whereIntegerNotInRaw(column: Expression | string, values: unknown[], boolean: 'and' | 'or' = 'and'): this {
+    return this.whereIntegerInRaw(column, values, boolean, true)
+  }
+
+  /**
+   * Add an "or where not in" clause to the query.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
+   * @param  mixed  $values
+   * @return $this
+   */
+  public orWhereNotIn(column: Expression | string, values: unknown[]): this {
+    return this.whereNotIn(column, values, 'or')
+  }
+
+  /**
+   * Add an "or where in" clause to the query.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
+   * @param  mixed  $values
+   * @return $this
+   */
+  public orWhereIn(column: Expression | string, values: unknown[]): this {
+    return this.whereIn(column, values, 'or')
+  }
+
+  /**
+   * Add an "or where not" clause to the query.
+   *
+   * @param  \Closure|string|array|\Illuminate\Contracts\Database\Query\Expression  $column
+   * @param  mixed  $operator
+   * @param  mixed  $value
+   * @return $this
+   */
+  public orWhereNot(
+    column: Expression | string | Array<Expression | string> | Function,
+    operator?: Scalar | Scalar[] | Expression | undefined,
+    value?: Scalar | Array<Scalar | Scalar[]> | Expression | undefined
+  ): this {
+    return this.whereNot(column, operator, value, 'or')
+  }
+
+  /**
+   * Add an "or where" clause to the query.
+   *
+   * @param  \Closure|string|array|\Illuminate\Contracts\Database\Query\Expression  $column
+   * @param  mixed  $operator
+   * @param  mixed  $value
+   * @return $this
+   */
+  public orWhere(
+    column: Expression | string | Array<Expression | string> | Function,
+    operator?: Scalar | Scalar[] | Expression | undefined,
+    value?: Scalar | Array<Scalar | Scalar[]> | Expression | undefined
+  ): this {
+    [value, operator] = this.prepareValueAndOperator(value, operator, arguments.length === 2)
+
+    return this.where(column, operator, value, 'or')
+  }
+
+  /**
+   * Add an "or where between columns" statement using a value to the query.
+   *
+   * @param  mixed  $value
+   * @param  array{\Illuminate\Contracts\Database\Query\Expression|string, \Illuminate\Contracts\Database\Query\Expression|string}  $columns
+   * @return $this
+   */
+  public orWhereValueBetween(
+    value: unknown,
+    columns: Array<Expression | string>
+  ): this {
+    return this.whereValueBetween(value, columns, 'or')
   }
 
   /**

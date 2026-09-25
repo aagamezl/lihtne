@@ -63,6 +63,13 @@ export class Collection<TKey extends PropertyKey, TValue> extends EnumeratesValu
   }
 
   /**
+   * Mirrors PHP's `IteratorAggregate`: iterating a collection yields its values.
+   */
+  * [Symbol.iterator] (): Iterator<TValue> {
+    yield * Object.values(this.items)
+  }
+
+  /**
    * Collapse the collection of items into a single array.
    *
    * @return static<int, mixed>
@@ -77,11 +84,36 @@ export class Collection<TKey extends PropertyKey, TValue> extends EnumeratesValu
    * Mirrors `Collection::first()`, which delegates straight to
    * `Arr::first()` over the collection's underlying items.
    */
-  first<TDefault = undefined>(
+  public first<TDefault = undefined>(
     callback?: (value: TValue, key: TKey) => boolean,
     defaultValue?: TDefault | (() => TDefault)
   ): TValue | TDefault | undefined {
     return Arr.first<TValue, TKey, TDefault>(this.items, callback, defaultValue)
+  }
+
+  /**
+   * Run a filter over each of the items.
+   *
+   * @param  (callable(TValue, TKey): bool)|null  $callback
+   * @return static
+   */
+  public filter (
+    callback?: (value: TValue, key: TKey) => boolean | TValue
+  ): Collection<TKey, TValue> {
+    if (callback) {
+      return this.newInstance(Arr.where<TValue, TKey>(Object.values(this.items), callback))
+    }
+
+    return this.newInstance(Object.values(this.items).filter(callback))
+  }
+
+  /**
+   * Reset the keys on the underlying array.
+   *
+   * @return static<int, TValue>
+   */
+  public values (): Collection<TKey, TValue> {
+    return this.newInstance(Object.values(this.items))
   }
 
   /**
