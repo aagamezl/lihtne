@@ -2182,55 +2182,50 @@ describe('Database Query Builder', () => {
     expect(builder.toSql()).toBe('(select * from `users`) union (select * from `dogs`) limit 10 offset 5')
   })
 
-  test('testUnionAggregate', () => {
-    const AGGREGATE_COLUMN = 'aggregate'
-    const NO_BINDINGS: unknown[] = []
-    const USE_READ_PDO = true
-    const EMPTY_PDO_ARRAY: unknown[] = []
-
+  test('testUnionAggregate', async () => {
     let expected = 'select count(*) as `aggregate` from ((select * from `posts`) union (select * from `videos`)) as `temp_table`'
     let builder = getMySqlBuilder()
     const selectSpyMySql = jest.spyOn(builder.getConnection(), 'select')
-      .mockImplementationOnce(() => NO_BINDINGS)
+      .mockImplementationOnce(() => [])
     const processSelectSpyMySql = jest.spyOn(builder.getProcessor(), 'processSelect')
-    builder.from('posts').union(getMySqlBuilder().from('videos')).count()
-    expect(selectSpyMySql).toHaveBeenCalledWith(expected, NO_BINDINGS, USE_READ_PDO, EMPTY_PDO_ARRAY)
+    await builder.from('posts').union(getMySqlBuilder().from('videos')).count()
+    expect(selectSpyMySql).toHaveBeenCalledWith(expected, [])
     expect(processSelectSpyMySql).toHaveBeenCalled()
 
     expected = 'select count(*) as `aggregate` from ((select `id` from `posts`) union (select `id` from `videos`)) as `temp_table`'
     builder = getMySqlBuilder()
     const selectSpyMySqlWithId = jest.spyOn(builder.getConnection(), 'select')
-      .mockImplementationOnce(() => NO_BINDINGS)
+      .mockImplementationOnce(() => [])
     const processSelectSpyMySqlWithId = jest.spyOn(builder.getProcessor(), 'processSelect')
-    builder.from('posts').select('id').union(getMySqlBuilder().from('videos').select('id')).count()
-    expect(selectSpyMySqlWithId).toHaveBeenCalledWith(expected, NO_BINDINGS, USE_READ_PDO, EMPTY_PDO_ARRAY)
+    await builder.from('posts').select('id').union(getMySqlBuilder().from('videos').select('id')).count()
+    expect(selectSpyMySqlWithId).toHaveBeenCalledWith(expected, [])
     expect(processSelectSpyMySqlWithId).toHaveBeenCalled()
 
     expected = 'select count(*) as "aggregate" from ((select * from "posts") union (select * from "videos")) as "temp_table"'
     builder = getPostgresBuilder()
     const selectSpyPostgres = jest.spyOn(builder.getConnection(), 'select')
-      .mockImplementationOnce(() => NO_BINDINGS)
+      .mockImplementationOnce(() => [])
     const processSelectSpyPostgres = jest.spyOn(builder.getProcessor(), 'processSelect')
-    builder.from('posts').union(getPostgresBuilder().from('videos')).count()
-    expect(selectSpyPostgres).toHaveBeenCalledWith(expected, NO_BINDINGS, USE_READ_PDO, EMPTY_PDO_ARRAY)
+    await builder.from('posts').union(getPostgresBuilder().from('videos')).count()
+    expect(selectSpyPostgres).toHaveBeenCalledWith(expected, [])
     expect(processSelectSpyPostgres).toHaveBeenCalled()
 
     expected = 'select count(*) as "aggregate" from (select * from (select * from "posts") union select * from (select * from "videos")) as "temp_table"'
     builder = getSQLiteBuilder()
     const selectSpySqlite = jest.spyOn(builder.getConnection(), 'select')
-      .mockImplementationOnce(() => NO_BINDINGS)
+      .mockImplementationOnce(() => [])
     const processSelectSpySqlite = jest.spyOn(builder.getProcessor(), 'processSelect')
-    builder.from('posts').union(getSQLiteBuilder().from('videos')).count()
-    expect(selectSpySqlite).toHaveBeenCalledWith(expected, NO_BINDINGS, USE_READ_PDO, EMPTY_PDO_ARRAY)
+    await builder.from('posts').union(getSQLiteBuilder().from('videos')).count()
+    expect(selectSpySqlite).toHaveBeenCalledWith(expected, [])
     expect(processSelectSpySqlite).toHaveBeenCalled()
 
     expected = 'select count(*) as [aggregate] from (select * from (select * from [posts]) as [temp_table] union select * from (select * from [videos]) as [temp_table]) as [temp_table]'
     builder = getSqlServerBuilder()
     const selectSpySqlServer = jest.spyOn(builder.getConnection(), 'select')
-      .mockImplementationOnce(() => NO_BINDINGS)
+      .mockImplementationOnce(() => [])
     const processSelectSpySqlServer = jest.spyOn(builder.getProcessor(), 'processSelect')
-    builder.from('posts').union(getSqlServerBuilder().from('videos')).count()
-    expect(selectSpySqlServer).toHaveBeenCalledWith(expected, NO_BINDINGS, USE_READ_PDO, EMPTY_PDO_ARRAY)
+    await builder.from('posts').union(getSqlServerBuilder().from('videos')).count()
+    expect(selectSpySqlServer).toHaveBeenCalledWith(expected, [])
     expect(processSelectSpySqlServer).toHaveBeenCalled()
   })
 })

@@ -8,7 +8,6 @@ import type { BindingValues } from './Query/Builder'
 import type { Statement } from './Statements'
 
 import { Arr } from '../Collections'
-import { mixing } from '../Support'
 import { DetectsLostConnections } from './DetectsLostConnections'
 import { QueryExecuted, StatementPrepared } from './Events'
 import { Grammar as QueryGrammar } from './Query/Grammars/Grammar'
@@ -23,10 +22,18 @@ export type QueryLogEntry = {
 
 export type ConnectionConfig = Record<string, unknown>
 export type Reconnector = (connection: Connection) => unknown
+export type DriverResolver = () => Driver
+export type BeforeExecutingCallback = (
+  query: string,
+  bindings: BindingValues,
+  connection: Connection
+) => unknown
+export type QueryCallback = (
+  query: string,
+  bindings: BindingValues
+) => Record<string, unknown>[] | Promise<Record<string, unknown>[]>
 
-export interface Connection extends DetectsLostConnections { }
-
-export class Connection extends mixing().useTrait([DetectsLostConnections]) {
+export class Connection extends DetectsLostConnections {
   // The query grammar implementation.
   protected queryGrammar: QueryGrammar | undefined = undefined
 
@@ -42,7 +49,7 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
    * @protected
    * @type {Driver}
    */
-  driver: Driver | Function
+  driver: Driver | DriverResolver
 
   // The table prefix for the connection.
   protected tablePrefix = ''
@@ -69,7 +76,7 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
     *
     * @var (\Closure(string, array, \Illuminate\Database\Connection): mixed)[]
     */
-  protected beforeExecutingCallbacks: Function[] = []
+  protected beforeExecutingCallbacks: BeforeExecutingCallback[] = []
 
   /**
     * The number of active transactions.
@@ -215,7 +222,9 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
    *
    * @throws \RuntimeException
    */
-  protected escapeBinary (value: string | number | boolean): string {
+  // The value is part of the override signature; this base connection cannot escape binary data.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  protected escapeBinary (_value: string | number | boolean): string {
     throw new Error('RuntimeException: The database connection does not support escaping binary values.')
   }
 
@@ -257,7 +266,9 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
    * @param  \Exception  $exception
    * @return bool
    */
-  protected isUniqueConstraintError (exception: Error) {
+  // The exception is part of the override signature; the base connection reports no unique violations.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  protected isUniqueConstraintError (_exception: Error) {
     return false
   }
 
@@ -274,7 +285,7 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
   protected async run (
     query: string,
     bindings: BindingValues,
-    callback: Function
+    callback: QueryCallback
   ): Promise<Record<string, unknown>[]> {
     for (const beforeExecutingCallback of this.beforeExecutingCallbacks) {
       await beforeExecutingCallback(query, bindings, this)
@@ -328,7 +339,7 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
     e: Error,
     query: string,
     bindings: BindingValues,
-    callback: Function
+    callback: QueryCallback
   ) {
     if (this.transactions >= 1) {
       throw e
@@ -408,7 +419,7 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
     e: Error,
     query: string,
     bindings: BindingValues,
-    callback: Function
+    callback: QueryCallback
   ) {
     if (this.causedByLostConnection(e.cause as Error)) {
       this.reconnect()
@@ -432,31 +443,28 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
   protected async runQueryCallback (
     query: string,
     bindings: BindingValues,
-    callback: Function
+    callback: QueryCallback
   ) {
     // To execute the statement, we'll simply call the callback, which will actually
     // run the SQL against the PDO connection. Then we can calculate the time it
     // took to execute and log the query SQL, bindings and time in our memory.
     try {
-      const result = await callback(query, bindings)
-
-      return result
-    }
-    // If an exception occurs when attempting to run a query, we'll format the error
-    // message to include the bindings with SQL, which will make this exception a
-    // lot more helpful to the developer instead of just the database's errors.
-    catch (e) {
+      return await callback(query, bindings)
+    } catch (e) {
+      // If an exception occurs when attempting to run a query, we'll format the error
+      // message to include the bindings with SQL, which will make this exception a
+      // lot more helpful to the developer instead of just the database's errors.
       const exceptionType = this.isUniqueConstraintError(e as Error)
         ? 'UniqueConstraintViolationException'
         : 'QueryException'
 
-      throw new Error(`${exceptionType}: ${JSON.stringify({
-        name: this.getNameWithReadWriteType(),
+      throw new Error(JSON.stringify({
+        type: exceptionType,
+        name: this.getName(),
         query,
         bindings: this.prepareBindings(bindings),
-        e,
-        connectionDetails: this.getConnectionDetails()
-      })}`)
+        e
+      }), { cause: e })
     }
   }
 
@@ -526,7 +534,7 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
     * @param  mixed  event
     * @return void
     */
-  protected event (event: any) {
+  protected event (event: string | object) {
     this.events?.dispatch(event)
   }
 
@@ -566,7 +574,11 @@ export class Connection extends mixing().useTrait([DetectsLostConnections]) {
    * @return \Illuminate\Database\Query\Grammars\Grammar
    */
   public getQueryGrammar (): Grammar {
-    return this.queryGrammar!
+    if (this.queryGrammar === undefined) {
+      throw new Error('Query grammar has not been set.')
+    }
+
+    return this.queryGrammar
   }
 
   /**

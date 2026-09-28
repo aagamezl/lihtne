@@ -1,4 +1,4 @@
-import { HigherOrderTapProxy } from "./HigherOrderTapProxy"
+import { HigherOrderTapProxy } from './HigherOrderTapProxy'
 
 export type Entries<T> = {
   [K in keyof T]: [K, T[K]]

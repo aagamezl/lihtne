@@ -1,20 +1,29 @@
+type EventCallback = (...args: unknown[]) => unknown
+
 export interface Dispatcher {
   /**
-   * Dispatch an event and call the listeners.
+   * Register an event listener with the dispatcher.
    *
-   * @param  {string|object}  event
-   * @param  {any}  payload
-   * @param  {boolean}  halt
-   * @return {array|null}
+   * @param  \Closure|string|array  $events
+   * @param  \Closure|string|array|null  $listener
+   * @return void
    */
-  dispatch(event: string | object, payload?: any, halt?: boolean): any[] | null;
+  listen(
+    events: EventCallback | string | Array<EventCallback | string>,
+    listener?: EventCallback | string | Array<EventCallback | string> | null
+  ): void;
 
   /**
    * Register an event listener with the dispatcher.
    *
-   * @param  {Function|string|array}  events
-   * @param  {Function|string|array|null}  [listener]
-   * @return {void}
+   * @param  string|object  $event
+   * @param  mixed  $payload
+   * @param  bool  $halt
+   * @return array|null
    */
-  listen(events: any, listener?: any): void;
+  dispatch(
+    event: string | object,
+    payload?: unknown,
+    halt?: boolean
+  ): unknown[] | null;
 }

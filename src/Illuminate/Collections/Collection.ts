@@ -48,6 +48,21 @@ export class Collection<TKey extends PropertyKey, TValue> extends EnumeratesValu
   }
 
   /**
+   * Determine if the collection is empty or not.
+   *
+   * @phpstan-assert-if-true null $this->first()
+   * @phpstan-assert-if-true null $this->last()
+   *
+   * @phpstan-assert-if-false TValue $this->first()
+   * @phpstan-assert-if-false TValue $this->last()
+   *
+   * @return bool
+   */
+  public isEmpty (): boolean {
+    return Object.keys(this.items).length === 0
+  }
+
+  /**
    * Get all of the items in the collection.
    *
    * Mirrors `Collection::all()`. List-shaped collections (dense numeric

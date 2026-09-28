@@ -1,7 +1,5 @@
-import { isPlainObject, isPrimitive } from 'es-toolkit'
+import { isPlainObject } from 'es-toolkit'
 
-import { isEnum } from '../../Support'
-import { Arr } from '../Arr'
 import { Collection } from '../Collection'
 export class EnumeratesValues {
   /**
@@ -75,7 +73,7 @@ export class EnumeratesValues {
    * @param  mixed  $value
    * @return bool
    */
-  public useAsCallable (value: unknown): value is Function {
+  public useAsCallable (value: unknown): value is (...args: never[]) => unknown {
     return typeof value === 'function'
   }
 

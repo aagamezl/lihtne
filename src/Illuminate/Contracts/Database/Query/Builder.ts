@@ -5,4 +5,5 @@
  *
  * @mixin \Illuminate\Database\Query\Builder
  */
-export interface Builder/*  extends BaseBuilder */ { }
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type -- marker contract;
+export interface Builder { }

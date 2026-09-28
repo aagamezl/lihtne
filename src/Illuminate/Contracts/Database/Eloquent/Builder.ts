@@ -3,4 +3,5 @@
  *
  * @mixin \Illuminate\Database\Eloquent\Builder
  */
-export interface Builder {}
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type -- marker contract;
+export interface Builder { }

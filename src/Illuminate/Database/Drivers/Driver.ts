@@ -1,3 +1,5 @@
+import type { Statement } from '../Statements'
+
 export type DriverOptions = Record<string, unknown>
 
 export class Driver {
@@ -37,8 +39,7 @@ export class Driver {
    * @returns {Statement}
    * @throws {Error}
    */
-  // @ts-ignore expected error must be implemented in concrete class
-  public prepare (query: string) {
-    return new Error(`RuntimeException: Implement 'prepare' method on concrete class.`)
+  public prepare (query: string): Statement {
+    throw new Error(`RuntimeException: Implement 'prepare' method on concrete class for query: ${query}`)
   }
 }

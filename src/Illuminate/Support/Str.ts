@@ -38,6 +38,42 @@ export class Str {
   }
 
   /**
+   * Replace a given value in the string sequentially with an array.
+   *
+   * @param  string  $search
+   * @param  string[]  $replace
+   * @param  string  $subject
+   * @return string
+   */
+  public static replaceArray (search: string, replace: string[], subject: string): string {
+    const segments = subject.split(search)
+    const replacements = replace.slice()
+
+    let result = segments.shift() ?? ''
+
+    for (const segment of segments) {
+      result += this.toStringOr(replacements.shift() ?? search, search) + segment
+    }
+
+    return result
+  }
+
+  /**
+   * Convert the given value to a string or return the given fallback on failure.
+   *
+   * @param  mixed  $value
+   * @param  string  $fallback
+   * @return string
+   */
+  private static toStringOr (value: unknown, fallback: string): string {
+    try {
+      return String(value)
+    } catch (_) {
+      return fallback
+    }
+  }
+
+  /**
    * Get a new stringable object from the given string.
    *
    * @param  string  $string
