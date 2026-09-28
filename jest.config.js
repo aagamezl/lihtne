@@ -3,7 +3,7 @@ export default {
   preset: 'ts-jest/presets/default-esm',
   testEnvironment: 'node',
   testPathIgnorePatterns: ['/build/', '/dist/', '/node_modules/'],
-  testMatch: ['**/test/**/*.spec.ts'],
+  testMatch: ['**/tests/**/*.spec.ts'],
   transform: {
     '^.+\\.m?tsx?$': ['ts-jest', {
       useESM: true,

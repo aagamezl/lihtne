@@ -77,6 +77,16 @@ export class SqlServerGrammar extends Grammar {
   }
 
   /**
+   * Wrap a union subquery in parentheses.
+   *
+   * @param  string  $sql
+   * @return string
+   */
+  protected override wrapUnion (sql: string): string {
+    return 'select * from (' + sql + ') as ' + this.wrapTable('temp_table')
+  }
+
+  /**
    * Compile the "select *" portion of the query.
    *
    * @param  \Illuminate\Database\Query\Builder  $query

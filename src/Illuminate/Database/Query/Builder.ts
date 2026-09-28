@@ -1,5 +1,5 @@
 import { dateFormat } from '@devnetic/utils'
-import { isNil } from 'es-toolkit'
+import { cloneDeep, isNil } from 'es-toolkit'
 
 import type { Scalar } from '../../Support/types'
 import type { Connection } from '../Connection'
@@ -11,9 +11,9 @@ import { Arr, Collection } from '../../Collections'
 import { enumValue } from '../../Collections/functions'
 import { end, head } from '../../Collections/helpers'
 import { DatePeriod, isSet, mixing, type Prettify, value } from '../../Support'
-import { isNumeric } from '../../Support/helpers'
 // import { registry } from './internal'
 import { resolveClass } from '../../Support/class-registry'
+import { isNumeric, tap } from '../../Support/helpers'
 import { BuildsQueries } from '../Concerns'
 import { BuildsWhereDateClauses } from '../Concerns/BuildsWhereDateClauses'
 import { Builder as EloquentBuilder } from '../Eloquent'
@@ -124,8 +124,15 @@ export class Builder extends mixing(BuildsQueries).useTrait([BuildsWhereDateClau
    */
   public processor: Processor
 
+  /**
+   * The groupings for the query.
+   *
+   * @var array|null
+   */
+  public groups = []
+
   // The query union statements.
-  public unions: Union[] | undefined = undefined
+  public unions: Union[] = []
 
   /**
    * The table joins for the query.
@@ -182,16 +189,16 @@ export class Builder extends mixing(BuildsQueries).useTrait([BuildsWhereDateClau
   /**
    * The maximum number of union records to return.
    *
-   * @var int|null
+   * @var int|undefined
    */
-  public unionLimit: number | null = null
+  public unionLimit: number | undefined = undefined
 
   /**
    * The number of union records to skip.
    *
-   * @var int|null
+   * @var int|undefined
    */
-  public unionOffset: number | null = null
+  public unionOffset: number | undefined = undefined
 
   /**
    * All of the available clause operators.
@@ -223,7 +230,7 @@ export class Builder extends mixing(BuildsQueries).useTrait([BuildsWhereDateClau
    */
   public orders: Order[] = []
 
-  public unionOrders: Order[] | undefined = undefined
+  public unionOrders: Order[] = []
 
   /**
      * Indicates whether row locking is being used.
@@ -923,7 +930,7 @@ export class Builder extends mixing(BuildsQueries).useTrait([BuildsWhereDateClau
 
       column = new Expression('(' + query + ')')
 
-      this.addBinding(bindings, this.unions ? 'unionOrder' : 'order')
+      this.addBinding(bindings, this.unions.length > 0 ? 'unionOrder' : 'order')
     }
 
     // switch (direction) {
@@ -937,7 +944,7 @@ export class Builder extends mixing(BuildsQueries).useTrait([BuildsWhereDateClau
     //     throw new Error('Order direction must be a SortDirection, "asc" or "desc".');
     // }
 
-    this[this.unions?.length > 0 ? 'unionOrders' : 'orders'].push({
+    this[this.unions.length > 0 ? 'unionOrders' : 'orders'].push({
       column,
       direction
     })
@@ -972,7 +979,7 @@ export class Builder extends mixing(BuildsQueries).useTrait([BuildsWhereDateClau
    * @return $this
    */
   public offset(value: number): this {
-    const property = this.unions?.length > 0 ? 'unionOffset' : 'offset'
+    const property = this.unions.length > 0 ? 'unionOffset' : 'offset'
 
     this[property] = Math.max(0, parseInt(value.toString()))
 
@@ -996,7 +1003,7 @@ export class Builder extends mixing(BuildsQueries).useTrait([BuildsWhereDateClau
    * @return $this
    */
   public limit(value: number): this {
-    const property = this.unions?.length > 0 ? 'unionLimit' : 'limitProperty'
+    const property = this.unions.length > 0 ? 'unionLimit' : 'limitProperty'
 
     if (value >= 0) {
       this[property] = value !== undefined ? parseInt(value.toString()) : undefined
@@ -2158,9 +2165,7 @@ export class Builder extends mixing(BuildsQueries).useTrait([BuildsWhereDateClau
    * @return $this
    */
   public whereAll(columns: Expression | string | Array<Expression | string>, operator: Scalar | Scalar[] | Expression | undefined = undefined, value: Scalar | Array<Scalar | Scalar[]> | Expression | undefined = undefined, boolean: 'and' | 'or' = 'and'): this {
-    [value, operator] = this.prepareValueAndOperator(
-      value, operator, arguments.length === 2
-    )
+    [value, operator] = this.prepareValueAndOperator(value, operator, arguments.length === 2)
 
     this.whereNested((query: Builder) => {
       for (const column of columns) {
@@ -2193,9 +2198,7 @@ export class Builder extends mixing(BuildsQueries).useTrait([BuildsWhereDateClau
    * @return $this
    */
   public whereAny(columns: Expression | string | Array<Expression | string>, operator: Scalar | Scalar[] | Expression | undefined = undefined, value: Scalar | Array<Scalar | Scalar[]> | Expression | undefined = undefined, boolean: 'and' | 'or' = 'and'): this {
-    [value, operator] = this.prepareValueAndOperator(
-      value, operator, arguments.length === 2
-    );
+    [value, operator] = this.prepareValueAndOperator(value, operator, arguments.length === 2)
 
     this.whereNested((query: Builder) => {
       for (const column of columns) {
@@ -2375,6 +2378,131 @@ export class Builder extends mixing(BuildsQueries).useTrait([BuildsWhereDateClau
     this.addBinding(query.getBindings(), 'where')
 
     return this
+  }
+
+  /**
+   * Retrieve the "count" result of the query.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression|string  $columns
+   * @return int<0, max>
+   */
+  public count(columns: string = '*') {
+    return this.aggregate('count', Arr.wrap(columns))
+  }
+
+  /**
+   * Clone the query.
+   *
+   * @return static
+   */
+  public clone() {
+    return cloneDeep(this)
+  }
+
+  /**
+   * Clone the query without the given properties.
+   *
+   * @return static
+   */
+  public cloneWithout(properties: string[]) {
+    return tap(this.clone(), (clone: Builder) => {
+      for (const property of properties) {
+        clone[property] = undefined
+      }
+    })
+  }
+
+  /**
+ * Clone the query without the given bindings.
+ *
+ * @return static
+ */
+  public cloneWithoutBindings(except: string[]) {
+    return tap(this.clone(), (clone: Builder) => {
+      for (const type of except) {
+        clone.bindings[type] = [];
+      }
+    });
+  }
+
+  /**
+   * Execute an aggregate function on the database.
+   *
+   * @param  string  $function
+   * @param  array  $columns
+   * @return mixed
+   */
+  public async aggregate(fn: string, columns: string[] = ['*']): unknown {
+    const NO_CLAUSES_TO_PRESERVE: string[] = []
+    const COLUMNS_CLAUSE_TO_PRESERVE = ['columns']
+    const SELECT_BINDING_TO_PRESERVE: string[] = []
+    const SELECT_BINDING_KEY = ['select']
+    const AGGREGATE_RESULT_KEY = 'aggregate'
+    const FIRST_RESULT_INDEX = 0
+
+    const hasUnionsOrHavings = this.unions.length > 0 || this.havings.length > 0
+
+    const results = await this
+      .cloneWithout(hasUnionsOrHavings ? NO_CLAUSES_TO_PRESERVE : COLUMNS_CLAUSE_TO_PRESERVE)
+      .cloneWithoutBindings(hasUnionsOrHavings ? SELECT_BINDING_TO_PRESERVE : SELECT_BINDING_KEY)
+      .setAggregate(fn, columns)
+      .get(columns)
+
+    if (!results.isEmpty()) {
+      const normalizedRow = changeKeyCase(results[FIRST_RESULT_INDEX] as Record<string, unknown>)
+
+      return normalizedRow[AGGREGATE_RESULT_KEY]
+    }
+  }
+
+  /**
+   * Set the aggregate property without running the query.
+   *
+   * @param  string  $function
+   * @param  array<\Illuminate\Contracts\Database\Query\Expression|string>  $columns
+   * @return $this
+   */
+  protected setAggregate(functionName: string, columns: Array<Expression | string>) {
+    this.aggregateProperty = { function: functionName, columns };
+
+    if (this.groups.length === 0) {
+      this.orders = null;
+
+      this.bindings['order'] = [];
+    }
+
+    return this;
+  }
+
+  /**
+   * Add a "union" statement to the query.
+   *
+   * @param  \Closure|\Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder<*>  $query
+   * @param  bool  $all
+   * @return $this
+   */
+  public union(query: Function | Builder | EloquentBuilder, all: boolean = false): this {
+    if (query instanceof Function) {
+      query(query = this.newQuery())
+    }
+
+    query = query instanceof EloquentBuilder ? query.toBase() : query
+
+    this.unions.push({ query, all })
+
+    this.addBinding(query.getBindings(), 'union')
+
+    return this
+  }
+
+  /**
+   * Add a "union all" statement to the query.
+   *
+   * @param  \Closure|\Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder<*>  $query
+   * @return $this
+   */
+  public unionAll(query: Function | Builder | EloquentBuilder): this {
+    return this.union(query, true)
   }
 
   /**

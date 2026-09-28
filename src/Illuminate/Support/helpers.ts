@@ -1,3 +1,5 @@
+import { HigherOrderTapProxy } from "./HigherOrderTapProxy"
+
 export type Entries<T> = {
   [K in keyof T]: [K, T[K]]
 }[keyof T][]
@@ -55,6 +57,25 @@ export const typedEntries = <T extends object>(obj: T): Entries<T> => {
  */
 export const ucfirst = (value: string): string => {
   return value.charAt(0).toUpperCase() + value.slice(1)
+}
+
+/**
+ * Call the given Closure with the given value then return the value.
+ *
+ * @template TValue
+ *
+ * @param  TValue  $value
+ * @param  (callable(TValue): mixed)|null  $callback
+ * @return ($callback is null ? \Illuminate\Support\HigherOrderTapProxy<TValue> : TValue)
+ */
+export const tap = <TValue>(value: TValue, callback?: (value: TValue) => unknown): TValue => {
+  if (callback === undefined) {
+    return new HigherOrderTapProxy(value)
+  }
+
+  callback(value)
+
+  return value
 }
 
 /**
