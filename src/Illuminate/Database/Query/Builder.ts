@@ -19,7 +19,7 @@ import { BuildsQueries } from '../Concerns'
 import { BuildsWhereDateClauses } from '../Concerns/BuildsWhereDateClauses'
 import { Builder as EloquentBuilder } from '../Eloquent'
 import { Relation } from '../Eloquent/Relations'
-import { SortDirection } from './Enums/SortDirection'
+import { SortDirection, type SortDirectionType } from './Enums/SortDirection'
 import { Expression } from './Expression'
 
 export type BindingValue = string | number | boolean | Date | null | Expression
@@ -46,7 +46,6 @@ export type WhereOptions = {
 }
 
 export type WhereClauseType =
-
   | 'Basic' |
   'Bitwise' |
   'Binary' |
@@ -438,6 +437,47 @@ export class Builder extends mixing(BuildsQueries).useTrait([
   }
 
   /**
+   * Put the query's results in random order.
+   *
+   * @param  string|int  $seed
+   * @return $this
+   */
+  public inRandomOrder (seed: string | number = ''): this {
+    return this.orderByRaw(this.grammar.compileRandom(seed))
+  }
+
+  /**
+   * Add an "order by" clause to order results by a given sequence of values.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression|string  column
+   * @param  Arrayable<unknown> | Array<unknown>  values
+   * @return $this
+   */
+  public inOrderOf (
+    column: Expression | string,
+    values: BindingValues
+  ): this {
+    values = values.map((value) => value)
+
+    if (values.length === 0) {
+      return this
+    }
+
+    // Support for union orders vs. regular orders
+    const orderType = this.unions.length > 0 ? 'unionOrders' : 'orders'
+
+    this[orderType].push({
+      type: 'InOrderOf',
+      column,
+      values
+    })
+
+    this.addBinding(this.cleanBindings(values), this.unions.length > 0 ? 'unionOrder' : 'order')
+
+    return this
+  }
+
+  /**
    * Add a "where" clause comparing two columns to the query.
    *
    * @param  \Illuminate\Contracts\Database\Query\Expression|string|array  $first
@@ -450,7 +490,7 @@ export class Builder extends mixing(BuildsQueries).useTrait([
     first: Expression | string | Array<Expression | string>,
     operator: string | undefined = undefined,
     second: string | Expression | undefined = undefined,
-    boolean: string = 'and'
+    boolean: WhereBoolean = 'and'
   ): this {
     // If the column is an array, we will assume it is an array of key-value pairs
     // and can add them each as a where clause. We will maintain the boolean we
@@ -511,7 +551,7 @@ export class Builder extends mixing(BuildsQueries).useTrait([
    */
   protected addArrayOfWheres (
     column: Array<unknown>,
-    boolean: string,
+    boolean: WhereBoolean,
     method: 'where' | 'whereColumn' = 'where'
   ): this {
     const whereBoolean: WhereBoolean =
@@ -554,7 +594,10 @@ export class Builder extends mixing(BuildsQueries).useTrait([
    * @param  string  $boolean
    * @return $this
    */
-  public whereNested (callback: QueryCallback, boolean: string = 'and'): this {
+  public whereNested (
+    callback: QueryCallback,
+    boolean: WhereBoolean = 'and'
+  ): this {
     const query = this.forNestedWhere()
     callback(query)
 
@@ -577,7 +620,10 @@ export class Builder extends mixing(BuildsQueries).useTrait([
    * @param  string  $boolean
    * @return $this
    */
-  public addNestedWhereQuery (query: Builder, boolean: string = 'and'): this {
+  public addNestedWhereQuery (
+    query: Builder,
+    boolean: WhereBoolean = 'and'
+  ): this {
     if (query.wheres.length > 0) {
       const type = 'Nested'
 
@@ -622,7 +668,7 @@ export class Builder extends mixing(BuildsQueries).useTrait([
     column: Expression | string,
     operator: unknown = undefined,
     value: unknown = undefined,
-    boolean: string = 'and'
+    boolean: BooleanOperator = 'and'
   ): this {
     let type: HavingClauseType = 'Basic'
 
@@ -701,7 +747,10 @@ export class Builder extends mixing(BuildsQueries).useTrait([
    * @param  string  $boolean
    * @return $this
    */
-  public havingNested (callback: QueryCallback, boolean: string = 'and'): this {
+  public havingNested (
+    callback: QueryCallback,
+    boolean: BooleanOperator = 'and'
+  ): this {
     const query = this.forNestedWhere()
     callback(query)
 
@@ -715,7 +764,10 @@ export class Builder extends mixing(BuildsQueries).useTrait([
    * @param  string  $boolean
    * @return $this
    */
-  public addNestedHavingQuery (query: Builder, boolean: string = 'and'): this {
+  public addNestedHavingQuery (
+    query: Builder,
+    boolean: BooleanOperator = 'and'
+  ): this {
     if (query.havings.length > 0) {
       const type: HavingClauseType = 'Nested'
 
@@ -741,7 +793,7 @@ export class Builder extends mixing(BuildsQueries).useTrait([
     column: Expression | string,
     value: string,
     caseSensitive: boolean = false,
-    boolean: string = 'and',
+    boolean: BooleanOperator = 'and',
     not: boolean = false
   ): this {
     const type: WhereClauseType = 'Like'
@@ -768,7 +820,7 @@ export class Builder extends mixing(BuildsQueries).useTrait([
   public whereNullSafeEquals (
     column: Expression | string,
     value: unknown,
-    boolean: string = 'and'
+    boolean: BooleanOperator = 'and'
   ): this {
     const type: WhereClauseType = 'NullSafeEquals'
 
@@ -804,7 +856,7 @@ export class Builder extends mixing(BuildsQueries).useTrait([
    * @param  string  $boolean
    * @return $this
    */
-  public havingRaw (sql: string, bindings: unknown[] = [], boolean: string = 'and'): this {
+  public havingRaw (sql: string, bindings: unknown[] = [], boolean: BooleanOperator = 'and'): this {
     const type: HavingClauseType = 'Raw'
 
     this.havings.push({ type, sql, boolean })
@@ -922,7 +974,7 @@ export class Builder extends mixing(BuildsQueries).useTrait([
     column: Expression | string,
     value: string,
     caseSensitive: boolean = false,
-    boolean: string = 'and'
+    boolean: BooleanOperator = 'and'
   ): this {
     return this.whereLike(column, value, caseSensitive, boolean, true)
   }
@@ -976,20 +1028,20 @@ export class Builder extends mixing(BuildsQueries).useTrait([
    * @param  mixed  $columns
    * @return $this
    */
-  // public select(columns: string | string[] = ['*']) {
-  public select (...columns: string[]) {
-    columns = columns.length === 0 ? ['*'] : columns
+  public select (
+    column: string | Expression | Array<string | Expression> = '*',
+    ...columns: Array<string | Expression>
+  ): this {
+    const selected = Array.isArray(column) ? column : [column, ...columns]
 
     this.columns = []
     this.bindings.select = []
 
-    const columnsArray = Array.isArray(columns) ? columns : [columns]
-
-    for (const [as, column] of Object.entries(columnsArray)) {
-      if (typeof as === 'string' && this.isQueryable(column)) {
-        this.selectSub(column, as)
+    for (const [as, value] of Object.entries(selected)) {
+      if (typeof as === 'string' && this.isQueryable(value)) {
+        this.selectSub(value, as)
       } else {
-        this.columns.push(column)
+        this.columns.push(value)
       }
     }
 
@@ -1144,7 +1196,7 @@ export class Builder extends mixing(BuildsQueries).useTrait([
   public whereBetweenColumns (
     column: Expression | string,
     values: Array<unknown>,
-    boolean: string = 'and',
+    boolean: BooleanOperator = 'and',
     not: boolean = false
   ): this {
     const type = 'betweenColumns'
@@ -1293,8 +1345,8 @@ export class Builder extends mixing(BuildsQueries).useTrait([
    * @throws \InvalidArgumentException
    */
   public orderBy (
-    column: Expression | string,
-    direction: SortDirection = SortDirection.Ascending
+    column: QueryCallback | Builder | EloquentBuilder | Expression | string,
+    direction: SortDirectionType = SortDirection.Ascending
   ): this {
     if (this.isQueryable(column)) {
       const [query, bindings] = this.createSub(column)
@@ -1304,16 +1356,18 @@ export class Builder extends mixing(BuildsQueries).useTrait([
       this.addBinding(bindings, this.unions.length > 0 ? 'unionOrder' : 'order')
     }
 
-    // switch (direction) {
-    //   case SortDirection.Ascending:
-    //     direction = 'asc';
-    //     break;
-    //   case SortDirection.Descending:
-    //     direction = 'desc';
-    //     break;
-    //   default:
-    //     throw new Error('Order direction must be a SortDirection, "asc" or "desc".');
-    // }
+    switch (direction) {
+      case SortDirection.Ascending.toLowerCase():
+        direction = SortDirection.Ascending
+        break
+
+      case SortDirection.Descending.toLowerCase():
+        direction = SortDirection.Descending
+        break
+
+      default:
+        throw new Error('InvalidArgumentException: Order direction must be a SortDirection, "asc" or "desc".')
+    }
 
     const order = { column, direction }
 
@@ -1327,12 +1381,114 @@ export class Builder extends mixing(BuildsQueries).useTrait([
   }
 
   /**
+   * Add a "having null" clause to the query.
+   *
+   * @param  string|array|\Illuminate\Contracts\Database\Query\Expression  $columns
+   * @param  string  $boolean
+   * @param  bool  $not
+   * @return $this
+   */
+  public havingNull (
+    columns: Expression | string | Array<Expression | string>,
+    boolean: BooleanOperator = 'and',
+    not: boolean = false
+  ): this {
+    const type: HavingClauseType = not ? 'NotNull' : 'Null'
+
+    for (const column of Arr.wrap(columns)) {
+      this.havings.push({ type, column, boolean })
+    }
+
+    return this
+  }
+
+  /**
+   * Add an "or having null" clause to the query.
+   *
+   * @param  string  $column
+   * @return $this
+   */
+  public orHavingNull (
+    column: Expression | string | Array<Expression | string>
+  ): this {
+    return this.havingNull(column, 'or')
+  }
+
+  /**
+   * Add a "having not null" clause to the query.
+   *
+   * @param  string|array  $columns
+   * @param  string  $boolean
+   * @return $this
+   */
+  public havingNotNull (
+    columns: Expression | string | Array<Expression | string>,
+    boolean: BooleanOperator = 'and'
+  ): this {
+    return this.havingNull(columns, boolean, true)
+  }
+
+  /**
+   * Add an "or having not null" clause to the query.
+   *
+   * @param  string  $column
+   * @return $this
+   */
+  public orHavingNotNull (
+    column: Expression | string | Array<Expression | string>
+  ): this {
+    return this.havingNotNull(column, 'or')
+  }
+
+  /**
+   * Add a "having between" clause to the query.
+   *
+   * @param  string  $column
+   * @param  string  $boolean
+   * @param  bool  $not
+   * @return $this
+   */
+  /**
+   * Add a "having between" clause to the query.
+   *
+   * @param  string  column
+   * @param  Iterable<any>  values
+   * @param  string  boolean
+   * @param  boolean  not
+   * @return this
+   */
+  public havingBetween (
+    column: string,
+    values: unknown[] | Iterable<unknown>,
+    boolean: BooleanOperator = 'and',
+    not: boolean = false
+  ): this {
+    const type = 'between'
+
+    // Handle possible DatePeriod objects for values, if supported in your environment.
+    if (values instanceof DatePeriod) {
+      values = this.resolveDatePeriodBounds(values)
+    }
+
+    // Normalize to array
+    const valueArray = Array.isArray(values) ? values : Array.from(values)
+
+    this.havings.push({ type, column, values: valueArray, boolean, not })
+
+    // Only keep first two bindings, as 'between' only takes two bounds.
+    const cleaned = this.cleanBindings(valueArray.flat())
+    this.addBinding(cleaned.slice(0, 2), 'having')
+
+    return this
+  }
+
+  /**
    * Add a descending "order by" clause to the query.
    *
    * @param  \Closure|\Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder<*>|\Illuminate\Contracts\Database\Query\Expression|string  $column
    * @return $this
    */
-  public orderByDesc (column: Expression | string): this {
+  public orderByDesc (column: QueryCallback | Expression | string): this {
     return this.orderBy(column, SortDirection.Descending)
   }
 
@@ -2050,7 +2206,7 @@ export class Builder extends mixing(BuildsQueries).useTrait([
     column: Expression | string,
     operator: unknown,
     value: unknown,
-    boolean: string = 'and'
+    boolean: BooleanOperator = 'and'
   ): this {
     const operatorText = typeof operator === 'string' ? operator : '='
 
@@ -3184,6 +3340,29 @@ export class Builder extends mixing(BuildsQueries).useTrait([
    */
   public unionAll (query: QueryCallback | Builder | EloquentBuilder): this {
     return this.union(query, true)
+  }
+
+  /**
+   * Remove all existing orders and optionally add a new order.
+   *
+   * @param  ((query: Builder) => void) | Builder | EloquentBuilder | Expression | string | null  column
+   * @param  SortDirection | 'asc' | 'desc'  direction
+   * @return $this
+   */
+  public reorder (
+    column?: QueryCallback | Builder | Expression | string,
+    direction: SortDirectionType = SortDirection.Ascending
+  ): this {
+    this.orders = []
+    this.unionOrders = []
+    this.bindings.order = []
+    this.bindings.unionOrder = []
+
+    if (column) {
+      return this.orderBy(column, direction)
+    }
+
+    return this
   }
 
   /**

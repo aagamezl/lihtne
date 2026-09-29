@@ -1,4 +1,9 @@
-import type { Bindings, WhereClause, WhereClauseType } from '../Query/Builder'
+import type {
+  Bindings,
+  BooleanOperator,
+  WhereClause,
+  WhereClauseType
+} from '../Query/Builder'
 import type { Expression } from '../Query/Expression'
 
 import { Arr } from '../../Collections/Arr'
@@ -11,9 +16,9 @@ export class BuildsWhereDateClauses {
   declare protected addDateBasedWhere: (
     type: WhereClauseType,
     column: string | Expression,
-    operator: string,
+    operator: unknown,
     value: unknown,
-    boolean: string
+    boolean?: BooleanOperator
   ) => this
 
   /**
@@ -129,7 +134,7 @@ export class BuildsWhereDateClauses {
    */
   public whereToday (
     columns: Array<string | Expression>,
-    boolean: string = 'and'
+    boolean: BooleanOperator = 'and'
   ) {
     return this.whereTodayBeforeOrAfter(columns, '=', boolean)
   }
@@ -235,7 +240,7 @@ export class BuildsWhereDateClauses {
   protected whereTodayBeforeOrAfter (
     columns: string | Array<string | Expression>,
     operator: string,
-    boolean: string
+    boolean: BooleanOperator
   ) {
     const value = new Date().toISOString().split('T')[0]
 

@@ -91,6 +91,34 @@ export class SqlServerGrammar extends Grammar {
   }
 
   /**
+   * Compile the "limit" portions of the query.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  int  $limit
+   * @return string
+   */
+  protected override compileLimit (query: Builder, limit: number): string {
+    limit = parseInt(String(limit))
+
+    if (limit && query.offsetProperty > 0) {
+      return `fetch next ${limit} rows only`
+    }
+
+    return ''
+  }
+
+  /**
+   * Compile the random statement into SQL.
+   *
+   * @param  string|int  $seed
+   * @return string
+   */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base compileRandom signature
+  public override compileRandom (seed: string | number): string {
+    return 'NEWID()'
+  }
+
+  /**
    * Compile a select query into SQL.
    *
    * @param  \Illuminate\Database\Query\Builder  $query

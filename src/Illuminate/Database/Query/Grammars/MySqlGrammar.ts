@@ -1,5 +1,6 @@
 import type { Builder, WhereClause } from '../Builder'
 
+import { isNumeric } from '../../../Support'
 import { Grammar } from './Grammar'
 
 export class MySqlGrammar extends Grammar {
@@ -35,6 +36,27 @@ export class MySqlGrammar extends Grammar {
     where.operator = `${where.not ? '!=' : '='} binary`
 
     return this.whereBasic(query, where)
+  }
+
+  /**
+   * Compile the random statement into SQL.
+   *
+   * @param  string|number  seed
+   * @return string
+   */
+  public override compileRandom (seed: string | number): string {
+    if (seed === '' || seed === null || typeof seed === 'undefined') {
+      return 'RAND()'
+    }
+
+    if (!isNumeric(seed)) {
+      throw new Error('InvalidArgumentException: The seed value must be numeric.')
+    }
+
+    // In MySQL, RAND accepts an integer seed
+    // Ensure we only pass an integer
+    const intSeed = parseInt(seed as string, 10)
+    return `RAND(${intSeed})`
   }
 
   /**

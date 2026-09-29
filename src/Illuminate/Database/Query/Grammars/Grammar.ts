@@ -224,6 +224,17 @@ export class Grammar
   }
 
   /**
+   * Compile the random statement into SQL.
+   *
+   * @param  string|int  $seed
+   * @return string
+   */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base compileRandom signature
+  public compileRandom (seed: string | number): string {
+    return 'RANDOM()'
+  }
+
+  /**
    * Compile a group limit clause.
    *
    * @param  \Illuminate\Database\Query\Builder  $query
@@ -390,13 +401,14 @@ export class Grammar
       )
     }
 
-    return (
-      'case ' +
-      cases.join(' ') +
-      ' else ' +
-      Object.values(order.values ?? []).length +
-      ' end'
-    )
+    // return (
+    //   'case ' +
+    //   cases.join(' ') +
+    //   ' else ' +
+    //   Object.values(order.values ?? []).length +
+    //   ' end'
+    // )
+    return 'case ' + cases.join(' ') + ' else ' + order.values?.length + ' end'
   }
 
   /**

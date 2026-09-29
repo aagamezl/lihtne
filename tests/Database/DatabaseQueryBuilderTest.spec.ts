@@ -7,6 +7,7 @@ import { Builder as EloquentBuilder } from '../../src/Illuminate/Database/Eloque
 import { Expression as Raw } from '../../src/Illuminate/Database/Query/Expression'
 import { Carbon, DateInterval, DatePeriod, Str } from '../../src/Illuminate/Support'
 import { Bar } from '../../tests/Database/Fixtures/Enums/Bar'
+import { IntegerStatus, StringStatus } from './Fixtures/Enums'
 import { getBuilder } from './helpers/getBuilder'
 import { getMariaDbBuilder } from './helpers/getMariaDbBuilder'
 import { getMySqlBuilder } from './helpers/getMySqlBuilder'
@@ -2419,5 +2420,328 @@ describe('Database Query Builder', () => {
     builder = getBuilder()
     builder.select('*').from('users').oldest('updated_at')
     expect(builder.toSql()).toBe('select * from "users" order by "updated_at" asc')
+  })
+
+  test('testInRandomOrderMySql', () => {
+    const builder = getBuilder()
+    builder.select('*').from('users').inRandomOrder()
+    expect(builder.toSql()).toBe('select * from "users" order by RANDOM()')
+  })
+
+  test('testInRandomOrderMySqlGrammarWithoutSeed', () => {
+    const builder = getMySqlBuilder()
+    builder.select('*').from('users').inRandomOrder()
+    expect(builder.toSql()).toBe('select * from `users` order by RAND()')
+  })
+
+  test('testInRandomOrderMySqlGrammarWithSeed', () => {
+    const builder = getMySqlBuilder()
+    builder.select('*').from('users').inRandomOrder(123)
+    expect(builder.toSql()).toBe('select * from `users` order by RAND(123)')
+  })
+
+  test('testInRandomOrderPostgres', () => {
+    const builder = getPostgresBuilder()
+    builder.select('*').from('users').inRandomOrder()
+    expect(builder.toSql()).toBe('select * from "users" order by RANDOM()')
+  })
+
+  test('testInRandomOrderSqlServer', () => {
+    const builder = getSqlServerBuilder()
+    builder.select('*').from('users').inRandomOrder()
+    expect(builder.toSql()).toBe('select * from [users] order by NEWID()')
+  })
+
+  test('testInOrderOf', () => {
+    const builder = getBuilder()
+    builder.select('*').from('users').inOrderOf('status', ['active', 'pending', 'inactive'])
+    expect(builder.toSql()).toBe('select * from "users" order by case when "status" = ? then 0 when "status" = ? then 1 when "status" = ? then 2 else 3 end')
+    expect(builder.getBindings()).toEqual(['active', 'pending', 'inactive'])
+  })
+
+  test('testInOrderOfWithExistingOrders', () => {
+    const builder = getBuilder()
+    builder.select('*').from('users').inOrderOf('status', ['active', 'pending']).orderBy('name')
+    expect(builder.toSql()).toBe('select * from "users" order by case when "status" = ? then 0 when "status" = ? then 1 else 2 end, "name" asc')
+    expect(builder.getBindings()).toEqual(['active', 'pending'])
+  })
+
+  test('testInOrderOfWithEmptyValues', () => {
+    const builder = getBuilder()
+    builder.select('*').from('users').inOrderOf('status', [])
+    expect(builder.toSql()).toBe('select * from "users"')
+  })
+
+  test('testInOrderOfWithSingleValue', () => {
+    const builder = getBuilder()
+    builder.select('*').from('users').inOrderOf('status', ['active'])
+    expect(builder.toSql()).toBe('select * from "users" order by case when "status" = ? then 0 else 1 end')
+    expect(builder.getBindings()).toEqual(['active'])
+  })
+
+  test('testInOrderOfMySql', () => {
+    const builder = getMySqlBuilder()
+    builder.select('*').from('users').inOrderOf('status', ['active', 'pending'])
+    expect(builder.toSql()).toBe('select * from `users` order by case when `status` = ? then 0 when `status` = ? then 1 else 2 end')
+    expect(builder.getBindings()).toEqual(['active', 'pending'])
+  })
+
+  test('testInOrderOfPostgres', () => {
+    const builder = getPostgresBuilder()
+    builder.select('*').from('users').inOrderOf('status', ['active', 'pending'])
+    expect(builder.toSql()).toBe('select * from "users" order by case when "status" = ? then 0 when "status" = ? then 1 else 2 end')
+    expect(builder.getBindings()).toEqual(['active', 'pending'])
+  })
+
+  test('testInOrderOfSqlServer', () => {
+    const builder = getSqlServerBuilder()
+    builder.select('*').from('users').inOrderOf('status', ['active', 'pending'])
+    expect(builder.toSql()).toBe('select * from [users] order by case when [status] = ? then 0 when [status] = ? then 1 else 2 end')
+    expect(builder.getBindings()).toEqual(['active', 'pending'])
+  })
+
+  test('testInOrderOfWithIntegerValues', () => {
+    const builder = getBuilder()
+    builder.select('*').from('users').inOrderOf('id', [5, 2, 8])
+    expect(builder.toSql()).toBe('select * from "users" order by case when "id" = ? then 0 when "id" = ? then 1 when "id" = ? then 2 else 3 end')
+    expect(builder.getBindings()).toEqual([5, 2, 8])
+  })
+
+  test('testInOrderOfWithWhereClause', () => {
+    const builder = getBuilder()
+    builder.select('*').from('users').where('active', true).inOrderOf('status', ['pending', 'approved'])
+    expect(builder.toSql()).toBe('select * from "users" where "active" = ? order by case when "status" = ? then 0 when "status" = ? then 1 else 2 end')
+    expect(builder.getBindings()).toEqual([true, 'pending', 'approved'])
+  })
+
+  test('testInOrderOfWithBackedEnumValues', () => {
+    const builder = getBuilder()
+    builder.select('*').from('users').inOrderOf('status', [StringStatus.pending, StringStatus.done, StringStatus.draft])
+    expect(builder.toSql()).toBe('select * from "users" order by case when "status" = ? then 0 when "status" = ? then 1 when "status" = ? then 2 else 3 end')
+    expect(builder.getBindings()).toEqual(['pending', 'done', 'draft'])
+  })
+
+  test('testInOrderOfWithIntegerBackedEnumValues', () => {
+    const builder = getBuilder()
+    builder.select('*').from('users').inOrderOf('status', [IntegerStatus.done, IntegerStatus.pending])
+    expect(builder.toSql()).toBe('select * from "users" order by case when "status" = ? then 0 when "status" = ? then 1 else 2 end')
+    expect(builder.getBindings()).toEqual([2, 1])
+  })
+
+  test('testOrderBysSqlServer', () => {
+    let builder = getSqlServerBuilder()
+    builder.select('*').from('users').orderBy('email').orderBy('age', 'desc')
+    expect(builder.toSql()).toBe('select * from [users] order by [email] asc, [age] desc')
+
+    builder.orders = []
+    expect(builder.toSql()).toBe('select * from [users]')
+
+    builder.orders = []
+    expect(builder.toSql()).toBe('select * from [users]')
+
+    builder = getSqlServerBuilder()
+    builder.select('*').from('users').orderBy('email')
+    expect(builder.toSql()).toBe('select * from [users] order by [email] asc')
+
+    builder = getSqlServerBuilder()
+    builder.select('*').from('users').orderByDesc('name')
+    expect(builder.toSql()).toBe('select * from [users] order by [name] desc')
+
+    builder = getSqlServerBuilder()
+    builder.select('*').from('users').orderByRaw('[age] asc')
+    expect(builder.toSql()).toBe('select * from [users] order by [age] asc')
+
+    builder = getSqlServerBuilder()
+    builder.select('*').from('users').orderBy('email').orderByRaw('[age] ? desc', ['foo'])
+    expect(builder.toSql()).toBe('select * from [users] order by [email] asc, [age] ? desc')
+    expect(builder.getBindings()).toEqual(['foo'])
+
+    builder = getSqlServerBuilder()
+    builder.select('*').from('users').offset(25).limit(10).orderByRaw('[email] desc')
+    expect(builder.toSql()).toBe('select * from [users] order by [email] desc offset 25 rows fetch next 10 rows only')
+  })
+
+  test('testReorder', () => {
+    let builder = getBuilder()
+    builder.select('*').from('users').orderBy('name')
+    expect(builder.toSql()).toBe('select * from "users" order by "name" asc')
+    builder.reorder()
+    expect(builder.toSql()).toBe('select * from "users"')
+
+    builder = getBuilder()
+    builder.select('*').from('users').orderBy('name')
+    expect(builder.toSql()).toBe('select * from "users" order by "name" asc')
+    builder.reorder('email', 'desc')
+    expect(builder.toSql()).toBe('select * from "users" order by "email" desc')
+
+    builder = getBuilder()
+    builder.select('*').from('first')
+    builder.union(getBuilder().select('*').from('second'))
+    builder.orderBy('name')
+    expect(builder.toSql()).toBe('(select * from "first") union (select * from "second") order by "name" asc')
+    builder.reorder()
+    expect(builder.toSql()).toBe('(select * from "first") union (select * from "second")')
+
+    builder = getBuilder()
+    builder.select('*').from('users').orderByRaw('?', [true])
+    expect(builder.getBindings()).toEqual([true])
+    builder.reorder()
+    expect(builder.getBindings()).toEqual([])
+  })
+
+  test('testOrderBySubQueries', () => {
+    const expected = 'select * from "users" order by (select "created_at" from "logins" where "user_id" = "users"."id" limit 1)'
+    const subQuery = (query: Builder) => {
+      return query.select('created_at').from('logins').whereColumn('user_id', 'users.id').limit(1)
+    }
+
+    let builder = getBuilder().select('*').from('users').orderBy(subQuery)
+    expect(builder.toSql()).toBe(`${expected} asc`)
+
+    builder = getBuilder().select('*').from('users').orderBy(subQuery, 'desc')
+    expect(builder.toSql()).toBe(`${expected} desc`)
+
+    builder = getBuilder().select('*').from('users').orderByDesc(subQuery)
+    expect(builder.toSql()).toBe(`${expected} desc`)
+
+    builder = getBuilder()
+    builder.select('*').from('posts').where('public', 1)
+      .unionAll(getBuilder().select('*').from('videos').where('public', 1))
+      .orderBy(getBuilder().selectRaw('field(category, ?, ?)', ['news', 'opinion']))
+    expect(builder.toSql()).toBe('(select * from "posts" where "public" = ?) union all (select * from "videos" where "public" = ?) order by (select field(category, ?, ?)) asc')
+    expect(builder.getBindings()).toEqual([1, 1, 'news', 'opinion'])
+  })
+
+  test('testOrderByInvalidDirectionParam', () => {
+    const builder = getBuilder()
+
+    expect(() => {
+      builder.select('*').from('users').orderBy('age', 'asec')
+    }).toThrow('InvalidArgumentException: Order direction must be a SortDirection, "asc" or "desc".')
+  })
+
+  test('testHavings', () => {
+    let builder = getBuilder()
+    builder.select('*').from('users').having('email', '>', 1)
+    expect(builder.toSql()).toBe('select * from "users" having "email" > ?')
+
+    builder = getBuilder()
+    builder.select('*').from('users')
+      .orHaving('email', '=', 'test@example.com')
+      .orHaving('email', '=', 'test2@example.com')
+    expect(builder.toSql()).toBe('select * from "users" having "email" = ? or "email" = ?')
+
+    builder = getBuilder()
+    builder.select('*').from('users').groupBy('email').having('email', '>', 1)
+    expect(builder.toSql()).toBe('select * from "users" group by "email" having "email" > ?')
+
+    builder = getBuilder()
+    builder.select('email as foo_email').from('users').having('foo_email', '>', 1)
+    expect(builder.toSql()).toBe('select "email" as "foo_email" from "users" having "foo_email" > ?')
+
+    builder = getBuilder()
+    builder.select(['category', new Raw('count(*) as "total"')]).from('item').where('department', '=', 'popular').groupBy('category').having('total', '>', new Raw('3'))
+    expect(builder.toSql()).toBe('select "category", count(*) as "total" from "item" where "department" = ? group by "category" having "total" > 3')
+
+    builder = getBuilder()
+    builder.select(['category', new Raw('count(*) as "total"')]).from('item').where('department', '=', 'popular').groupBy('category').having('total', '>', 3)
+    expect(builder.toSql()).toBe('select "category", count(*) as "total" from "item" where "department" = ? group by "category" having "total" > ?')
+  })
+
+  test('testNestedHavings', () => {
+    const builder = getBuilder()
+    builder.select('*').from('users').having('email', '=', 'foo').orHaving((q: Builder) => {
+      q.having('name', '=', 'bar').having('age', '=', 25)
+    })
+    expect(builder.toSql()).toBe('select * from "users" having "email" = ? or ("name" = ? and "age" = ?)')
+    expect(builder.getBindings()).toEqual(['foo', 'bar', 25])
+  })
+
+  test('testNestedHavingBindings', () => {
+    const builder = getBuilder()
+    builder.having('email', '=', 'foo').having((q: Builder) => {
+      q.selectRaw('?', ['ignore']).having('name', '=', 'bar')
+    })
+    expect(builder.getBindings()).toEqual(['foo', 'bar'])
+  })
+
+  test('testHavingBetweens', () => {
+    let builder = getBuilder()
+    builder.select('*').from('users').havingBetween('id', [1, 2, 3])
+    expect(builder.toSql()).toBe('select * from "users" having "id" between ? and ?')
+    expect(builder.getBindings()).toEqual([1, 2])
+
+    builder = getBuilder()
+    builder.select('*').from('users').havingBetween('id', [[1, 2], [3, 4]])
+    expect(builder.toSql()).toBe('select * from "users" having "id" between ? and ?')
+    expect(builder.getBindings()).toEqual([1, 2])
+  })
+
+  test('testHavingNull', () => {
+    let builder = getBuilder()
+    builder.select('*').from('users').havingNull('email')
+    expect(builder.toSql()).toBe('select * from "users" having "email" is null')
+
+    builder = getBuilder()
+    builder.select('*').from('users')
+      .havingNull('email')
+      .havingNull('phone')
+    expect(builder.toSql()).toBe('select * from "users" having "email" is null and "phone" is null')
+
+    builder = getBuilder()
+    builder.select('*').from('users')
+      .orHavingNull('email')
+      .orHavingNull('phone')
+    expect(builder.toSql()).toBe('select * from "users" having "email" is null or "phone" is null')
+
+    builder = getBuilder()
+    builder.select('*').from('users').groupBy('email').havingNull('email')
+    expect(builder.toSql()).toBe('select * from "users" group by "email" having "email" is null')
+
+    builder = getBuilder()
+    builder.select('email as foo_email').from('users').havingNull('foo_email')
+    expect(builder.toSql()).toBe('select "email" as "foo_email" from "users" having "foo_email" is null')
+
+    builder = getBuilder()
+    builder.select(['category', new Raw('count(*) as "total"')]).from('item').where('department', '=', 'popular').groupBy('category').havingNull('total')
+    expect(builder.toSql()).toBe('select "category", count(*) as "total" from "item" where "department" = ? group by "category" having "total" is null')
+
+    builder = getBuilder()
+    builder.select(['category', new Raw('count(*) as "total"')]).from('item').where('department', '=', 'popular').groupBy('category').havingNull('total')
+    expect(builder.toSql()).toBe('select "category", count(*) as "total" from "item" where "department" = ? group by "category" having "total" is null')
+  })
+
+  test('testHavingNotNull', () => {
+    let builder = getBuilder()
+    builder.select('*').from('users').havingNotNull('email')
+    expect(builder.toSql()).toBe('select * from "users" having "email" is not null')
+
+    builder = getBuilder()
+    builder.select('*').from('users')
+      .havingNotNull('email')
+      .havingNotNull('phone')
+    expect(builder.toSql()).toBe('select * from "users" having "email" is not null and "phone" is not null')
+
+    builder = getBuilder()
+    builder.select('*').from('users')
+      .orHavingNotNull('email')
+      .orHavingNotNull('phone')
+    expect(builder.toSql()).toBe('select * from "users" having "email" is not null or "phone" is not null')
+
+    builder = getBuilder()
+    builder.select('*').from('users').groupBy('email').havingNotNull('email')
+    expect(builder.toSql()).toBe('select * from "users" group by "email" having "email" is not null')
+
+    builder = getBuilder()
+    builder.select('email as foo_email').from('users').havingNotNull('foo_email')
+    expect(builder.toSql()).toBe('select "email" as "foo_email" from "users" having "foo_email" is not null')
+
+    builder = getBuilder()
+    builder.select(['category', new Raw('count(*) as "total"')]).from('item').where('department', '=', 'popular').groupBy('category').havingNotNull('total')
+    expect(builder.toSql()).toBe('select "category", count(*) as "total" from "item" where "department" = ? group by "category" having "total" is not null')
+
+    builder = getBuilder()
+    builder.select(['category', new Raw('count(*) as "total"')]).from('item').where('department', '=', 'popular').groupBy('category').havingNotNull('total')
+    expect(builder.toSql()).toBe('select "category", count(*) as "total" from "item" where "department" = ? group by "category" having "total" is not null')
   })
 })
