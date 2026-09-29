@@ -452,7 +452,7 @@ export class Grammar
    */
   // @ts-expect-error expected error; query is not used in this method
   // @eslint-disable-next-line @typescript-eslint/no-unused-vars
-  protected compileGroups (query: Builder, groups: string[]): string {
+  protected compileGroups (query: Builder, groups: Array<Expression | string>): string {
     return 'group by ' + this.columnize(groups)
   }
 
@@ -1224,6 +1224,12 @@ export class Grammar
    * @return {string}
    */
   protected compileNestedHavings (having: Having): string {
+    if (having.query === undefined) {
+      throw new Error(
+        'RuntimeException: Nested having clause is missing its query.'
+      )
+    }
+
     return '(' + this.compileHavings(having.query).substring(7) + ')'
   }
 

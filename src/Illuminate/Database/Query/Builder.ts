@@ -22,17 +22,9 @@ import { Relation } from '../Eloquent/Relations'
 import { SortDirection } from './Enums/SortDirection'
 import { Expression } from './Expression'
 
-export type BindingValue =
+export type BindingValue = string | number | boolean | Date | null | Expression
 
-    | string |
-    number |
-    // | bigint
-    boolean |
-    Date |
-    // | Buffer
-    // | Uint8Array
-    null |
-    Expression
+export type OrderClauseType = 'Basic' | 'Raw'
 
 export type BindingValues = BindingValue[]
 
@@ -55,32 +47,32 @@ export type WhereOptions = {
 
 export type WhereClauseType =
 
-    | 'Basic' |
-    'Bitwise' |
-    'Binary' |
-    'Column' |
-    'Date' |
-    'Day' |
-    'Expression' |
-    'Fulltext' |
-    'In' |
-    'InRaw' |
-    'JsonBoolean' |
-    'Like' |
-    'Month' |
-    'Nested' |
-    'NotIn' |
-    'NotInRaw' |
-    'NotNull' |
-    'Null' |
-    'NullSafeEquals' |
-    'Sub' |
-    'Time' |
-    'Year' |
-    'between' |
-    'betweenColumns' |
-    'raw' |
-    'valueBetween'
+  | 'Basic' |
+  'Bitwise' |
+  'Binary' |
+  'Column' |
+  'Date' |
+  'Day' |
+  'Expression' |
+  'Fulltext' |
+  'In' |
+  'InRaw' |
+  'JsonBoolean' |
+  'Like' |
+  'Month' |
+  'Nested' |
+  'NotIn' |
+  'NotInRaw' |
+  'NotNull' |
+  'Null' |
+  'NullSafeEquals' |
+  'Sub' |
+  'Time' |
+  'Year' |
+  'between' |
+  'betweenColumns' |
+  'raw' |
+  'valueBetween'
 
 export type WhereClause = {
   caseSensitive?: boolean
@@ -111,16 +103,27 @@ export type Bindings = {
   unionOrder: BindingValues
 }
 
+export type HavingClauseType =
+  | 'Basic' |
+  'Bitwise' |
+  'Expression' |
+  'Nested' |
+  'NotNull' |
+  'Null' |
+  'Raw' |
+  'between' |
+  'bit'
+
 export type Having = {
-  type: string
+  type: HavingClauseType
   column?: string | Expression
   operator?: string
-  value?: string
+  value?: unknown
   boolean: string
   sql?: string
   values?: string[]
   not?: boolean
-  query: Builder
+  query?: Builder
 }
 
 export type Order = {
@@ -145,7 +148,7 @@ export type GroupLimit = {
   column: string
 }
 
-type QueryCallback = (query: Builder) => unknown
+export type QueryCallback = (query: Builder) => unknown
 type JoinCallback = (join: JoinClause) => unknown
 type AfterQueryCallback = <TResult>(
   result: TResult
@@ -164,7 +167,7 @@ export const BOOLEAN_OPERATORS: Record<BooleanOperator, BooleanOperator> = {
 
 // Trait methods are merged onto the class. `mixing().useTrait()` copies them onto the prototype at runtime.
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export interface Builder extends BuildsQueries, BuildsWhereDateClauses {}
+export interface Builder extends BuildsQueries, BuildsWhereDateClauses { }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Builder extends mixing(BuildsQueries).useTrait([
@@ -193,7 +196,7 @@ export class Builder extends mixing(BuildsQueries).useTrait([
    *
    * @var array|null
    */
-  public groups = []
+  public groups: Array<Expression | string> = []
 
   // The query union statements.
   public unions: Union[] = []
@@ -607,6 +610,124 @@ export class Builder extends mixing(BuildsQueries).useTrait([
   }
 
   /**
+   * Add a "having" clause to the query.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression|\Closure|string  $column
+   * @param  \DateTimeInterface|string|int|float|null  $operator
+   * @param  \Illuminate\Contracts\Database\Query\Expression|\DateTimeInterface|string|int|float|null  $value
+   * @param  string  $boolean
+   * @return $this
+   */
+  public having (
+    column: Expression | string,
+    operator: unknown = undefined,
+    value: unknown = undefined,
+    boolean: string = 'and'
+  ): this {
+    let type: HavingClauseType = 'Basic'
+
+    if (column instanceof Expression) {
+      type = 'Expression'
+
+      this.havings.push({ type, column, boolean })
+
+      return this
+    }
+
+    // Here we will make some assumptions about the operator. If only 2 values are
+    // passed to the method, we will assume that the operator is an equals sign
+    // and keep going. Otherwise, we'll require the operator to be passed in.
+    ;[value, operator] = this.prepareValueAndOperator(
+      value,
+      operator,
+      arguments.length === 2
+    )
+
+    if (typeof column === 'function' && operator === undefined) {
+      return this.havingNested(column, boolean)
+    }
+
+    // If the given operator is not found in the list of valid operators we will
+    // assume that the developer is just short-cutting the '=' operators and
+    // we will set the operators to '=' and set the values appropriately.
+    if (this.invalidOperator(operator)) {
+      ;[value, operator] = [operator, '=']
+    }
+
+    if (this.isBitwiseOperator(operator)) {
+      type = 'Bitwise'
+    }
+
+    const having: Having = { type, column, value, boolean }
+
+    if (typeof operator === 'string') {
+      having.operator = operator
+    }
+
+    this.havings.push(having)
+
+    if (!(value instanceof Expression)) {
+      this.addBinding(this.flattenValue(value), 'having')
+    }
+
+    return this
+  }
+
+  /**
+   * Add an "or having" clause to the query.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression|\Closure|string  $column
+   * @param  \DateTimeInterface|string|int|float|null  $operator
+   * @param  \Illuminate\Contracts\Database\Query\Expression|\DateTimeInterface|string|int|float|null  $value
+   * @return $this
+   */
+  public orHaving (
+    column: Expression | string,
+    operator: unknown = undefined,
+    value: unknown = undefined
+  ): this {
+    ;[value, operator] = this.prepareValueAndOperator(
+      value,
+      operator,
+      arguments.length === 2
+    )
+
+    return this.having(column, operator, value, 'or')
+  }
+
+  /**
+   * Add a nested "having" statement to the query.
+   *
+   * @param  string  $boolean
+   * @return $this
+   */
+  public havingNested (callback: QueryCallback, boolean: string = 'and'): this {
+    const query = this.forNestedWhere()
+    callback(query)
+
+    return this.addNestedHavingQuery(query, boolean)
+  }
+
+  /**
+   * Add another query builder as a nested having to the query builder.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  string  $boolean
+   * @return $this
+   */
+  public addNestedHavingQuery (query: Builder, boolean: string = 'and'): this {
+    if (query.havings.length > 0) {
+      const type: HavingClauseType = 'Nested'
+
+      this.havings.push({ type, query, boolean })
+
+      this.addBinding(query.getRawBindings().having, 'having')
+    }
+
+    return this
+  }
+
+  /**
    * Add a "where like" clause to the query.
    *
    * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
@@ -658,6 +779,95 @@ export class Builder extends mixing(BuildsQueries).useTrait([
     }
 
     return this
+  }
+
+  /**
+   * Add a "group by" clause to the query.
+   *
+   * @param  array|\Illuminate\Contracts\Database\Query\Expression|string  ...$groups
+   * @return $this
+   */
+  public groupBy (
+    ...groups: Array<Expression | string | Array<Expression | string>>
+  ): this {
+    for (const group of groups) {
+      this.groups = [...this.groups, ...Arr.wrap(group)]
+    }
+
+    return this
+  }
+
+  /**
+   * Add a raw "having" clause to the query.
+   *
+   * @param  literal-string  $sql
+   * @param  string  $boolean
+   * @return $this
+   */
+  public havingRaw (sql: string, bindings: unknown[] = [], boolean: string = 'and'): this {
+    const type: HavingClauseType = 'Raw'
+
+    this.havings.push({ type, sql, boolean })
+
+    this.addBinding(bindings, 'having')
+
+    return this
+  }
+
+  /**
+   * Add an "order by" clause for a timestamp to the query.
+   *
+   * @param  \Closure|\Illuminate\Database\Query\Builder|\Illuminate\Contracts\Database\Query\Expression|string  $column
+   * @return $this
+   */
+  public latest (column: Expression | string = 'created_at'): this {
+    return this.orderBy(column, SortDirection.Descending)
+  }
+
+  /**
+   * Add an "order by" clause for a timestamp to the query.
+   *
+   * @param  \Closure|\Illuminate\Database\Query\Builder|\Illuminate\Contracts\Database\Query\Expression|string  $column
+   * @return $this
+   */
+  public oldest (column: Expression | string = 'created_at'): this {
+    return this.orderBy(column, SortDirection.Ascending)
+  }
+
+  /**
+   * Add a raw "or having" clause to the query.
+   *
+   * @param  literal-string  $sql
+   * @return $this
+   */
+  public orHavingRaw (sql: string, bindings: unknown[] = []): this {
+    return this.havingRaw(sql, bindings, 'or')
+  }
+
+  /**
+   * Add a raw "groupBy" clause to the query.
+   *
+   * @param  literal-string  $sql
+   * @return $this
+   */
+  public groupByRaw (sql: string, bindings: unknown[] = []): this {
+    this.groups.push(new Expression(sql))
+
+    this.addBinding(bindings, 'groupBy')
+
+    return this
+  }
+
+  /**
+   * Add an "or where null" clause to the query.
+   *
+   * @param  string|array|\Illuminate\Contracts\Database\Query\Expression  $column
+   * @return $this
+   */
+  public orWhereNull (
+    column: Expression | string | Array<Expression | string>
+  ): this {
+    return this.whereNull(column, BOOLEAN_OPERATORS.or)
   }
 
   /**
@@ -960,7 +1170,7 @@ export class Builder extends mixing(BuildsQueries).useTrait([
    * @param  mixed  result
    * @return mixed
    */
-  public applyAfterQueryCallbacks<TResult> (result: TResult): TResult {
+  public applyAfterQueryCallbacks<TResult>(result: TResult): TResult {
     for (const afterQueryCallback of this.afterQueryCallbacks) {
       result = afterQueryCallback(result) ?? result
     }
@@ -979,7 +1189,7 @@ export class Builder extends mixing(BuildsQueries).useTrait([
    * @param  callable(): TResult  $callback
    * @return TResult
    */
-  protected onceWithColumns<TResult> (
+  protected onceWithColumns<TResult>(
     columns: Array<string | Expression>,
     callback: () => TResult
   ): TResult {
@@ -1523,6 +1733,25 @@ export class Builder extends mixing(BuildsQueries).useTrait([
   }
 
   /**
+   * Add a raw "order by" clause to the query.
+   *
+   * @param  literal-string  $sql
+   * @param  array  $bindings
+   * @return $this
+   */
+  public orderByRaw (sql: string, bindings: unknown[] = []): this {
+    const type: OrderClauseType = 'Raw'
+
+    const orderProperty = this.unions.length > 0 ? 'unionOrders' : 'orders'
+
+    this[orderProperty].push({ type, sql })
+
+    this.addBinding(bindings, this.unions.length > 0 ? 'unionOrder' : 'order')
+
+    return this
+  }
+
+  /**
    * Get the base query builder instance from a subquery.
    *
    * @param  \Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder<*>|\Illuminate\Database\Eloquent\Relations\Relation  query
@@ -1540,7 +1769,7 @@ export class Builder extends mixing(BuildsQueries).useTrait([
    */
   protected prependDatabaseNameIfCrossDatabaseQuery<
     T extends Builder | EloquentBuilder | Relation
-  > (query: T): T {
+  >(query: T): T {
     const builder = this.toBaseQuery(query)
 
     if (

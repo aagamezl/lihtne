@@ -2228,4 +2228,196 @@ describe('Database Query Builder', () => {
     expect(selectSpySqlServer).toHaveBeenCalledWith(expected, [])
     expect(processSelectSpySqlServer).toHaveBeenCalled()
   })
+
+  test('testHavingAggregate', async () => {
+    const expected = 'select count(*) as `aggregate` from (select (select `count(*)` from `videos` where `posts`.`id` = `videos`.`post_id`) as `videos_count` from `posts` having `videos_count` > ?) as `temp_table`'
+    const builder = getMySqlBuilder()
+    const selectSpyMySql = jest.spyOn(builder.getConnection(), 'select')
+      .mockImplementationOnce(() => [])
+    const processSelectSpyMySql = jest.spyOn(builder.getProcessor(), 'processSelect')
+
+    await builder.from('posts').selectSub((query: Builder) => {
+      query.from('videos').select('count(*)').whereColumn('posts.id', '=', 'videos.post_id')
+    }, 'videos_count').having('videos_count', '>', 1).count()
+    expect(selectSpyMySql).toHaveBeenCalledWith(expected, [1])
+    expect(processSelectSpyMySql).toHaveBeenCalled()
+  })
+
+  test('testSubSelectWhereIns', () => {
+    let builder = getBuilder()
+    builder.select('*').from('users').whereIn('id', (q: Builder) => {
+      q.select('id').from('users').where('age', '>', 25).limit(3)
+    })
+    expect(builder.toSql()).toBe('select * from "users" where "id" in (select "id" from "users" where "age" > ? limit 3)')
+    expect(builder.getBindings()).toEqual([25])
+
+    builder = getBuilder()
+    builder.select('*').from('users').whereNotIn('id', (q: Builder) => {
+      q.select('id').from('users').where('age', '>', 25).limit(3)
+    })
+    expect(builder.toSql()).toBe('select * from "users" where "id" not in (select "id" from "users" where "age" > ? limit 3)')
+    expect(builder.getBindings()).toEqual([25])
+  })
+
+  test('testBasicWhereNulls', () => {
+    let builder = getBuilder()
+    builder.select('*').from('users').whereNull('id')
+    expect(builder.toSql()).toBe('select * from "users" where "id" is null')
+    expect(builder.getBindings()).toEqual([])
+
+    builder = getBuilder()
+    builder.select('*').from('users').where('id', '=', 1).orWhereNull('id')
+    expect(builder.toSql()).toBe('select * from "users" where "id" = ? or "id" is null')
+    expect(builder.getBindings()).toEqual([1])
+  })
+
+  test('testBasicWhereNullExpressionsMysql', () => {
+    let builder = getMySqlBuilder()
+    builder.select('*').from('users').whereNull(new Raw('id'))
+    expect(builder.toSql()).toBe('select * from `users` where id is null')
+    expect(builder.getBindings()).toEqual([])
+
+    builder = getMySqlBuilder()
+    builder.select('*').from('users').where('id', '=', 1).orWhereNull(new Raw('id'))
+    expect(builder.toSql()).toBe('select * from `users` where `id` = ? or id is null')
+    expect(builder.getBindings()).toEqual([1])
+  })
+
+  test('testJsonWhereNullMysql', () => {
+    const builder = getMySqlBuilder()
+    builder.select('*').from('users').whereNull('items->id')
+    expect(builder.toSql()).toBe('select * from `users` where (json_extract(`items`, \'$."id"\') is null OR json_type(json_extract(`items`, \'$."id"\')) = \'NULL\')')
+  })
+
+  test('testJsonWhereNotNullMysql', () => {
+    const builder = getMySqlBuilder()
+    builder.select('*').from('users').whereNotNull('items->id')
+    expect(builder.toSql()).toBe('select * from `users` where (json_extract(`items`, \'$."id"\') is not null AND json_type(json_extract(`items`, \'$."id"\')) != \'NULL\')')
+  })
+
+  test('testJsonWhereNullExpressionMysql', () => {
+    const builder = getMySqlBuilder()
+    builder.select('*').from('users').whereNull(new Raw('items->id'))
+    expect(builder.toSql()).toBe('select * from `users` where (json_extract(`items`, \'$."id"\') is null OR json_type(json_extract(`items`, \'$."id"\')) = \'NULL\')')
+  })
+
+  test('testJsonWhereNotNullExpressionMysql', () => {
+    const builder = getMySqlBuilder()
+    builder.select('*').from('users').whereNotNull(new Raw('items->id'))
+    expect(builder.toSql()).toBe('select * from `users` where (json_extract(`items`, \'$."id"\') is not null AND json_type(json_extract(`items`, \'$."id"\')) != \'NULL\')')
+  })
+
+  test('testArrayWhereNulls', () => {
+    let builder = getBuilder()
+    builder.select('*').from('users').whereNull(['id', 'expires_at'])
+    expect(builder.toSql()).toBe('select * from "users" where "id" is null and "expires_at" is null')
+    expect(builder.getBindings()).toEqual([])
+
+    builder = getBuilder()
+    builder.select('*').from('users').where('id', '=', 1).orWhereNull(['id', 'expires_at'])
+    expect(builder.toSql()).toBe('select * from "users" where "id" = ? or "id" is null or "expires_at" is null')
+    expect(builder.getBindings()).toEqual([1])
+  })
+
+  test('testBasicWhereNotNulls', () => {
+    let builder = getBuilder()
+    builder.select('*').from('users').whereNotNull('id')
+    expect(builder.toSql()).toBe('select * from "users" where "id" is not null')
+    expect(builder.getBindings()).toEqual([])
+
+    builder = getBuilder()
+    builder.select('*').from('users').where('id', '>', 1).orWhereNotNull('id')
+    expect(builder.toSql()).toBe('select * from "users" where "id" > ? or "id" is not null')
+    expect(builder.getBindings()).toEqual([1])
+  })
+
+  test('testArrayWhereNotNulls', () => {
+    let builder = getBuilder()
+    builder.select('*').from('users').whereNotNull(['id', 'expires_at'])
+    expect(builder.toSql()).toBe('select * from "users" where "id" is not null and "expires_at" is not null')
+    expect(builder.getBindings()).toEqual([])
+
+    builder = getBuilder()
+    builder.select('*').from('users').where('id', '>', 1).orWhereNotNull(['id', 'expires_at'])
+    expect(builder.toSql()).toBe('select * from "users" where "id" > ? or "id" is not null or "expires_at" is not null')
+    expect(builder.getBindings()).toEqual([1])
+  })
+
+  test('testGroupBys', () => {
+    let builder = getBuilder()
+    builder.select('*').from('users').groupBy('email')
+    expect(builder.toSql()).toBe('select * from "users" group by "email"')
+
+    builder = getBuilder()
+    builder.select('*').from('users').groupBy('id', 'email')
+    expect(builder.toSql()).toBe('select * from "users" group by "id", "email"')
+
+    builder = getBuilder()
+    builder.select('*').from('users').groupBy(['id', 'email'])
+    expect(builder.toSql()).toBe('select * from "users" group by "id", "email"')
+
+    builder = getBuilder()
+    builder.select('*').from('users').groupBy(new Raw('DATE(created_at)'))
+    expect(builder.toSql()).toBe('select * from "users" group by DATE(created_at)')
+
+    builder = getBuilder()
+    builder.select('*').from('users').groupByRaw('DATE(created_at), ? DESC', ['foo'])
+    expect(builder.toSql()).toBe('select * from "users" group by DATE(created_at), ? DESC')
+    expect(builder.getBindings()).toEqual(['foo'])
+
+    builder = getBuilder()
+    builder.havingRaw('?', ['havingRawBinding']).groupByRaw('?', ['groupByRawBinding']).whereRaw('?', ['whereRawBinding'])
+    expect(builder.getBindings()).toEqual(['whereRawBinding', 'groupByRawBinding', 'havingRawBinding'])
+  })
+
+  test('testOrderBys', () => {
+    let builder = getBuilder()
+    builder.select('*').from('users').orderBy('email').orderBy('age', 'desc')
+    expect(builder.toSql()).toBe('select * from "users" order by "email" asc, "age" desc')
+    expect(builder.getBindings()).toEqual([])
+
+    builder = getBuilder()
+    builder.select('*').from('users').orderBy('email').orderByRaw('"age" ? desc', ['foo'])
+    expect(builder.toSql()).toBe('select * from "users" order by "email" asc, "age" ? desc')
+    expect(builder.getBindings()).toEqual(['foo'])
+
+    builder = getBuilder()
+    builder.select('*').from('users').orderByDesc('name')
+    expect(builder.toSql()).toBe('select * from "users" order by "name" desc')
+
+    builder = getBuilder()
+    builder.select('*').from('posts').where('public', 1)
+    builder.unionAll(getBuilder().select('*').from('videos').where('public', 1))
+    builder.orderByRaw('field(category, ?, ?) asc', ['news', 'opinion'])
+    expect(builder.toSql()).toBe('(select * from "posts" where "public" = ?) union all (select * from "videos" where "public" = ?) order by field(category, ?, ?) asc')
+    expect(builder.getBindings()).toEqual([1, 1, 'news', 'opinion'])
+  })
+
+  test('testLatest', () => {
+    let builder = getBuilder()
+    builder.select('*').from('users').latest()
+    expect(builder.toSql()).toBe('select * from "users" order by "created_at" desc')
+
+    builder = getBuilder()
+    builder.select('*').from('users').latest().limit(1)
+    expect(builder.toSql()).toBe('select * from "users" order by "created_at" desc limit 1')
+
+    builder = getBuilder()
+    builder.select('*').from('users').latest('updated_at')
+    expect(builder.toSql()).toBe('select * from "users" order by "updated_at" desc')
+  })
+
+  test('testOldest', () => {
+    let builder = getBuilder()
+    builder.select('*').from('users').oldest()
+    expect(builder.toSql()).toBe('select * from "users" order by "created_at" asc')
+
+    builder = getBuilder()
+    builder.select('*').from('users').oldest().limit(1)
+    expect(builder.toSql()).toBe('select * from "users" order by "created_at" asc limit 1')
+
+    builder = getBuilder()
+    builder.select('*').from('users').oldest('updated_at')
+    expect(builder.toSql()).toBe('select * from "users" order by "updated_at" asc')
+  })
 })
