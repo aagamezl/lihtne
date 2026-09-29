@@ -18,14 +18,17 @@ const EMPTY_GLUE = ''
  * this port, `Collection` instead extends the `EnumeratesValues` base
  * class to obtain `each`, `getArrayableItems`, and `useAsCallable`.
  */
-export class Collection<TKey extends PropertyKey, TValue> extends EnumeratesValues<TKey, TValue> {
+export class Collection<
+  TKey extends PropertyKey,
+  TValue
+> extends EnumeratesValues<TKey, TValue> {
   /**
    * Create a new collection.
    *
    * Mirrors `Collection::__construct()`: normalizes whatever was passed
    * in through `getArrayableItems()` before storing it.
    */
-  constructor (items: ArrayableInput<TKey, TValue> = []) {
+  constructor (items: ArrayableInput<TValue> = []) {
     super({})
 
     this.items = this.getArrayableItems(items)
@@ -41,8 +44,8 @@ export class Collection<TKey extends PropertyKey, TValue> extends EnumeratesValu
    * always builds a plain `Collection` — faithful for this port's scope,
    * since no subclassing is exercised here.
    */
-  protected newInstance<TNewValue = TValue>(
-    items: ArrayableInput<TKey, TNewValue> = []
+  protected newInstance<TNewValue = TValue> (
+    items: ArrayableInput<TNewValue> = []
   ): Collection<TKey, TNewValue> {
     return new Collection<TKey, TNewValue>(items)
   }
@@ -99,7 +102,7 @@ export class Collection<TKey extends PropertyKey, TValue> extends EnumeratesValu
    * Mirrors `Collection::first()`, which delegates straight to
    * `Arr::first()` over the collection's underlying items.
    */
-  public first<TDefault = undefined>(
+  public first<TDefault = undefined> (
     callback?: (value: TValue, key: TKey) => boolean,
     defaultValue?: TDefault | (() => TDefault)
   ): TValue | TDefault | undefined {
@@ -113,13 +116,35 @@ export class Collection<TKey extends PropertyKey, TValue> extends EnumeratesValu
    * @return static
    */
   public filter (
-    callback?: (value: TValue, key: TKey) => boolean | TValue
+    callback?: (value: TValue, key: number) => boolean | TValue
   ): Collection<TKey, TValue> {
-    if (callback) {
-      return this.newInstance(Arr.where<TValue, TKey>(Object.values(this.items), callback))
+    const values = Object.values(this.items)
+
+    if (callback === undefined) {
+      return this.newInstance(values.filter((value) => Boolean(value)))
     }
 
-    return this.newInstance(Object.values(this.items).filter(callback))
+    return this.newInstance(
+      values.filter((value, key) => Boolean(callback(value, key)))
+    )
+  }
+
+  /**
+   * Create a collection of all elements that do not pass a given truth test.
+   */
+  public reject (
+    callback:
+      | ((value: TValue, key: number) => boolean | TValue) |
+      boolean |
+      TValue = true
+  ): Collection<TKey, TValue> {
+    if (typeof callback !== 'function') {
+      return this.filter((value) => value !== callback)
+    }
+
+    return this.filter(
+      (value, key) => !Reflect.apply(callback, undefined, [value, key])
+    )
   }
 
   /**
@@ -160,7 +185,10 @@ export class Collection<TKey extends PropertyKey, TValue> extends EnumeratesValu
    * 'function'` check narrows both branches without needing that helper
    * or a cast back to the specific callback shape.
    */
-  implode (value?: string | ((item: TValue, key: TKey) => unknown), glue?: string): string {
+  implode (
+    value?: string | ((item: TValue, key: TKey) => unknown),
+    glue?: string
+  ): string {
     if (typeof value === 'function') {
       return this.joinAll(this.map(value).all(), glue ?? EMPTY_GLUE)
     }
@@ -171,7 +199,10 @@ export class Collection<TKey extends PropertyKey, TValue> extends EnumeratesValu
       Array.isArray(first) ||
       (isPlainObject(first) && !(first instanceof String))
     ) {
-      return this.joinAll(this.pluck<unknown>(value as string).all(), glue ?? EMPTY_GLUE)
+      return this.joinAll(
+        this.pluck<unknown>(value as string).all(),
+        glue ?? EMPTY_GLUE
+      )
     }
 
     return this.joinAll(this.items, value ?? EMPTY_GLUE)
@@ -182,7 +213,9 @@ export class Collection<TKey extends PropertyKey, TValue> extends EnumeratesValu
    *
    * Mirrors `Collection::map()`, which delegates to `Arr::map()`.
    */
-  map<TMapped>(callback: (value: TValue, key: TKey) => TMapped): Collection<TKey, TMapped> {
+  map<TMapped> (
+    callback: (value: TValue, key: TKey) => TMapped
+  ): Collection<TKey, TMapped> {
     const mapped = Arr.map<TKey, TValue, TMapped>(this.items, callback)
 
     return this.newInstance<TMapped>(mapped)
@@ -193,11 +226,15 @@ export class Collection<TKey extends PropertyKey, TValue> extends EnumeratesValu
    *
    * Mirrors `Collection::pluck()`, which delegates to `Arr::pluck()`.
    */
-  pluck<TPlucked>(
+  pluck<TPlucked> (
     value: string | string[] | ((item: TValue) => TPlucked),
     key?: string | string[] | ((item: TValue) => PropertyKey) | null
   ): Collection<PropertyKey, TPlucked | undefined> {
-    const plucked = Arr.pluck<TValue, TPlucked>(Object.values(this.items), value, key)
+    const plucked = Arr.pluck<TValue, TPlucked>(
+      Object.values(this.items),
+      value,
+      key
+    )
 
     return new Collection<PropertyKey, TPlucked | undefined>(plucked)
   }

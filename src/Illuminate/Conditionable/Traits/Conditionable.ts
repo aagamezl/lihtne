@@ -5,11 +5,13 @@ import { HigherOrderWhenProxy } from '../HigherOrderWhenProxy'
 /**
  * Laravel returns `$callback(...) ?? $this`; void callbacks still chain on `$this`.
  */
-type WhenReturnType<TInstance, TReturn> =
-  [TReturn] extends [void] ? TInstance : TInstance | TReturn
+type WhenReturnType<TInstance, TReturn> = [TReturn] extends [void]
+  ? TInstance
+  : TInstance | TReturn
 
-type UnlessReturnType<TInstance, TReturn> =
-  [TReturn] extends [void] ? TInstance : TInstance | TReturn
+type UnlessReturnType<TInstance, TReturn> = [TReturn] extends [void]
+  ? TInstance
+  : TInstance | TReturn
 
 export class Conditionable {
   /**
@@ -25,15 +27,21 @@ export class Conditionable {
    */
   public when (): HigherOrderWhenProxy<this>
   public when (value: unknown): HigherOrderWhenProxy<this>
-  public when<TWhenParameter, TWhenReturnType = this>(
+  public when<TWhenParameter, TWhenReturnType = this> (
     value: TWhenParameter | ((instance: this) => TWhenParameter),
     callback?: (value: this, condition: TWhenParameter) => TWhenReturnType,
-    defaultValue?: (value: this | Builder, condition: TWhenParameter) => TWhenReturnType
+    defaultValue?: (
+      value: this | Builder,
+      condition: TWhenParameter
+    ) => TWhenReturnType
   ): WhenReturnType<this, TWhenReturnType>
-  public when<TWhenParameter, TWhenReturnType = this>(
+  public when<TWhenParameter, TWhenReturnType = this> (
     value?: TWhenParameter | ((instance: this) => TWhenParameter) | unknown,
     callback?: (instance: this, condition: TWhenParameter) => TWhenReturnType,
-    defaultValue?: (instance: this, condition: TWhenParameter) => TWhenReturnType
+    defaultValue?: (
+      instance: this,
+      condition: TWhenParameter
+    ) => TWhenReturnType
   ): WhenReturnType<this, TWhenReturnType> | HigherOrderWhenProxy<this> {
     if (arguments.length === 0) {
       return new HigherOrderWhenProxy(this)
@@ -43,16 +51,23 @@ export class Conditionable {
       return new HigherOrderWhenProxy(this).condition(Boolean(value))
     }
 
-    const resolved = value instanceof Function
-      ? (value as (instance: this) => TWhenParameter)(this)
-      : value as TWhenParameter
+    const resolved =
+      value instanceof Function
+        ? (value as (instance: this) => TWhenParameter)(this)
+        : (value as TWhenParameter)
 
     if (resolved) {
-      return (callback?.(this, resolved) ?? this) as WhenReturnType<this, TWhenReturnType>
+      return (callback?.(this, resolved) ?? this) as WhenReturnType<
+        this,
+        TWhenReturnType
+      >
     }
 
     if (defaultValue) {
-      return (defaultValue(this, resolved) ?? this) as WhenReturnType<this, TWhenReturnType>
+      return (defaultValue(this, resolved) ?? this) as WhenReturnType<
+        this,
+        TWhenReturnType
+      >
     }
 
     return this as WhenReturnType<this, TWhenReturnType>
@@ -71,32 +86,51 @@ export class Conditionable {
    */
   public unless (): HigherOrderWhenProxy<this>
   public unless (value: unknown): HigherOrderWhenProxy<this>
-  public unless<TUnlessParameter, TUnlessReturnType = this>(
+  public unless<TUnlessParameter, TUnlessReturnType = this> (
     value: TUnlessParameter | ((instance: this) => TUnlessParameter),
-    callback?: (instance: this, condition: TUnlessParameter) => TUnlessReturnType,
-    defaultValue?: (instance: this, condition: TUnlessParameter) => TUnlessReturnType
+    callback?: (
+      instance: this,
+      condition: TUnlessParameter
+    ) => TUnlessReturnType,
+    defaultValue?: (
+      instance: this,
+      condition: TUnlessParameter
+    ) => TUnlessReturnType
   ): UnlessReturnType<this, TUnlessReturnType>
-  public unless<TUnlessParameter, TUnlessReturnType = this>(
+  public unless<TUnlessParameter, TUnlessReturnType = this> (
     value?: TUnlessParameter | ((instance: this) => TUnlessParameter) | unknown,
-    callback?: (instance: this, condition: TUnlessParameter) => TUnlessReturnType,
-    defaultValue?: (instance: this, condition: TUnlessParameter) => TUnlessReturnType
+    callback?: (
+      instance: this,
+      condition: TUnlessParameter
+    ) => TUnlessReturnType,
+    defaultValue?: (
+      instance: this,
+      condition: TUnlessParameter
+    ) => TUnlessReturnType
   ): UnlessReturnType<this, TUnlessReturnType> | HigherOrderWhenProxy<this> {
     if (arguments.length === 0) {
-      return (new HigherOrderWhenProxy(this)).negateConditionOnCapture()
+      return new HigherOrderWhenProxy(this).negateConditionOnCapture()
     }
 
     if (arguments.length === 1) {
-      return (new HigherOrderWhenProxy(this)).condition(!value)
+      return new HigherOrderWhenProxy(this).condition(!value)
     }
 
-    const resolved = value instanceof Function
-      ? (value as (instance: this) => TUnlessParameter)(this)
-      : value as TUnlessParameter
+    const resolved =
+      value instanceof Function
+        ? (value as (instance: this) => TUnlessParameter)(this)
+        : (value as TUnlessParameter)
 
     if (!value) {
-      return (callback?.(this, resolved) ?? this) as UnlessReturnType<this, TUnlessReturnType>
+      return (callback?.(this, resolved) ?? this) as UnlessReturnType<
+        this,
+        TUnlessReturnType
+      >
     } else if (defaultValue) {
-      return (defaultValue(this, resolved) ?? this) as UnlessReturnType<this, TUnlessReturnType>
+      return (defaultValue(this, resolved) ?? this) as UnlessReturnType<
+        this,
+        TUnlessReturnType
+      >
     }
 
     return this

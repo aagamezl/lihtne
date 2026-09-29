@@ -1,4 +1,7 @@
-export const instanceProxy = <T extends object>(instance: T, handler?: ProxyHandler<T>) => {
+export const instanceProxy = <T extends object>(
+  instance: T,
+  handler?: ProxyHandler<T>
+) => {
   const proxyHandler = handler ?? {
     get (target, property, receiver) {
       if (Reflect.has(target, property)) {

@@ -3,8 +3,8 @@ import { isPlainObject } from 'es-toolkit'
 import { Collection } from '../Collection'
 export class EnumeratesValues {
   /**
- * The methods that can be proxied.
- */
+   * The methods that can be proxied.
+   */
   static proxies: string[] = [
     'average',
     'avg',
@@ -48,11 +48,13 @@ export class EnumeratesValues {
    * @param  mixed  $items
    * @return array<TKey, TValue>
    */
-  public getArrayableItems /* <TValue> */(items: unknown)/* : Iterable<TValue> */ {
+  public getArrayableItems /* <TValue> */ (
+    items: unknown
+  ) /* : Iterable<TValue> */ {
     // return isPrimitive(items) || isEnum(items)
     //   ? Arr.wrap<TValue>(items as TValue)
     //   : Arr.from(items)
-    if (Array.isArray(items)/*  || items instanceof Map */) {
+    if (Array.isArray(items) /*  || items instanceof Map */) {
       return items
     } else if (items instanceof Collection) {
       return items.all()
@@ -73,7 +75,9 @@ export class EnumeratesValues {
    * @param  mixed  $value
    * @return bool
    */
-  public useAsCallable (value: unknown): value is (...args: never[]) => unknown {
+  public useAsCallable (
+    value: unknown
+  ): value is (...args: never[]) => unknown {
     return typeof value === 'function'
   }
 
@@ -83,7 +87,9 @@ export class EnumeratesValues {
    * @param  callable(TValue, TKey): mixed  $callback
    * @return $this
    */
-  public each (callback: (item: unknown, key: string | number) => unknown): this {
+  public each (
+    callback: (item: unknown, key: string | number) => unknown
+  ): this {
     const items = (this as { items?: Iterable<unknown> }).items ?? []
 
     if (Array.isArray(items)) {

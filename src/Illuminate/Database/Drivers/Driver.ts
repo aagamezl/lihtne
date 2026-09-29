@@ -13,11 +13,11 @@ export class Driver {
   static FETCH_OBJ: number = 5
 
   /**
- * Creates an instance of Statement.
- * @param {string} dsn
- * @param {Record<string, unknown>} options
- * @memberof Driver
- */
+   * Creates an instance of Statement.
+   * @param {string} dsn
+   * @param {Record<string, unknown>} options
+   * @memberof Driver
+   */
   constructor (dsn: string, options: DriverOptions) {
     this.dsn = dsn
     this.options = options
@@ -28,9 +28,11 @@ export class Driver {
    * @param {number} attribute
    * @returns {any}
    */
-  // @ts-ignore expected error must be implemented in concrete class
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base getAttribute signature
   public getAttribute (attribute: string | number) {
-    return new Error(`RuntimeException: Implement 'getAttribute' method on concrete class.`)
+    return new Error(
+      `RuntimeException: Implement 'getAttribute' method on concrete class.`
+    )
   }
 
   /**
@@ -40,6 +42,8 @@ export class Driver {
    * @throws {Error}
    */
   public prepare (query: string): Statement {
-    throw new Error(`RuntimeException: Implement 'prepare' method on concrete class for query: ${query}`)
+    throw new Error(
+      `RuntimeException: Implement 'prepare' method on concrete class for query: ${query}`
+    )
   }
 }

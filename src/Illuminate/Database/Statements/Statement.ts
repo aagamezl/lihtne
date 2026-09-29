@@ -14,11 +14,11 @@ export class Statement {
   protected result: Result = { rows: [] }
 
   /**
-  *
-  * @param {string|number} param
-  * @param {*} value
-  * @return {boolean}
-  */
+   *
+   * @param {string|number} param
+   * @param {*} value
+   * @return {boolean}
+   */
   public bindValue (param: string | number, value: BindingValue): boolean {
     try {
       this.bindings[param] = value
@@ -29,7 +29,7 @@ export class Statement {
     }
   }
 
-  // @ts-expect-error expected error must be implemented in concrete class
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base execute signature
   public execute (params?: BindingValues) {
     throw new Error(
       `RuntimeException: Implement execute method on concrete class.`

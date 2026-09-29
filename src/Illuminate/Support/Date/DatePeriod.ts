@@ -15,7 +15,11 @@ const MONTHS_PER_YEAR = 12
  * Applies a DateInterval to a Date, returning a new Date.
  * Mirrors how PHP's DateTime::add()/sub() advances calendar fields.
  */
-function applyInterval (date: Date, interval: DateInterval, invert: boolean): Date {
+function applyInterval (
+  date: Date,
+  interval: DateInterval,
+  invert: boolean
+): Date {
   const sign = invert ? -1 : 1
   const result = new Date(date.getTime())
 
@@ -109,7 +113,9 @@ export class DatePeriod implements Iterable<Date> {
       throw new Error(`DatePeriod: Unknown or bad format (${spec})`)
     }
 
-    const [, recurrenceCount, startOrIntervalToken, intervalOrEndToken] = match
+    const recurrenceCount = match[1] ?? ''
+    const startOrIntervalToken = match[2] ?? ''
+    const intervalOrEndToken = match[3] ?? ''
 
     const startCandidate = new Date(startOrIntervalToken)
     const startIsDate = !Number.isNaN(startCandidate.getTime())

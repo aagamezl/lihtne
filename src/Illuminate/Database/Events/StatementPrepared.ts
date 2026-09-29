@@ -11,5 +11,5 @@ export class StatementPrepared {
   constructor (
     protected connection: Connection,
     protected statement: Statement
-  ) { }
+  ) {}
 }

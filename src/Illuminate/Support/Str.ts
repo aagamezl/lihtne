@@ -45,14 +45,19 @@ export class Str {
    * @param  string  $subject
    * @return string
    */
-  public static replaceArray (search: string, replace: string[], subject: string): string {
+  public static replaceArray (
+    search: string,
+    replace: string[],
+    subject: string
+  ): string {
     const segments = subject.split(search)
     const replacements = replace.slice()
 
     let result = segments.shift() ?? ''
 
     for (const segment of segments) {
-      result += this.toStringOr(replacements.shift() ?? search, search) + segment
+      result +=
+        this.toStringOr(replacements.shift() ?? search, search) + segment
     }
 
     return result

@@ -4,11 +4,11 @@ import { Grammar } from './Grammar'
 
 export class MySqlGrammar extends Grammar {
   /**
- * Compile a select query into SQL.
- *
- * @param  \Illuminate\Database\Query\Builder  $query
- * @return string
- */
+   * Compile a select query into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @return string
+   */
   public override compileSelect (query: Builder): string {
     const sql = super.compileSelect(query)
 
@@ -16,7 +16,7 @@ export class MySqlGrammar extends Grammar {
       return sql
     }
 
-    const milliseconds = query.timeout! * 1000
+    const milliseconds = query.timeout * 1000
 
     return sql.replace(
       /^select\b/i,
@@ -44,18 +44,21 @@ export class MySqlGrammar extends Grammar {
    * @param  array  $where
    * @return string
    */
-  public override whereFulltext (query: Builder, where: WhereClause): string {
+  public override whereFulltext (_query: Builder, where: WhereClause): string {
     const columns = this.columnize(where.columns ?? [])
 
     const value = this.parameter(where.value)
 
-    const mode = (where.options?.mode ?? '') === 'boolean'
-      ? ' in boolean mode'
-      : ' in natural language mode'
+    const mode =
+      (where.options?.mode ?? '') === 'boolean'
+        ? ' in boolean mode'
+        : ' in natural language mode'
 
-    const expanded = (where.options?.expanded ?? false) && (where.options?.mode ?? '') !== 'boolean'
-      ? ' with query expansion'
-      : ''
+    const expanded =
+      (where.options?.expanded ?? false) &&
+      (where.options?.mode ?? '') !== 'boolean'
+        ? ' with query expansion'
+        : ''
 
     return `match (${columns}) against (${value}${mode}${expanded})`
   }
@@ -68,7 +71,7 @@ export class MySqlGrammar extends Grammar {
    * @return string
    */
   protected override whereNull (query: Builder, where: WhereClause): string {
-    const columnValue = this.getValue(where.column ?? '')
+    const columnValue = String(this.getValue(where.column ?? ''))
 
     if (this.isJsonSelector(columnValue)) {
       const [field, path] = this.wrapJsonFieldAndPath(columnValue)
@@ -87,7 +90,7 @@ export class MySqlGrammar extends Grammar {
    * @return string
    */
   protected override whereNotNull (query: Builder, where: WhereClause): string {
-    const columnValue = this.getValue(where.column)
+    const columnValue = String(this.getValue(where.column ?? ''))
 
     if (this.isJsonSelector(columnValue)) {
       const [field, path] = this.wrapJsonFieldAndPath(columnValue)
@@ -120,7 +123,10 @@ export class MySqlGrammar extends Grammar {
    * @param  array  $where
    * @return string
    */
-  protected override whereNullSafeEquals (query: Builder, where: WhereClause): string {
+  protected override whereNullSafeEquals (
+    _query: Builder,
+    where: WhereClause
+  ): string {
     return this.wrap(where.column ?? '') + ' <=> ' + this.parameter(where.value)
   }
 

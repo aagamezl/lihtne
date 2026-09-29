@@ -282,13 +282,13 @@ describe('Database Query Builder', () => {
   test('testPipeCallback', () => {
     const query = getBuilder()
 
-    let result = query.pipe((query: Builder) => 5)
+    let result = query.pipe(() => 5)
     expect(result).toBe(5)
 
-    result = query.pipe((query: Builder) => null)
+    result = query.pipe(() => null)
     expect(result).toBe(query)
 
-    result = query.pipe((query: Builder) => {
+    result = query.pipe(() => {
       //
     })
     expect(result).toBe(query)

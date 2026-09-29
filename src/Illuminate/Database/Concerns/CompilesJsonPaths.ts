@@ -30,7 +30,7 @@ const DOUBLED_APOSTROPHE_REPLACEMENT = "''"
  * class that CompilesJsonPaths is mixed into.
  */
 export interface Wrappable {
-  wrap(value: string): string
+  wrap (value: string): string
 }
 
 /**
@@ -71,12 +71,12 @@ export class CompilesJsonPaths {
     const parts = column.split(JSON_FIELD_PATH_SEPARATOR, MAX_SPLIT_PARTS)
 
     // @ts-expect-error Property 'wrap' does not exist on type 'CompilesJsonPaths'.
-    const field = this.wrap(parts[0]!)
+    const field = this.wrap(parts[0] ?? '')
 
     let path = ''
 
     if (parts.length > 1) {
-      path = ', ' + this.wrapJsonPath(parts[1]!, JSON_FIELD_PATH_SEPARATOR)
+      path = ', ' + this.wrapJsonPath(parts[1] ?? '', JSON_FIELD_PATH_SEPARATOR)
     }
 
     return [field, path]
@@ -85,7 +85,10 @@ export class CompilesJsonPaths {
   /**
    * Wrap the given JSON path.
    */
-  wrapJsonPath (value: string, delimiter: string = DEFAULT_JSON_PATH_DELIMITER): string {
+  wrapJsonPath (
+    value: string,
+    delimiter: string = DEFAULT_JSON_PATH_DELIMITER
+  ): string {
     const escapedValue = value.replace(
       ESCAPED_APOSTROPHE_PATTERN,
       DOUBLED_APOSTROPHE_REPLACEMENT

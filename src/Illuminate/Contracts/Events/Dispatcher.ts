@@ -8,10 +8,10 @@ export interface Dispatcher {
    * @param  \Closure|string|array|null  $listener
    * @return void
    */
-  listen(
+  listen (
     events: EventCallback | string | Array<EventCallback | string>,
     listener?: EventCallback | string | Array<EventCallback | string> | null
-  ): void;
+  ): void
 
   /**
    * Register an event listener with the dispatcher.
@@ -21,9 +21,9 @@ export interface Dispatcher {
    * @param  bool  $halt
    * @return array|null
    */
-  dispatch(
+  dispatch (
     event: string | object,
     payload?: unknown,
     halt?: boolean
-  ): unknown[] | null;
+  ): unknown[] | null
 }

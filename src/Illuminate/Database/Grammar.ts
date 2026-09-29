@@ -23,7 +23,14 @@ export abstract class Grammar {
    * @param  bool  $binary
    * @return string
    */
-  public escape (value: string | number | boolean | null, binary: boolean = false): string {
+  public escape (
+    value: string | number | boolean | Date | null,
+    binary: boolean = false
+  ): string {
+    if (value instanceof Date) {
+      return this.connection.escape(value.toISOString(), binary)
+    }
+
     return this.connection.escape(value, binary)
   }
 
@@ -35,9 +42,9 @@ export abstract class Grammar {
    * @return string | number
    */
   public wrapTable (
-    table: Expression | string,
+    table: string | Expression,
     prefix: string | null = null
-  ): string | number {
+  ): string {
     if (this.isExpression(table)) {
       return this.getValue(table)
     }
@@ -71,7 +78,7 @@ export abstract class Grammar {
    * @param  \Illuminate\Contracts\Database\Query\Expression|string  $value
    * @return string
    */
-  public wrap (value: Expression | string): string | number {
+  public wrap (value: Expression | string): string {
     if (this.isExpression(value)) {
       return this.getValue(value)
     }
@@ -102,7 +109,9 @@ export abstract class Grammar {
   protected wrapAliasedValue (value: string): string {
     const segments = value.split(/\s+as\s+/i)
 
-    return this.wrap(segments[0]!) + ' as ' + this.wrapValue(segments[1]!)
+    return (
+      this.wrap(segments[0] ?? '') + ' as ' + this.wrapValue(segments[1] ?? '')
+    )
   }
 
   /**
@@ -121,9 +130,9 @@ export abstract class Grammar {
     prefix ??= this.connection.getTablePrefix()
 
     return (
-      this.wrapTable(segments[0]!, prefix) +
+      this.wrapTable(segments[0] ?? '', prefix) +
       ' as ' +
-      this.wrapValue(prefix + segments[1]!)
+      this.wrapValue(prefix + (segments[1] ?? ''))
     )
   }
 
@@ -175,8 +184,7 @@ export abstract class Grammar {
    *
    * @throws \RuntimeException
    */
-  // @ts-expect-error expected error must be implemented in concrete class
-  // @eslint-disable-next-line @typescript-eslint/no-unused-vars
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base wrapJsonSelector signature
   protected wrapJsonSelector (value: string): string {
     throw new Error(
       'RuntimeException: This database engine does not support JSON operations.'
@@ -229,12 +237,12 @@ export abstract class Grammar {
    * @param {Expression | string | number} expression - The expression to transform.
    * @returns {string | number} - The transformed value.
    */
-  public getValue (expression: Expression | string | number): string | number {
+  public getValue (expression: Expression | string | number): string {
     if (this.isExpression(expression)) {
       return this.getValue(expression.getValue(this))
     }
 
-    return expression
+    return String(expression)
   }
 
   /**

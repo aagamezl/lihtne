@@ -30,7 +30,13 @@ export class HigherOrderTapProxy<TTarget> {
    * @return TTarget
    */
   public __call (method: string, parameters: unknown[]) {
-    this.target[method](...parameters)
+    if (typeof this.target === 'object' && this.target !== null) {
+      const targetMethod = Reflect.get(this.target, method)
+
+      if (typeof targetMethod === 'function') {
+        targetMethod.apply(this.target, parameters)
+      }
+    }
 
     return this.target
   }

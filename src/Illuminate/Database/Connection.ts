@@ -58,10 +58,10 @@ export class Connection extends DetectsLostConnections {
   protected config: ConnectionConfig = {}
 
   /**
- * Indicates if the connection is in a "dry run".
- *
- * @var bool
- */
+   * Indicates if the connection is in a "dry run".
+   *
+   * @var bool
+   */
   protected pretendingProperty = false
 
   /**
@@ -72,17 +72,17 @@ export class Connection extends DetectsLostConnections {
   protected events: Dispatcher | null = null
 
   /**
-    * All of the callbacks that should be invoked before a query is executed.
-    *
-    * @var (\Closure(string, array, \Illuminate\Database\Connection): mixed)[]
-    */
+   * All of the callbacks that should be invoked before a query is executed.
+   *
+   * @var (\Closure(string, array, \Illuminate\Database\Connection): mixed)[]
+   */
   protected beforeExecutingCallbacks: BeforeExecutingCallback[] = []
 
   /**
-    * The number of active transactions.
-    *
-    * @var number
-    */
+   * The number of active transactions.
+   *
+   * @var number
+   */
   protected transactions = 0
 
   /**
@@ -97,7 +97,7 @@ export class Connection extends DetectsLostConnections {
    *
    * @var (callable(\Illuminate\Database\Connection): mixed)
    */
-  protected reconnector: Reconnector = () => { }
+  protected reconnector: Reconnector = () => {}
 
   /**
    * Indicates whether queries are being logged.
@@ -157,7 +157,10 @@ export class Connection extends DetectsLostConnections {
    *
    * @throws \RuntimeException
    */
-  public escape (value: string | number | boolean | undefined | null, binary: boolean = false): string {
+  public escape (
+    value: string | number | boolean | undefined | null,
+    binary: boolean = false
+  ): string {
     if (isNil(value) === true) {
       return 'null'
     } else if (binary) {
@@ -167,14 +170,20 @@ export class Connection extends DetectsLostConnections {
     } else if (typeof value === 'boolean') {
       return this.escapeBool(value)
     } else if (Array.isArray(value)) {
-      throw new Error('RuntimeException: The database connection does not support escaping arrays.')
+      throw new Error(
+        'RuntimeException: The database connection does not support escaping arrays.'
+      )
     } else {
       if (value.includes('\0')) {
-        throw new Error('RuntimeException: Strings with null bytes cannot be escaped. Use the binary escape option.')
+        throw new Error(
+          'RuntimeException: Strings with null bytes cannot be escaped. Use the binary escape option.'
+        )
       }
 
       if (value.isWellFormed() === false) {
-        throw new Error('RuntimeException: Strings with invalid UTF-8 byte sequences cannot be escaped.')
+        throw new Error(
+          'RuntimeException: Strings with invalid UTF-8 byte sequences cannot be escaped.'
+        )
       }
 
       return this.escapeString(value)
@@ -193,10 +202,10 @@ export class Connection extends DetectsLostConnections {
   }
 
   /**
- *
- * @param {string} value
- * @returns {string}
- */
+   *
+   * @param {string} value
+   * @returns {string}
+   */
   protected quote (value: string): string {
     // Escape special characters within the input string
     const escapedString = value.replace(/'/g, "''")
@@ -225,7 +234,9 @@ export class Connection extends DetectsLostConnections {
   // The value is part of the override signature; this base connection cannot escape binary data.
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   protected escapeBinary (_value: string | number | boolean): string {
-    throw new Error('RuntimeException: The database connection does not support escaping binary values.')
+    throw new Error(
+      'RuntimeException: The database connection does not support escaping binary values.'
+    )
   }
 
   /**
@@ -239,7 +250,10 @@ export class Connection extends DetectsLostConnections {
     query: string,
     bindings: BindingValues
   ): Promise<Record<string, unknown>[]> {
-    return await this.run(query, bindings, (query: string, bindings: BindingValues) => {
+    return await this.run(query, bindings, (
+      query: string,
+      bindings: BindingValues
+    ) => {
       if (this.pretending()) {
         return []
       }
@@ -353,8 +367,10 @@ export class Connection extends DetectsLostConnections {
    *
    * @return string|null
    */
-  public getName () {
-    return this.getConfig('name')
+  public getName (): string {
+    const name = this.getConfig('name')
+
+    return typeof name === 'string' ? name : ''
   }
 
   /**
@@ -380,9 +396,11 @@ export class Connection extends DetectsLostConnections {
 
     this.event(new QueryExecuted(query, bindings, time, this))
 
-    query = this.pretendingProperty === true
-      ? this.queryGrammar?.substituteBindingsIntoRawSql(query, bindings) ?? query
-      : query
+    query =
+      this.pretendingProperty === true
+        ? (this.queryGrammar?.substituteBindingsIntoRawSql(query, bindings) ??
+          query)
+        : query
 
     if (this.loggingQueries) {
       this.queryLog.push({ query, bindings, time })
@@ -401,20 +419,22 @@ export class Connection extends DetectsLostConnections {
       return this.reconnector(this)
     }
 
-    throw new Error('LostConnectionException: Lost connection and no reconnector available.')
+    throw new Error(
+      'LostConnectionException: Lost connection and no reconnector available.'
+    )
   }
 
   /**
-    * Handle a query exception that occurred during query execution.
-    *
-    * @param  \Illuminate\Database\QueryException  $e
-    * @param  string  $query
-    * @param  array  $bindings
-    * @param  \Closure  $callback
-    * @return mixed
-    *
-    * @throws \Illuminate\Database\QueryException
-    */
+   * Handle a query exception that occurred during query execution.
+   *
+   * @param  \Illuminate\Database\QueryException  $e
+   * @param  string  $query
+   * @param  array  $bindings
+   * @param  \Closure  $callback
+   * @return mixed
+   *
+   * @throws \Illuminate\Database\QueryException
+   */
   protected tryAgainIfCausedByLostConnection (
     e: Error,
     query: string,
@@ -458,13 +478,16 @@ export class Connection extends DetectsLostConnections {
         ? 'UniqueConstraintViolationException'
         : 'QueryException'
 
-      throw new Error(JSON.stringify({
-        type: exceptionType,
-        name: this.getName(),
-        query,
-        bindings: this.prepareBindings(bindings),
-        e
-      }), { cause: e })
+      throw new Error(
+        JSON.stringify({
+          type: exceptionType,
+          name: this.getName(),
+          query,
+          bindings: this.prepareBindings(bindings),
+          e
+        }),
+        { cause: e }
+      )
     }
   }
 
@@ -503,10 +526,10 @@ export class Connection extends DetectsLostConnections {
   }
 
   /**
-    * Get the current Driver connection.
-    *
-    * @return {Driver}
-    */
+   * Get the current Driver connection.
+   *
+   * @return {Driver}
+   */
   getDriver () {
     if (typeof this.driver === 'function') {
       return this.driver()
@@ -516,34 +539,37 @@ export class Connection extends DetectsLostConnections {
   }
 
   /**
-    * Bind values to their parameters in the given statement.
-    *
-    * @param  \PDOStatement  $statement
-    * @param  array  bindings
-    * @return void
-    */
+   * Bind values to their parameters in the given statement.
+   *
+   * @param  \PDOStatement  $statement
+   * @param  array  bindings
+   * @return void
+   */
   public bindValues (statement: Statement, bindings: BindingValues) {
     for (const [key, value] of Object.entries(bindings)) {
-      statement.bindValue(typeof key === 'string' ? key : Number(key) + 1, value)
+      statement.bindValue(
+        typeof key === 'string' ? key : Number(key) + 1,
+        value
+      )
     }
   }
 
   /**
-    * Fire the given event if possible.
-    *
-    * @param  mixed  event
-    * @return void
-    */
+   * Fire the given event if possible.
+   *
+   * @param  mixed  event
+   * @return void
+   */
   protected event (event: string | object) {
     this.events?.dispatch(event)
   }
 
   /**
-    * Configure the PDO prepared statement.
-    *
-    * @param  \PDOStatement  statement
-    * @return \PDOStatement
-    */
+   * Configure the PDO prepared statement.
+   *
+   * @param  \PDOStatement  statement
+   * @return \PDOStatement
+   */
   protected prepared (statement: Statement): Statement {
     this.event(new StatementPrepared(this, statement))
 
@@ -600,10 +626,10 @@ export class Connection extends DetectsLostConnections {
   }
 
   /**
- * Set the query grammar to the default implementation.
- *
- * @return void
- */
+   * Set the query grammar to the default implementation.
+   *
+   * @return void
+   */
   public useDefaultQueryGrammar () {
     this.queryGrammar = this.getDefaultQueryGrammar()
   }
@@ -618,19 +644,19 @@ export class Connection extends DetectsLostConnections {
   }
 
   /**
- * Set the query post processor to the default implementation.
- *
- * @return void
- */
+   * Set the query post processor to the default implementation.
+   *
+   * @return void
+   */
   public useDefaultPostProcessor () {
     this.postProcessor = this.getDefaultPostProcessor()
   }
 
   /**
- * Get the default post processor instance.
- *
- * @return \Illuminate\Database\Query\Processors\Processor
- */
+   * Get the default post processor instance.
+   *
+   * @return \Illuminate\Database\Query\Processors\Processor
+   */
   protected getDefaultPostProcessor () {
     return new Processor()
   }

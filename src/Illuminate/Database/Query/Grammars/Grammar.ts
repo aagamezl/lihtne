@@ -1,10 +1,20 @@
-import { isTruthy, pascalCase } from '@devnetic/utils'
+import { isTruthy } from '@devnetic/utils'
 
-import type { Agregate, BindingValues, Builder, Having, Order, Union, WhereClause } from '../Builder'
+import type {
+  Agregate,
+  BindingValues,
+  Builder,
+  Having,
+  Order,
+  Union,
+  WhereClause,
+  WhereClauseType
+} from '../Builder'
+import type { IndexHint } from '../IndexHint'
 
 import { Arr, Collection } from '../../../Collections'
 import { head, last } from '../../../Collections/helpers'
-import { isEmpty, isValueSet, type Prettify } from '../../../Support'
+import { isValueSet, type Prettify } from '../../../Support'
 import { mixing } from '../../../Support/Traits'
 import { CompilesJsonPaths } from '../../Concerns/CompilesJsonPaths'
 import { Grammar as BaseGrammar } from '../../Grammar'
@@ -17,20 +27,19 @@ import { JoinLateralClause } from '../JoinLateralClause'
  */
 
 export type SelectComponentName =
-  'aggregate' |
-  'columns' |
-  'from' |
-  'indexHint' |
-  'joins' |
-  'wheres' |
-  'groups' |
-  'havings' |
-  'orders' |
-  'limit' |
-  'offset' |
-  'lock'
 
-export type CompilerMethod = `compile${Capitalize<string & Exclude<SelectComponentName, 'indexHint'>>}`
+    | 'aggregate' |
+    'columns' |
+    'from' |
+    'indexHint' |
+    'joins' |
+    'wheres' |
+    'groups' |
+    'havings' |
+    'orders' |
+    'limit' |
+    'offset' |
+    'lock'
 
 export type SelectComponent = {
   name: SelectComponentName
@@ -39,9 +48,25 @@ export type SelectComponent = {
 
 export type SelectComponents = Array<Prettify<SelectComponent>>
 
-export interface Grammar extends BaseGrammar, CompilesJsonPaths { }
+export type ComponentCompilers = Record<
+  SelectComponentName,
+  (query: Builder) => string
+>
 
-export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) implements Grammar {
+export type WhereCompilers = Record<
+  WhereClauseType,
+  (query: Builder, where: WhereClause) => string
+>
+
+// Trait methods are merged onto the class. `mixing().useTrait()` copies them onto the prototype at runtime.
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Grammar extends BaseGrammar, CompilesJsonPaths {}
+
+// Trait methods are merged onto the class. `mixing().useTrait()` copies them onto the prototype at runtime.
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export class Grammar
+  extends mixing(BaseGrammar).useTrait([CompilesJsonPaths])
+  implements Grammar {
   /**
    * The components that make up a select clause.
    *
@@ -63,10 +88,78 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
   ]
 
   /**
-     * The grammar specific bitwise operators.
-     *
-     * @var array
-     */
+   * Each compiler receives the query and reads its own typed value,
+   * so no value has to be passed through an `unknown` parameter.
+   */
+  protected get compilers (): ComponentCompilers {
+    return {
+      aggregate: (query: Builder) => {
+        const aggregate = query.aggregateProperty
+
+        return aggregate === undefined
+          ? ''
+          : this.compileAggregate(query, aggregate)
+      },
+      columns: (query: Builder) => this.compileColumns(query, query.columns),
+      from: (query: Builder) => this.compileFrom(query, query.fromProperty),
+      indexHint: (query: Builder) =>
+        this.compileIndexHint(query, query.indexHint),
+      joins: (query: Builder) => this.compileJoins(query, query.joins),
+      wheres: (query: Builder) => this.compileWheres(query),
+      groups: (query: Builder) => this.compileGroups(query, query.groups),
+      havings: (query: Builder) => this.compileHavings(query),
+      orders: (query: Builder) => this.compileOrders(query, query.orders),
+      limit: (query: Builder) => {
+        const limit = query.limitProperty
+
+        return limit === undefined ? '' : this.compileLimit(query, limit)
+      },
+      offset: (query: Builder) =>
+        this.compileOffset(query, query.offsetProperty ?? 0),
+      lock: (query: Builder) =>
+        this.compileLock(query, query.lockProperty ?? false)
+    }
+  }
+
+  /**
+   * Each where type has its own compiler, looked up the same way as select components.
+   */
+  protected get whereCompilers (): WhereCompilers {
+    return {
+      Basic: (query, where) => this.whereBasic(query, where),
+      Bitwise: (query, where) => this.whereBasic(query, where),
+      Binary: (query, where) => this.whereBinary(query, where),
+      Column: (query, where) => this.whereColumn(query, where),
+      Date: (query, where) => this.whereDate(query, where),
+      Day: (query, where) => this.whereDay(query, where),
+      Expression: (query, where) => this.whereExpression(query, where),
+      Fulltext: (query, where) => this.whereFulltext(query, where),
+      In: (query, where) => this.whereIn(query, where),
+      InRaw: (query, where) => this.whereInRaw(query, where),
+      JsonBoolean: (query, where) => this.whereBasic(query, where),
+      Like: (query, where) => this.whereLike(query, where),
+      Month: (query, where) => this.whereMonth(query, where),
+      Nested: (query, where) => this.whereNested(query, where),
+      NotIn: (query, where) => this.whereNotIn(query, where),
+      NotInRaw: (query, where) => this.whereNotInRaw(query, where),
+      NotNull: (query, where) => this.whereNotNull(query, where),
+      Null: (query, where) => this.whereNull(query, where),
+      NullSafeEquals: (query, where) => this.whereNullSafeEquals(query, where),
+      Sub: (query, where) => this.whereSub(query, where),
+      Time: (query, where) => this.whereTime(query, where),
+      Year: (query, where) => this.whereYear(query, where),
+      between: (query, where) => this.whereBetween(query, where),
+      betweenColumns: (query, where) => this.whereBetweenColumns(query, where),
+      raw: (query, where) => this.whereRaw(query, where),
+      valueBetween: (query, where) => this.whereValueBetween(query, where)
+    }
+  }
+
+  /**
+   * The grammar specific bitwise operators.
+   *
+   * @var array
+   */
   protected bitwiseOperators: string[] = []
 
   /**
@@ -86,11 +179,11 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
   }
 
   /**
- * Compile a select query into SQL.
- *
- * @param  \Illuminate\Database\Query\Builder  $query
- * @return string
- */
+   * Compile a select query into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @return string
+   */
   public compileSelect (query: Builder): string {
     if ((query.unions.length > 0 || query.havings) && query.aggregateProperty) {
       return this.compileUnionAggregate(query)
@@ -137,12 +230,21 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    * @return string
    */
   protected compileGroupLimit (query: Builder): string {
-    const selectBindings = [...query.getRawBindings().select, ...query.getRawBindings().order]
+    const selectBindings = [
+      ...query.getRawBindings().select,
+      ...query.getRawBindings().order
+    ]
 
     query.setBindings(selectBindings, 'select')
     query.setBindings([], 'order')
 
-    let limit = query.groupLimitProperty!.value
+    const groupLimit = query.groupLimitProperty
+
+    if (groupLimit === undefined) {
+      return ''
+    }
+
+    let limit = groupLimit.value
     let offset = query.offsetProperty
 
     if (isValueSet(offset)) {
@@ -155,7 +257,7 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
     const components = this.compileComponents(query)
 
     components.columns += this.compileRowNumber(
-      query.groupLimitProperty!.column,
+      query.groupLimitProperty?.column ?? '',
       components.orders ?? ''
     )
 
@@ -166,7 +268,15 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
 
     let sql = this.concatenate(components)
 
-    sql = 'select * from (' + sql + ') as ' + table + ' where ' + row + ' <= ' + limit
+    sql =
+      'select * from (' +
+      sql +
+      ') as ' +
+      table +
+      ' where ' +
+      row +
+      ' <= ' +
+      limit
 
     if (isValueSet(offset)) {
       sql += ' and ' + row + ' > ' + offset
@@ -183,7 +293,9 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    * @return string
    */
   protected compileRowNumber (partition: string, orders: string): string {
-    const over = String('partition by ' + this.wrap(partition) + ' ' + orders).trim()
+    const over = String(
+      'partition by ' + this.wrap(partition) + ' ' + orders
+    ).trim()
 
     return ', row_number() over (' + over + ') as ' + this.wrap('laravel_row')
   }
@@ -195,11 +307,23 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    * @return string
    */
   protected compileUnionAggregate (query: Builder): string {
-    const sql = this.compileAggregate(query, query.aggregateProperty!)
+    const aggregate = query.aggregateProperty
+
+    if (aggregate === undefined) {
+      return ''
+    }
+
+    const sql = this.compileAggregate(query, aggregate)
 
     query.aggregateProperty = undefined
 
-    return sql + ' from (' + this.compileSelect(query) + ') as ' + this.wrapTable('temp_table')
+    return (
+      sql +
+      ' from (' +
+      this.compileSelect(query) +
+      ') as ' +
+      this.wrapTable('temp_table')
+    )
   }
 
   /**
@@ -216,15 +340,19 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
     }
 
     if (query.unionOrders.length > 0) {
-      sql += ' ' + this.compileOrders(query, query.unionOrders!)
+      sql += ' ' + this.compileOrders(query, query.unionOrders)
     }
 
-    if (query.unionLimit !== undefined) {
-      sql += ' ' + this.compileLimit(query, query.unionLimit!)
+    const unionLimit = query.unionLimit
+
+    if (unionLimit !== undefined) {
+      sql += ' ' + this.compileLimit(query, unionLimit)
     }
 
-    if (query.unionOffset !== undefined) {
-      sql += ' ' + this.compileOffset(query, query.unionOffset!)
+    const unionOffset = query.unionOffset
+
+    if (unionOffset !== undefined) {
+      sql += ' ' + this.compileOffset(query, unionOffset)
     }
 
     return sql.trimStart()
@@ -257,10 +385,18 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
     const cases = []
 
     for (const [index, value] of Object.entries(order.values ?? [])) {
-      cases.push('when ' + column + ' = ' + this.parameter(value) + ' then ' + index)
+      cases.push(
+        'when ' + column + ' = ' + this.parameter(value) + ' then ' + index
+      )
     }
 
-    return 'case ' + cases.join(' ') + ' else ' + Object.values(order.values ?? []).length + ' end'
+    return (
+      'case ' +
+      cases.join(' ') +
+      ' else ' +
+      Object.values(order.values ?? []).length +
+      ' end'
+    )
   }
 
   /**
@@ -297,6 +433,30 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
   }
 
   /**
+   * Compile the lock into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  bool|string  $value
+   * @return string
+   */
+  protected compileLock (query: Builder, value: boolean | string): string {
+    return typeof value === 'string' ? value : ''
+  }
+
+  /**
+   * Compile the "group by" portions of the query.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $groups
+   * @return string
+   */
+  // @ts-expect-error expected error; query is not used in this method
+  // @eslint-disable-next-line @typescript-eslint/no-unused-vars
+  protected compileGroups (query: Builder, groups: string[]): string {
+    return 'group by ' + this.columnize(groups)
+  }
+
+  /**
    * Wrap a union subquery in parentheses.
    *
    * @param  string  $sql
@@ -327,8 +487,8 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    */
   protected compileColumns (
     query: Builder,
-    columns: Array<Expression | string>
-  ): string | null | undefined {
+    columns: Array<string | Expression>
+  ): string {
     // If the query is actually performing an aggregating select, we will let that
     // compiler handle the building of the select clauses, as it will need some
     // more syntax that is best handled by that function to keep things neat.
@@ -388,7 +548,9 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    * @return string
    */
   protected compileOffset (query: Builder, offset: number): string {
-    return 'offset ' + (typeof offset === 'number' ? offset : parseInt(offset, 10))
+    return (
+      'offset ' + (typeof offset === 'number' ? offset : parseInt(offset, 10))
+    )
   }
 
   /**
@@ -397,14 +559,17 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    * @param  \Illuminate\Database\Query\Builder  query
    * @return array
    */
-  protected compileComponents (query: Builder): Partial<Record<SelectComponentName, string>> {
+  protected compileComponents (
+    query: Builder
+  ): Partial<Record<SelectComponentName, string>> {
     const sql: Partial<Record<SelectComponentName, string>> = {}
 
     for (const { name, property } of this.selectComponents) {
       if (this.isExecutable(query, property)) {
-        const method = `compile${pascalCase(name)}` as CompilerMethod
+        // const method = `compile${pascalCase(name)}`
 
-        sql[name] = this[method](query, query[property as keyof Builder])
+        // sql[name] = this[method](query, query[property as keyof Builder])
+        sql[name] = this.compilers[name](query)
       }
     }
 
@@ -433,9 +598,16 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    */
   protected compileHavings (query: Builder): string {
     // return 'having ' + this.removeLeadingBoolean((new Collection(query.havings)).map((having: Having) => having.boolean + ' ' + this.compileHaving(having)).join(' '))
-    return 'having ' + this.removeLeadingBoolean(new Collection(query.havings).map((/** @type {Having} */having) => {
-      return having.boolean + ' ' + this.compileHaving(having)
-    }).implode(' '))
+    return (
+      'having ' +
+      this.removeLeadingBoolean(
+        new Collection(query.havings)
+          .map((/** @type {Having} */ having) => {
+            return having.boolean + ' ' + this.compileHaving(having)
+          })
+          .implode(' ')
+      )
+    )
   }
 
   /**
@@ -486,21 +658,32 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    * @return string
    */
   protected compileJoins (query: Builder, joins: JoinClause[]): string {
-    return (new Collection(joins)).map((join: JoinClause) => {
-      const table = this.wrapTable(join.table)
+    return new Collection(joins)
+      .map((join: JoinClause) => {
+        const table = this.wrapTable(join.table)
 
-      const nestedJoins = join.joins.length === 0 ? '' : ' ' + this.compileJoins(query, join.joins)
+        const nestedJoins =
+          join.joins.length === 0
+            ? ''
+            : ' ' + this.compileJoins(query, join.joins)
 
-      const tableAndNestedJoins = join.joins.length === 0 ? table : '(' + table + nestedJoins + ')'
+        const tableAndNestedJoins =
+          join.joins.length === 0 ? table : '(' + table + nestedJoins + ')'
 
-      if (join instanceof JoinLateralClause) {
-        return this.compileJoinLateral(join, String(tableAndNestedJoins))
-      }
+        if (join instanceof JoinLateralClause) {
+          return this.compileJoinLateral(join, String(tableAndNestedJoins))
+        }
 
-      const joinWord = (join.type === 'straight_join' && this.supportsStraightJoins()) ? '' : ' join'
+        const joinWord =
+          join.type === 'straight_join' && this.supportsStraightJoins()
+            ? ''
+            : ' join'
 
-      return String(`${join.type}${joinWord} ${tableAndNestedJoins} ${this.compileWheres(join)}`).trim()
-    }).implode(' ')
+        return String(
+          `${join.type}${joinWord} ${tableAndNestedJoins} ${this.compileWheres(join)}`
+        ).trim()
+      })
+      .implode(' ')
   }
 
   /**
@@ -530,13 +713,13 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
   }
 
   /**
- * Compile a basic where clause.
- *
- * @param  \Illuminate\Database\Query\Builder  $query
- * @param  array  $where
- * @return string
- */
-  protected whereBasic (query: Builder, where: WhereClause): string {
+   * Compile a basic where clause.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $where
+   * @return string
+   */
+  protected whereBasic (_query: Builder, where: WhereClause): string {
     const value = this.parameter(where.value)
 
     const operator = where.operator?.replace('?', '??') ?? ''
@@ -551,14 +734,21 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    * @param  array  $where
    * @return string
    */
-  protected whereBetween (query: Builder, where: WhereClause): string {
+  protected whereBetween (_query: Builder, where: WhereClause): string {
     const between = where.not ? 'not between' : 'between'
+    const values = where.values ?? []
 
-    const min = this.parameter(Array.isArray(where.values) ? Arr.first(where.values) : where.values[0])
+    const min = this.parameter(
+      Array.isArray(values) ? Arr.first(values) : values[0]
+    )
 
-    const max = this.parameter(Array.isArray(where.values) ? Arr.last(where.values) : where.values[1])
+    const max = this.parameter(
+      Array.isArray(values) ? Arr.last(values) : values[1]
+    )
 
-    return this.wrap(where.column ?? '') + ' ' + between + ' ' + min + ' and ' + max
+    return (
+      this.wrap(where.column ?? '') + ' ' + between + ' ' + min + ' and ' + max
+    )
   }
 
   /**
@@ -568,14 +758,9 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    * @return array
    */
   protected compileWheresToArray (query: Builder): string[] {
-    const collection = new Collection<WhereClause[]>(query.wheres)
-
-    return collection
-      .map((where: WhereClause) => {
-        // console.log(`where${where.type}`)
-        return where.boolean + ' ' + this[`where${pascalCase(where.type)}` as CompilerMethod](query, where)
-      })
-      .all()
+    return query.wheres.map((where) => {
+      return where.boolean + ' ' + this.whereCompilers[where.type](query, where)
+    })
   }
 
   /**
@@ -585,7 +770,7 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    * @param  array  $where
    * @return string
    */
-  protected whereNotNull (query: Builder, where: WhereClause): string {
+  protected whereNotNull (_query: Builder, where: WhereClause): string {
     return this.wrap(where.column ?? '') + ' is not null'
   }
 
@@ -598,8 +783,12 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    *
    * @throws \RuntimeException
    */
+  // Query and clause belong to the compiler signature. This engine rejects fulltext.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   public whereFulltext (query: Builder, where: WhereClause): string {
-    throw new Error('RuntimeException: This database engine does not support fulltext search operations.')
+    throw new Error(
+      'RuntimeException: This database engine does not support fulltext search operations.'
+    )
   }
 
   /**
@@ -609,13 +798,48 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    * @param  array  $where
    * @return string
    */
+  protected whereExpression (query: Builder, where: WhereClause): string {
+    if (where.column instanceof Expression) {
+      return String(this.getValue(where.column))
+    }
+
+    return String(this.wrap(where.column ?? ''))
+  }
+
+  protected whereSub (query: Builder, where: WhereClause): string {
+    const nested = where.query
+
+    if (nested === undefined) {
+      throw new Error(
+        'RuntimeException: Subquery where clause is missing its query.'
+      )
+    }
+
+    return (
+      this.wrap(where.column ?? '') +
+      ' ' +
+      (where.operator ?? '') +
+      ' (' +
+      nested.toSql() +
+      ')'
+    )
+  }
+
   protected whereNested (query: Builder, where: WhereClause): string {
+    const nested = where.query
+
+    if (nested === undefined) {
+      throw new Error(
+        'RuntimeException: Nested where clause is missing its query.'
+      )
+    }
+
     // Here we will calculate what portion of the string we need to remove. If this
     // is a join clause query, we need to remove the "on" portion of the SQL and
     // if it is a normal query we need to take the leading "where" of queries.
-    const offset = where.query instanceof JoinClause ? 3 : 6
+    const offset = nested instanceof JoinClause ? 3 : 6
 
-    return '(' + this.compileWheres(where.query).substring(offset) + ')'
+    return '(' + this.compileWheres(nested).substring(offset) + ')'
   }
 
   /**
@@ -628,8 +852,12 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    * @return string
    */
   protected whereNotInRaw (query: Builder, where: WhereClause): string {
-    if (where.values.length > 0) {
-      return this.wrap(where.column) + ' not in (' + where.values.join(', ') + ')'
+    const values = where.values
+
+    if (Array.isArray(values) && values.length > 0) {
+      return (
+        this.wrap(where.column ?? '') + ' not in (' + values.join(', ') + ')'
+      )
     }
 
     return '1 = 1'
@@ -645,8 +873,10 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    * @return string
    */
   protected whereInRaw (query: Builder, where: WhereClause): string {
-    if (where.values.length > 0) {
-      return this.wrap(where.column) + ' in (' + where.values.join(', ') + ')'
+    const values = where.values
+
+    if (Array.isArray(values) && values.length > 0) {
+      return this.wrap(where.column ?? '') + ' in (' + values.join(', ') + ')'
     }
 
     return '0 = 1'
@@ -660,8 +890,15 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    * @return string
    */
   protected whereIn (query: Builder, where: WhereClause): string {
-    if (where.values.length > 0) {
-      return this.wrap(where.column) + ' in (' + this.parameterize(where.values) + ')'
+    const values = where.values
+
+    if (Array.isArray(values) && values.length > 0) {
+      return (
+        this.wrap(where.column ?? '') +
+        ' in (' +
+        this.parameterize(values) +
+        ')'
+      )
     }
 
     return '0 = 1'
@@ -675,8 +912,15 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    * @return string
    */
   protected whereNotIn (query: Builder, where: WhereClause): string {
-    if (where.values.length > 0) {
-      return this.wrap(where.column) + ' not in (' + this.parameterize(where.values) + ')'
+    const values = where.values
+
+    if (Array.isArray(values) && values.length > 0) {
+      return (
+        this.wrap(where.column ?? '') +
+        ' not in (' +
+        this.parameterize(values) +
+        ')'
+      )
     }
 
     return '1 = 1'
@@ -690,7 +934,9 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    * @return string
    */
   protected whereRaw (query: Builder, where: WhereClause): string {
-    return where.sql instanceof Expression ? where.sql.getValue(this) : where.sql
+    return where.sql instanceof Expression
+      ? String(where.sql.getValue(this))
+      : (where.sql ?? '')
   }
 
   /**
@@ -702,12 +948,15 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    */
   protected whereValueBetween (query: Builder, where: WhereClause): string {
     const between = where.not ? 'not between' : 'between'
+    const columns = where.columns ?? []
 
-    const min = this.wrap(Array.isArray(where.columns) ? Arr.first(where.columns) : where.columns[0])
+    const min = this.wrap(Arr.first(columns) ?? '')
 
-    const max = this.wrap(Array.isArray(where.columns) ? Arr.last(where.columns) : where.columns[1])
+    const max = this.wrap(Arr.last(columns) ?? '')
 
-    return this.parameter(where.value) + ' ' + between + ' ' + min + ' and ' + max
+    return (
+      this.parameter(where.value) + ' ' + between + ' ' + min + ' and ' + max
+    )
   }
 
   /**
@@ -729,7 +978,11 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    * @return string
    */
   protected whereNullSafeEquals (query: Builder, where: WhereClause): string {
-    return this.wrap(where.column ?? '') + ' is not distinct from ' + this.parameter(where.value)
+    return (
+      this.wrap(where.column ?? '') +
+      ' is not distinct from ' +
+      this.parameter(where.value)
+    )
   }
 
   /**
@@ -743,7 +996,9 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    */
   protected whereLike (query: Builder, where: WhereClause): string {
     if (where.caseSensitive) {
-      throw new Error('RuntimeException: This database engine does not support case sensitive like operations.')
+      throw new Error(
+        'RuntimeException: This database engine does not support case sensitive like operations.'
+      )
     }
 
     where.operator = where.not ? 'not like' : 'like'
@@ -760,8 +1015,12 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    *
    * @throws \RuntimeException
    */
+  // Query and clause belong to the compiler signature. This engine rejects binary comparison.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   protected whereBinary (query: Builder, where: WhereClause): string {
-    throw new Error('RuntimeException: This database engine does not support binary comparison operations.')
+    throw new Error(
+      'RuntimeException: This database engine does not support binary comparison operations.'
+    )
   }
 
   /**
@@ -809,6 +1068,17 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
   }
 
   /**
+   * Narrow a where value to something `wrap()` can accept.
+   */
+  private columnExpression (value: unknown): string | Expression {
+    if (typeof value === 'string' || value instanceof Expression) {
+      return value
+    }
+
+    return ''
+  }
+
+  /**
    * Compile a "between" where clause.
    *
    * @param  \Illuminate\Database\Query\Builder  $query
@@ -817,12 +1087,23 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    */
   protected whereBetweenColumns (query: Builder, where: WhereClause): string {
     const between = where.not ? 'not between' : 'between'
+    const values = where.values ?? []
 
-    const min = this.wrap(Array.isArray(where.values) ? Arr.first(where.values) : where.values[0])
+    const min = this.wrap(
+      this.columnExpression(
+        Array.isArray(values) ? Arr.first(values) : values[0]
+      )
+    )
 
-    const max = this.wrap(Array.isArray(where.values) ? Arr.last(where.values) : where.values[1])
+    const max = this.wrap(
+      this.columnExpression(
+        Array.isArray(values) ? Arr.last(values) : values[1]
+      )
+    )
 
-    return this.wrap(where.column ?? '') + ' ' + between + ' ' + min + ' and ' + max
+    return (
+      this.wrap(where.column ?? '') + ' ' + between + ' ' + min + ' and ' + max
+    )
   }
 
   /**
@@ -833,10 +1114,22 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    * @param  array  $where
    * @return string
    */
-  protected dateBasedWhere (type: string, query: Builder, where: WhereClause): string {
+  protected dateBasedWhere (
+    type: string,
+    query: Builder,
+    where: WhereClause
+  ): string {
     const value = this.parameter(where.value)
 
-    return type + '(' + this.wrap(where.column) + ') ' + where.operator + ' ' + value
+    return (
+      type +
+      '(' +
+      this.wrap(where.column ?? '') +
+      ') ' +
+      where.operator +
+      ' ' +
+      value
+    )
   }
 
   /**
@@ -860,7 +1153,13 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
   protected whereColumn (query: Builder, where: WhereClause): string {
     const operator = (where.operator ?? '').replace('?', '??')
 
-    return this.wrap(where.first ?? '') + ' ' + operator + ' ' + this.wrap(where.second ?? '')
+    return (
+      this.wrap(this.columnExpression(where.first)) +
+      ' ' +
+      operator +
+      ' ' +
+      this.wrap(where.second ?? '')
+    )
   }
 
   /**
@@ -884,7 +1183,9 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    * @throws \RuntimeException
    */
   protected supportsStraightJoins (): boolean {
-    throw new Error('RuntimeException: This database engine does not support straight joins.')
+    throw new Error(
+      'RuntimeException: This database engine does not support straight joins.'
+    )
   }
 
   /**
@@ -896,8 +1197,24 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    *
    * @throws \RuntimeException
    */
-  public compileJoinLateral (join: JoinLateralClause, expression: string): string {
-    throw new Error('RuntimeException: This database engine does not support lateral joins.')
+  public compileJoinLateral (
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- dialect overrides use the join
+    join: JoinLateralClause,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- dialect overrides use the expression
+    expression: string
+  ): string {
+    throw new Error(
+      'RuntimeException: This database engine does not support lateral joins.'
+    )
+  }
+
+  /**
+   * Compile an index hint. Dialects that support index hints override this.
+   */
+  // Query and hint belong to the compiler signature. Dialects that support hints override this.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  protected compileIndexHint (query: Builder, indexHint?: IndexHint): string {
+    return ''
   }
 
   /**
@@ -1001,19 +1318,28 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
    * @param  string  $table
    * @return string
    */
-  protected compileFrom (query: Builder, table: string): string {
+  protected compileFrom (query: Builder, table: string | Expression): string {
     return 'from ' + this.wrapTable(table)
   }
 
   /**
- * Substitute the given bindings into the given raw SQL query.
- *
- * @param  string  sql
- * @param  array  bindings
- * @return string
- */
-  public substituteBindingsIntoRawSql (sql: string, bindings: BindingValues): string {
-    bindings = bindings.map((value) => this.escape(value))
+   * Substitute the given bindings into the given raw SQL query.
+   *
+   * @param  string  sql
+   * @param  array  bindings
+   * @return string
+   */
+  public substituteBindingsIntoRawSql (
+    sql: string,
+    bindings: BindingValues
+  ): string {
+    const escaped = bindings.map((value) => {
+      if (value instanceof Expression) {
+        return String(this.getValue(value))
+      }
+
+      return this.escape(value)
+    })
 
     let query = ''
 
@@ -1035,7 +1361,7 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
         isStringLiteral = !isStringLiteral
       } else if (char === '?' && !isStringLiteral) {
         // Substitutable binding...
-        query += bindings.shift() ?? '?'
+        query += escaped.shift() ?? '?'
       } else {
         // Normal character...
         query += char
@@ -1045,11 +1371,6 @@ export class Grammar extends mixing(BaseGrammar).useTrait([CompilesJsonPaths]) i
     return query
   }
 
-  /**
- * Get the grammar specific bitwise operators.
- *
- * @return array
- */
   public getBitwiseOperators (): string[] {
     return this.bitwiseOperators
   }

@@ -1,6 +1,4 @@
-export type Constructor<T = object> = abstract new (
-  ...args: never[]
-) => T
+export type Constructor<T = object> = abstract new (...args: never[]) => T
 
 type DefaultMixinCtor = new () => object
 
@@ -9,7 +7,7 @@ export type Mixing<TCtor extends Constructor = DefaultMixinCtor> = {
 }
 
 export const mixing = <TCtor extends Constructor = DefaultMixinCtor>(
-  derivedCtor: TCtor = class { } as unknown as TCtor
+  derivedCtor: TCtor = class {} as unknown as TCtor
 ): Mixing<TCtor> => {
   return {
     useTrait: (constructors: Constructor[]): TCtor => {
@@ -19,7 +17,7 @@ export const mixing = <TCtor extends Constructor = DefaultMixinCtor>(
             derivedCtor.prototype,
             name,
             Object.getOwnPropertyDescriptor(baseCtor.prototype, name) ||
-            Object.create(null)
+              Object.create(null)
           )
         })
       })

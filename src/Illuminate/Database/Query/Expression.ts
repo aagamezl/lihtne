@@ -18,8 +18,7 @@ export class Expression implements ExpressionContract {
    * @param  {Grammar}  grammar
    * @return {string | number}
    */
-  // @eslint-disable-next-line @typescript-eslint/no-unused-vars
-  // @ts-expect-error expected error must be implemented in concrete class
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base getValue signature
   public getValue (grammar: Grammar): string | number {
     return this.value
   }

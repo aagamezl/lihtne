@@ -9,9 +9,20 @@ export class SQLiteGrammar extends Grammar {
    * @var string[]
    */
   protected override operators: string[] = [
-    '=', '<', '>', '<=', '>=', '<>', '!=',
-    'like', 'not like', 'ilike',
-    '&', '|', '<<', '>>'
+    '=',
+    '<',
+    '>',
+    '<=',
+    '>=',
+    '<>',
+    '!=',
+    'like',
+    'not like',
+    'ilike',
+    '&',
+    '|',
+    '<<',
+    '>>'
   ]
 
   /**
@@ -21,7 +32,12 @@ export class SQLiteGrammar extends Grammar {
    * @param  bool|string  $value
    * @return string
    */
-  protected compileLock (query: Builder, value: boolean | string): string {
+  protected override compileLock (
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base compileLock signature
+    query: Builder,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base compileLock signature
+    value: boolean | string
+  ): string {
     return ''
   }
 
@@ -36,13 +52,16 @@ export class SQLiteGrammar extends Grammar {
   }
 
   /**
- * Compile a "where null safe equals" clause.
- *
- * @param  \Illuminate\Database\Query\Builder  $query
- * @param  array  $where
- * @return string
- */
-  protected whereNullSafeEquals (query: Builder, where: WhereClause): string {
+   * Compile a "where null safe equals" clause.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $where
+   * @return string
+   */
+  protected override whereNullSafeEquals (
+    _query: Builder,
+    where: WhereClause
+  ): string {
     return this.wrap(where.column ?? '') + ' is ' + this.parameter(where.value)
   }
 
@@ -97,7 +116,10 @@ export class SQLiteGrammar extends Grammar {
    * @param  bool  $caseSensitive
    * @return string
    */
-  public prepareWhereLikeBinding (value: string, caseSensitive: boolean): string {
+  public prepareWhereLikeBinding (
+    value: string,
+    caseSensitive: boolean
+  ): string {
     if (!caseSensitive) {
       return value
     }
@@ -116,8 +138,8 @@ export class SQLiteGrammar extends Grammar {
    * @param  array  $where
    * @return string
    */
-  protected whereLike (query: Builder, where: WhereClause): string {
-    if (where.caseSensitive == false) {
+  protected override whereLike (query: Builder, where: WhereClause): string {
+    if (where.caseSensitive === false) {
       return super.whereLike(query, where)
     }
     where.operator = where.not ? 'not glob' : 'glob'
@@ -137,14 +159,18 @@ export class SQLiteGrammar extends Grammar {
   }
 
   /**
- * Compile a date based where clause.
- *
- * @param  string  $type
- * @param  \Illuminate\Database\Query\Builder  $query
- * @param  array  $where
- * @return string
- */
-  protected override dateBasedWhere (type: string, query: Builder, where: WhereClause): string {
+   * Compile a date based where clause.
+   *
+   * @param  string  $type
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $where
+   * @return string
+   */
+  protected override dateBasedWhere (
+    type: string,
+    _query: Builder,
+    where: WhereClause
+  ): string {
     const value = this.parameter(where.value)
 
     return `strftime('${type}', ${this.wrap(where.column ?? '')}) ${where.operator} cast(${value} as text)`

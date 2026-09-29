@@ -16,7 +16,7 @@ import { Collection } from './Collection'
  * @return \Illuminate\Support\Collection<TKey, TValue>
  */
 export const collect = <TKey extends PropertyKey, TValue>(
-  value?: ArrayableInput<TKey, TValue> | undefined
+  value?: ArrayableInput<TValue> | undefined
 ): Collection<TKey, TValue> => {
   return new Collection(value)
 }
@@ -40,18 +40,19 @@ export const dataGet = (
 
   const explodedKey = Array.isArray(key)
     ? key
-    : (typeof key === 'string'
+    : typeof key === 'string'
       ? key.split('.')
-      : [String(key)])
+      : [String(key)]
 
   for (let segment of explodedKey) {
     if (segment === '*') {
-      let values: Iterable<unknown> | Collection<PropertyKey, unknown>
+      let values: unknown[]
 
       if (target instanceof Collection) {
-        values = target.all()
+        const all = target.all()
+        values = Array.isArray(all) ? all : Object.values(all)
       } else if (isIterable(target)) {
-        values = target
+        values = [...target]
       } else {
         return value(defaultValue)
       }
@@ -68,19 +69,16 @@ export const dataGet = (
         segment = '{first}'
         break
       case '{first}':
-        // Use Arr.from and get the first key (array_key_first in PHP)
-        segment = Object.keys(Arr.from(target))[0]
+        segment = Object.keys(readableTarget(target))[0] ?? ''
         break
       case '\\{last}':
         segment = '{last}'
         break
-      case '{last}':
-        // Use Arr.from and get the last key (array_key_last in PHP)
-        {
-          const keys = Object.keys(Arr.from(target))
-          segment = keys[keys.length - 1]
-        }
+      case '{last}': {
+        const keys = Object.keys(readableTarget(target))
+        segment = keys[keys.length - 1] ?? ''
         break
+      }
       default:
         // No transformation needed
         // segment remains unchanged
@@ -103,13 +101,29 @@ export const dataGet = (
   return target
 }
 
+const readableTarget = (target: unknown): Record<string, unknown> => {
+  if (Array.isArray(target)) {
+    return Object.fromEntries(target.map((item, index) => [index, item]))
+  }
+
+  if (typeof target === 'object' && target !== null) {
+    return Object.fromEntries(Object.entries(target))
+  }
+
+  return {}
+}
+
 const isIterable = (value: unknown): value is Iterable<unknown> => {
   // Accepts arrays or objects implementing iterable protocol (like Traversable in PHP).
-  return Array.isArray(value) || (
-    value !== null &&
-    typeof value === 'object' &&
-    typeof (value as any)[Symbol.iterator] === 'function'
-  )
+  if (Array.isArray(value)) {
+    return true
+  }
+
+  if (value === null || typeof value !== 'object') {
+    return false
+  }
+
+  return typeof Reflect.get(value, Symbol.iterator) === 'function'
 }
 
 /**

@@ -1,6 +1,6 @@
 import { Collection } from '../src/Illuminate/Collections/CollectionNew'
 
-const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+// const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 const users = [
   { id: 1, name: 'Alice Jensen', email: 'alice@example.com', active: true, createdAt: '2026-01-12T09:15:00Z' },
   { id: 2, name: 'Bruno Sørensen', email: 'bruno@example.com', active: false, createdAt: '2026-01-13T11:22:00Z' },
@@ -14,8 +14,7 @@ const users = [
   { id: 10, name: 'Jonas Vester', email: 'jonas@example.com', active: true, createdAt: '2026-01-21T12:28:00Z' }
 ]
 
-let first
-const collectionNumbers = new Collection(numbers)
+// const collectionNumbers = new Collection(numbers)
 
 // for (const item of collection.all()) {
 //   console.log(item);
@@ -36,7 +35,7 @@ const collectionUsers = new Collection(users)
 // first = collection.first()
 // console.log(first);
 
-first = collectionUsers.first((value: typeof users[0], key: PropertyKey) => {
+const first = collectionUsers.first((value: typeof users[0]) => {
   return value.active === false
 }, 'All users are active')
 console.log(first)

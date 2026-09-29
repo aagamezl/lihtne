@@ -13,8 +13,15 @@ export class MariaDbGrammar extends MySqlGrammar {
    *
    * @throws \RuntimeException
    */
-  public override compileJoinLateral (join: JoinLateralClause, expression: string): string {
-    throw new Error('RuntimeException: This database engine does not support lateral joins.')
+  public override compileJoinLateral (
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base compileJoinLateral signature
+    join: JoinLateralClause,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base compileJoinLateral signature
+    expression: string
+  ): string {
+    throw new Error(
+      'RuntimeException: This database engine does not support lateral joins.'
+    )
   }
 
   /**
@@ -33,7 +40,7 @@ export class MariaDbGrammar extends MySqlGrammar {
    * @return string
    */
   public compileThreadCount (): string {
-    return 'select variable_value as `Value` from information_schema.global_status where variable_name = \'THREADS_CONNECTED\''
+    return "select variable_value as `Value` from information_schema.global_status where variable_name = 'THREADS_CONNECTED'"
   }
 
   /**
@@ -61,6 +68,7 @@ export class MariaDbGrammar extends MySqlGrammar {
    * @param  \Illuminate\Database\Query\Builder  $query
    * @return bool
    */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base useLegacyGroupLimit signature
   public useLegacyGroupLimit (query: Builder): boolean {
     return false
   }

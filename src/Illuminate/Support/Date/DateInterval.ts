@@ -51,9 +51,7 @@ export class DateInterval {
   days: number | false
 
   constructor (spec: string | DateIntervalParts = {}) {
-    const parts = typeof spec === 'string'
-      ? DateInterval.parseSpec(spec)
-      : spec
+    const parts = typeof spec === 'string' ? DateInterval.parseSpec(spec) : spec
 
     this.y = parts.years ?? 0
     this.m = parts.months ?? 0
@@ -102,7 +100,8 @@ export class DateInterval {
    */
   static createFromDateString (datetime: string): DateInterval {
     const interval = new DateInterval()
-    const unitPattern = /([+-]?\d+)\s*(year|month|week|day|hour|minute|min|second|sec)s?/gi
+    const unitPattern =
+      /([+-]?\d+)\s*(year|month|week|day|hour|minute|min|second|sec)s?/gi
 
     let match = unitPattern.exec(datetime)
 
@@ -111,8 +110,16 @@ export class DateInterval {
     }
 
     while (match !== null) {
-      const value = parseInt(match[1], 10)
-      const unit = match[2].toLowerCase()
+      const amount = match[1]
+      const unitName = match[2]
+
+      if (amount === undefined || unitName === undefined) {
+        match = unitPattern.exec(datetime)
+        continue
+      }
+
+      const value = parseInt(amount, 10)
+      const unit = unitName.toLowerCase()
 
       DateInterval.applyUnit(interval, unit, value)
 
@@ -122,7 +129,11 @@ export class DateInterval {
     return interval
   }
 
-  private static applyUnit (interval: DateInterval, unit: string, value: number): void {
+  private static applyUnit (
+    interval: DateInterval,
+    unit: string,
+    value: number
+  ): void {
     if (unit === 'year') {
       interval.y += value
       return
@@ -182,7 +193,10 @@ export class DateInterval {
 
     const specifierPattern = /%[%YyMmDdaHhIiSsRr]/g
 
-    return formatStr.replace(specifierPattern, (token) => replacements[token] ?? token)
+    return formatStr.replace(
+      specifierPattern,
+      (token) => replacements[token] ?? token
+    )
   }
 
   /**
@@ -191,11 +205,13 @@ export class DateInterval {
    * exact equivalent either, since months/years vary in length).
    */
   toApproximateSeconds (): number {
-    const totalDays = this.d +
+    const totalDays =
+      this.d +
       this.m * APPROXIMATE_DAYS_PER_MONTH +
       this.y * APPROXIMATE_DAYS_PER_YEAR
 
-    const totalSeconds = totalDays * SECONDS_PER_DAY_UNIT +
+    const totalSeconds =
+      totalDays * SECONDS_PER_DAY_UNIT +
       this.h * SECONDS_PER_HOUR_UNIT +
       this.i * SECONDS_PER_MINUTE_UNIT +
       this.s

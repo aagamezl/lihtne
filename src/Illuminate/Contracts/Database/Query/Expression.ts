@@ -7,5 +7,5 @@ export interface Expression {
    * @param  \Illuminate\Database\Grammar  $grammar
    * @return string|int|float
    */
-  getValue(grammar: Grammar): string | number
+  getValue (grammar: Grammar): string | number
 }

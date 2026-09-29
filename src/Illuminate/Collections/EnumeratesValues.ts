@@ -35,18 +35,6 @@ export class EnumeratesValues<TKey extends PropertyKey, TValue> {
    * @param  (callable(TValue, TKey): bool)|bool|TValue  $callback
    * @return static
    */
-  public reject (
-    callback: (value: TValue, key: TKey) => boolean | TValue = true
-  ): this {
-    const useAsCallable = this.useAsCallable(callback)
-
-    return this.filter((value, key) => {
-      return useAsCallable
-        ? !callback(value, key)
-        : value !== callback
-    })
-  }
-
   /**
    * Execute a callback over each item.
    *
@@ -71,7 +59,7 @@ export class EnumeratesValues<TKey extends PropertyKey, TValue> {
    * back to the caller's declared key type. See the matching helper on
    * `Arr` for why this cast — the one in this file — is unavoidable.
    */
-  private static toKey<TKey extends PropertyKey>(key: string): TKey {
+  private static toKey<TKey extends PropertyKey> (key: string): TKey {
     return key as unknown as TKey
   }
 
@@ -89,7 +77,9 @@ export class EnumeratesValues<TKey extends PropertyKey, TValue> {
    * is normalized via `Arr.from()`. TypeScript has no `UnitEnum`
    * equivalent, so that branch is omitted.
    */
-  protected getArrayableItems (items: ArrayableInput<TKey, TValue> | TValue): Dictionary<TValue> {
+  protected getArrayableItems (
+    items: ArrayableInput<TValue> | TValue
+  ): Dictionary<TValue> {
     if (this.isScalarLike(items)) {
       const wrapped = Arr.wrap(items)
       const result: Dictionary<TValue> = {}
@@ -112,7 +102,9 @@ export class EnumeratesValues<TKey extends PropertyKey, TValue> {
    * itself be a valid PHP callable (a function name); in TypeScript the
    * equivalent distinction is simply "is this a function".
    */
-  protected useAsCallable (value: unknown): value is (...args: never[]) => unknown {
+  protected useAsCallable (
+    value: unknown
+  ): value is (...args: never[]) => unknown {
     return typeof value !== 'string' && typeof value === 'function'
   }
 
@@ -122,18 +114,22 @@ export class EnumeratesValues<TKey extends PropertyKey, TValue> {
    * i.e. not an array/object/Arrayable that `Arr.from()` should handle.
    */
   private isScalarLike (
-    value: ArrayableInput<TKey, TValue> | TValue
+    value: ArrayableInput<TValue> | TValue
   ): value is TValue | null | undefined {
     if (value === null || value === undefined) {
       return true
     }
 
-    if (isArrayable<TKey, TValue>(value)) {
+    if (isArrayable<TValue>(value)) {
       return false
     }
 
     const scalarType = typeof value
 
-    return scalarType === 'string' || scalarType === 'number' || scalarType === 'boolean'
+    return (
+      scalarType === 'string' ||
+      scalarType === 'number' ||
+      scalarType === 'boolean'
+    )
   }
 }

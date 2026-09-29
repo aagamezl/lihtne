@@ -5,8 +5,10 @@ export type Entries<T> = {
 }[keyof T][]
 
 export type Prettify<T> = {
-  [K in keyof T]: Prettify<T[K]>;
+  [K in keyof T]: Prettify<T[K]>
 } & {}
+
+export type ChangeCase = 'CASE_LOWER' | 'CASE_UPPER'
 
 export const isEmpty = (value: unknown): boolean => {
   return value === undefined || value === 0 || value === false || value === null
@@ -68,7 +70,15 @@ export const ucfirst = (value: string): string => {
  * @param  (callable(TValue): mixed)|null  $callback
  * @return ($callback is null ? \Illuminate\Support\HigherOrderTapProxy<TValue> : TValue)
  */
-export const tap = <TValue>(value: TValue, callback?: (value: TValue) => unknown): TValue => {
+export function tap<TValue> (value: TValue): HigherOrderTapProxy<TValue>
+export function tap<TValue> (
+  value: TValue,
+  callback: (value: TValue) => unknown
+): TValue
+export function tap<TValue> (
+  value: TValue,
+  callback?: (value: TValue) => unknown
+): TValue | HigherOrderTapProxy<TValue> {
   if (callback === undefined) {
     return new HigherOrderTapProxy(value)
   }
@@ -76,6 +86,17 @@ export const tap = <TValue>(value: TValue, callback?: (value: TValue) => unknown
   callback(value)
 
   return value
+}
+
+export const changeKeyCase = (
+  value: Record<string, unknown>,
+  changeCase: ChangeCase = 'CASE_LOWER'
+): Record<string, unknown> => {
+  const casefunction =
+    changeCase === 'CASE_LOWER' ? 'toLowerCase' : 'toUpperCase'
+  return Object.fromEntries(
+    Object.entries(value).map(([key, value]) => [key[casefunction](), value])
+  )
 }
 
 /**
@@ -109,8 +130,8 @@ export const hex2bin = (str: string): string => {
   return hex
 }
 
-export const findKey = <TKey, TValue>(
-  obj: any,
+export const findKey = <TKey extends PropertyKey, TValue>(
+  obj: Record<TKey, TValue>,
   callback: ((value: TValue, key: TKey) => boolean) | undefined
 ): TKey | undefined => {
   for (const key in obj) {
@@ -122,6 +143,8 @@ export const findKey = <TKey, TValue>(
   return undefined
 }
 
-export const isObject = (value: unknown): value is Record<PropertyKey, unknown> => {
+export const isObject = (
+  value: unknown
+): value is Record<PropertyKey, unknown> => {
   return value !== null && typeof value === 'object'
 }

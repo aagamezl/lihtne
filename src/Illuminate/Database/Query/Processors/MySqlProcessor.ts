@@ -1,5 +1,3 @@
 import { Processor } from './Processor'
 
-export class MySqlProcessor extends Processor {
-
-}
+export class MySqlProcessor extends Processor {}

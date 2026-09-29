@@ -16,10 +16,10 @@ type BuilderConstructor = new (
 
 export class JoinClause extends Builder {
   /**
- * The type of join being performed.
- *
- * @var string
- */
+   * The type of join being performed.
+   *
+   * @var string
+   */
   public type: string
 
   /**
@@ -64,7 +64,11 @@ export class JoinClause extends Builder {
    * @param  string  type
    * @param  string  table
    */
-  public constructor (parentQuery: Builder, type: string, table: Expression | string) {
+  public constructor (
+    parentQuery: Builder,
+    type: string,
+    table: Expression | string
+  ) {
     super(
       parentQuery.getConnection(),
       parentQuery.getGrammar(),
@@ -100,12 +104,12 @@ export class JoinClause extends Builder {
    * @throws \InvalidArgumentException
    */
   public on (
-    first: Function | Expression | string,
+    first: ((query: Builder) => unknown) | Expression | string,
     operator: string | undefined = undefined,
     second: string | Expression | undefined = undefined,
     boolean: string = 'and'
   ): this {
-    if (first instanceof Function) {
+    if (typeof first === 'function') {
       return this.whereNested(first, boolean)
     }
 
@@ -121,7 +125,7 @@ export class JoinClause extends Builder {
    * @return \Illuminate\Database\Query\JoinClause
    */
   public orOn (
-    first: Function | Expression | string,
+    first: ((query: Builder) => unknown) | Expression | string,
     operator: string | undefined = undefined,
     second: string | Expression | undefined = undefined
   ): this {
@@ -129,10 +133,10 @@ export class JoinClause extends Builder {
   }
 
   /**
- * Get a new instance of the join clause builder.
- *
- * @return \Illuminate\Database\Query\JoinClause
- */
+   * Get a new instance of the join clause builder.
+   *
+   * @return \Illuminate\Database\Query\JoinClause
+   */
   public override newQuery (): JoinClause {
     return new JoinClause(this.newParentQuery(), this.type, this.table)
   }
@@ -152,7 +156,9 @@ export class JoinClause extends Builder {
    * @return \Illuminate\Database\Query\Builder
    */
   protected newParentQuery (): Builder {
-    return new this.parentClass(
+    const ParentClass = this.parentClass
+
+    return new ParentClass(
       this.parentConnection,
       this.parentGrammar,
       this.parentProcessor

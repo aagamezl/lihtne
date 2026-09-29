@@ -2,10 +2,10 @@ import { instanceProxy } from '../Support'
 
 export class HigherOrderWhenProxy<TTarget> {
   /**
- * The target being conditionally operated on.
- *
- * @var mixed
- */
+   * The target being conditionally operated on.
+   *
+   * @var mixed
+   */
   protected target: TTarget
 
   /**
@@ -36,7 +36,7 @@ export class HigherOrderWhenProxy<TTarget> {
   }
 
   public condition (value: boolean): this {
-    [this.conditionProperty, this.hasCondition] = [value, true]
+    ;[this.conditionProperty, this.hasCondition] = [value, true]
 
     return this
   }
@@ -53,21 +53,37 @@ export class HigherOrderWhenProxy<TTarget> {
   }
 
   /**
- * Proxy a method call on the target.
- *
- * @param  string  method
- * @param  array  parameters
- * @return mixed
- */
+   * Proxy a method call on the target.
+   *
+   * @param  string  method
+   * @param  array  parameters
+   * @return mixed
+   */
   public __call (method: string, parameters: unknown[]): unknown {
-    if (!this.hasCondition) {
-      const condition = this.target[method](...parameters)
+    const callTarget = (target: TTarget): unknown => {
+      if (typeof target !== 'object' || target === null) {
+        return target
+      }
 
-      return this.condition(this.negateConditionOnCapture ? !condition : condition)
+      const targetMethod = Reflect.get(target, method)
+
+      if (typeof targetMethod !== 'function') {
+        return target
+      }
+
+      return targetMethod.apply(target, parameters)
     }
 
-    return this.conditionProperty
-      ? this.target[method](...parameters)
-      : this.target
+    if (!this.hasCondition) {
+      const condition = callTarget(this.target)
+
+      const enabled = condition === true
+
+      return this.condition(
+        this.negateConditionOnCaptureProperty ? !enabled : enabled
+      )
+    }
+
+    return this.conditionProperty ? callTarget(this.target) : this.target
   }
 }

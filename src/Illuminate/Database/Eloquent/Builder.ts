@@ -3,11 +3,18 @@ import type { Builder as QueryBuilder } from '../Query/Builder'
 
 import { instanceProxy } from '../../Support/Proxies/InstanceProxy'
 
+const isMacro = (value: unknown): value is (...args: unknown[]) => unknown => {
+  return typeof value === 'function'
+}
+
 /**
  * @mixin \Illuminate\Database\Query\Builder
  */
-export interface Builder extends QueryBuilder { }
+// Merges query-builder members onto this class. The interface adds no fields of its own.
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging
+export interface Builder extends QueryBuilder {}
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Builder implements BuilderContract {
   query: QueryBuilder
 
@@ -36,25 +43,25 @@ export class Builder implements BuilderContract {
   ]
 
   /**
- * All of the globally registered builder macros.
- *
- * @var array
- */
-  protected static macros = []
+   * All of the globally registered builder macros.
+   *
+   * @var array
+   */
+  protected static macros: Record<string, (...args: unknown[]) => unknown> = {}
 
   /**
    * The model being queried.
    *
    * @var TModel
    */
-  protected model
+  protected model: { hasNamedScope (scope: string): boolean } | undefined
 
   /**
    * All of the locally registered builder macros.
    *
    * @var array
    */
-  protected localMacros = []
+  protected localMacros: Record<string, (...args: unknown[]) => unknown> = {}
 
   constructor (query: QueryBuilder) {
     this.query = query
@@ -89,7 +96,7 @@ export class Builder implements BuilderContract {
    * @return bool
    */
   public hasNamedScope (scope: string): boolean {
-    return this.model && this.model.hasNamedScope(scope)
+    return this.model?.hasNamedScope(scope) === true
   }
 
   __call (method: string, ...parameters: unknown[]) {
@@ -110,24 +117,26 @@ export class Builder implements BuilderContract {
     // const localMacros = builder.localMacros ?? (builder.localMacros = {})
 
     if (method === 'macro') {
-      this.localMacros[parameters[0]] = parameters[1]
+      const name = parameters[0]
+      const macro = parameters[1]
+
+      if (typeof name === 'string' && isMacro(macro)) {
+        this.localMacros[name] = macro
+      }
+
       return
     }
 
-    if (this.hasMacro(method)) {
-      parameters.unshift(this)
+    const localMacro = this.localMacros[method]
 
-      return this.localMacros[method](...parameters)
+    if (localMacro !== undefined) {
+      return localMacro(this, ...parameters)
     }
 
-    if (Builder.hasGlobalMacro(method)) {
-      let callable = Builder.macros[method]
+    const globalMacro = Builder.macros[method]
 
-      if (callable instanceof Function) {
-        callable = callable.bind(this)
-      }
-
-      return callable(...parameters)
+    if (globalMacro !== undefined) {
+      return globalMacro.apply(this, parameters)
     }
 
     if (this.hasNamedScope(method)) {
@@ -135,12 +144,32 @@ export class Builder implements BuilderContract {
     }
 
     if (this.passthru.includes(method.toLowerCase())) {
-      return this.toBase()[method](...parameters)
+      const forwarded = Reflect.get(this.toBase(), method)
+
+      if (typeof forwarded === 'function') {
+        return forwarded.apply(this.toBase(), parameters)
+      }
     }
 
-    this.query[method](...parameters)
+    const queryMethod = Reflect.get(this.query, method)
+
+    if (typeof queryMethod === 'function') {
+      queryMethod.apply(this.query, parameters)
+    }
 
     return this
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base callNamedScope signature
+  public callNamedScope (method: string, parameters: unknown[]): this {
+    return this
+  }
+
+  public newModelInstance (): {
+    newCollection: (items: unknown[]) => unknown
+    newFromBuilder: (item: unknown) => { preventsLazyLoading?: boolean }
+  } {
+    throw new Error('newModelInstance() is not implemented.')
   }
 
   toBase () {
@@ -160,15 +189,11 @@ export class Builder implements BuilderContract {
   public hydrate (items: unknown[]) {
     const instance = this.newModelInstance()
 
-    return instance.newCollection(items.map((item: Builder) => {
-      const model = instance.newFromBuilder(item)
-
-      if (items.length > 1) {
-        model.preventsLazyLoading = Model.preventsLazyLoading()
-      }
-
-      return model
-    }))
+    return instance.newCollection(
+      items.map((item: unknown) => {
+        return instance.newFromBuilder(item)
+      })
+    )
   }
 
   /**

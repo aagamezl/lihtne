@@ -11,8 +11,8 @@
  * Any object that can produce a plain array/record representation of
  * itself. `Collection` itself implements this.
  */
-export interface Arrayable<TKey extends PropertyKey, TValue> {
-  toArray(): Dictionary<TValue>
+export interface Arrayable<TValue> {
+  toArray (): Dictionary<TValue>
 }
 
 /**
@@ -34,22 +34,23 @@ export type Dictionary<TValue> = Record<string, TValue>
  * Anything Arr/Collection helpers can read entries from: a JS array, a
  * plain record/dictionary, or something Arrayable.
  */
-export type ArrayableInput<TKey extends PropertyKey, TValue> =
-  | TValue[] |
-  Dictionary<TValue> |
-  Arrayable<TKey, TValue> |
-  Iterable<TValue> |
-  null |
-  undefined
+export type ArrayableInput<TValue> =
+
+    | TValue[] |
+    Dictionary<TValue> |
+    Arrayable<TValue> |
+    Iterable<TValue> |
+    null |
+    undefined
 
 /**
  * Type guard for the Arrayable contract, used in place of `instanceof`
  * checks against an interface (interfaces have no runtime representation
  * in TypeScript, so this checks for the `toArray` method shape instead).
  */
-export function isArrayable<TKey extends PropertyKey, TValue> (
+export function isArrayable<TValue> (
   value: unknown
-): value is Arrayable<TKey, TValue> {
+): value is Arrayable<TValue> {
   if (value === null || typeof value !== 'object') {
     return false
   }

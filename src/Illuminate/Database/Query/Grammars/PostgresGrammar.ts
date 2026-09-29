@@ -15,11 +15,39 @@ export class PostgresGrammar extends Grammar {
    * @var string[]
    */
   protected override operators = [
-    '=', '<', '>', '<=', '>=', '<>', '!=',
-    'like', 'not like', 'between', 'ilike', 'not ilike',
-    '~', '&', '|', '#', '<<', '>>', '<<=', '>>=',
-    '&&', '@>', '<@', '?', '?|', '?&', '||', '-', '@?', '@@', '#-',
-    'is distinct from', 'is not distinct from'
+    '=',
+    '<',
+    '>',
+    '<=',
+    '>=',
+    '<>',
+    '!=',
+    'like',
+    'not like',
+    'between',
+    'ilike',
+    'not ilike',
+    '~',
+    '&',
+    '|',
+    '#',
+    '<<',
+    '>>',
+    '<<=',
+    '>>=',
+    '&&',
+    '@>',
+    '<@',
+    '?',
+    '?|',
+    '?&',
+    '||',
+    '-',
+    '@?',
+    '@@',
+    '#-',
+    'is distinct from',
+    'is not distinct from'
   ]
 
   /**
@@ -35,7 +63,14 @@ export class PostgresGrammar extends Grammar {
    * @var array
    */
   protected override bitwiseOperators = [
-    '~', '&', '|', '#', '<<', '>>', '<<=', '>>='
+    '~',
+    '&',
+    '|',
+    '#',
+    '<<',
+    '>>',
+    '<<=',
+    '>>='
   ]
 
   /**
@@ -55,7 +90,7 @@ export class PostgresGrammar extends Grammar {
   protected override compileColumns (
     query: Builder,
     columns: Array<Expression | string>
-  ): string | null | undefined {
+  ): string {
     // If the query is actually performing an aggregating select, we will let that
     // compiler handle the building of the select clauses, as it will need some
     // more syntax that is best handled by that function to keep things neat.
@@ -66,7 +101,8 @@ export class PostgresGrammar extends Grammar {
     let select: string
 
     if (Array.isArray(query.distinctProperty)) {
-      select = 'select distinct on (' + this.columnize(query.distinctProperty) + ') '
+      select =
+        'select distinct on (' + this.columnize(query.distinctProperty) + ') '
     } else if (isTruthy(query.distinctProperty)) {
       select = 'select distinct '
     } else {
@@ -86,12 +122,21 @@ export class PostgresGrammar extends Grammar {
    */
   protected override dateBasedWhere (
     type: string,
-    query: Builder,
+    _query: Builder,
     where: WhereClause
   ): string {
     const value = this.parameter(where.value)
 
-    return 'extract(' + type + ' from ' + this.wrap(where.column) + ') ' + where.operator + ' ' + value
+    return (
+      'extract(' +
+      type +
+      ' from ' +
+      this.wrap(where.column ?? '') +
+      ') ' +
+      where.operator +
+      ' ' +
+      value
+    )
   }
 
   /**
@@ -101,8 +146,8 @@ export class PostgresGrammar extends Grammar {
    * @param  array  $where
    * @return string
    */
-  protected override whereDate (query: Builder, where: WhereClause): string {
-    let column = this.wrap(where.column)
+  protected override whereDate (_query: Builder, where: WhereClause): string {
+    let column = this.wrap(where.column ?? '')
     const value = this.parameter(where.value)
 
     if (this.isJsonSelector(column)) {
@@ -119,8 +164,8 @@ export class PostgresGrammar extends Grammar {
    * @param  array  $where
    * @return string
    */
-  protected override whereTime (query: Builder, where: WhereClause): string {
-    let column = this.wrap(where.column)
+  protected override whereTime (_query: Builder, where: WhereClause): string {
+    let column = this.wrap(where.column ?? '')
     const value = this.parameter(where.value)
 
     if (this.isJsonSelector(column)) {
@@ -169,7 +214,7 @@ export class PostgresGrammar extends Grammar {
    * @param  array  $where
    * @return string
    */
-  public override whereFulltext (query: Builder, where: WhereClause): string {
+  public override whereFulltext (_query: Builder, where: WhereClause): string {
     let language = where.options?.language ?? 'english'
 
     if (!this.validFullTextLanguages().includes(language)) {
@@ -178,10 +223,11 @@ export class PostgresGrammar extends Grammar {
 
     const isVector = where.options?.vector ?? false
 
-    const columns = (new Collection(where.columns ?? []))
-      .map((column: Expression | string) => isVector
-        ? this.wrap(column)
-        : `to_tsvector('${language}', ${this.wrap(column)})`)
+    const columns = new Collection(where.columns ?? [])
+      .map((column: Expression | string) =>
+        isVector
+          ? this.wrap(column)
+          : `to_tsvector('${language}', ${this.wrap(column)})`)
       .implode(' || ')
 
     let mode = 'plainto_tsquery'
@@ -223,7 +269,7 @@ export class PostgresGrammar extends Grammar {
    * @param  array  $where
    * @return string
    */
-  protected whereLike (query: Builder, where: WhereClause): string {
+  protected override whereLike (query: Builder, where: WhereClause): string {
     where.operator = where.not ? 'not ' : ''
     where.operator += where.caseSensitive ? 'like' : 'ilike'
 
@@ -253,11 +299,11 @@ export class PostgresGrammar extends Grammar {
   }
 
   /**
- * Wrap the given JSON selector for boolean values.
- *
- * @param  string  $value
- * @return string
- */
+   * Wrap the given JSON selector for boolean values.
+   *
+   * @param  string  $value
+   * @return string
+   */
   protected wrapJsonBooleanSelector (value: string): string {
     const selector = this.wrapJsonSelector(value).replace('->>', '->')
 
@@ -280,26 +326,25 @@ export class PostgresGrammar extends Grammar {
    * @param  array  $path
    * @return array
    */
-  protected wrapJsonPathAttributes (path: string[]): string[] {
-    const quote = arguments.length === 2 ? arguments[1] : "'"
-
-    return new Collection<string, string[]>(path)
-      .map((attribute: string) => this.parseJsonPathArrayKeys(attribute))
-      .collapse()
-      .map((attribute: string) => {
-        if (Number.isInteger(attribute)) {
+  protected wrapJsonPathAttributes (
+    path: string[],
+    quote: string = "'"
+  ): string[] {
+    return path
+      .flatMap((attribute) => this.parseJsonPathArrayKeys(attribute))
+      .map((attribute) => {
+        if (/^\d+$/.test(attribute)) {
           return attribute
         }
 
-        attribute = attribute.replace("'", "''")
+        let quoted = attribute.replace("'", "''")
 
         if (quote !== "'") {
-          attribute = attribute.replace(quote, quote + quote)
+          quoted = quoted.replaceAll(quote, quote + quote)
         }
 
-        return quote + attribute + quote
+        return quote + quoted + quote
       })
-      .all()
   }
 
   /**
@@ -310,18 +355,15 @@ export class PostgresGrammar extends Grammar {
    */
   protected parseJsonPathArrayKeys (attribute: string): string[] {
     const parts = attribute.match(/(\[[^\]]+\])+$/)
-    if (parts) {
-      const key = Str.beforeLast(attribute, parts[0])
+    const matched = parts?.[0]
 
-      const keys = parts[0].match(/\[([^\]]+)\]/g)
-
-      return (new Collection<string, string[]>([key]))
-        .merge(keys?.[1] ?? [])
-        .diff('')
-        .values()
-        .all()
+    if (matched === undefined) {
+      return [attribute]
     }
 
-    return [attribute]
+    const key = Str.beforeLast(attribute, matched)
+    const keys = matched.match(/\[([^\]]+)\]/g) ?? []
+
+    return [key, ...keys].filter((part) => part !== '')
   }
 }

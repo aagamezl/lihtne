@@ -1,8 +1,21 @@
+import type { Bindings, WhereClause, WhereClauseType } from '../Query/Builder'
 import type { Expression } from '../Query/Expression'
 
 import { Arr } from '../../Collections/Arr'
 
 export class BuildsWhereDateClauses {
+  declare wheres: WhereClause[]
+
+  declare addBinding: (value: unknown, type?: keyof Bindings) => this
+
+  declare protected addDateBasedWhere: (
+    type: WhereClauseType,
+    column: string | Expression,
+    operator: string,
+    value: unknown,
+    boolean: string
+  ) => this
+
   /**
    * Add a where clause to determine if a "date" column is in the past to the query.
    *
@@ -24,11 +37,11 @@ export class BuildsWhereDateClauses {
   }
 
   /**
- * Add an "or where" clause to determine if a "date" column is in the future or now to the query.
- *
- * @param  array|string  $columns
- * @return $this
- */
+   * Add an "or where" clause to determine if a "date" column is in the future or now to the query.
+   *
+   * @param  array|string  $columns
+   * @return $this
+   */
   public orWhereNowOrFuture (columns: Array<string | Expression>) {
     return this.wherePastOrFuture(columns, '>=', 'or')
   }
@@ -41,7 +54,11 @@ export class BuildsWhereDateClauses {
    * @param  string  $boolean
    * @return $this
    */
-  protected wherePastOrFuture (columns: Array<string | Expression>, operator: string, boolean: string) {
+  protected wherePastOrFuture (
+    columns: Array<string | Expression>,
+    operator: string,
+    boolean: string
+  ) {
     const type = 'Basic'
     const value = new Date()
 
@@ -110,7 +127,10 @@ export class BuildsWhereDateClauses {
    * @param  string  $boolean
    * @return $this
    */
-  public whereToday (columns: Array<string | Expression>, boolean: string = 'and') {
+  public whereToday (
+    columns: Array<string | Expression>,
+    boolean: string = 'and'
+  ) {
     return this.whereTodayBeforeOrAfter(columns, '=', boolean)
   }
 
