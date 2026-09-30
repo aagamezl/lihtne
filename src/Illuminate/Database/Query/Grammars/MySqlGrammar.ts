@@ -50,7 +50,9 @@ export class MySqlGrammar extends Grammar {
     }
 
     if (!isNumeric(seed)) {
-      throw new Error('InvalidArgumentException: The seed value must be numeric.')
+      throw new Error(
+        'InvalidArgumentException: The seed value must be numeric.'
+      )
     }
 
     // In MySQL, RAND accepts an integer seed

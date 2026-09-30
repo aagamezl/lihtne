@@ -185,7 +185,10 @@ export class Grammar
    * @return string
    */
   public compileSelect (query: Builder): string {
-    if ((query.unions.length > 0 || query.havings) && query.aggregateProperty) {
+    if (
+      (query.unions.length > 0 || query.havings.length > 0) &&
+      query.aggregateProperty
+    ) {
       return this.compileUnionAggregate(query)
     }
 
@@ -205,7 +208,7 @@ export class Grammar
     // can build the query and concatenate all the pieces together as one.
     const original = query.columns
 
-    if (query.columns.length === 0) {
+    if (query.columns == null || query.columns.length === 0) {
       query.columns = ['*']
     }
 
@@ -229,6 +232,7 @@ export class Grammar
    * @param  string|int  $seed
    * @return string
    */
+  // @ts-expect-error expected error; seed is not used in this method
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base compileRandom signature
   public compileRandom (seed: string | number): string {
     return 'RANDOM()'
@@ -350,7 +354,7 @@ export class Grammar
       sql += this.compileUnion(union)
     }
 
-    if (query.unionOrders.length > 0) {
+    if (query.unionOrders?.length > 0) {
       sql += ' ' + this.compileOrders(query, query.unionOrders)
     }
 
@@ -451,7 +455,7 @@ export class Grammar
    * @param  bool|string  $value
    * @return string
    */
-  protected compileLock (query: Builder, value: boolean | string): string {
+  protected compileLock (_query: Builder, value: boolean | string): string {
     return typeof value === 'string' ? value : ''
   }
 
@@ -462,9 +466,12 @@ export class Grammar
    * @param  array  $groups
    * @return string
    */
-  // @ts-expect-error expected error; query is not used in this method
-  // @eslint-disable-next-line @typescript-eslint/no-unused-vars
-  protected compileGroups (query: Builder, groups: Array<Expression | string>): string {
+  protected compileGroups (
+    // @ts-expect-error expected error; query is not used in this method
+    // @eslint-disable-next-line @typescript-eslint/no-unused-vars
+    query: Builder,
+    groups: Array<Expression | string>
+  ): string {
     return 'group by ' + this.columnize(groups)
   }
 
@@ -548,6 +555,8 @@ export class Grammar
    * @param  {number}  limit
    * @return {string}
    */
+  // @ts-expect-error expected error; query is not used in this method
+
   protected compileLimit (query: Builder, limit: number): string {
     return `limit ${typeof limit === 'number' ? limit : parseInt(limit, 10)}`
   }
@@ -559,6 +568,8 @@ export class Grammar
    * @param  int  $offset
    * @return string
    */
+  // @ts-expect-error expected error; query is not used in this method
+
   protected compileOffset (query: Builder, offset: number): string {
     return (
       'offset ' + (typeof offset === 'number' ? offset : parseInt(offset, 10))
@@ -614,7 +625,7 @@ export class Grammar
       'having ' +
       this.removeLeadingBoolean(
         new Collection(query.havings)
-          .map((/** @type {Having} */ having) => {
+          .map((having: Having) => {
             return having.boolean + ' ' + this.compileHaving(having)
           })
           .implode(' ')
@@ -795,7 +806,7 @@ export class Grammar
    *
    * @throws \RuntimeException
    */
-  // Query and clause belong to the compiler signature. This engine rejects fulltext.
+  // @ts-expect-error expected error; query is not used in this method
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   public whereFulltext (query: Builder, where: WhereClause): string {
     throw new Error(
@@ -810,6 +821,8 @@ export class Grammar
    * @param  array  $where
    * @return string
    */
+  // @ts-expect-error expected error; query is not used in this method
+
   protected whereExpression (query: Builder, where: WhereClause): string {
     if (where.column instanceof Expression) {
       return String(this.getValue(where.column))
@@ -817,6 +830,8 @@ export class Grammar
 
     return String(this.wrap(where.column ?? ''))
   }
+
+  // @ts-expect-error expected error; query is not used in this method
 
   protected whereSub (query: Builder, where: WhereClause): string {
     const nested = where.query
@@ -836,6 +851,8 @@ export class Grammar
       ')'
     )
   }
+
+  // @ts-expect-error expected error; query is not used in this method
 
   protected whereNested (query: Builder, where: WhereClause): string {
     const nested = where.query
@@ -863,6 +880,8 @@ export class Grammar
    * @param  array  $where
    * @return string
    */
+  // @ts-expect-error expected error; query is not used in this method
+
   protected whereNotInRaw (query: Builder, where: WhereClause): string {
     const values = where.values
 
@@ -884,6 +903,8 @@ export class Grammar
    * @param  array  $where
    * @return string
    */
+  // @ts-expect-error expected error; query is not used in this method
+
   protected whereInRaw (query: Builder, where: WhereClause): string {
     const values = where.values
 
@@ -901,6 +922,8 @@ export class Grammar
    * @param  array  $where
    * @return string
    */
+  // @ts-expect-error expected error; query is not used in this method
+
   protected whereIn (query: Builder, where: WhereClause): string {
     const values = where.values
 
@@ -923,6 +946,8 @@ export class Grammar
    * @param  array  $where
    * @return string
    */
+  // @ts-expect-error expected error; query is not used in this method
+
   protected whereNotIn (query: Builder, where: WhereClause): string {
     const values = where.values
 
@@ -945,6 +970,8 @@ export class Grammar
    * @param  array  $where
    * @return string
    */
+  // @ts-expect-error expected error; query is not used in this method
+
   protected whereRaw (query: Builder, where: WhereClause): string {
     return where.sql instanceof Expression
       ? String(where.sql.getValue(this))
@@ -958,6 +985,8 @@ export class Grammar
    * @param  array  $where
    * @return string
    */
+  // @ts-expect-error expected error; query is not used in this method
+
   protected whereValueBetween (query: Builder, where: WhereClause): string {
     const between = where.not ? 'not between' : 'between'
     const columns = where.columns ?? []
@@ -978,6 +1007,8 @@ export class Grammar
    * @param  array  $where
    * @return string
    */
+  // @ts-expect-error expected error; query is not used in this method
+
   protected whereNull (query: Builder, where: WhereClause): string {
     return this.wrap(where.column ?? '') + ' is null'
   }
@@ -989,6 +1020,8 @@ export class Grammar
    * @param  array  $where
    * @return string
    */
+  // @ts-expect-error expected error; query is not used in this method
+
   protected whereNullSafeEquals (query: Builder, where: WhereClause): string {
     return (
       this.wrap(where.column ?? '') +
@@ -1027,7 +1060,7 @@ export class Grammar
    *
    * @throws \RuntimeException
    */
-  // Query and clause belong to the compiler signature. This engine rejects binary comparison.
+  // @ts-expect-error expected error; query is not used in this method
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   protected whereBinary (query: Builder, where: WhereClause): string {
     throw new Error(
@@ -1097,6 +1130,8 @@ export class Grammar
    * @param  array  $where
    * @return string
    */
+  // @ts-expect-error expected error; query is not used in this method
+
   protected whereBetweenColumns (query: Builder, where: WhereClause): string {
     const between = where.not ? 'not between' : 'between'
     const values = where.values ?? []
@@ -1128,6 +1163,8 @@ export class Grammar
    */
   protected dateBasedWhere (
     type: string,
+    // @ts-expect-error expected error; query is not used in this method
+
     query: Builder,
     where: WhereClause
   ): string {
@@ -1162,6 +1199,8 @@ export class Grammar
    * @param  array  $where
    * @return string
    */
+  // @ts-expect-error expected error; query is not used in this method
+
   protected whereColumn (query: Builder, where: WhereClause): string {
     const operator = (where.operator ?? '').replace('?', '??')
 
@@ -1210,9 +1249,11 @@ export class Grammar
    * @throws \RuntimeException
    */
   public compileJoinLateral (
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- dialect overrides use the join
+    // @ts-expect-error expected error; join is not used in this method
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     join: JoinLateralClause,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- dialect overrides use the expression
+    // @ts-expect-error expected error; expression is not used in this method
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     expression: string
   ): string {
     throw new Error(
@@ -1223,7 +1264,7 @@ export class Grammar
   /**
    * Compile an index hint. Dialects that support index hints override this.
    */
-  // Query and hint belong to the compiler signature. Dialects that support hints override this.
+  // @ts-expect-error expected error; query is not used in this method
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   protected compileIndexHint (query: Builder, indexHint?: IndexHint): string {
     return ''
@@ -1252,7 +1293,7 @@ export class Grammar
    * @return {string}
    */
   protected compileBasicHaving (having: Having): string {
-    const column = this.wrap(having.column ?? '')
+    const column = this.wrap((having.column ?? '') as string | Expression)
 
     const parameter = this.parameter(having.value)
 
@@ -1268,7 +1309,7 @@ export class Grammar
   protected compileHavingBetween (having: Having): string {
     const between = having.not ? 'not between' : 'between'
 
-    const column = this.wrap(having.column ?? '')
+    const column = this.wrap((having.column ?? '') as string | Expression)
 
     const min = this.parameter(head(having.values ?? []))
 
@@ -1284,7 +1325,7 @@ export class Grammar
    * @return string
    */
   protected compileHavingNull (having: Having): string {
-    const column = this.wrap(having.column ?? '')
+    const column = this.wrap((having.column ?? '') as string | Expression)
 
     return column + ' is null'
   }
@@ -1296,7 +1337,7 @@ export class Grammar
    * @return string
    */
   protected compileHavingNotNull (having: Having): string {
-    const column = this.wrap(having.column ?? '')
+    const column = this.wrap((having.column ?? '') as string | Expression)
 
     return column + ' is not null'
   }
@@ -1308,7 +1349,7 @@ export class Grammar
    * @return string
    */
   protected compileHavingBit (having: Having): string {
-    const column = this.wrap(having.column ?? '')
+    const column = this.wrap((having.column ?? '') as string | Expression)
 
     const parameter = this.parameter(having.value ?? '')
 
@@ -1322,11 +1363,18 @@ export class Grammar
    * @return string
    */
   protected compileHavingExpression (having: Having): string {
-    if (this.isExpression(having.column)) {
-      return String(having.column.getValue(this))
-    }
+    // const column = having.column
 
-    return having.column ?? ''
+    // if (
+    //   typeof column === 'object' &&
+    //   column !== null &&
+    //   typeof column.getValue === 'function'
+    // ) {
+    //   return String(column.getValue(this))
+    // }
+
+    // return typeof column === 'string' ? column : ''
+    return String((having.column as Expression).getValue(this))
   }
 
   /**
@@ -1336,6 +1384,8 @@ export class Grammar
    * @param  string  $table
    * @return string
    */
+  // @ts-expect-error expected error; query is not used in this method
+
   protected compileFrom (query: Builder, table: string | Expression): string {
     return 'from ' + this.wrapTable(table)
   }

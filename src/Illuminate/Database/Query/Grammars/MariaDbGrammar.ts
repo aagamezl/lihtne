@@ -15,9 +15,9 @@ export class MariaDbGrammar extends MySqlGrammar {
    */
   public override compileJoinLateral (
     // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base compileJoinLateral signature
-    join: JoinLateralClause,
+    _join: JoinLateralClause,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base compileJoinLateral signature
-    expression: string
+    _expression: string
   ): string {
     throw new Error(
       'RuntimeException: This database engine does not support lateral joins.'
@@ -69,7 +69,7 @@ export class MariaDbGrammar extends MySqlGrammar {
    * @return bool
    */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base useLegacyGroupLimit signature
-  public useLegacyGroupLimit (query: Builder): boolean {
+  public useLegacyGroupLimit (_query: Builder): boolean {
     return false
   }
 

@@ -185,7 +185,7 @@ export abstract class Grammar {
    * @throws \RuntimeException
    */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base wrapJsonSelector signature
-  protected wrapJsonSelector (value: string): string {
+  protected wrapJsonSelector (_value: string): string {
     throw new Error(
       'RuntimeException: This database engine does not support JSON operations.'
     )

@@ -34,9 +34,9 @@ export class SQLiteGrammar extends Grammar {
    */
   protected override compileLock (
     // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base compileLock signature
-    query: Builder,
+    _query: Builder,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base compileLock signature
-    value: boolean | string
+    _value: boolean | string
   ): string {
     return ''
   }

@@ -30,7 +30,7 @@ export class Statement {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base execute signature
-  public execute (params?: BindingValues) {
+  public execute (_params?: BindingValues) {
     throw new Error(
       `RuntimeException: Implement execute method on concrete class.`
     )

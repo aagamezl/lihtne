@@ -29,7 +29,7 @@ export class Driver {
    * @returns {any}
    */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base getAttribute signature
-  public getAttribute (attribute: string | number) {
+  public getAttribute (_attribute: string | number) {
     return new Error(
       `RuntimeException: Implement 'getAttribute' method on concrete class.`
     )

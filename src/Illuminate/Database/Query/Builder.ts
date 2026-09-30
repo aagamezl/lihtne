@@ -1,6 +1,7 @@
 import { dateFormat } from '@devnetic/utils'
-import { cloneDeep, isNil } from 'es-toolkit'
+import { cloneDeep, isNil, isPlainObject } from 'es-toolkit'
 
+import type { ConditionExpression } from '../../Contracts/Database/Query/ConditionExpression'
 import type { Scalar } from '../../Support/types'
 import type { Connection } from '../Connection'
 import type { Grammar } from '../Query/Grammars/Grammar'
@@ -46,32 +47,33 @@ export type WhereOptions = {
 }
 
 export type WhereClauseType =
-  | 'Basic' |
-  'Bitwise' |
-  'Binary' |
-  'Column' |
-  'Date' |
-  'Day' |
-  'Expression' |
-  'Fulltext' |
-  'In' |
-  'InRaw' |
-  'JsonBoolean' |
-  'Like' |
-  'Month' |
-  'Nested' |
-  'NotIn' |
-  'NotInRaw' |
-  'NotNull' |
-  'Null' |
-  'NullSafeEquals' |
-  'Sub' |
-  'Time' |
-  'Year' |
-  'between' |
-  'betweenColumns' |
-  'raw' |
-  'valueBetween'
+
+    | 'Basic' |
+    'Bitwise' |
+    'Binary' |
+    'Column' |
+    'Date' |
+    'Day' |
+    'Expression' |
+    'Fulltext' |
+    'In' |
+    'InRaw' |
+    'JsonBoolean' |
+    'Like' |
+    'Month' |
+    'Nested' |
+    'NotIn' |
+    'NotInRaw' |
+    'NotNull' |
+    'Null' |
+    'NullSafeEquals' |
+    'Sub' |
+    'Time' |
+    'Year' |
+    'between' |
+    'betweenColumns' |
+    'raw' |
+    'valueBetween'
 
 export type WhereClause = {
   caseSensitive?: boolean
@@ -103,19 +105,20 @@ export type Bindings = {
 }
 
 export type HavingClauseType =
-  | 'Basic' |
-  'Bitwise' |
-  'Expression' |
-  'Nested' |
-  'NotNull' |
-  'Null' |
-  'Raw' |
-  'between' |
-  'bit'
+
+    | 'Basic' |
+    'Bitwise' |
+    'Expression' |
+    'Nested' |
+    'NotNull' |
+    'Null' |
+    'Raw' |
+    'between' |
+    'bit'
 
 export type Having = {
   type: HavingClauseType
-  column?: string | Expression
+  column?: string | Expression | ConditionExpression | QueryCallback
   operator?: string
   value?: unknown
   boolean: string
@@ -166,7 +169,7 @@ export const BOOLEAN_OPERATORS: Record<BooleanOperator, BooleanOperator> = {
 
 // Trait methods are merged onto the class. `mixing().useTrait()` copies them onto the prototype at runtime.
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export interface Builder extends BuildsQueries, BuildsWhereDateClauses { }
+export interface Builder extends BuildsQueries, BuildsWhereDateClauses {}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Builder extends mixing(BuildsQueries).useTrait([
@@ -453,10 +456,7 @@ export class Builder extends mixing(BuildsQueries).useTrait([
    * @param  Arrayable<unknown> | Array<unknown>  values
    * @return $this
    */
-  public inOrderOf (
-    column: Expression | string,
-    values: BindingValues
-  ): this {
+  public inOrderOf (column: Expression | string, values: BindingValues): this {
     values = values.map((value) => value)
 
     if (values.length === 0) {
@@ -472,7 +472,10 @@ export class Builder extends mixing(BuildsQueries).useTrait([
       values
     })
 
-    this.addBinding(this.cleanBindings(values), this.unions.length > 0 ? 'unionOrder' : 'order')
+    this.addBinding(
+      this.cleanBindings(values),
+      this.unions.length > 0 ? 'unionOrder' : 'order'
+    )
 
     return this
   }
@@ -492,10 +495,14 @@ export class Builder extends mixing(BuildsQueries).useTrait([
     second: string | Expression | undefined = undefined,
     boolean: WhereBoolean = 'and'
   ): this {
+    if (Object.keys(BOOLEAN_OPERATORS).includes(operator as string)) {
+      boolean = operator as WhereBoolean
+    }
+
     // If the column is an array, we will assume it is an array of key-value pairs
     // and can add them each as a where clause. We will maintain the boolean we
     // received when the method was called and pass it into the nested where.
-    if (Array.isArray(first)) {
+    if (Array.isArray(first) || isPlainObject(first)) {
       return this.addArrayOfWheres(first, boolean, 'whereColumn')
     }
 
@@ -550,39 +557,52 @@ export class Builder extends mixing(BuildsQueries).useTrait([
    * @return $this
    */
   protected addArrayOfWheres (
-    column: Array<unknown>,
+    column: object,
     boolean: WhereBoolean,
     method: 'where' | 'whereColumn' = 'where'
   ): this {
-    const whereBoolean: WhereBoolean =
-      boolean === 'or' || boolean === 'and not' || boolean === 'or not'
-        ? boolean
-        : BOOLEAN_OPERATORS.and
+    // const whereBoolean: WhereBoolean =
+    //   boolean === 'or' || boolean === 'and not' || boolean === 'or not'
+    //     ? boolean
+    //     : BOOLEAN_OPERATORS.and
 
+    // return this.whereNested((query: Builder) => {
+    //   for (const [key, entry] of Object.entries(column)) {
+    //     if (isNumeric(key) && Array.isArray(entry)) {
+    //       if (method === 'whereColumn') {
+    //         query.whereColumn(
+    //           String(entry[0] ?? ''),
+    //           typeof entry[1] === 'string' ? entry[1] : undefined,
+    //           typeof entry[2] === 'string' ? entry[2] : undefined,
+    //           boolean
+    //         )
+    //       } else {
+    //         query.where(entry[0], entry[1], entry[2], whereBoolean)
+    //       }
+    //     } else if (method === 'whereColumn') {
+    //       query.whereColumn(
+    //         key,
+    //         '=',
+    //         typeof entry === 'string' || entry instanceof Expression
+    //           ? entry
+    //           : String(entry),
+    //         boolean
+    //       )
+    //     } else {
+    //       query.where(key, '=', entry, whereBoolean)
+    //     }
+    //   }
+    // }, boolean)
     return this.whereNested((query: Builder) => {
-      for (const [key, entry] of Object.entries(column)) {
-        if (isNumeric(key) && Array.isArray(entry)) {
-          if (method === 'whereColumn') {
-            query.whereColumn(
-              String(entry[0] ?? ''),
-              typeof entry[1] === 'string' ? entry[1] : undefined,
-              typeof entry[2] === 'string' ? entry[2] : undefined,
-              boolean
-            )
+      for (const [key, value] of Object.entries(column)) {
+        if (isNumeric(key) && Array.isArray(value)) {
+          if (value.length < 3) {
+            query[method](value[0], value[1], undefined, boolean)
           } else {
-            query.where(entry[0], entry[1], entry[2], whereBoolean)
+            query[method](value[0], value[1], value[2], boolean)
           }
-        } else if (method === 'whereColumn') {
-          query.whereColumn(
-            key,
-            '=',
-            typeof entry === 'string' || entry instanceof Expression
-              ? entry
-              : String(entry),
-            boolean
-          )
         } else {
-          query.where(key, '=', entry, whereBoolean)
+          query[method](key, '=', value, boolean)
         }
       }
     }, boolean)
@@ -665,7 +685,7 @@ export class Builder extends mixing(BuildsQueries).useTrait([
    * @return $this
    */
   public having (
-    column: Expression | string,
+    column: Expression | QueryCallback | string,
     operator: unknown = undefined,
     value: unknown = undefined,
     boolean: BooleanOperator = 'and'
@@ -704,7 +724,12 @@ export class Builder extends mixing(BuildsQueries).useTrait([
       type = 'Bitwise'
     }
 
-    const having: Having = { type, column, value, boolean }
+    const having: Having = {
+      type,
+      column,
+      value,
+      boolean
+    }
 
     if (typeof operator === 'string') {
       having.operator = operator
@@ -856,7 +881,11 @@ export class Builder extends mixing(BuildsQueries).useTrait([
    * @param  string  $boolean
    * @return $this
    */
-  public havingRaw (sql: string, bindings: unknown[] = [], boolean: BooleanOperator = 'and'): this {
+  public havingRaw (
+    sql: string,
+    bindings: unknown[] = [],
+    boolean: BooleanOperator = 'and'
+  ): this {
     const type: HavingClauseType = 'Raw'
 
     this.havings.push({ type, sql, boolean })
@@ -1222,7 +1251,7 @@ export class Builder extends mixing(BuildsQueries).useTrait([
    * @param  mixed  result
    * @return mixed
    */
-  public applyAfterQueryCallbacks<TResult>(result: TResult): TResult {
+  public applyAfterQueryCallbacks<TResult> (result: TResult): TResult {
     for (const afterQueryCallback of this.afterQueryCallbacks) {
       result = afterQueryCallback(result) ?? result
     }
@@ -1241,7 +1270,7 @@ export class Builder extends mixing(BuildsQueries).useTrait([
    * @param  callable(): TResult  $callback
    * @return TResult
    */
-  protected onceWithColumns<TResult>(
+  protected onceWithColumns<TResult> (
     columns: Array<string | Expression>,
     callback: () => TResult
   ): TResult {
@@ -1366,7 +1395,9 @@ export class Builder extends mixing(BuildsQueries).useTrait([
         break
 
       default:
-        throw new Error('InvalidArgumentException: Order direction must be a SortDirection, "asc" or "desc".')
+        throw new Error(
+          'InvalidArgumentException: Order direction must be a SortDirection, "asc" or "desc".'
+        )
     }
 
     const order = { column, direction }
@@ -1509,7 +1540,10 @@ export class Builder extends mixing(BuildsQueries).useTrait([
    * @return $this
    */
   public offset (value: number): this {
-    const offset = Math.max(0, parseInt(value.toString(), 10))
+    const offset = Math.max(
+      0,
+      value !== undefined ? parseInt(String(value), 10) : 0
+    )
 
     if (this.unions.length > 0) {
       this.unionOffset = offset
@@ -1925,7 +1959,7 @@ export class Builder extends mixing(BuildsQueries).useTrait([
    */
   protected prependDatabaseNameIfCrossDatabaseQuery<
     T extends Builder | EloquentBuilder | Relation
-  >(query: T): T {
+  > (query: T): T {
     const builder = this.toBaseQuery(query)
 
     if (
@@ -1991,8 +2025,8 @@ export class Builder extends mixing(BuildsQueries).useTrait([
    */
   public where (
     column: Expression | Scalar | Array<Expression | Scalar> | QueryCallback,
-    operator: unknown = undefined,
-    value: unknown = undefined,
+    operator: string | undefined = undefined,
+    value: string | number | Expression | undefined = undefined,
     boolean: WhereBoolean = BOOLEAN_OPERATORS.and
   ): this {
     if (column instanceof Expression) {
@@ -2003,17 +2037,21 @@ export class Builder extends mixing(BuildsQueries).useTrait([
       return this
     }
 
+    if (Object.keys(BOOLEAN_OPERATORS).includes(operator as string)) {
+      boolean = operator as WhereBoolean
+    }
+
     // If the column is an array, we will assume it is an array of key-value pairs
     // and can add them each as a where clause. We will maintain the boolean we
     // received when the method was called and pass it into the nested where.
-    if (Array.isArray(column)) {
+    if (Array.isArray(column) || isPlainObject(column)) {
       return this.addArrayOfWheres(column, boolean)
     }
 
     // Here we will make some assumptions about the operator. If only 2 values are
     // passed to the method, we will assume that the operator is an equals sign
     // and keep going. Otherwise, we'll require the operator to be passed in.
-    ;[value, operator] = this.prepareValueAndOperator(
+    [value, operator] = this.prepareValueAndOperator(
       value,
       operator,
       arguments.length === 2
@@ -2129,10 +2167,10 @@ export class Builder extends mixing(BuildsQueries).useTrait([
    * @throws \InvalidArgumentException
    */
   public prepareValueAndOperator (
-    value: unknown,
-    operator: unknown,
+    value: string | number | Expression | undefined,
+    operator: string | undefined,
     useDefault: boolean = false
-  ): [unknown, unknown] {
+  ): [string | number | Expression | undefined, string | undefined] {
     if (useDefault) {
       return [operator, '=']
     }
@@ -2157,12 +2195,12 @@ export class Builder extends mixing(BuildsQueries).useTrait([
    * @return $this
    */
   public whereNot (
-    column: Expression | string | Array<Expression | string> | QueryCallback,
-    operator?: unknown,
-    value?: unknown,
+    column: Expression | Scalar | Array<Expression | Scalar> | QueryCallback,
+    operator?: string | undefined,
+    value?: string | number | Expression | undefined,
     boolean: BooleanOperator = BOOLEAN_OPERATORS.and
   ): this {
-    if (Array.isArray(column)) {
+    if (Array.isArray(column) || isPlainObject(column)) {
       return this.whereNested((query: Builder) => {
         query.where(column, operator, value, boolean)
       }, `${boolean} not`)
@@ -2182,7 +2220,7 @@ export class Builder extends mixing(BuildsQueries).useTrait([
    */
   protected invalidOperatorAndValue (
     operator: string,
-    value: unknown
+    value: string | number | Expression | undefined
   ): boolean {
     return (
       isNil(value) &&
@@ -2204,8 +2242,8 @@ export class Builder extends mixing(BuildsQueries).useTrait([
   protected addDateBasedWhere (
     type: WhereClauseType,
     column: Expression | string,
-    operator: unknown,
-    value: unknown,
+    operator: string | undefined,
+    value: string | number | Expression | undefined,
     boolean: BooleanOperator = 'and'
   ): this {
     const operatorText = typeof operator === 'string' ? operator : '='
@@ -2266,21 +2304,205 @@ export class Builder extends mixing(BuildsQueries).useTrait([
   }
 
   /**
+   * Merge an array of bindings into our bindings.
+   *
+   * @param  self  $query
+   * @return $this
+   */
+  public mergeBindings (query: Builder): this {
+    this.bindings = { ...this.bindings, ...query.bindings }
+
+    return this
+  }
+
+  /**
+   * Set the limit and offset for a given page.
+   *
+   * @param  int  $page
+   * @param  int  $perPage
+   * @return $this
+   */
+  public forPage (page: number, perPage: number = 15): this {
+    return this.offset((page - 1) * perPage).limit(perPage)
+  }
+
+  /**
+   * Constrain the query to the previous "page" of results before a given ID.
+   *
+   * @param  int  $perPage
+   * @param  int|null  $lastId
+   * @param  string  $column
+   * @return $this
+   */
+  public forPageBeforeId (
+    perPage: number = 15,
+    lastId: number | undefined,
+    column: string = 'id'
+  ): this {
+    this.orders = this.removeExistingOrdersFor(column)
+
+    if (lastId === undefined) {
+      this.whereNotNull(column)
+    } else {
+      this.where(column, '<', lastId)
+    }
+
+    return this.orderBy(column, SortDirection.Descending).limit(perPage)
+  }
+
+  /**
+   * Constrain the query to the next "page" of results after a given ID.
+   *
+   * @param  int  $perPage
+   * @param  int|null  $lastId
+   * @param  string  $column
+   * @return $this
+   */
+  public forPageAfterId (
+    perPage: number = 15,
+    lastId: number | undefined,
+    column: string = 'id'
+  ): this {
+    this.orders = this.removeExistingOrdersFor(column)
+
+    if (lastId === undefined) {
+      this.whereNotNull(column)
+    } else {
+      this.where(column, '>', lastId)
+    }
+
+    return this.orderBy(column, SortDirection.Ascending).limit(perPage)
+  }
+
+  /**
+   * Get an array with all orders with a given column removed.
+   *
+   * @param  string  $column
+   * @return array
+   */
+  protected removeExistingOrdersFor (column: string): Order[] {
+    const orders = new Collection(this.orders)
+      .reject((order: Order) => order.column === column)
+      .values()
+      .all()
+
+    return Array.isArray(orders) ? orders : Object.values(orders)
+  }
+
+  /**
+   * Get the count of the total records for the paginator.
+   *
+   * @param  array<string|\Illuminate\Contracts\Database\Query\Expression>  $columns
+   * @return int<0, max>
+   */
+  public async getCountForPagination (
+    columns: string[] = ['*']
+  ): Promise<number> {
+    const results = await this.runPaginationCountQuery(columns)
+
+    // Once we have run the pagination count query, we will get the resulting count and
+    // take into account what type of query it was. When there is a group by we will
+    // just return the count of the entire results set since that will be correct.
+    if (results.length === 0) {
+      return 0
+    } else if (results[0] instanceof Object) {
+      return parseInt(String(results[0].aggregate), 10)
+    }
+
+    return parseInt(String(changeKeyCase(results[0].aggregate)), 10)
+  }
+
+  /**
+   * Run a pagination count query.
+   *
+   * @param  array<string|\Illuminate\Contracts\Database\Query\Expression>  $columns
+   * @return array<string | number | Expression>
+   */
+  protected async runPaginationCountQuery (
+    columns: string[] = ['*']
+  ): Promise<Array<string | number | Expression>> {
+    if (this.groups.length > 0 || this.havings.length > 0) {
+      const clone = this.cloneForPaginationCount()
+
+      if (clone.columns === undefined && this.joins.length > 0) {
+        clone.select(`${this.from}.*`)
+      }
+
+      const result = await this.newQuery()
+        .from(
+          new Expression(
+            `(${clone.toSql()}) as ${this.grammar.wrap('aggregate_table')}`
+          )
+        )
+        .mergeBindings(clone)
+        .setAggregate('count', this.withoutSelectAliases(columns))
+        .get()
+
+      return result.all() as Array<string | number | Expression>
+    }
+
+    const without = this.unions
+      ? ['unionOrders', 'unionLimit', 'unionOffset']
+      : ['columns', 'orders', 'limit', 'offset']
+
+    const result = await this.cloneWithout(without)
+      .cloneWithoutBindings(this.unions ? ['unionOrder'] : ['select', 'order'])
+      .setAggregate('count', this.withoutSelectAliases(columns))
+      .get()
+
+    return result.all() as Array<string | number | Expression>
+  }
+
+  /**
+   * Clone the existing query instance for usage in a pagination subquery.
+   *
+   * @return self
+   */
+  protected cloneForPaginationCount (): this {
+    return this.cloneWithout([
+      'orders',
+      'limit',
+      'offset'
+    ]).cloneWithoutBindings(['order'])
+  }
+
+  /**
+   * Remove the column aliases since they will break count queries.
+   *
+   * @param  array<string|\Illuminate\Contracts\Database\Query\Expression>  $columns
+   * @return array<string|\Illuminate\Contracts\Database\Query\Expression>
+   */
+  protected withoutSelectAliases (
+    columns: Array<string | Expression>
+  ): Array<string | Expression> {
+    return columns.map((column: string | Expression) => {
+      if (typeof column === 'string') {
+        const aliasPosition = column.indexOf(' as ')
+        if (aliasPosition !== -1) {
+          return column.substring(0, aliasPosition)
+        }
+      }
+
+      return column
+    })
+  }
+
+  /**
    * Remove all of the expressions from a list of bindings.
    *
    * @param  array<mixed>  $bindings
    * @return list<mixed>
    */
   public cleanBindings (
-    bindings: unknown[],
+    bindings: Array<string | number | Expression | undefined>,
     includeExpressions = false
   ): BindingValues {
     const cleaned = new Collection(bindings)
       .reject(
-        (binding: unknown) =>
+        (binding: string | number | Expression | undefined) =>
           binding instanceof Expression && !includeExpressions
       )
-      .map((binding: unknown) => {
+      .map((binding: string | number | Expression | undefined) => {
         if (binding instanceof Expression) {
           return this.castBinding(
             this.toBinding(binding.getValue(this.grammar))
@@ -2306,8 +2528,8 @@ export class Builder extends mixing(BuildsQueries).useTrait([
    */
   public whereMonth (
     column: Expression | string,
-    operator: unknown = undefined,
-    value: unknown = undefined,
+    operator: string | undefined = undefined,
+    value: string | number | Expression | undefined = undefined,
     boolean: BooleanOperator = BOOLEAN_OPERATORS.and
   ): this {
     ;[value, operator] = this.prepareValueAndOperator(
@@ -2348,8 +2570,8 @@ export class Builder extends mixing(BuildsQueries).useTrait([
    */
   public whereYear (
     column: Expression | string,
-    operator: unknown = undefined,
-    value: unknown = undefined,
+    operator: string | undefined = undefined,
+    value: string | number | Expression | undefined = undefined,
     boolean: BooleanOperator = BOOLEAN_OPERATORS.and
   ): this {
     ;[value, operator] = this.prepareValueAndOperator(
@@ -2385,8 +2607,8 @@ export class Builder extends mixing(BuildsQueries).useTrait([
    */
   public orWhereDate (
     column: Expression | string,
-    operator: unknown = undefined,
-    value: unknown = undefined
+    operator: string | undefined = undefined,
+    value: string | number | Expression | undefined = undefined
   ): this {
     ;[value, operator] = this.prepareValueAndOperator(
       value,
@@ -2408,8 +2630,8 @@ export class Builder extends mixing(BuildsQueries).useTrait([
    */
   public whereTime (
     column: Expression | string,
-    operator: unknown = undefined,
-    value: unknown = undefined,
+    operator: string | undefined = undefined,
+    value: string | number | Expression | undefined = undefined,
     boolean: BooleanOperator = BOOLEAN_OPERATORS.and
   ): this {
     ;[value, operator] = this.prepareValueAndOperator(
@@ -2444,8 +2666,8 @@ export class Builder extends mixing(BuildsQueries).useTrait([
    */
   public orWhereTime (
     column: Expression | string,
-    operator: unknown = undefined,
-    value: unknown = undefined
+    operator: string | undefined = undefined,
+    value: string | number | Expression | undefined = undefined
   ): this {
     ;[value, operator] = this.prepareValueAndOperator(
       value,
@@ -2466,8 +2688,8 @@ export class Builder extends mixing(BuildsQueries).useTrait([
    */
   public orWhereDay (
     column: Expression | string,
-    operator: unknown = undefined,
-    value: unknown = undefined
+    operator: string | undefined = undefined,
+    value: string | number | Expression | undefined = undefined
   ): this {
     ;[value, operator] = this.prepareValueAndOperator(
       value,
@@ -2488,8 +2710,8 @@ export class Builder extends mixing(BuildsQueries).useTrait([
    */
   public orWhereMonth (
     column: Expression | string,
-    operator: unknown = undefined,
-    value: unknown = undefined
+    operator: string | undefined = undefined,
+    value: string | number | Expression | undefined = undefined
   ): this {
     ;[value, operator] = this.prepareValueAndOperator(
       value,
@@ -2510,8 +2732,8 @@ export class Builder extends mixing(BuildsQueries).useTrait([
    */
   public orWhereYear (
     column: Expression | string,
-    operator: unknown = undefined,
-    value: unknown = undefined
+    operator: string | undefined = undefined,
+    value: string | number | Expression | undefined = undefined
   ): this {
     ;[value, operator] = this.prepareValueAndOperator(
       value,
@@ -2533,8 +2755,8 @@ export class Builder extends mixing(BuildsQueries).useTrait([
    */
   public whereDay (
     column: Expression | string,
-    operator: unknown = undefined,
-    value: unknown = undefined,
+    operator: string | undefined = undefined,
+    value: string | number | Expression | undefined = undefined,
     boolean: BooleanOperator = BOOLEAN_OPERATORS.and
   ): this {
     ;[value, operator] = this.prepareValueAndOperator(
@@ -2575,8 +2797,8 @@ export class Builder extends mixing(BuildsQueries).useTrait([
    */
   public whereDate (
     column: Expression | string,
-    operator: unknown = undefined,
-    value: unknown = undefined,
+    operator: string | undefined = undefined,
+    value: string | number | Expression | undefined = undefined,
     boolean: BooleanOperator = BOOLEAN_OPERATORS.and
   ): this {
     ;[value, operator] = this.prepareValueAndOperator(
@@ -2898,8 +3120,8 @@ export class Builder extends mixing(BuildsQueries).useTrait([
    */
   public whereAll (
     columns: Expression | string | Array<Expression | string>,
-    operator: unknown = undefined,
-    value: unknown = undefined,
+    operator: string | undefined = undefined,
+    value: string | number | Expression | undefined = undefined,
     boolean: BooleanOperator = BOOLEAN_OPERATORS.and
   ): this {
     ;[value, operator] = this.prepareValueAndOperator(
@@ -2929,8 +3151,8 @@ export class Builder extends mixing(BuildsQueries).useTrait([
    */
   public orWhereAll (
     columns: Expression | string | Array<Expression | string>,
-    operator: unknown = undefined,
-    value: unknown = undefined
+    operator: string | undefined = undefined,
+    value: string | number | Expression | undefined = undefined
   ): this {
     return this.whereAll(columns, operator, value, 'or')
   }
@@ -2946,8 +3168,8 @@ export class Builder extends mixing(BuildsQueries).useTrait([
    */
   public whereAny (
     columns: Expression | string | Array<Expression | string>,
-    operator: unknown = undefined,
-    value: unknown = undefined,
+    operator: string | undefined = undefined,
+    value: string | number | Expression | undefined = undefined,
     boolean: WhereBoolean = BOOLEAN_OPERATORS.and
   ): this {
     ;[value, operator] = this.prepareValueAndOperator(
@@ -2977,8 +3199,8 @@ export class Builder extends mixing(BuildsQueries).useTrait([
    */
   public orWhereAny (
     columns: Expression | string | Array<Expression | string>,
-    operator: unknown = undefined,
-    value: unknown = undefined
+    operator: string | undefined = undefined,
+    value: string | number | Expression | undefined = undefined
   ): this {
     return this.whereAny(columns, operator, value, 'or')
   }
@@ -2994,8 +3216,8 @@ export class Builder extends mixing(BuildsQueries).useTrait([
    */
   public whereNone (
     columns: Expression | string | Array<Expression | string>,
-    operator: unknown = undefined,
-    value: unknown = undefined,
+    operator: string | undefined = undefined,
+    value: string | number | Expression | undefined = undefined,
     boolean: BooleanOperator = BOOLEAN_OPERATORS.and
   ): this {
     return this.whereAny(columns, operator, value, `${boolean} not`)
@@ -3011,8 +3233,8 @@ export class Builder extends mixing(BuildsQueries).useTrait([
    */
   public orWhereNone (
     columns: Expression | string | Array<Expression | string>,
-    operator: unknown = undefined,
-    value: unknown = undefined
+    operator: string | undefined = undefined,
+    value: string | number | Expression | undefined = undefined
   ): this {
     return this.whereNone(columns, operator, value, 'or')
   }
@@ -3079,8 +3301,8 @@ export class Builder extends mixing(BuildsQueries).useTrait([
    */
   public orWhereNot (
     column: Expression | string | Array<Expression | string> | QueryCallback,
-    operator?: Scalar | Scalar[] | Expression | undefined,
-    value?: Scalar | Array<Scalar | Scalar[]> | Expression | undefined
+    operator?: string | undefined,
+    value?: string | number | Expression | undefined
   ): this {
     return this.whereNot(column, operator, value, 'or')
   }
@@ -3095,8 +3317,8 @@ export class Builder extends mixing(BuildsQueries).useTrait([
    */
   public orWhere (
     column: Expression | string | Array<Expression | string> | QueryCallback,
-    operator?: unknown,
-    value?: unknown
+    operator?: string | undefined,
+    value?: string | number | Expression | undefined
   ): this {
     ;[value, operator] = this.prepareValueAndOperator(
       value,
@@ -3127,7 +3349,7 @@ export class Builder extends mixing(BuildsQueries).useTrait([
    * @param  mixed  $value
    * @return mixed
    */
-  protected flattenValue (value: unknown): unknown {
+  protected flattenValue (value: string | number | Expression | undefined): string | number | Expression | undefined {
     return Array.isArray(value) ? head(Arr.flatten(value)) : value
   }
 
@@ -3142,7 +3364,7 @@ export class Builder extends mixing(BuildsQueries).useTrait([
    */
   protected whereSub (
     column: Expression | string,
-    operator: unknown,
+    operator: string | undefined,
     callback: QueryCallback | Builder | EloquentBuilder | Relation,
     boolean: WhereBoolean | string = BOOLEAN_OPERATORS.and
   ): this {

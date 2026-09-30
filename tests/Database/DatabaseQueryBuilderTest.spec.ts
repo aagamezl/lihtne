@@ -4,7 +4,7 @@ import type { Builder } from '../../src/Illuminate/Database/Query'
 
 import { collect } from '../../src/Illuminate/Collections/helpers'
 import { Builder as EloquentBuilder } from '../../src/Illuminate/Database/Eloquent/Builder'
-import { Expression as Raw } from '../../src/Illuminate/Database/Query/Expression'
+import { Expression, Expression as Raw } from '../../src/Illuminate/Database/Query/Expression'
 import { Carbon, DateInterval, DatePeriod, Str } from '../../src/Illuminate/Support'
 import { Bar } from '../../tests/Database/Fixtures/Enums/Bar'
 import { IntegerStatus, StringStatus } from './Fixtures/Enums'
@@ -2743,5 +2743,554 @@ describe('Database Query Builder', () => {
     builder = getBuilder()
     builder.select(['category', new Raw('count(*) as "total"')]).from('item').where('department', '=', 'popular').groupBy('category').havingNotNull('total')
     expect(builder.toSql()).toBe('select "category", count(*) as "total" from "item" where "department" = ? group by "category" having "total" is not null')
+  })
+
+  test('testHavingExpression', () => {
+    const builder = getBuilder()
+
+    const expression = new (class extends Expression {
+      constructor () {
+        super('1 = 1')
+      }
+
+      public getValue () {
+        return '1 = 1'
+      }
+    })()
+
+    builder.select('*').from('users').having(expression)
+
+    expect(builder.toSql()).toBe('select * from "users" having 1 = 1')
+    expect(builder.getBindings()).toEqual([])
+  })
+
+  test('testHavingShortcut', () => {
+    const builder = getBuilder()
+    builder.select('*').from('users').having('email', 1).orHaving('email', 2)
+    expect(builder.toSql()).toBe('select * from "users" having "email" = ? or "email" = ?')
+  })
+
+  test('testHavingFollowedBySelectGet', async () => {
+    const rows = [{ category: 'rock', total: 5 }]
+
+    let builder = getBuilder()
+    let query = 'select "category", count(*) as "total" from "item" where "department" = ? group by "category" having "total" > ?'
+    const selectSpy = jest.spyOn(builder.getConnection(), 'select')
+      .mockResolvedValueOnce(rows)
+    const processSelectSpy = jest.spyOn(builder.getProcessor(), 'processSelect')
+      .mockImplementation((_builder, results) => results)
+
+    builder.from('item')
+    let result = await builder.select(['category', new Raw('count(*) as "total"')]).where('department', '=', 'popular').groupBy('category').having('total', '>', 3).get()
+    expect(selectSpy).toHaveBeenCalledWith(query, ['popular', 3])
+    expect(processSelectSpy).toHaveBeenCalled()
+    expect(result.all()).toEqual(rows)
+
+    // Using Raw value
+    builder = getBuilder()
+    query = 'select "category", count(*) as "total" from "item" where "department" = ? group by "category" having "total" > 3'
+    const selectSpyRaw = jest.spyOn(builder.getConnection(), 'select')
+      .mockResolvedValueOnce(rows)
+    const processSelectSpyRaw = jest.spyOn(builder.getProcessor(), 'processSelect')
+      .mockImplementation((_builder, results) => results)
+
+    builder.from('item')
+    result = await builder.select(['category', new Raw('count(*) as "total"')]).where('department', '=', 'popular').groupBy('category').having('total', '>', new Raw('3')).get()
+    expect(selectSpyRaw).toHaveBeenCalledWith(query, ['popular'])
+    expect(processSelectSpyRaw).toHaveBeenCalled()
+    expect(result.all()).toEqual(rows)
+  })
+
+  test('testRawHavings', () => {
+    let builder = getBuilder()
+    builder.select('*').from('users').havingRaw('user_foo < user_bar')
+    expect(builder.toSql()).toBe('select * from "users" having user_foo < user_bar')
+
+    builder = getBuilder()
+    builder.select('*').from('users').having('baz', '=', 1).orHavingRaw('user_foo < user_bar')
+    expect(builder.toSql()).toBe('select * from "users" having "baz" = ? or user_foo < user_bar')
+
+    builder = getBuilder()
+    builder.select('*').from('users').havingBetween('last_login_date', ['2018-11-16', '2018-12-16']).orHavingRaw('user_foo < user_bar')
+    expect(builder.toSql()).toBe('select * from "users" having "last_login_date" between ? and ? or user_foo < user_bar')
+  })
+
+  test('testLimitsAndOffsets', () => {
+    let builder = getBuilder()
+    builder.select('*').from('users').offset(5).limit(10)
+    expect(builder.toSql()).toBe('select * from "users" limit 10 offset 5')
+
+    builder = getBuilder()
+    builder.select('*').from('users').limit(undefined)
+    expect(builder.toSql()).toBe('select * from "users"')
+
+    builder = getBuilder()
+    builder.select('*').from('users').limit(0)
+    expect(builder.toSql()).toBe('select * from "users" limit 0')
+
+    builder = getBuilder()
+    builder.select('*').from('users').offset(5).limit(10)
+    expect(builder.toSql()).toBe('select * from "users" limit 10 offset 5')
+
+    builder = getBuilder()
+    builder.select('*').from('users').offset(0).limit(0)
+    expect(builder.toSql()).toBe('select * from "users" limit 0 offset 0')
+
+    builder = getBuilder()
+    builder.select('*').from('users').offset(-5).limit(-10)
+    expect(builder.toSql()).toBe('select * from "users" offset 0')
+
+    builder = getBuilder()
+    builder.select('*').from('users').offset(undefined).limit(undefined)
+    expect(builder.toSql()).toBe('select * from "users" offset 0')
+
+    builder = getBuilder()
+    builder.select('*').from('users').offset(5).limit(undefined)
+    expect(builder.toSql()).toBe('select * from "users" offset 5')
+
+    builder = getBuilder()
+    builder.select('*').from('users').offset(5).limit(undefined)
+    expect(builder.toSql()).toBe('select * from "users" offset 5')
+  })
+
+  test('testForPage', () => {
+    let builder = getBuilder()
+    builder.select('*').from('users').forPage(2, 15)
+    expect(builder.toSql()).toBe('select * from "users" limit 15 offset 15')
+
+    builder = getBuilder()
+    builder.select('*').from('users').forPage(0, 15)
+    expect(builder.toSql()).toBe('select * from "users" limit 15 offset 0')
+
+    builder = getBuilder()
+    builder.select('*').from('users').forPage(-2, 15)
+    expect(builder.toSql()).toBe('select * from "users" limit 15 offset 0')
+
+    builder = getBuilder()
+    builder.select('*').from('users').forPage(2, 0)
+    expect(builder.toSql()).toBe('select * from "users" limit 0 offset 0')
+
+    builder = getBuilder()
+    builder.select('*').from('users').forPage(0, 0)
+    expect(builder.toSql()).toBe('select * from "users" limit 0 offset 0')
+
+    builder = getBuilder()
+    builder.select('*').from('users').forPage(-2, 0)
+    expect(builder.toSql()).toBe('select * from "users" limit 0 offset 0')
+  })
+
+  test('testForPageBeforeId', () => {
+    let builder = getBuilder()
+    builder.select('*').from('users').forPageBeforeId(15, undefined)
+    expect(builder.toSql()).toBe('select * from "users" where "id" is not null order by "id" desc limit 15')
+
+    builder = getBuilder()
+    builder.select('*').from('users').forPageBeforeId(15, 0)
+    expect(builder.toSql()).toBe('select * from "users" where "id" < ? order by "id" desc limit 15')
+  })
+
+  test('testForPageAfterId', () => {
+    let builder = getBuilder()
+    builder.select('*').from('users').forPageAfterId(15, undefined)
+    expect(builder.toSql()).toBe('select * from "users" where "id" is not null order by "id" asc limit 15')
+
+    builder = getBuilder()
+    builder.select('*').from('users').forPageAfterId(15, 0)
+    expect(builder.toSql()).toBe('select * from "users" where "id" > ? order by "id" asc limit 15')
+  })
+
+  test('testGetCountForPaginationWithBindings', async () => {
+    const builder = getBuilder()
+    builder.from('users').selectSub((q: Builder) => {
+      q.select('body').from('posts').where('id', 4)
+    }, 'post')
+
+    const processor = builder.getProcessor()
+    const connection = builder.getConnection()
+
+    const selectSpy = jest.spyOn(connection, 'select').mockResolvedValueOnce([{ aggregate: 1 }])
+    const processSelectSpy = jest.spyOn(processor, 'processSelect').mockImplementation((builder: Builder, results: unknown[]) => results)
+
+    const count = await builder.getCountForPagination()
+    expect(selectSpy).toHaveBeenCalledWith('select count(*) as "aggregate" from "users"', [4])
+    expect(processSelectSpy).toHaveBeenCalled()
+    expect(count).toBe(1)
+    expect(builder.getBindings()).toEqual([4])
+  })
+
+  test('testGetCountForPaginationWithColumnAliases', async () => {
+    const builder = getBuilder()
+    const columns = ['body as post_body', 'teaser', 'posts.created as published']
+    builder.from('posts').select(columns)
+
+    const selectSpy = jest.spyOn(builder.getConnection(), 'select')
+      .mockResolvedValueOnce([{ aggregate: 1 }])
+    const processSelectSpy = jest.spyOn(builder.getProcessor(), 'processSelect')
+      .mockImplementation((_builder, results) => results)
+
+    const count = await builder.getCountForPagination(columns)
+    expect(selectSpy).toHaveBeenCalledWith('select count("body", "teaser", "posts"."created") as "aggregate" from "posts"', [])
+    expect(processSelectSpy).toHaveBeenCalled()
+    expect(count).toBe(1)
+  })
+
+  test('testGetCountForPaginationWithUnion', async () => {
+    const builder = getBuilder()
+    builder.from('posts').select('id').union(getBuilder().from('videos').select('id'))
+
+    const selectSpy = jest.spyOn(builder.getConnection(), 'select')
+      .mockResolvedValueOnce([{ aggregate: 1 }])
+    const processSelectSpy = jest.spyOn(builder.getProcessor(), 'processSelect')
+      .mockImplementation((builder: Builder, results: unknown[]) => results)
+
+    const count = await builder.getCountForPagination()
+    expect(selectSpy).toHaveBeenCalledWith('select count(*) as "aggregate" from ((select "id" from "posts") union (select "id" from "videos")) as "temp_table"', [])
+    expect(processSelectSpy).toHaveBeenCalled()
+    expect(count).toBe(1)
+  })
+
+  test('testGetCountForPaginationWithUnionOrders', async () => {
+    const builder = getBuilder()
+    builder.from('posts').select('id').union(getBuilder().from('videos').select('id')).latest()
+
+    const selectSpy = jest.spyOn(builder.getConnection(), 'select')
+      .mockResolvedValueOnce([{ aggregate: 1 }])
+    const processSelectSpy = jest.spyOn(builder.getProcessor(), 'processSelect')
+      .mockImplementation((_builder, results) => results)
+
+    const count = await builder.getCountForPagination()
+    expect(selectSpy).toHaveBeenCalledWith('select count(*) as "aggregate" from ((select "id" from "posts") union (select "id" from "videos")) as "temp_table"', [])
+    expect(processSelectSpy).toHaveBeenCalled()
+    expect(count).toBe(1)
+  })
+
+  test('testGetCountForPaginationWithUnionLimitAndOffset', async () => {
+    const builder = getBuilder()
+    builder.from('posts').select('id').union(getBuilder().from('videos').select('id')).limit(15).offset(1)
+
+    const selectSpy = jest.spyOn(builder.getConnection(), 'select')
+      .mockResolvedValueOnce([{ aggregate: 1 }])
+    const processSelectSpy = jest.spyOn(builder.getProcessor(), 'processSelect')
+      .mockImplementation((_builder, results) => results)
+
+    const count = await builder.getCountForPagination()
+    expect(selectSpy).toHaveBeenCalledWith('select count(*) as "aggregate" from ((select "id" from "posts") union (select "id" from "videos")) as "temp_table"', [])
+    expect(processSelectSpy).toHaveBeenCalled()
+    expect(count).toBe(1)
+  })
+
+  test('testWhereShortcut', () => {
+    const builder = getBuilder()
+    builder.select('*').from('users').where('id', 1).orWhere('name', 'foo')
+    expect(builder.toSql()).toBe('select * from "users" where "id" = ? or "name" = ?')
+    expect(builder.getBindings()).toEqual([1, 'foo'])
+  })
+
+  test('testOrWheresHaveConsistentResults', () => {
+    let queries = []
+    let builder = getBuilder()
+    builder.select('*').from('users').where('xxxx', 'xxxx').orWhere({ foo: 1, bar: 2 })
+    queries.push(builder.toSql())
+
+    builder = getBuilder()
+    builder.select('*').from('users').where('xxxx', 'xxxx').orWhere([['foo', 1], ['bar', 2]])
+    queries.push(builder.toSql())
+
+    expect(queries).toEqual([
+      'select * from "users" where "xxxx" = ? or ("foo" = ? or "bar" = ?)',
+      'select * from "users" where "xxxx" = ? or ("foo" = ? or "bar" = ?)'
+    ])
+
+    queries = []
+    builder = getBuilder()
+    builder.select('*').from('users').where('xxxx', 'xxxx').orWhereColumn({ foo: '_foo', bar: '_bar' })
+    queries.push(builder.toSql())
+
+    builder = getBuilder()
+    builder.select('*').from('users').where('xxxx', 'xxxx').orWhereColumn([['foo', '_foo'], ['bar', '_bar']])
+    queries.push(builder.toSql())
+
+    expect(queries).toEqual([
+      'select * from "users" where "xxxx" = ? or ("foo" = "_foo" or "bar" = "_bar")',
+      'select * from "users" where "xxxx" = ? or ("foo" = "_foo" or "bar" = "_bar")'
+    ])
+  })
+
+  test('testWhereWithArrayConditions', () => {
+    // where(key, value)
+
+    let builder = getBuilder()
+    builder.select('*').from('users').where([['foo', 1], ['bar', 2]])
+    expect(builder.toSql()).toBe('select * from "users" where ("foo" = ? and "bar" = ?)')
+    expect(builder.getBindings()).toEqual([1, 2])
+
+    builder = getBuilder()
+    builder.select('*').from('users').where([['foo', 1], ['bar', 2]], 'or')
+    expect(builder.toSql()).toBe('select * from "users" where ("foo" = ? or "bar" = ?)')
+    expect(builder.getBindings()).toEqual([1, 2])
+
+    builder = getBuilder()
+    builder.select('*').from('users').where([['foo', 1], ['bar', 2]], 'and')
+    expect(builder.toSql()).toBe('select * from "users" where ("foo" = ? and "bar" = ?)')
+    expect(builder.getBindings()).toEqual([1, 2])
+
+    builder = getBuilder()
+    builder.select('*').from('users').where({ foo: 1, bar: 2 })
+    expect(builder.toSql()).toBe('select * from "users" where ("foo" = ? and "bar" = ?)')
+    expect(builder.getBindings()).toEqual([1, 2])
+
+    builder = getBuilder()
+    builder.select('*').from('users').where({ foo: 1, bar: 2 }, 'or')
+    expect(builder.toSql()).toBe('select * from "users" where ("foo" = ? or "bar" = ?)')
+    expect(builder.getBindings()).toEqual([1, 2])
+
+    builder = getBuilder()
+    builder.select('*').from('users').where({ foo: 1, bar: 2 }, 'and')
+    expect(builder.toSql()).toBe('select * from "users" where ("foo" = ? and "bar" = ?)')
+    expect(builder.getBindings()).toEqual([1, 2])
+
+    // where(key, <, value)
+
+    builder = getBuilder()
+    builder.select('*').from('users').where([['foo', 1], ['bar', '<', 2]])
+    expect(builder.toSql()).toBe('select * from "users" where ("foo" = ? and "bar" < ?)')
+    expect(builder.getBindings()).toEqual([1, 2])
+
+    builder = getBuilder()
+    builder.select('*').from('users').where([['foo', 1], ['bar', '<', 2]], 'or')
+    expect(builder.toSql()).toBe('select * from "users" where ("foo" = ? or "bar" < ?)')
+    expect(builder.getBindings()).toEqual([1, 2])
+
+    builder = getBuilder()
+    builder.select('*').from('users').where([['foo', 1], ['bar', '<', 2]], 'and')
+    expect(builder.toSql()).toBe('select * from "users" where ("foo" = ? and "bar" < ?)')
+    expect(builder.getBindings()).toEqual([1, 2])
+
+    // whereNot(key, value)
+
+    builder = getBuilder()
+    builder.select('*').from('users').whereNot([['foo', 1], ['bar', 2]])
+    expect(builder.toSql()).toBe('select * from "users" where not (("foo" = ? and "bar" = ?))')
+    expect(builder.getBindings()).toEqual([1, 2])
+
+    builder = getBuilder()
+    builder.select('*').from('users').whereNot([['foo', 1], ['bar', 2]], 'or')
+    expect(builder.toSql()).toBe('select * from "users" where not (("foo" = ? or "bar" = ?))')
+    expect(builder.getBindings()).toEqual([1, 2])
+
+    builder = getBuilder()
+    builder.select('*').from('users').whereNot([['foo', 1], ['bar', 2]], 'and')
+    expect(builder.toSql()).toBe('select * from "users" where not (("foo" = ? and "bar" = ?))')
+    expect(builder.getBindings()).toEqual([1, 2])
+
+    builder = getBuilder()
+    builder.select('*').from('users').whereNot({ foo: 1, bar: 2 })
+    expect(builder.toSql()).toBe('select * from "users" where not (("foo" = ? and "bar" = ?))')
+    expect(builder.getBindings()).toEqual([1, 2])
+
+    builder = getBuilder()
+    builder.select('*').from('users').whereNot({ foo: 1, bar: 2 }, 'or')
+    expect(builder.toSql()).toBe('select * from "users" where not (("foo" = ? or "bar" = ?))')
+    expect(builder.getBindings()).toEqual([1, 2])
+
+    builder = getBuilder()
+    builder.select('*').from('users').whereNot({ foo: 1, bar: 2 }, 'and')
+    expect(builder.toSql()).toBe('select * from "users" where not (("foo" = ? and "bar" = ?))')
+    expect(builder.getBindings()).toEqual([1, 2])
+
+    // whereNot(key, <, value)
+
+    builder = getBuilder()
+    builder.select('*').from('users').whereNot([['foo', 1], ['bar', '<', 2]])
+    expect(builder.toSql()).toBe('select * from "users" where not (("foo" = ? and "bar" < ?))')
+    expect(builder.getBindings()).toEqual([1, 2])
+
+    builder = getBuilder()
+    builder.select('*').from('users').whereNot([['foo', 1], ['bar', '<', 2]], 'or')
+    expect(builder.toSql()).toBe('select * from "users" where not (("foo" = ? or "bar" < ?))')
+    expect(builder.getBindings()).toEqual([1, 2])
+
+    builder = getBuilder()
+    builder.select('*').from('users').whereNot([['foo', 1], ['bar', '<', 2]], 'and')
+    expect(builder.toSql()).toBe('select * from "users" where not (("foo" = ? and "bar" < ?))')
+    expect(builder.getBindings()).toEqual([1, 2])
+
+    // whereColumn(col1, col2)
+
+    builder = getBuilder()
+    builder.select('*').from('users').whereColumn([['foo', '_foo'], ['bar', '_bar']])
+    expect(builder.toSql()).toBe('select * from "users" where ("foo" = "_foo" and "bar" = "_bar")')
+    expect(builder.getBindings()).toEqual([])
+
+    builder = getBuilder()
+    builder.select('*').from('users').whereColumn([['foo', '_foo'], ['bar', '_bar']], 'or')
+    expect(builder.toSql()).toBe('select * from "users" where ("foo" = "_foo" or "bar" = "_bar")')
+    expect(builder.getBindings()).toEqual([])
+
+    builder = getBuilder()
+    builder.select('*').from('users').whereColumn([['foo', '_foo'], ['bar', '_bar']], 'and')
+    expect(builder.toSql()).toBe('select * from "users" where ("foo" = "_foo" and "bar" = "_bar")')
+    expect(builder.getBindings()).toEqual([])
+
+    builder = getBuilder()
+    builder.select('*').from('users').whereColumn({ foo: '_foo', bar: '_bar' })
+    expect(builder.toSql()).toBe('select * from "users" where ("foo" = "_foo" and "bar" = "_bar")')
+    expect(builder.getBindings()).toEqual([])
+
+    builder = getBuilder()
+    builder.select('*').from('users').whereColumn({ foo: '_foo', bar: '_bar' }, 'or')
+    expect(builder.toSql()).toBe('select * from "users" where ("foo" = "_foo" or "bar" = "_bar")')
+    expect(builder.getBindings()).toEqual([])
+
+    builder = getBuilder()
+    builder.select('*').from('users').whereColumn({ foo: '_foo', bar: '_bar' }, 'and')
+    expect(builder.toSql()).toBe('select * from "users" where ("foo" = "_foo" and "bar" = "_bar")')
+    expect(builder.getBindings()).toEqual([])
+
+    // whereColumn(col1, <, col2)
+
+    builder = getBuilder()
+    builder.select('*').from('users').whereColumn([['foo', '_foo'], ['bar', '<', '_bar']])
+    expect(builder.toSql()).toBe('select * from "users" where ("foo" = "_foo" and "bar" < "_bar")')
+    expect(builder.getBindings()).toEqual([])
+
+    builder = getBuilder()
+    builder.select('*').from('users').whereColumn([['foo', '_foo'], ['bar', '<', '_bar']], 'or')
+    expect(builder.toSql()).toBe('select * from "users" where ("foo" = "_foo" or "bar" < "_bar")')
+    expect(builder.getBindings()).toEqual([])
+
+    builder = getBuilder()
+    builder.select('*').from('users').whereColumn([['foo', '_foo'], ['bar', '<', '_bar']], 'and')
+    expect(builder.toSql()).toBe('select * from "users" where ("foo" = "_foo" and "bar" < "_bar")')
+    expect(builder.getBindings()).toEqual([])
+
+    // whereAll([...keys], value)
+
+    builder = getBuilder()
+    builder.select('*').from('users').whereAll(['foo', 'bar'], 2)
+    expect(builder.toSql()).toBe('select * from "users" where ("foo" = ? and "bar" = ?)')
+    expect(builder.getBindings()).toEqual([2, 2])
+
+    builder = getBuilder()
+    builder.select('*').from('users').whereAll(['foo', 'bar'], 2)
+    expect(builder.toSql()).toBe('select * from "users" where ("foo" = ? and "bar" = ?)')
+    expect(builder.getBindings()).toEqual([2, 2])
+
+    // whereAny([...keys], value)
+
+    builder = getBuilder()
+    builder.select('*').from('users').whereAny(['foo', 'bar'], 2)
+    expect(builder.toSql()).toBe('select * from "users" where ("foo" = ? or "bar" = ?)')
+    expect(builder.getBindings()).toEqual([2, 2])
+
+    builder = getBuilder()
+    builder.select('*').from('users').whereAny(['foo', 'bar'], 2)
+    expect(builder.toSql()).toBe('select * from "users" where ("foo" = ? or "bar" = ?)')
+    expect(builder.getBindings()).toEqual([2, 2])
+
+    // whereNone([...keys], value)
+
+    builder = getBuilder()
+    builder.select('*').from('users').whereNone(['foo', 'bar'], 2)
+    expect(builder.toSql()).toBe('select * from "users" where not ("foo" = ? or "bar" = ?)')
+    expect(builder.getBindings()).toEqual([2, 2])
+
+    builder = getBuilder()
+    builder.select('*').from('users').whereNone(['foo', 'bar'], 2)
+    expect(builder.toSql()).toBe('select * from "users" where not ("foo" = ? or "bar" = ?)')
+    expect(builder.getBindings()).toEqual([2, 2])
+
+    // where()->orWhere(key, value)
+
+    builder = getBuilder()
+    builder.select('*').from('users').where('xxxx', 'xxxx').orWhere([['foo', 1], ['bar', 2]])
+    expect(builder.toSql()).toBe('select * from "users" where "xxxx" = ? or ("foo" = ? or "bar" = ?)')
+    expect(builder.getBindings()).toEqual(['xxxx', 1, 2])
+
+    builder = getBuilder()
+    builder.select('*').from('users').where('xxxx', 'xxxx').orWhere({ foo: 1, bar: 2 })
+    expect(builder.toSql()).toBe('select * from "users" where "xxxx" = ? or ("foo" = ? or "bar" = ?)')
+    expect(builder.getBindings()).toEqual(['xxxx', 1, 2])
+
+    // where()->orWhere(key, <, value)
+
+    builder = getBuilder()
+    builder.select('*').from('users').where('xxxx', 'xxxx').orWhere([['foo', 1], ['bar', '<', 2]])
+    expect(builder.toSql()).toBe('select * from "users" where "xxxx" = ? or ("foo" = ? or "bar" < ?)')
+    expect(builder.getBindings()).toEqual(['xxxx', 1, 2])
+
+    // where()->orWhereColumn(col1, col2)
+
+    builder = getBuilder()
+    builder.select('*').from('users').where('xxxx', 'xxxx').orWhereColumn([['foo', '_foo'], ['bar', '_bar']])
+    expect(builder.toSql()).toBe('select * from "users" where "xxxx" = ? or ("foo" = "_foo" or "bar" = "_bar")')
+    expect(builder.getBindings()).toEqual(['xxxx'])
+
+    builder = getBuilder()
+    builder.select('*').from('users').where('xxxx', 'xxxx').orWhereColumn({ foo: '_foo', bar: '_bar' })
+    expect(builder.toSql()).toBe('select * from "users" where "xxxx" = ? or ("foo" = "_foo" or "bar" = "_bar")')
+    expect(builder.getBindings()).toEqual(['xxxx'])
+
+    // where()->orWhere(key, <, value)
+
+    builder = getBuilder()
+    builder.select('*').from('users').where('xxxx', 'xxxx').orWhere([['foo', 1], ['bar', '<', 2]])
+    expect(builder.toSql()).toBe('select * from "users" where "xxxx" = ? or ("foo" = ? or "bar" < ?)')
+    expect(builder.getBindings()).toEqual(['xxxx', 1, 2])
+
+    // where()->orWhereNot(key, value)
+
+    builder = getBuilder()
+    builder.select('*').from('users').where('xxxx', 'xxxx').orWhereNot([['foo', 1], ['bar', 2]])
+    expect(builder.toSql()).toBe('select * from "users" where "xxxx" = ? or not (("foo" = ? or "bar" = ?))')
+    expect(builder.getBindings()).toEqual(['xxxx', 1, 2])
+
+    builder = getBuilder()
+    builder.select('*').from('users').where('xxxx', 'xxxx').orWhereNot({ foo: 1, bar: 2 })
+    expect(builder.toSql()).toBe('select * from "users" where "xxxx" = ? or not (("foo" = ? or "bar" = ?))')
+    expect(builder.getBindings()).toEqual(['xxxx', 1, 2])
+
+    // where()->orWhereNot(key, <, value)
+
+    builder = getBuilder()
+    builder.select('*').from('users').where('xxxx', 'xxxx').orWhereNot([['foo', 1], ['bar', '<', 2]])
+    expect(builder.toSql()).toBe('select * from "users" where "xxxx" = ? or not (("foo" = ? or "bar" < ?))')
+    expect(builder.getBindings()).toEqual(['xxxx', 1, 2])
+
+    // where()->orWhereAll([...keys], value)
+
+    builder = getBuilder()
+    builder.select('*').from('users').where('xxxx', 'xxxx').orWhereAll(['foo', 'bar'], 2)
+    expect(builder.toSql()).toBe('select * from "users" where "xxxx" = ? or ("foo" = ? and "bar" = ?)')
+    expect(builder.getBindings()).toEqual(['xxxx', 2, 2])
+
+    builder = getBuilder()
+    builder.select('*').from('users').where('xxxx', 'xxxx').orWhereAll(['foo', 'bar'], 2)
+    expect(builder.toSql()).toBe('select * from "users" where "xxxx" = ? or ("foo" = ? and "bar" = ?)')
+    expect(builder.getBindings()).toEqual(['xxxx', 2, 2])
+
+    // where()->orWhereAny([...keys], value)
+
+    builder = getBuilder()
+    builder.select('*').from('users').where('xxxx', 'xxxx').orWhereAny(['foo', 'bar'], 2)
+    expect(builder.toSql()).toBe('select * from "users" where "xxxx" = ? or ("foo" = ? or "bar" = ?)')
+    expect(builder.getBindings()).toEqual(['xxxx', 2, 2])
+
+    builder = getBuilder()
+    builder.select('*').from('users').where('xxxx', 'xxxx').orWhereAny(['foo', 'bar'], 2)
+    expect(builder.toSql()).toBe('select * from "users" where "xxxx" = ? or ("foo" = ? or "bar" = ?)')
+    expect(builder.getBindings()).toEqual(['xxxx', 2, 2])
+
+    // where()->orWhereNone([...keys], value)
+
+    builder = getBuilder()
+    builder.select('*').from('users').where('xxxx', 'xxxx').orWhereNone(['foo', 'bar'], 2)
+    expect(builder.toSql()).toBe('select * from "users" where "xxxx" = ? or not ("foo" = ? or "bar" = ?)')
+    expect(builder.getBindings()).toEqual(['xxxx', 2, 2])
+
+    builder = getBuilder()
+    builder.select('*').from('users').where('xxxx', 'xxxx').orWhereNone(['foo', 'bar'], 2)
+    expect(builder.toSql()).toBe('select * from "users" where "xxxx" = ? or not ("foo" = ? or "bar" = ?)')
+    expect(builder.getBindings()).toEqual(['xxxx', 2, 2])
   })
 })

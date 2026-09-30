@@ -5,7 +5,7 @@ import type { Processor } from './Processors'
 
 // import type { Constructor } from '../../Support'
 import { registerClass } from '../../Support/class-registry'
-import { Builder } from './Builder'
+import { Builder, type WhereBoolean } from './Builder'
 // import { registry } from './internal'
 
 type BuilderConstructor = new (
@@ -107,7 +107,7 @@ export class JoinClause extends Builder {
     first: ((query: Builder) => unknown) | Expression | string,
     operator: string | undefined = undefined,
     second: string | Expression | undefined = undefined,
-    boolean: string = 'and'
+    boolean: WhereBoolean = 'and'
   ): this {
     if (typeof first === 'function') {
       return this.whereNested(first, boolean)

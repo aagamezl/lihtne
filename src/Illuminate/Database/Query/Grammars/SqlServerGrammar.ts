@@ -100,7 +100,7 @@ export class SqlServerGrammar extends Grammar {
   protected override compileLimit (query: Builder, limit: number): string {
     limit = parseInt(String(limit))
 
-    if (limit && query.offsetProperty > 0) {
+    if (limit && (query.offsetProperty ?? 0) > 0) {
       return `fetch next ${limit} rows only`
     }
 
@@ -113,7 +113,8 @@ export class SqlServerGrammar extends Grammar {
    * @param  string|int  $seed
    * @return string
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base compileRandom signature
+  // @ts-expect-error expected error; seed is not used in this method
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   public override compileRandom (seed: string | number): string {
     return 'NEWID()'
   }
@@ -225,9 +226,11 @@ export class SqlServerGrammar extends Grammar {
    * @return string
    */
   protected override compileLock (
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base lock signature
+    // @ts-expect-error expected error; query is not used in this method
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     query: Builder,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base lock signature
+    // @ts-expect-error expected error; value is not used in this method
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     value: boolean | string
   ): string {
     return ''

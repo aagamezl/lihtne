@@ -3,4 +3,5 @@ export enum SortDirection {
   Descending = 'desc'
 }
 
-export type SortDirectionType = `${SortDirection.Ascending}` | `${SortDirection.Descending}`
+export type SortDirectionType =
+  `${SortDirection.Ascending}` | `${SortDirection.Descending}`

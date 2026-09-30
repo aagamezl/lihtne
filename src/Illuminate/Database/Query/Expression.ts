@@ -19,7 +19,7 @@ export class Expression implements ExpressionContract {
    * @return {string | number}
    */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base getValue signature
-  public getValue (grammar: Grammar): string | number {
+  public getValue (_grammar: Grammar): string | number {
     return this.value
   }
 }

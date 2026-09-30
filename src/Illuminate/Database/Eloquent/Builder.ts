@@ -161,7 +161,7 @@ export class Builder implements BuilderContract {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base callNamedScope signature
-  public callNamedScope (method: string, parameters: unknown[]): this {
+  public callNamedScope (_method: string, _parameters: unknown[]): this {
     return this
   }
 
