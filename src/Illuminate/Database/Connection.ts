@@ -10,6 +10,7 @@ import type { Statement } from './Statements'
 import { Arr } from '../Collections'
 import { DetectsLostConnections } from './DetectsLostConnections'
 import { QueryExecuted, StatementPrepared } from './Events'
+import { Expression } from './Query/Expression'
 import { Grammar as QueryGrammar } from './Query/Grammars/Grammar'
 import { Processor } from './Query/Processors/Processor'
 // import { type BindingValues, Processor, Grammar as QueryGrammar } from './Query/index-backup'
@@ -97,7 +98,7 @@ export class Connection extends DetectsLostConnections {
    *
    * @var (callable(\Illuminate\Database\Connection): mixed)
    */
-  protected reconnector: Reconnector = () => {}
+  protected reconnector: Reconnector = () => { }
 
   /**
    * Indicates whether queries are being logged.
@@ -188,6 +189,16 @@ export class Connection extends DetectsLostConnections {
 
       return this.escapeString(value)
     }
+  }
+
+  /**
+   * Get a new raw query expression.
+   *
+   * @param  literal-string|int|float  $value
+   * @return \Illuminate\Contracts\Database\Query\Expression
+   */
+  public raw (value: string | number): Expression {
+    return new Expression(value)
   }
 
   /**

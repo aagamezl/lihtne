@@ -28,18 +28,18 @@ import { JoinLateralClause } from '../JoinLateralClause'
 
 export type SelectComponentName =
 
-    | 'aggregate' |
-    'columns' |
-    'from' |
-    'indexHint' |
-    'joins' |
-    'wheres' |
-    'groups' |
-    'havings' |
-    'orders' |
-    'limit' |
-    'offset' |
-    'lock'
+  | 'aggregate' |
+  'columns' |
+  'from' |
+  'indexHint' |
+  'joins' |
+  'wheres' |
+  'groups' |
+  'havings' |
+  'orders' |
+  'limit' |
+  'offset' |
+  'lock'
 
 export type SelectComponent = {
   name: SelectComponentName
@@ -60,7 +60,7 @@ export type WhereCompilers = Record<
 
 // Trait methods are merged onto the class. `mixing().useTrait()` copies them onto the prototype at runtime.
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export interface Grammar extends BaseGrammar, CompilesJsonPaths {}
+export interface Grammar extends BaseGrammar, CompilesJsonPaths { }
 
 // Trait methods are merged onto the class. `mixing().useTrait()` copies them onto the prototype at runtime.
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -133,6 +133,7 @@ export class Grammar
       Date: (query, where) => this.whereDate(query, where),
       Day: (query, where) => this.whereDay(query, where),
       Expression: (query, where) => this.whereExpression(query, where),
+      Exists: (query, where) => this.whereExists(query, where),
       Fulltext: (query, where) => this.whereFulltext(query, where),
       In: (query, where) => this.whereIn(query, where),
       InRaw: (query, where) => this.whereInRaw(query, where),
@@ -140,6 +141,7 @@ export class Grammar
       Like: (query, where) => this.whereLike(query, where),
       Month: (query, where) => this.whereMonth(query, where),
       Nested: (query, where) => this.whereNested(query, where),
+      NotExists: (query, where) => this.whereNotExists(query, where),
       NotIn: (query, where) => this.whereNotIn(query, where),
       NotInRaw: (query, where) => this.whereNotInRaw(query, where),
       NotNull: (query, where) => this.whereNotNull(query, where),
@@ -782,8 +784,35 @@ export class Grammar
    */
   protected compileWheresToArray (query: Builder): string[] {
     return query.wheres.map((where) => {
+      // console.log("where type", where.type)
       return where.boolean + ' ' + this.whereCompilers[where.type](query, where)
     })
+  }
+
+  /**
+   * Compile a where exists clause.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $where
+   * @return string
+   */
+  // @ts-expect-error expected error; query is not used in this method
+
+  protected whereExists (query: Builder, where: WhereClause): string {
+    return 'exists (' + this.compileSelect(where.query) + ')'
+  }
+
+  /**
+   * Compile a where exists clause.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $where
+   * @return string
+   */
+  // @ts-expect-error expected error; query is not used in this method
+
+  protected whereNotExists (query: Builder, where: WhereClause): string {
+    return 'not exists (' + this.compileSelect(where.query) + ')'
   }
 
   /**
@@ -1328,6 +1357,117 @@ export class Grammar
     const column = this.wrap((having.column ?? '') as string | Expression)
 
     return column + ' is null'
+  }
+
+  /**
+   * Prepare the bindings for an update statement.
+   *
+   * @param  array  $bindings
+   * @param  array  $values
+   * @return array
+   */
+  public prepareBindingsForUpdate (bindings: Record<string, unknown>, values: Record<string, unknown>): unknown[] {
+    const cleanBindings = Arr.except(bindings, ['select', 'join'])
+
+    const flattenedValues = Arr.flatten(Object.values(values).map((value) => value()))
+
+    return Array.values(
+      Object.assign(bindings.join, flattenedValues, Arr.flatten(cleanBindings))
+    )
+  }
+
+  /**
+   * Compile an update statement into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $values
+   * @return string
+   */
+  public compileUpdate (query: Builder, values: Record<string, unknown>): string {
+    const table = this.wrapTable(query.fromProperty)
+
+    const columns = this.compileUpdateColumns(query, values)
+
+    const where = this.compileWheres(query)
+
+    return (
+      query.joins.length > 0
+        ? this.compileUpdateWithJoins(query, table, columns, where)
+        : this.compileUpdateWithoutJoins(query, table, columns, where)
+    ).trim()
+  }
+
+  /**
+   * Compile an update statement with joins into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  string  $table
+   * @param  string  $columns
+   * @param  string  $where
+   * @return string
+   */
+  protected compileUpdateWithJoins (query: Builder, table: string, columns: string, where: string): string {
+    const joins = this.compileJoins(query, query.joins)
+
+    return `update ${table} ${joins} set ${columns} ${where}`
+  }
+
+  /**
+   * Compile an update statement without joins into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  string  $table
+   * @param  string  $columns
+   * @param  string  $where
+   * @return string
+   */
+  protected compileUpdateWithoutJoins (query: Builder, table: string, columns: string, where: string): string {
+    return `update ${table} set ${columns} ${where}`
+  }
+
+  /**
+   * Compile the columns for an update statement.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $values
+   * @return string
+   */
+  protected compileUpdateColumns (query: Builder, values: Record<string, unknown>): string {
+    return new Collection(values)
+      .map((value, key) => this.wrap(key) + ' = ' + this.parameter(value))
+      .implode(', ')
+  }
+
+  /**
+   * Compile a delete statement without joins into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  string  $table
+   * @param  string  $where
+   * @return string
+   */
+  protected compileDeleteWithoutJoins (query: Builder, table: string, where: string): string {
+    return `delete from ${table} ${where}`
+  }
+
+  /**
+   * Compile a delete statement with joins into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  string  $table
+   * @param  string  $where
+   * @return string
+   */
+  protected compileDeleteWithJoins (
+    query: Builder,
+    table: string,
+    where: string
+  ): string {
+    const alias = last(table.split(' as '))
+
+    const joins = this.compileJoins(query, query.joins)
+
+    return `delete ${alias} from ${table} ${joins} ${where}`
   }
 
   /**

@@ -1,6 +1,6 @@
 import { describe, expect, jest, test } from '@jest/globals'
 
-import type { Builder } from '../../src/Illuminate/Database/Query'
+import type { Builder, JoinClause } from '../../src/Illuminate/Database/Query'
 
 import { collect } from '../../src/Illuminate/Collections/helpers'
 import { Builder as EloquentBuilder } from '../../src/Illuminate/Database/Eloquent/Builder'
@@ -16,6 +16,7 @@ import { getPostgresBuilder } from './helpers/getPostgresBuilder'
 import { getPostgresBuilderWithProcessor } from './helpers/getPostgresBuilderWithProcessor'
 import { getSQLiteBuilder } from './helpers/getSQLiteBuilder'
 import { getSqlServerBuilder } from './helpers/getSqlServerBuilder'
+import { getMockQueryBuilder } from './helpers/getMockQueryBuilder'
 
 describe('Database Query Builder', () => {
   test('testBasicSelect', () => {
@@ -2749,11 +2750,11 @@ describe('Database Query Builder', () => {
     const builder = getBuilder()
 
     const expression = new (class extends Expression {
-      constructor () {
+      constructor() {
         super('1 = 1')
       }
 
-      public getValue () {
+      public getValue() {
         return '1 = 1'
       }
     })()
@@ -3292,5 +3293,716 @@ describe('Database Query Builder', () => {
     builder.select('*').from('users').where('xxxx', 'xxxx').orWhereNone(['foo', 'bar'], 2)
     expect(builder.toSql()).toBe('select * from "users" where "xxxx" = ? or not ("foo" = ? or "bar" = ?)')
     expect(builder.getBindings()).toEqual(['xxxx', 2, 2])
+  })
+
+  test('testNestedWheres', () => {
+    const builder = getBuilder()
+    builder.select('*').from('users').where('email', '=', 'foo').orWhere((q: Builder) => {
+      q.where('name', '=', 'bar').where('age', '=', 25)
+    })
+    expect(builder.toSql()).toBe('select * from "users" where "email" = ? or ("name" = ? and "age" = ?)')
+    expect(builder.getBindings()).toEqual(['foo', 'bar', 25])
+  })
+
+  test('testNestedWhereBindings', () => {
+    const builder = getBuilder()
+    builder.where('email', '=', 'foo').where((q: Builder) => {
+      q.selectRaw('?', ['ignore']).where('name', '=', 'bar')
+    })
+    expect(builder.getBindings()).toEqual(['foo', 'bar'])
+  })
+
+  test('testWhereNot', () => {
+    let builder = getBuilder()
+    builder.select('*').from('users').whereNot((q: Builder) => {
+      q.where('email', '=', 'foo')
+    })
+    expect(builder.toSql()).toBe('select * from "users" where not ("email" = ?)')
+    expect(builder.getBindings()).toEqual(['foo'])
+
+    builder = getBuilder()
+    builder.select('*').from('users').where('name', '=', 'bar').whereNot((q: Builder) => {
+      q.where('email', '=', 'foo')
+    })
+    expect(builder.toSql()).toBe('select * from "users" where "name" = ? and not ("email" = ?)')
+    expect(builder.getBindings()).toEqual(['bar', 'foo'])
+
+    builder = getBuilder()
+    builder.select('*').from('users').where('name', '=', 'bar').orWhereNot((q: Builder) => {
+      q.where('email', '=', 'foo')
+    })
+    expect(builder.toSql()).toBe('select * from "users" where "name" = ? or not ("email" = ?)')
+    expect(builder.getBindings()).toEqual(['bar', 'foo'])
+  })
+
+  test('testIncrementManyArgumentValidation1', () => {
+    expect(() => {
+      const builder = getBuilder()
+      builder.from('users').incrementEach({ col: 'a' })
+    }).toThrow(new Error('InvalidArgumentException: Non-numeric value passed as increment amount for column: \'col\'.'))
+  })
+
+  test('testIncrementManyArgumentValidation2', () => {
+    expect(() => {
+      const builder = getBuilder()
+      builder.from('users').incrementEach({ 11: 12 })
+    }).toThrow(new Error('InvalidArgumentException: Non-associative array passed to incrementEach method.'))
+  })
+
+  test('testWhereNotWithArrayConditions', () => {
+    let builder = getBuilder()
+    builder.select('*').from('users').whereNot([['foo', 1], ['bar', 2]])
+    expect(builder.toSql()).toBe('select * from "users" where not (("foo" = ? and "bar" = ?))')
+    expect(builder.getBindings()).toEqual([1, 2])
+
+    builder = getBuilder()
+    builder.select('*').from('users').whereNot({ foo: 1, bar: 2 })
+    expect(builder.toSql()).toBe('select * from "users" where not (("foo" = ? and "bar" = ?))')
+    expect(builder.getBindings()).toEqual([1, 2])
+
+    builder = getBuilder()
+    builder.select('*').from('users').whereNot([['foo', 1], ['bar', '<', 2]])
+    expect(builder.toSql()).toBe('select * from "users" where not (("foo" = ? and "bar" < ?))')
+    expect(builder.getBindings()).toEqual([1, 2])
+  })
+
+  test('testFullSubSelects', () => {
+    const builder = getBuilder()
+    builder.select('*').from('users').where('email', '=', 'foo').orWhere('id', '=', (q: Builder) => {
+      return q.select(new Raw('max(id)')).from('users').where('email', '=', 'bar')
+    })
+
+    expect(builder.toSql()).toBe('select * from "users" where "email" = ? or "id" = (select max(id) from "users" where "email" = ?)')
+    expect(builder.getBindings()).toEqual(['foo', 'bar'])
+  })
+
+  test('testWhereExists', () => {
+    let builder = getBuilder()
+    builder.select('*').from('orders').whereExists((q: Builder) => {
+      q.select('*').from('products').where('products.id', '=', new Raw('"orders"."id"'))
+    })
+    expect(builder.toSql()).toBe('select * from "orders" where exists (select * from "products" where "products"."id" = "orders"."id")')
+
+    builder = getBuilder()
+    builder.select('*').from('orders').whereNotExists((q: Builder) => {
+      q.select('*').from('products').where('products.id', '=', new Raw('"orders"."id"'))
+    })
+    expect(builder.toSql()).toBe('select * from "orders" where not exists (select * from "products" where "products"."id" = "orders"."id")')
+
+    builder = getBuilder()
+    builder.select('*').from('orders').where('id', '=', 1).orWhereExists((q: Builder) => {
+      q.select('*').from('products').where('products.id', '=', new Raw('"orders"."id"'))
+    })
+    expect(builder.toSql()).toBe('select * from "orders" where "id" = ? or exists (select * from "products" where "products"."id" = "orders"."id")')
+
+    builder = getBuilder()
+    builder.select('*').from('orders').where('id', '=', 1).orWhereNotExists((q: Builder) => {
+      q.select('*').from('products').where('products.id', '=', new Raw('"orders"."id"'))
+    })
+    expect(builder.toSql()).toBe('select * from "orders" where "id" = ? or not exists (select * from "products" where "products"."id" = "orders"."id")')
+
+    builder = getBuilder()
+    builder.select('*').from('orders').whereExists(
+      getBuilder().select('*').from('products').where('products.id', '=', new Raw('"orders"."id"'))
+    )
+    expect(builder.toSql()).toBe('select * from "orders" where exists (select * from "products" where "products"."id" = "orders"."id")')
+
+    builder = getBuilder()
+    builder.select('*').from('orders').whereNotExists(
+      getBuilder().select('*').from('products').where('products.id', '=', new Raw('"orders"."id"'))
+    )
+    expect(builder.toSql()).toBe('select * from "orders" where not exists (select * from "products" where "products"."id" = "orders"."id")')
+
+    builder = getBuilder()
+    builder.select('*').from('orders').where('id', '=', 1).orWhereExists(
+      getBuilder().select('*').from('products').where('products.id', '=', new Raw('"orders"."id"'))
+    )
+    expect(builder.toSql()).toBe('select * from "orders" where "id" = ? or exists (select * from "products" where "products"."id" = "orders"."id")')
+
+    builder = getBuilder()
+    builder.select('*').from('orders').where('id', '=', 1).orWhereNotExists(
+      getBuilder().select('*').from('products').where('products.id', '=', new Raw('"orders"."id"'))
+    )
+    expect(builder.toSql()).toBe('select * from "orders" where "id" = ? or not exists (select * from "products" where "products"."id" = "orders"."id")')
+
+    builder = getBuilder()
+    builder.select('*').from('orders').whereExists(
+      (new EloquentBuilder(getBuilder())).select('*').from('products').where('products.id', '=', new Raw('"orders"."id"'))
+    )
+    expect(builder.toSql()).toBe('select * from "orders" where exists (select * from "products" where "products"."id" = "orders"."id")')
+  })
+
+  test('testBasicJoins', () => {
+    let builder = getBuilder()
+    builder.select('*').from('users').join('contacts', 'users.id', 'contacts.id')
+    expect(builder.toSql()).toBe('select * from "users" inner join "contacts" on "users"."id" = "contacts"."id"')
+
+    builder = getBuilder()
+    builder.select('*').from('users').join('contacts', 'users.id', '=', 'contacts.id').leftJoin('photos', 'users.id', '=', 'photos.id')
+    expect(builder.toSql()).toBe('select * from "users" inner join "contacts" on "users"."id" = "contacts"."id" left join "photos" on "users"."id" = "photos"."id"')
+
+    builder = getBuilder()
+    builder.select('*').from('users').leftJoinWhere('photos', 'users.id', '=', 'bar').joinWhere('photos', 'users.id', '=', 'foo')
+    expect(builder.toSql()).toBe('select * from "users" left join "photos" on "users"."id" = ? inner join "photos" on "users"."id" = ?')
+    expect(builder.getBindings()).toEqual(['bar', 'foo'])
+  })
+
+  test('testCrossJoins', () => {
+    let builder = getBuilder()
+    builder.select('*').from('sizes').crossJoin('colors')
+    expect(builder.toSql()).toBe('select * from "sizes" cross join "colors"')
+
+    builder = getBuilder()
+    builder.select('*').from('tableB').join('tableA', 'tableA.column1', '=', 'tableB.column2', 'cross')
+    expect(builder.toSql()).toBe('select * from "tableB" cross join "tableA" on "tableA"."column1" = "tableB"."column2"')
+
+    builder = getBuilder()
+    builder.select('*').from('tableB').crossJoin('tableA', 'tableA.column1', '=', 'tableB.column2')
+    expect(builder.toSql()).toBe('select * from "tableB" cross join "tableA" on "tableA"."column1" = "tableB"."column2"')
+  })
+
+  test('testCrossJoinSubs', () => {
+    const builder = getBuilder()
+    builder.selectRaw('(sale / overall.sales) * 100 AS percent_of_total').from('sales').crossJoinSub(getBuilder().selectRaw('SUM(sale) AS sales').from('sales'), 'overall')
+    expect(builder.toSql()).toBe('select (sale / overall.sales) * 100 AS percent_of_total from "sales" cross join (select SUM(sale) AS sales from "sales") as "overall"')
+  })
+
+  test('testComplexJoin', () => {
+    let builder = getBuilder()
+    builder.select('*').from('users').join('contacts', (j: JoinClause) => {
+      j.on('users.id', '=', 'contacts.id').orOn('users.name', '=', 'contacts.name')
+    })
+    expect(builder.toSql()).toBe('select * from "users" inner join "contacts" on "users"."id" = "contacts"."id" or "users"."name" = "contacts"."name"')
+
+    builder = getBuilder()
+    builder.select('*').from('users').join('contacts', (j: JoinClause) => {
+      j.where('users.id', '=', 'foo').orWhere('users.name', '=', 'bar')
+    })
+    expect(builder.toSql()).toBe('select * from "users" inner join "contacts" on "users"."id" = ? or "users"."name" = ?')
+    expect(builder.getBindings()).toEqual(['foo', 'bar'])
+
+    // Run the assertions again
+    expect(builder.toSql()).toBe('select * from "users" inner join "contacts" on "users"."id" = ? or "users"."name" = ?')
+    expect(builder.getBindings()).toEqual(['foo', 'bar'])
+  })
+
+  test('testJoinWhereNull', () => {
+    let builder = getBuilder()
+    builder.select('*').from('users').join('contacts', (j: JoinClause) => {
+      j.on('users.id', '=', 'contacts.id').whereNull('contacts.deleted_at')
+    })
+    expect(builder.toSql()).toBe('select * from "users" inner join "contacts" on "users"."id" = "contacts"."id" and "contacts"."deleted_at" is null')
+
+    builder = getBuilder()
+    builder.select('*').from('users').join('contacts', (j: JoinClause) => {
+      j.on('users.id', '=', 'contacts.id').orWhereNull('contacts.deleted_at')
+    })
+    expect(builder.toSql()).toBe('select * from "users" inner join "contacts" on "users"."id" = "contacts"."id" or "contacts"."deleted_at" is null')
+  })
+
+  test('testJoinWhereNotNull', () => {
+    let builder = getBuilder()
+    builder = getBuilder()
+    builder.select('*').from('users').join('contacts', (j: JoinClause) => {
+      j.on('users.id', '=', 'contacts.id').whereNotNull('contacts.deleted_at')
+    })
+    expect(builder.toSql()).toBe('select * from "users" inner join "contacts" on "users"."id" = "contacts"."id" and "contacts"."deleted_at" is not null')
+
+    builder = getBuilder()
+    builder.select('*').from('users').join('contacts', (j: JoinClause) => {
+      j.on('users.id', '=', 'contacts.id').orWhereNotNull('contacts.deleted_at')
+    })
+    expect(builder.toSql()).toBe('select * from "users" inner join "contacts" on "users"."id" = "contacts"."id" or "contacts"."deleted_at" is not null')
+  })
+
+  test('testJoinWhereIn', () => {
+    let builder = getBuilder()
+    builder = getBuilder()
+    builder.select('*').from('users').join('contacts', (j: JoinClause) => {
+      j.on('users.id', '=', 'contacts.id').whereIn('contacts.name', [48, 'baz', null])
+    })
+    expect(builder.toSql()).toBe('select * from "users" inner join "contacts" on "users"."id" = "contacts"."id" and "contacts"."name" in (?, ?, ?)')
+    expect(builder.getBindings()).toEqual([48, 'baz', null])
+
+    builder = getBuilder()
+    builder.select('*').from('users').join('contacts', (j: JoinClause) => {
+      j.on('users.id', '=', 'contacts.id').orWhereIn('contacts.name', [48, 'baz', null])
+    })
+    expect(builder.toSql()).toBe('select * from "users" inner join "contacts" on "users"."id" = "contacts"."id" or "contacts"."name" in (?, ?, ?)')
+    expect(builder.getBindings()).toEqual([48, 'baz', null])
+  })
+
+  test('testJoinWhereInSubquery', () => {
+    let builder = getBuilder()
+    builder = getBuilder()
+    builder.select('*').from('users').join('contacts', (j: JoinClause) => {
+      const q = getBuilder()
+      q.select('name').from('contacts').where('name', 'baz')
+      j.on('users.id', '=', 'contacts.id').whereIn('contacts.name', q)
+    })
+    expect(builder.toSql()).toBe('select * from "users" inner join "contacts" on "users"."id" = "contacts"."id" and "contacts"."name" in (select "name" from "contacts" where "name" = ?)')
+    expect(builder.getBindings()).toEqual(['baz'])
+
+    builder = getBuilder()
+    builder.select('*').from('users').join('contacts', (j: JoinClause) => {
+      const q = getBuilder()
+      q.select('name').from('contacts').where('name', 'baz')
+      j.on('users.id', '=', 'contacts.id').orWhereIn('contacts.name', q)
+    })
+    expect(builder.toSql()).toBe('select * from "users" inner join "contacts" on "users"."id" = "contacts"."id" or "contacts"."name" in (select "name" from "contacts" where "name" = ?)')
+    expect(builder.getBindings()).toEqual(['baz'])
+  })
+
+  test('testJoinWhereNotIn', () => {
+    let builder = getBuilder()
+    builder.select('*').from('users').join('contacts', (j: JoinClause) => {
+      j.on('users.id', '=', 'contacts.id').whereNotIn('contacts.name', [48, 'baz', null])
+    })
+    expect(builder.toSql()).toBe('select * from "users" inner join "contacts" on "users"."id" = "contacts"."id" and "contacts"."name" not in (?, ?, ?)')
+    expect(builder.getBindings()).toEqual([48, 'baz', null])
+
+    builder = getBuilder()
+    builder.select('*').from('users').join('contacts', (j: JoinClause) => {
+      j.on('users.id', '=', 'contacts.id').orWhereNotIn('contacts.name', [48, 'baz', null])
+    })
+    expect(builder.toSql()).toBe('select * from "users" inner join "contacts" on "users"."id" = "contacts"."id" or "contacts"."name" not in (?, ?, ?)')
+    expect(builder.getBindings()).toEqual([48, 'baz', null])
+  })
+
+  test('testJoinsWithNestedConditions', () => {
+    let builder = getBuilder()
+    builder.select('*').from('users').leftJoin('contacts', (j: JoinClause) => {
+      j.on('users.id', '=', 'contacts.id').where((j: JoinClause) => {
+        j.where('contacts.country', '=', 'US').orWhere('contacts.is_partner', '=', 1)
+      })
+    })
+    expect(builder.toSql()).toBe('select * from "users" left join "contacts" on "users"."id" = "contacts"."id" and ("contacts"."country" = ? or "contacts"."is_partner" = ?)')
+    expect(builder.getBindings()).toEqual(['US', 1])
+
+    builder = getBuilder()
+    builder.select('*').from('users').leftJoin('contacts', (j: JoinClause) => {
+      j.on('users.id', '=', 'contacts.id').where('contacts.is_active', '=', 1).orOn((j: JoinClause) => {
+        j.orWhere((j: JoinClause) => {
+          j.where('contacts.country', '=', 'UK').orOn('contacts.type', '=', 'users.type')
+        }).where((j: JoinClause) => {
+          j.where('contacts.country', '=', 'US').orWhereNull('contacts.is_partner')
+        })
+      })
+    })
+    expect(builder.toSql()).toBe('select * from "users" left join "contacts" on "users"."id" = "contacts"."id" and "contacts"."is_active" = ? or (("contacts"."country" = ? or "contacts"."type" = "users"."type") and ("contacts"."country" = ? or "contacts"."is_partner" is null))')
+    expect(builder.getBindings()).toEqual([1, 'UK', 'US'])
+  })
+
+  test.skip('testJoinsWithAdvancedConditions', () => {
+    const builder = getBuilder()
+    builder.select('*').from('users').leftJoin('contacts', (j: JoinClause) => {
+      j.on('users.id', 'contacts.id').where((j: JoinClause) => {
+        j.whereRole('admin')
+          .orWhereNull('contacts.disabled')
+          .orWhereRaw('year(contacts.created_at) = 2016')
+      })
+    })
+    expect(builder.toSql()).toBe('select * from "users" left join "contacts" on "users"."id" = "contacts"."id" and ("role" = ? or "contacts"."disabled" is null or year(contacts.created_at) = 2016)')
+    expect(builder.getBindings()).toEqual(['admin'])
+  })
+
+  test('testJoinsWithSubqueryCondition', () => {
+    let builder = getBuilder()
+    builder.select('*').from('users').leftJoin('contacts', (j: JoinClause) => {
+      j.on('users.id', 'contacts.id').whereIn('contact_type_id', (q: Builder) => {
+        q.select('id').from('contact_types').where('category_id', '1').whereNull('deleted_at')
+      })
+    })
+    expect(builder.toSql()).toBe('select * from "users" left join "contacts" on "users"."id" = "contacts"."id" and "contact_type_id" in (select "id" from "contact_types" where "category_id" = ? and "deleted_at" is null)')
+    expect(builder.getBindings()).toEqual(['1'])
+
+    builder = getBuilder()
+    builder.select('*').from('users').leftJoin('contacts', (j: JoinClause) => {
+      j.on('users.id', 'contacts.id').whereExists((q: Builder) => {
+        q.selectRaw('1').from('contact_types')
+          .whereRaw('contact_types.id = contacts.contact_type_id')
+          .where('category_id', '1')
+          .whereNull('deleted_at')
+      })
+    })
+    expect(builder.toSql()).toBe('select * from "users" left join "contacts" on "users"."id" = "contacts"."id" and exists (select 1 from "contact_types" where contact_types.id = contacts.contact_type_id and "category_id" = ? and "deleted_at" is null)')
+    expect(builder.getBindings()).toEqual(['1'])
+  })
+
+  test('testJoinsWithAdvancedSubqueryCondition', () => {
+    const builder = getBuilder()
+    builder.select('*').from('users').leftJoin('contacts', (j: JoinClause) => {
+      j.on('users.id', 'contacts.id').whereExists((q: Builder) => {
+        q.selectRaw('1').from('contact_types')
+          .whereRaw('contact_types.id = contacts.contact_type_id').where('category_id', '1').whereNull('deleted_at').whereIn('level_id', (q: Builder) => {
+            q.select('id').from('levels').where('is_active', true)
+          })
+      })
+    })
+    expect(builder.toSql()).toBe('select * from "users" left join "contacts" on "users"."id" = "contacts"."id" and exists (select 1 from "contact_types" where contact_types.id = contacts.contact_type_id and "category_id" = ? and "deleted_at" is null and "level_id" in (select "id" from "levels" where "is_active" = ?))')
+    expect(builder.getBindings()).toEqual(['1', true])
+  })
+
+  test('testJoinsWithNestedJoins', () => {
+    const builder = getBuilder()
+    builder.select('users.id', 'contacts.id', 'contact_types.id').from('users').leftJoin('contacts', (j: JoinClause) => {
+      j.on('users.id', 'contacts.id').join('contact_types', 'contacts.contact_type_id', '=', 'contact_types.id')
+    })
+    expect(builder.toSql()).toBe('select "users"."id", "contacts"."id", "contact_types"."id" from "users" left join ("contacts" inner join "contact_types" on "contacts"."contact_type_id" = "contact_types"."id") on "users"."id" = "contacts"."id"')
+  })
+
+  test('testJoinsWithMultipleNestedJoins', () => {
+    const builder = getBuilder()
+    builder.select('users.id', 'contacts.id', 'contact_types.id', 'countries.id', 'planets.id').from('users').leftJoin('contacts', (j: JoinClause) => {
+      j.on('users.id', 'contacts.id')
+        .join('contact_types', 'contacts.contact_type_id', '=', 'contact_types.id')
+        .leftJoin('countries', (q: JoinClause) => {
+          q.on('contacts.country', '=', 'countries.country')
+            .join('planets', (q: JoinClause) => {
+              q.on('countries.planet_id', '=', 'planet.id')
+                .where('planet.is_settled', '=', 1)
+                .where('planet.population', '>=', 10000)
+            })
+        })
+    })
+    expect(builder.toSql()).toBe('select "users"."id", "contacts"."id", "contact_types"."id", "countries"."id", "planets"."id" from "users" left join ("contacts" inner join "contact_types" on "contacts"."contact_type_id" = "contact_types"."id" left join ("countries" inner join "planets" on "countries"."planet_id" = "planet"."id" and "planet"."is_settled" = ? and "planet"."population" >= ?) on "contacts"."country" = "countries"."country") on "users"."id" = "contacts"."id"')
+    expect(builder.getBindings()).toEqual([1, 10000])
+  })
+
+  test('testJoinsWithNestedJoinWithAdvancedSubqueryCondition', () => {
+    const builder = getBuilder()
+    builder.select('users.id', 'contacts.id', 'contact_types.id').from('users').leftJoin('contacts', (j: JoinClause) => {
+      j.on('users.id', 'contacts.id')
+        .join('contact_types', 'contacts.contact_type_id', '=', 'contact_types.id')
+        .whereExists((q: Builder) => {
+          q.select('*').from('countries')
+            .whereColumn('contacts.country', '=', 'countries.country')
+            .join('planets', (q: JoinClause) => {
+              q.on('countries.planet_id', '=', 'planet.id')
+                .where('planet.is_settled', '=', 1)
+            })
+            .where('planet.population', '>=', 10000)
+        })
+    })
+    expect(builder.toSql()).toBe('select "users"."id", "contacts"."id", "contact_types"."id" from "users" left join ("contacts" inner join "contact_types" on "contacts"."contact_type_id" = "contact_types"."id") on "users"."id" = "contacts"."id" and exists (select * from "countries" inner join "planets" on "countries"."planet_id" = "planet"."id" and "planet"."is_settled" = ? where "contacts"."country" = "countries"."country" and "planet"."population" >= ?)')
+    expect(builder.getBindings()).toEqual([1, 10000])
+  })
+
+  test('testJoinWithNestedOnCondition', () => {
+    const builder = getBuilder()
+    builder.select('users.id').from('users').join('contacts', (j: JoinClause) => {
+      return j
+        .on('users.id', 'contacts.id')
+        .addNestedWhereQuery(getBuilder().where('contacts.id', 1))
+    })
+    expect(builder.toSql()).toBe('select "users"."id" from "users" inner join "contacts" on "users"."id" = "contacts"."id" and ("contacts"."id" = ?)')
+    expect(builder.getBindings()).toEqual([1])
+  })
+
+  test('testJoinSub', () => {
+    let builder = getBuilder()
+    builder.from('users').joinSub('select * from "contacts"', 'sub', 'users.id', '=', 'sub.id')
+    expect(builder.toSql()).toBe('select * from "users" inner join (select * from "contacts") as "sub" on "users"."id" = "sub"."id"')
+
+    builder = getBuilder()
+    builder.from('users').joinSub((q: Builder) => {
+      q.from('contacts')
+    }, 'sub', 'users.id', '=', 'sub.id')
+    expect(builder.toSql()).toBe('select * from "users" inner join (select * from "contacts") as "sub" on "users"."id" = "sub"."id"')
+
+    builder = getBuilder()
+    const eloquentBuilder = new EloquentBuilder(getBuilder().from('contacts'))
+    builder.from('users').joinSub(eloquentBuilder, 'sub', 'users.id', '=', 'sub.id')
+    expect(builder.toSql()).toBe('select * from "users" inner join (select * from "contacts") as "sub" on "users"."id" = "sub"."id"')
+
+    builder = getBuilder()
+    const sub1 = getBuilder().from('contacts').where('name', 'foo')
+    const sub2 = getBuilder().from('contacts').where('name', 'bar')
+    builder.from('users')
+      .joinSub(sub1, 'sub1', 'users.id', '=', 1, 'inner', true)
+      .joinSub(sub2, 'sub2', 'users.id', '=', 'sub2.user_id')
+    let expected = 'select * from "users" '
+    expected += 'inner join (select * from "contacts" where "name" = ?) as "sub1" on "users"."id" = ? '
+    expected += 'inner join (select * from "contacts" where "name" = ?) as "sub2" on "users"."id" = "sub2"."user_id"'
+    expect(builder.toSql()).toBe(expected)
+    expect(builder.getRawBindings().join).toEqual(['foo', 1, 'bar'])
+
+    expect(()
+      => {
+      const builder = getBuilder()
+      builder.from('users').joinSub(['foo'], 'sub', 'users.id', '=', 'sub.id')
+    }).toThrow(Error)
+  })
+
+  test('testJoinSubWithPrefix', () => {
+    const builder = getBuilder('prefix_')
+    builder.from('users').joinSub('select * from "contacts"', 'sub', 'users.id', '=', 'sub.id')
+    expect(builder.toSql()).toBe('select * from "prefix_users" inner join (select * from "contacts") as "prefix_sub" on "prefix_users"."id" = "prefix_sub"."id"')
+  })
+
+  test('testLeftJoinSub', () => {
+    const builder = getBuilder()
+    builder.from('users').leftJoinSub(getBuilder().from('contacts'), 'sub', 'users.id', '=', 'sub.id')
+    expect(builder.toSql()).toBe('select * from "users" left join (select * from "contacts") as "sub" on "users"."id" = "sub"."id"')
+
+    expect(() => {
+      const builder = getBuilder()
+      builder.from('users').leftJoinSub(['foo'], 'sub', 'users.id', '=', 'sub.id')
+    }).toThrow(Error)
+  })
+
+  test('testRightJoinSub', () => {
+    const builder = getBuilder()
+    builder.from('users').rightJoinSub(getBuilder().from('contacts'), 'sub', 'users.id', '=', 'sub.id')
+    expect(builder.toSql()).toBe('select * from "users" right join (select * from "contacts") as "sub" on "users"."id" = "sub"."id"')
+
+    expect(() => {
+      const builder = getBuilder()
+      builder.from('users').rightJoinSub(['foo'], 'sub', 'users.id', '=', 'sub.id')
+    }).toThrow(Error)
+  })
+
+  test('testStraightJoin', () => {
+    let builder = getMySqlBuilder()
+    builder.select('*').from('users').straightJoin('contacts', 'users.id', 'contacts.id')
+    expect(builder.toSql()).toBe('select * from `users` straight_join `contacts` on `users`.`id` = `contacts`.`id`')
+
+    builder = getMySqlBuilder()
+    builder.select('*').from('users').join('contacts', 'users.id', '=', 'contacts.id').straightJoin('photos', 'users.id', '=', 'photos.id')
+    expect(builder.toSql()).toBe('select * from `users` inner join `contacts` on `users`.`id` = `contacts`.`id` straight_join `photos` on `users`.`id` = `photos`.`id`')
+
+    builder = getMySqlBuilder()
+    builder.select('*').from('users').straightJoinWhere('photos', 'users.id', '=', 'bar').joinWhere('photos', 'users.id', '=', 'foo')
+    expect(builder.toSql()).toBe('select * from `users` straight_join `photos` on `users`.`id` = ? inner join `photos` on `users`.`id` = ?')
+    expect(builder.getBindings()).toEqual(['bar', 'foo'])
+  })
+
+  test('testStraightJoinNoSupport', () => {
+    expect(() => {
+      const builder = getBuilder()
+      builder.select('*').from('users').straightJoin('contacts', 'users.id', 'contacts.id')
+      builder.toSql()
+    }).toThrow(Error)
+  })
+
+  test('testStraightJoinSub', () => {
+    const builder = getMySqlBuilder()
+    builder.from('users').straightJoinSub(getBuilder().from('contacts'), 'sub', 'users.id', '=', 'sub.id')
+    expect(builder.toSql()).toBe('select * from `users` straight_join (select * from "contacts") as `sub` on `users`.`id` = `sub`.`id`')
+
+    expect(() => {
+      const builder = getBuilder()
+      builder.from('users').straightJoinSub(['foo'], 'sub', 'users.id', '=', 'sub.id')
+    }).toThrow(Error)
+  })
+
+  test('testStraightJoinSubNoSupport', () => {
+    expect(() => {
+      const builder = getBuilder()
+      builder.from('users').straightJoinSub(getBuilder().from('contacts'), 'sub', 'users.id', '=', 'sub.id')
+      builder.toSql()
+    }).toThrow(Error)
+  })
+
+  test('testJoinLateral', () => {
+    let builder = getMySqlBuilder()
+    builder.from('users').joinLateral('select * from `contacts` where `contracts`.`user_id` = `users`.`id`', 'sub')
+    expect(builder.toSql()).toBe('select * from `users` inner join lateral (select * from `contacts` where `contracts`.`user_id` = `users`.`id`) as `sub` on true')
+
+    builder = getMySqlBuilder()
+    builder.from('users').joinLateral((q: Builder) => {
+      q.from('contacts').whereColumn('contracts.user_id', 'users.id')
+    }, 'sub')
+    expect(builder.toSql()).toBe('select * from `users` inner join lateral (select * from `contacts` where `contracts`.`user_id` = `users`.`id`) as `sub` on true')
+
+    builder = getMySqlBuilder()
+    const sub = getMySqlBuilder()
+    const eloquentBuilder = new EloquentBuilder(sub.from('contacts').whereColumn('contracts.user_id', 'users.id'))
+    builder.from('users').joinLateral(eloquentBuilder, 'sub')
+    expect(builder.toSql()).toBe('select * from `users` inner join lateral (select * from `contacts` where `contracts`.`user_id` = `users`.`id`) as `sub` on true')
+
+    let sub1 = getMySqlBuilder()
+    sub1 = sub1.from('contacts').whereColumn('contracts.user_id', 'users.id').where('name', 'foo')
+
+    let sub2 = getMySqlBuilder()
+    sub2 = sub2.from('contacts').whereColumn('contracts.user_id', 'users.id').where('name', 'bar')
+
+    builder = getMySqlBuilder()
+    builder.from('users').joinLateral(sub1, 'sub1').joinLateral(sub2, 'sub2')
+
+    let expected = 'select * from `users` '
+    expected += 'inner join lateral (select * from `contacts` where `contracts`.`user_id` = `users`.`id` and `name` = ?) as `sub1` on true '
+    expected += 'inner join lateral (select * from `contacts` where `contracts`.`user_id` = `users`.`id` and `name` = ?) as `sub2` on true'
+
+    expect(builder.toSql()).toBe(expected)
+    expect(builder.getRawBindings().join).toEqual(['foo', 'bar'])
+
+    expect(() => {
+      const builder = getMySqlBuilder()
+      builder.from('users').joinLateral(['foo'], 'sub')
+    }).toThrow(Error)
+  })
+
+  test('testJoinLateralMariaDb', () => {
+    expect(() => {
+      const builder = getMariaDbBuilder()
+      builder.from('users').joinLateral((q: Builder) => {
+        q.from('contacts').whereColumn('contracts.user_id', 'users.id')
+      }, 'sub')
+      builder.toSql()
+    }).toThrow(Error)
+  })
+
+  test('testJoinLateralSQLite', () => {
+    expect(() => {
+      const builder = getSQLiteBuilder()
+      builder.from('users').joinLateral((q: Builder) => {
+        q.from('contacts').whereColumn('contracts.user_id', 'users.id')
+      }, 'sub')
+      builder.toSql()
+    }).toThrow(Error)
+  })
+
+  test('testJoinLateralPostgres', () => {
+    const builder = getPostgresBuilder()
+    builder.from('users').joinLateral((q: Builder) => {
+      q.from('contacts').whereColumn('contracts.user_id', 'users.id')
+    }, 'sub')
+    expect(builder.toSql()).toBe('select * from "users" inner join lateral (select * from "contacts" where "contracts"."user_id" = "users"."id") as "sub" on true')
+  })
+
+  test('testJoinLateralSqlServer', () => {
+    const builder = getSqlServerBuilder()
+    builder.from('users').joinLateral((q: Builder) => {
+      q.from('contacts').whereColumn('contracts.user_id', 'users.id')
+    }, 'sub')
+    expect(builder.toSql()).toBe('select * from [users] cross apply (select * from [contacts] where [contracts].[user_id] = [users].[id]) as [sub]')
+  })
+
+  test('testJoinLateralWithPrefix', () => {
+    const builder = getMySqlBuilder('prefix_')
+    builder.from('users').joinLateral('select * from `contacts` where `contracts`.`user_id` = `users`.`id`', 'sub')
+    expect(builder.toSql()).toBe('select * from `prefix_users` inner join lateral (select * from `contacts` where `contracts`.`user_id` = `users`.`id`) as `prefix_sub` on true')
+  })
+
+  test('testLeftJoinLateral', () => {
+    const builder = getMySqlBuilder()
+
+    const sub = getMySqlBuilder()
+
+    builder.from('users').leftJoinLateral(sub.from('contacts').whereColumn('contracts.user_id', 'users.id'), 'sub')
+    expect(builder.toSql()).toBe('select * from `users` left join lateral (select * from `contacts` where `contracts`.`user_id` = `users`.`id`) as `sub` on true')
+
+    expect(() => {
+      const builder = getBuilder()
+      builder.from('users').leftJoinLateral(['foo'], 'sub')
+    }).toThrow(Error)
+  })
+
+  test('testLeftJoinLateralSqlServer', () => {
+    const builder = getSqlServerBuilder()
+    builder.from('users').leftJoinLateral((q: Builder) => {
+      q.from('contacts').whereColumn('contracts.user_id', 'users.id')
+    }, 'sub')
+    expect(builder.toSql()).toBe('select * from [users] outer apply (select * from [contacts] where [contracts].[user_id] = [users].[id]) as [sub]')
+  })
+
+  test('testRawExpressionsInSelect', () => {
+    const builder = getBuilder()
+    builder.select(new Raw('substr(foo, 6)')).from('users')
+    expect(builder.toSql()).toBe('select substr(foo, 6) from "users"')
+  })
+
+  test('testFindReturnsFirstResultByID', async () => {
+    const builder = getBuilder()
+    const connection = builder.getConnection()
+    const processor = builder.getProcessor()
+
+    jest.spyOn(connection, 'select').mockReturnValue([{ foo: 'bar' }])
+    jest.spyOn(processor, 'processSelect').mockImplementation((query: Builder, results: unknown[]) => {
+      return results
+    })
+    const results = await builder.from('users').find(1)
+    expect(results).toEqual({ foo: 'bar' })
+    expect(processor.processSelect).toHaveBeenCalledWith(builder, [{ foo: 'bar' }])
+  })
+
+  test('testFindOrReturnsFirstResultByID', () => {
+    const builder = getMockQueryBuilder()
+    const data = mock(stdClass)
+    builder.expects('first').andReturn(data)
+    builder.expects('first').with(['column']).andReturn(data)
+    builder.expects('first').andReturn(null)
+
+    expect(builder.findOr(1, () => 'callback result')).toBe(data)
+    expect(builder.findOr(1, ['column'], () => 'callback result')).toBe(data)
+    expect(builder.findOr(1, () => 'callback result')).toBe('callback result')
+  })
+
+  test('testFirstMethodReturnsFirstResult', () => {
+    const builder = getBuilder()
+
+    const connection = builder.getConnection()
+    const processor = builder.getProcessor()
+
+    jest.spyOn(connection, 'select').mockReturnValue([{ foo: 'bar' }])
+    jest.spyOn(processor, 'processSelect').mockImplementation((query: Builder, results: unknown[]) => {
+      return results
+    })
+
+    const results = builder.from('users').where('id', '=', 1).first()
+    expect(results).toEqual({ foo: 'bar' })
+    expect(processor.processSelect).toHaveBeenCalledWith(builder, [{ foo: 'bar' }])
+  })
+
+  test('testFirstOrFailMethodReturnsFirstResult', () => {
+    const builder = getBuilder()
+    const connection = builder.getConnection()
+    const processor = builder.getProcessor()
+
+    jest.spyOn(connection, 'select').mockReturnValue([{ foo: 'bar' }])
+    jest.spyOn(processor, 'processSelect').mockImplementation((query: Builder, results: unknown[]) => {
+      return results
+    })
+    const results = builder.from('users').where('id', '=', 1).firstOrFail()
+    expect(results).toEqual({ foo: 'bar' })
+  })
+
+  test('testFirstOrFailMethodThrowsRecordNotFoundException', () => {
+    const builder = getBuilder()
+    const connection = builder.getConnection()
+    const processor = builder.getProcessor()
+
+    jest.spyOn(connection, 'select').mockReturnValue([])
+    jest.spyOn(processor, 'processSelect').mockImplementation((query: Builder, results: unknown[]) => {
+      return results
+    })
+    expect(() => {
+      builder.from('users').where('id', '=', 1).firstOrFail()
+    }).toThrow(Error)
+  })
+
+  test('testPluckMethodGetsCollectionOfColumnValues', () => {
+    let builder = getBuilder();
+    let connection = builder.getConnection();
+    let processor = builder.getProcessor();
+    jest.spyOn(connection, 'select').mockReturnValue([{ foo: 'bar' }, { foo: 'baz' }])
+    jest.spyOn(processor, 'processSelect').mockImplementation((query: Builder, results: unknown[]) => {
+      return results
+    })
+    let results = builder.from('users').where('id', '=', 1).pluck('foo');
+    expect(results).toEqual(['bar', 'baz'])
+    expect(processor.processSelect).toHaveBeenCalledWith(builder, [{ foo: 'bar' }, { foo: 'baz' }])
+
+    builder = getBuilder();
+    connection = builder.getConnection();
+    processor = builder.getProcessor();
+    jest.spyOn(connection, 'select').mockReturnValue([{ id: 1, foo: 'bar' }, { id: 10, foo: 'baz' }])
+    jest.spyOn(processor, 'processSelect').mockImplementation((query: Builder, results: unknown[]) => {
+      return results
+    })
+    results = builder.from('users').where('id', '=', 1).pluck('foo', 'id');
+    expect(results).toEqual({1: 'bar', 10: 'baz'})
+    expect(processor.processSelect).toHaveBeenCalledWith(builder, [{ id: 1, foo: 'bar' }, { id: 10, foo: 'baz' }])
   })
 })

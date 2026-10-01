@@ -2,6 +2,7 @@ import type { Builder, WhereClause } from '../Builder'
 
 import { isNumeric } from '../../../Support'
 import { Grammar } from './Grammar'
+import type { JoinLateralClause } from '../JoinLateralClause'
 
 export class MySqlGrammar extends Grammar {
   /**
@@ -10,7 +11,7 @@ export class MySqlGrammar extends Grammar {
    * @param  \Illuminate\Database\Query\Builder  $query
    * @return string
    */
-  public override compileSelect (query: Builder): string {
+  public override compileSelect(query: Builder): string {
     const sql = super.compileSelect(query)
 
     if (!query.timeout) {
@@ -26,16 +27,41 @@ export class MySqlGrammar extends Grammar {
   }
 
   /**
+    * Compile a "lateral join" clause.
+    *
+    * @param  \Illuminate\Database\Query\JoinLateralClause  $join
+    * @param  string  $expression
+    * @return string
+    */
+  public override compileJoinLateral(
+    // @ts-expect-error expected error; join is not used in this method
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    join: JoinLateralClause,
+    // @ts-expect-error expected error; expression is not used in this method
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    expression: string
+  ): string {
+    return `${join.type} join lateral ${expression} on true`;
+  }
+
+  /**
    * Compile a "where binary" clause.
    *
    * @param  \Illuminate\Database\Query\Builder  $query
    * @param  array  $where
    * @return string
    */
-  protected override whereBinary (query: Builder, where: WhereClause): string {
+  protected override whereBinary(query: Builder, where: WhereClause): string {
     where.operator = `${where.not ? '!=' : '='} binary`
 
     return this.whereBasic(query, where)
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  protected override supportsStraightJoins(): boolean {
+    return true
   }
 
   /**
@@ -44,7 +70,7 @@ export class MySqlGrammar extends Grammar {
    * @param  string|number  seed
    * @return string
    */
-  public override compileRandom (seed: string | number): string {
+  public override compileRandom(seed: string | number): string {
     if (seed === '' || seed === null || typeof seed === 'undefined') {
       return 'RAND()'
     }
@@ -68,7 +94,7 @@ export class MySqlGrammar extends Grammar {
    * @param  array  $where
    * @return string
    */
-  public override whereFulltext (_query: Builder, where: WhereClause): string {
+  public override whereFulltext(_query: Builder, where: WhereClause): string {
     const columns = this.columnize(where.columns ?? [])
 
     const value = this.parameter(where.value)
@@ -80,7 +106,7 @@ export class MySqlGrammar extends Grammar {
 
     const expanded =
       (where.options?.expanded ?? false) &&
-      (where.options?.mode ?? '') !== 'boolean'
+        (where.options?.mode ?? '') !== 'boolean'
         ? ' with query expansion'
         : ''
 
@@ -94,7 +120,7 @@ export class MySqlGrammar extends Grammar {
    * @param  array  $where
    * @return string
    */
-  protected override whereNull (query: Builder, where: WhereClause): string {
+  protected override whereNull(query: Builder, where: WhereClause): string {
     const columnValue = String(this.getValue(where.column ?? ''))
 
     if (this.isJsonSelector(columnValue)) {
@@ -113,7 +139,7 @@ export class MySqlGrammar extends Grammar {
    * @param  array  $where
    * @return string
    */
-  protected override whereNotNull (query: Builder, where: WhereClause): string {
+  protected override whereNotNull(query: Builder, where: WhereClause): string {
     const columnValue = String(this.getValue(where.column ?? ''))
 
     if (this.isJsonSelector(columnValue)) {
@@ -132,7 +158,7 @@ export class MySqlGrammar extends Grammar {
    * @param  array  $where
    * @return string
    */
-  protected override whereLike (query: Builder, where: WhereClause): string {
+  protected override whereLike(query: Builder, where: WhereClause): string {
     where.operator = where.not ? 'not ' : ''
 
     where.operator += where.caseSensitive ? 'like binary' : 'like'
@@ -147,7 +173,7 @@ export class MySqlGrammar extends Grammar {
    * @param  array  $where
    * @return string
    */
-  protected override whereNullSafeEquals (
+  protected override whereNullSafeEquals(
     _query: Builder,
     where: WhereClause
   ): string {
@@ -160,7 +186,7 @@ export class MySqlGrammar extends Grammar {
    * @param  {string}  value
    * @return {string}
    */
-  public override wrapValue (value: string): string {
+  public override wrapValue(value: string): string {
     return value === '*' ? value : '`' + value.replace('`', '``') + '`'
   }
 }

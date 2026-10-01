@@ -16,8 +16,8 @@ export class BuildsWhereDateClauses {
   declare protected addDateBasedWhere: (
     type: WhereClauseType,
     column: string | Expression,
-    operator: unknown,
-    value: unknown,
+    operator: string | undefined,
+    value: string | number | Expression | undefined,
     boolean?: BooleanOperator
   ) => this
 

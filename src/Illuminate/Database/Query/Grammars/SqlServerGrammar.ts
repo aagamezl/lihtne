@@ -1,5 +1,6 @@
 import type { Builder, WhereClause } from '../Builder'
 import type { Expression } from '../Expression'
+import type { JoinLateralClause } from '../JoinLateralClause'
 
 import { Grammar, type SelectComponents } from './Grammar'
 
@@ -57,7 +58,7 @@ export class SqlServerGrammar extends Grammar {
    * @param  array  $where
    * @return string
    */
-  protected override whereDate (_query: Builder, where: WhereClause): string {
+  protected override whereDate(_query: Builder, where: WhereClause): string {
     const value = this.parameter(where.value)
 
     return (
@@ -77,7 +78,7 @@ export class SqlServerGrammar extends Grammar {
    * @param  array  $where
    * @return string
    */
-  protected override whereTime (_query: Builder, where: WhereClause): string {
+  protected override whereTime(_query: Builder, where: WhereClause): string {
     const value = this.parameter(where.value)
 
     return (
@@ -97,7 +98,7 @@ export class SqlServerGrammar extends Grammar {
    * @param  int  $limit
    * @return string
    */
-  protected override compileLimit (query: Builder, limit: number): string {
+  protected override compileLimit(query: Builder, limit: number): string {
     limit = parseInt(String(limit))
 
     if (limit && (query.offsetProperty ?? 0) > 0) {
@@ -115,7 +116,7 @@ export class SqlServerGrammar extends Grammar {
    */
   // @ts-expect-error expected error; seed is not used in this method
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  public override compileRandom (seed: string | number): string {
+  public override compileRandom(seed: string | number): string {
     return 'NEWID()'
   }
 
@@ -125,7 +126,7 @@ export class SqlServerGrammar extends Grammar {
    * @param  \Illuminate\Database\Query\Builder  $query
    * @return string
    */
-  public override compileSelect (query: Builder): string {
+  public override compileSelect(query: Builder): string {
     // An order by clause is required for SQL Server offset to function...
     if (query.offsetProperty && query.orders.length === 0) {
       query.orders.push({ sql: '(SELECT 0)' })
@@ -135,12 +136,32 @@ export class SqlServerGrammar extends Grammar {
   }
 
   /**
+    * Compile a "lateral join" clause.
+    *
+    * @param  \Illuminate\Database\Query\JoinLateralClause  $join
+    * @param  string  $expression
+    * @return string
+    */
+  public override compileJoinLateral(
+    // @ts-expect-error expected error; join is not used in this method
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    join: JoinLateralClause,
+    // @ts-expect-error expected error; expression is not used in this method
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    expression: string
+  ): string {
+    const type = join.type === 'left' ? 'outer' : 'cross';
+
+    return String(`${type} apply ${expression}`).trim();
+  }
+
+  /**
    * Wrap a union subquery in parentheses.
    *
    * @param  string  $sql
    * @return string
    */
-  protected override wrapUnion (sql: string): string {
+  protected override wrapUnion(sql: string): string {
     return 'select * from (' + sql + ') as ' + this.wrapTable('temp_table')
   }
 
@@ -151,7 +172,7 @@ export class SqlServerGrammar extends Grammar {
    * @param  array  $columns
    * @return string|null
    */
-  protected override compileColumns (
+  protected override compileColumns(
     query: Builder,
     columns: Array<Expression | string>
   ): string {
@@ -182,7 +203,7 @@ export class SqlServerGrammar extends Grammar {
    * @param  string  $table
    * @return string
    */
-  protected override compileFrom (query: Builder, table: string): string {
+  protected override compileFrom(query: Builder, table: string): string {
     const from = super.compileFrom(query, table)
 
     if (typeof query.lockProperty === 'string') {
@@ -208,7 +229,7 @@ export class SqlServerGrammar extends Grammar {
    * @param  int  $offset
    * @return string
    */
-  protected override compileOffset (_query: Builder, offset: number): string {
+  protected override compileOffset(_query: Builder, offset: number): string {
     offset = Number(offset)
 
     if (offset) {
@@ -225,7 +246,7 @@ export class SqlServerGrammar extends Grammar {
    * @param  bool|string  $value
    * @return string
    */
-  protected override compileLock (
+  protected override compileLock(
     // @ts-expect-error expected error; query is not used in this method
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     query: Builder,
@@ -242,7 +263,7 @@ export class SqlServerGrammar extends Grammar {
    * @param  string  $value
    * @return string
    */
-  protected override wrapValue (value: string): string {
+  protected override wrapValue(value: string): string {
     return value === '*' ? value : '[' + value.replace(']', ']]') + ']'
   }
 
@@ -253,7 +274,7 @@ export class SqlServerGrammar extends Grammar {
    * @param  string|null  $prefix
    * @return string
    */
-  public override wrapTable (
+  public override wrapTable(
     table: Expression | string,
     prefix: string | null = null
   ): string {
@@ -271,7 +292,7 @@ export class SqlServerGrammar extends Grammar {
    * @param  array  $where
    * @return string
    */
-  protected override whereNullSafeEquals (
+  protected override whereNullSafeEquals(
     _query: Builder,
     where: WhereClause
   ): string {
@@ -290,7 +311,7 @@ export class SqlServerGrammar extends Grammar {
    * @param  string  $table
    * @return string
    */
-  protected wrapTableValuedFunction (table: string): string {
+  protected wrapTableValuedFunction(table: string): string {
     const tableValuedFunction = /^(.+?)(\(.*?\))]$/
 
     if (tableValuedFunction.test(table)) {
