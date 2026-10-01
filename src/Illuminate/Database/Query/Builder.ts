@@ -557,7 +557,7 @@ export class Builder extends mixing(BuildsQueries).useTrait([
    * @return $this
    */
   protected addArrayOfWheres (
-    column: object,
+    column: Record<string, unknown>,
     boolean: WhereBoolean,
     method: 'where' | 'whereColumn' = 'where'
   ): this {
@@ -2051,7 +2051,7 @@ export class Builder extends mixing(BuildsQueries).useTrait([
     // Here we will make some assumptions about the operator. If only 2 values are
     // passed to the method, we will assume that the operator is an equals sign
     // and keep going. Otherwise, we'll require the operator to be passed in.
-    [value, operator] = this.prepareValueAndOperator(
+    ;[value, operator] = this.prepareValueAndOperator(
       value,
       operator,
       arguments.length === 2
@@ -3349,7 +3349,9 @@ export class Builder extends mixing(BuildsQueries).useTrait([
    * @param  mixed  $value
    * @return mixed
    */
-  protected flattenValue (value: string | number | Expression | undefined): string | number | Expression | undefined {
+  protected flattenValue (
+    value: string | number | Expression | undefined
+  ): string | number | Expression | undefined {
     return Array.isArray(value) ? head(Arr.flatten(value)) : value
   }
 
