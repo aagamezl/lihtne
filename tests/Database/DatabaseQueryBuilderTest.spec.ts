@@ -5,18 +5,18 @@ import type { Builder, JoinClause } from '../../src/Illuminate/Database/Query'
 import { collect } from '../../src/Illuminate/Collections/helpers'
 import { Builder as EloquentBuilder } from '../../src/Illuminate/Database/Eloquent/Builder'
 import { Expression, Expression as Raw } from '../../src/Illuminate/Database/Query/Expression'
-import { Carbon, DateInterval, DatePeriod, Str } from '../../src/Illuminate/Support'
+import { Carbon, DateInterval, DatePeriod, Str, value } from '../../src/Illuminate/Support'
 import { Bar } from '../../tests/Database/Fixtures/Enums/Bar'
 import { IntegerStatus, StringStatus } from './Fixtures/Enums'
 import { getBuilder } from './helpers/getBuilder'
 import { getMariaDbBuilder } from './helpers/getMariaDbBuilder'
+import { getMockQueryBuilder } from './helpers/getMockQueryBuilder'
 import { getMySqlBuilder } from './helpers/getMySqlBuilder'
 import { getMySqlBuilderWithProcessor } from './helpers/getMySqlBuilderWithProcessor'
 import { getPostgresBuilder } from './helpers/getPostgresBuilder'
 import { getPostgresBuilderWithProcessor } from './helpers/getPostgresBuilderWithProcessor'
 import { getSQLiteBuilder } from './helpers/getSQLiteBuilder'
 import { getSqlServerBuilder } from './helpers/getSqlServerBuilder'
-import { getMockQueryBuilder } from './helpers/getMockQueryBuilder'
 
 describe('Database Query Builder', () => {
   test('testBasicSelect', () => {
@@ -2750,11 +2750,11 @@ describe('Database Query Builder', () => {
     const builder = getBuilder()
 
     const expression = new (class extends Expression {
-      constructor() {
+      constructor () {
         super('1 = 1')
       }
 
-      public getValue() {
+      public getValue () {
         return '1 = 1'
       }
     })()
@@ -3728,7 +3728,7 @@ describe('Database Query Builder', () => {
     expect(builder.getRawBindings().join).toEqual(['foo', 1, 'bar'])
 
     expect(()
-      => {
+    => {
       const builder = getBuilder()
       builder.from('users').joinSub(['foo'], 'sub', 'users.id', '=', 'sub.id')
     }).toThrow(Error)
@@ -3927,19 +3927,20 @@ describe('Database Query Builder', () => {
     expect(processor.processSelect).toHaveBeenCalledWith(builder, [{ foo: 'bar' }])
   })
 
-  test('testFindOrReturnsFirstResultByID', () => {
+  test('testFindOrReturnsFirstResultByID', async () => {
     const builder = getMockQueryBuilder()
-    const data = mock(stdClass)
-    builder.expects('first').andReturn(data)
-    builder.expects('first').with(['column']).andReturn(data)
-    builder.expects('first').andReturn(null)
 
-    expect(builder.findOr(1, () => 'callback result')).toBe(data)
-    expect(builder.findOr(1, ['column'], () => 'callback result')).toBe(data)
-    expect(builder.findOr(1, () => 'callback result')).toBe('callback result')
+    const data = {}
+    jest.spyOn(builder, 'first').mockResolvedValue(data)
+    jest.spyOn(builder, 'first').mockResolvedValue(data)
+    jest.spyOn(builder, 'first').mockResolvedValue(undefined)
+
+    expect(await builder.findOr(1, () => 'callback result')).toBe('callback result')
+    expect(await builder.findOr(1, ['column'], () => 'callback result')).toBe('callback result')
+    expect(await builder.findOr(1, () => 'callback result')).toBe('callback result')
   })
 
-  test('testFirstMethodReturnsFirstResult', () => {
+  test('testFirstMethodReturnsFirstResult', async () => {
     const builder = getBuilder()
 
     const connection = builder.getConnection()
@@ -3950,12 +3951,12 @@ describe('Database Query Builder', () => {
       return results
     })
 
-    const results = builder.from('users').where('id', '=', 1).first()
+    const results = await builder.from('users').where('id', '=', 1).first()
     expect(results).toEqual({ foo: 'bar' })
     expect(processor.processSelect).toHaveBeenCalledWith(builder, [{ foo: 'bar' }])
   })
 
-  test('testFirstOrFailMethodReturnsFirstResult', () => {
+  test('testFirstOrFailMethodReturnsFirstResult', async () => {
     const builder = getBuilder()
     const connection = builder.getConnection()
     const processor = builder.getProcessor()
@@ -3964,45 +3965,359 @@ describe('Database Query Builder', () => {
     jest.spyOn(processor, 'processSelect').mockImplementation((query: Builder, results: unknown[]) => {
       return results
     })
-    const results = builder.from('users').where('id', '=', 1).firstOrFail()
+    const results = await builder.from('users').where('id', '=', 1).firstOrFail()
     expect(results).toEqual({ foo: 'bar' })
   })
 
-  test('testFirstOrFailMethodThrowsRecordNotFoundException', () => {
+  test('testFirstOrFailMethodThrowsRecordNotFoundException', async () => {
     const builder = getBuilder()
     const connection = builder.getConnection()
     const processor = builder.getProcessor()
 
-    jest.spyOn(connection, 'select').mockReturnValue([])
+    jest.spyOn(connection, 'select').mockResolvedValue([])
     jest.spyOn(processor, 'processSelect').mockImplementation((query: Builder, results: unknown[]) => {
       return results
     })
-    expect(() => {
-      builder.from('users').where('id', '=', 1).firstOrFail()
-    }).toThrow(Error)
+
+    await expect(builder.from('users').where('id', '=', 1).firstOrFail()).rejects.toThrow(
+      'RecordNotFoundException: No record found for the given query.'
+    )
   })
 
-  test('testPluckMethodGetsCollectionOfColumnValues', () => {
-    let builder = getBuilder();
-    let connection = builder.getConnection();
-    let processor = builder.getProcessor();
+  test('testPluckMethodGetsCollectionOfColumnValues', async () => {
+    let builder = getBuilder()
+    let connection = builder.getConnection()
+    let processor = builder.getProcessor()
     jest.spyOn(connection, 'select').mockReturnValue([{ foo: 'bar' }, { foo: 'baz' }])
     jest.spyOn(processor, 'processSelect').mockImplementation((query: Builder, results: unknown[]) => {
       return results
     })
-    let results = builder.from('users').where('id', '=', 1).pluck('foo');
-    expect(results).toEqual(['bar', 'baz'])
+    let results = await builder.from('users').where('id', '=', 1).pluck('foo')
+    expect(results.all()).toEqual(['bar', 'baz'])
     expect(processor.processSelect).toHaveBeenCalledWith(builder, [{ foo: 'bar' }, { foo: 'baz' }])
 
-    builder = getBuilder();
-    connection = builder.getConnection();
-    processor = builder.getProcessor();
+    builder = getBuilder()
+    connection = builder.getConnection()
+    processor = builder.getProcessor()
     jest.spyOn(connection, 'select').mockReturnValue([{ id: 1, foo: 'bar' }, { id: 10, foo: 'baz' }])
     jest.spyOn(processor, 'processSelect').mockImplementation((query: Builder, results: unknown[]) => {
       return results
     })
-    results = builder.from('users').where('id', '=', 1).pluck('foo', 'id');
-    expect(results).toEqual({1: 'bar', 10: 'baz'})
+    results = await builder.from('users').where('id', '=', 1).pluck('foo', 'id')
+    expect(results.all()).toEqual({ 1: 'bar', 10: 'baz' })
     expect(processor.processSelect).toHaveBeenCalledWith(builder, [{ id: 1, foo: 'bar' }, { id: 10, foo: 'baz' }])
+  })
+
+  test('testPluckAvoidsDuplicateColumnSelection', async () => {
+    const builder = getBuilder()
+    const connection = builder.getConnection()
+    const processor = builder.getProcessor()
+
+    jest.spyOn(connection, 'select').mockImplementation((sql: string, bindings: unknown) => {
+      expect(sql).toBe('select "foo" from "users" where "id" = ?')
+      expect(bindings).toEqual([1])
+
+      return Promise.resolve([{ foo: 'bar' }])
+    })
+    jest.spyOn(processor, 'processSelect').mockImplementation((query: Builder, results: unknown[]) => {
+      return results
+    })
+
+    const results = await builder.from('users').where('id', '=', 1).pluck('foo', 'foo')
+    expect(results.all()).toEqual({ bar: 'bar' })
+  })
+
+  test('testImplode', async () => {
+    // Test without glue.
+    let builder = getBuilder()
+    let connection = builder.getConnection()
+    let processor = builder.getProcessor()
+    jest.spyOn(connection, 'select').mockResolvedValue([{ foo: 'bar' }, { foo: 'baz' }])
+    jest.spyOn(processor, 'processSelect').mockImplementation((query: Builder, results: unknown[]) => {
+      return results
+    })
+    let results = await builder.from('users').where('id', '=', 1).implode('foo')
+    expect(results).toBe('barbaz')
+
+    // Test with glue.
+    builder = getBuilder()
+    connection = builder.getConnection()
+    processor = builder.getProcessor()
+    jest.spyOn(connection, 'select').mockResolvedValue([{ foo: 'bar' }, { foo: 'baz' }])
+    jest.spyOn(processor, 'processSelect').mockImplementation((query: Builder, results: unknown[]) => {
+      return results
+    })
+    results = await builder.from('users').where('id', '=', 1).implode('foo', ',')
+    expect(results).toBe('bar,baz')
+  })
+
+  test('testValueMethodReturnsSingleColumn', async () => {
+    const builder = getBuilder()
+    const connection = builder.getConnection()
+    const processor = builder.getProcessor()
+
+    jest.spyOn(connection, 'select').mockResolvedValue([{ foo: 'bar' }])
+    jest.spyOn(processor, 'processSelect').mockImplementation((query: Builder, results: unknown[]) => {
+      return results
+    })
+    const results = await builder.from('users').where('id', '=', 1).value('foo')
+    expect(results).toBe('bar')
+  })
+
+  test('testRawValueMethodReturnsSingleColumn', async () => {
+    const builder = getBuilder()
+    const connection = builder.getConnection()
+    const processor = builder.getProcessor()
+
+    jest.spyOn(connection, 'select').mockResolvedValue([{ 'UPPER("foo")': 'BAR' }])
+    jest.spyOn(processor, 'processSelect').mockImplementation((query: Builder, results: unknown[]) => {
+      return results
+    })
+    const results = await builder.from('users').where('id', '=', 1).rawValue('UPPER("foo")')
+    expect(results).toBe('BAR')
+  })
+
+  test('testAggregateFunctions', async () => {
+    let builder = getBuilder()
+    let connection = builder.getConnection()
+    let processor = builder.getProcessor()
+
+    jest.spyOn(connection, 'select').mockResolvedValue([{ aggregate: 1 }])
+    jest.spyOn(processor, 'processSelect').mockImplementation((query: Builder, results: unknown[]) => {
+      return results
+    })
+    let results = await builder.from('users').count()
+    expect(connection.select).toHaveBeenCalledWith('select count(*) as "aggregate" from "users"', [])
+    expect(results).toBe(1)
+
+    builder = getBuilder()
+    connection = builder.getConnection()
+    processor = builder.getProcessor()
+    jest.spyOn(connection, 'select').mockResolvedValue([{ exists: 1 }])
+    jest.spyOn(processor, 'processSelect').mockImplementation((query: Builder, results: unknown[]) => {
+      return results
+    })
+    results = await builder.from('users').exists()
+    expect(connection.select).toHaveBeenCalledWith('select exists(select * from "users") as "exists"', [])
+    expect(results).toBe(true)
+
+    builder = getBuilder()
+    connection = builder.getConnection()
+    processor = builder.getProcessor()
+    jest.spyOn(connection, 'select').mockResolvedValue([{ exists: 0 }])
+    jest.spyOn(processor, 'processSelect').mockImplementation((query: Builder, results: unknown[]) => {
+      return results
+    })
+    results = await builder.from('users').doesntExist()
+    expect(connection.select).toHaveBeenCalledWith('select exists(select * from "users") as "exists"', [])
+    expect(results).toBe(true)
+
+    builder = getBuilder()
+    connection = builder.getConnection()
+    processor = builder.getProcessor()
+    jest.spyOn(connection, 'select').mockResolvedValue([{ aggregate: 1 }])
+    jest.spyOn(processor, 'processSelect').mockImplementation((query: Builder, results: unknown[]) => {
+      return results
+    })
+    results = await builder.from('users').max('id')
+    expect(connection.select).toHaveBeenCalledWith('select max("id") as "aggregate" from "users"', [])
+    expect(results).toBe(1)
+
+    builder = getBuilder()
+    connection = builder.getConnection()
+    processor = builder.getProcessor()
+    jest.spyOn(connection, 'select').mockResolvedValue([{ aggregate: 1 }])
+    jest.spyOn(processor, 'processSelect').mockImplementation((query: Builder, results: unknown[]) => {
+      return results
+    })
+    results = await builder.from('users').min('id')
+    expect(connection.select).toHaveBeenCalledWith('select min("id") as "aggregate" from "users"', [])
+    expect(results).toBe(1)
+
+    builder = getBuilder()
+    connection = builder.getConnection()
+    processor = builder.getProcessor()
+    jest.spyOn(connection, 'select').mockResolvedValue([{ aggregate: 1 }])
+    jest.spyOn(processor, 'processSelect').mockImplementation((query: Builder, results: unknown[]) => {
+      return results
+    })
+    results = await builder.from('users').sum('id')
+    expect(connection.select).toHaveBeenCalledWith('select sum("id") as "aggregate" from "users"', [])
+    expect(results).toBe(1)
+
+    builder = getBuilder()
+    connection = builder.getConnection()
+    processor = builder.getProcessor()
+    jest.spyOn(connection, 'select').mockResolvedValue([{ aggregate: 1 }])
+    jest.spyOn(processor, 'processSelect').mockImplementation((query: Builder, results: unknown[]) => {
+      return results
+    })
+    results = await builder.from('users').avg('id')
+    expect(connection.select).toHaveBeenCalledWith('select avg("id") as "aggregate" from "users"', [])
+    expect(results).toBe(1)
+
+    builder = getBuilder()
+    connection = builder.getConnection()
+    processor = builder.getProcessor()
+    jest.spyOn(connection, 'select').mockResolvedValue([{ aggregate: 1 }])
+    jest.spyOn(processor, 'processSelect').mockImplementation((query: Builder, results: unknown[]) => {
+      return results
+    })
+    results = await builder.from('users').average('id')
+    expect(connection.select).toHaveBeenCalledWith('select avg("id") as "aggregate" from "users"', [])
+    expect(results).toBe(1)
+  })
+
+  test('testSqlServerExists', async () => {
+    const builder = getSqlServerBuilder()
+    const connection = builder.getConnection()
+    jest.spyOn(connection, 'select').mockResolvedValue([{ exists: 1 }])
+    const results = await builder.from('users').exists()
+    expect(connection.select).toHaveBeenCalledWith('select top 1 1 [exists] from [users]', [])
+    expect(results).toBe(true)
+  })
+
+  test('testExistsOr', async () => {
+    let builder = getBuilder()
+    let connection = builder.getConnection()
+    jest.spyOn(connection, 'select').mockResolvedValue([{ exists: 1 }])
+    let results = await builder.from('users').doesntExistOr(() => {
+      return 123
+    })
+    expect(results).toBe(123)
+
+    builder = getBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'select').mockResolvedValue([{ exists: 0 }])
+    results = await builder.from('users').doesntExistOr(() => {
+      throw new Error()
+    })
+    expect(results).toBe(true)
+  })
+
+  test('testDoesntExistsOr', async () => {
+    let builder = getBuilder()
+    let connection = builder.getConnection()
+    jest.spyOn(connection, 'select').mockResolvedValue([{ exists: 0 }])
+    let results = await builder.from('users').existsOr(() => {
+      return 123
+    })
+    expect(results).toBe(123)
+
+    builder = getBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'select').mockResolvedValue([{ exists: 1 }])
+    results = await builder.from('users').existsOr(() => {
+      expect(results).toBe(true)
+    })
+  })
+
+  test('testAggregateResetFollowedByGet', async () => {
+    const builder = getBuilder()
+    const connection = builder.getConnection()
+    jest.spyOn(connection, 'select')
+      .mockResolvedValueOnce([{ aggregate: 1 }])
+      .mockResolvedValueOnce([{ aggregate: 2 }])
+      .mockResolvedValueOnce([{ column1: 'foo', column2: 'bar' }])
+    jest.spyOn(builder.getProcessor(), 'processSelect').mockImplementation((query: Builder, results: unknown[]) => {
+      return results
+    })
+    const count = await builder.from('users').count()
+    expect(count).toBe(1)
+
+    const sum = await builder.from('users').sum('id')
+    expect(sum).toBe(2)
+    const result = await builder.from('users').get()
+    expect(result.all()).toEqual([{ column1: 'foo', column2: 'bar' }])
+  })
+
+  test('testAggregateResetFollowedBySelectGet', async () => {
+    const builder = getBuilder()
+    const connection = builder.getConnection()
+    const processor = builder.getProcessor()
+    jest.spyOn(connection, 'select')
+      .mockResolvedValueOnce([{ aggregate: 1 }])
+      .mockResolvedValueOnce([{ column2: 'foo', column3: 'bar' }])
+    jest.spyOn(processor, 'processSelect').mockImplementation((query: Builder, results: unknown[]) => {
+      return results
+    })
+    const count = await builder.from('users').count('column1')
+    expect(count).toBe(1)
+    const result = await builder.from('users').select('column2', 'column3').get()
+    expect(result.all()).toEqual([{ column2: 'foo', column3: 'bar' }])
+  })
+
+  test('testAggregateResetFollowedByGetWithColumns', async () => {
+    const builder = getBuilder()
+    const connection = builder.getConnection()
+    const processor = builder.getProcessor()
+    jest.spyOn(connection, 'select')
+      .mockResolvedValueOnce([{ aggregate: 1 }])
+      .mockResolvedValueOnce([{ column2: 'foo', column3: 'bar' }])
+    jest.spyOn(processor, 'processSelect').mockImplementation((query: Builder, results: unknown[]) => {
+      return results
+    })
+    const count = await builder.from('users').count('column1')
+    expect(count).toBe(1)
+    const result = await builder.from('users').get(['column2', 'column3'])
+    expect(result.all()).toEqual([{ column2: 'foo', column3: 'bar' }])
+  })
+
+  test('testAggregateWithSubSelect', async () => {
+    const builder = getBuilder()
+    const connection = builder.getConnection()
+    const processor = builder.getProcessor()
+    jest.spyOn(connection, 'select').mockResolvedValue([{ aggregate: 1 }])
+    jest.spyOn(processor, 'processSelect').mockImplementation((query: Builder, results: unknown[]) => {
+      return results
+    })
+    jest.spyOn(connection, 'select').mockResolvedValue([{ aggregate: 1 }])
+    jest.spyOn(processor, 'processSelect').mockImplementation((query: Builder, results: unknown[]) => {
+      return results
+    })
+    builder.from('users').selectSub((query: Builder) => {
+      query.from('posts').select('foo', 'bar').where('title', 'foo')
+    }, 'post')
+    const count = await builder.count()
+    expect(count).toBe(1)
+    expect(builder.getGrammar().getValue(builder.columns[0])).toBe('(select "foo", "bar" from "posts" where "title" = ?) as "post"')
+    expect(builder.getBindings()).toEqual(['foo'])
+    expect(connection.select).toHaveBeenCalledWith('select count(*) as "aggregate" from "users"', [])
+  })
+
+  test('testSubqueriesBindings', async () => {
+    let builder = getBuilder()
+    const second = getBuilder().select('*').from('users').orderByRaw('id = ?', 2)
+    const third = getBuilder().select('*').from('users').where('id', 3).groupBy('id').having('id', '!=', 4)
+    builder.groupBy('a').having('a', '=', 1).union(second).union(third)
+    expect(builder.getBindings()).toEqual([1, 2, 3, 4])
+
+    builder = getBuilder().select('*').from('users').where('email', '=', (q: Builder) => {
+      q.select(new Raw('max(id)'))
+        .from('users')
+        .where('email', '=', 'bar')
+        .orderByRaw('email like ?', '%.com')
+        .groupBy('id')
+        .having('id', '=', 4)
+    }).orWhere('id', '=', 'foo').groupBy('id').having('id', '=', 5)
+    expect(builder.getBindings()).toEqual(['bar', 4, '%.com', 'foo', 5])
+  })
+
+  test('testInsertMethod', async () => {
+    const builder = getBuilder()
+    const connection = builder.getConnection()
+    jest.spyOn(connection, 'insert').mockResolvedValue(true)
+    const result = await builder.from('users').insert({ email: 'foo' })
+    expect(result).toBe(true)
+  })
+
+  test('testInsertUsingMethod', async () => {
+    const builder = getBuilder()
+    const connection = builder.getConnection()
+    jest.spyOn(connection, 'insert').mockResolvedValue(true)
+    const result = await builder.from('table1').insertUsing(['foo'], (query: Builder) => {
+      query.select(['bar']).from('table2').where('foreign_id', '=', 5)
+    })
+    expect(result).toBe(true)
   })
 })

@@ -39,4 +39,10 @@ export class Statement {
   public fetchAll (): Result['rows'] {
     return this.result.rows
   }
+
+  public rowCount (): number {
+    throw new Error(
+      `RuntimeException: Implement rowCount method on concrete class.`
+    )
+  }
 }

@@ -790,6 +790,51 @@ export class Grammar
   }
 
   /**
+   * Compile an exists statement into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @return string
+   */
+  public compileExists (query: Builder): string {
+    const select = this.compileSelect(query)
+
+    return `select exists(${select}) as ${this.wrap('exists')}`
+  }
+
+  /**
+   * Compile an insert statement into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $values
+   * @return string
+   */
+  public compileInsert (query: Builder, values: unknown[]): string {
+    // Essentially we will force every insert to be treated as a batch insert which
+    // simply makes creating the SQL easier for us since we can utilize the same
+    // basic routine regardless of an amount of records given to us to insert.
+    const table = this.wrapTable(query.fromProperty)
+
+    if (values.length === 0) {
+      return `insert into ${table} default values`
+    }
+
+    if (!Array.isArray(values[0])) {
+      values = [values]
+    }
+
+    const columns = this.columnize(Object.keys(values[0]))
+
+    // We need to build a list of parameter place-holders of values that are bound
+    // to the query. Each insert should have the exact same number of parameter
+    // bindings so we will loop through the record and parameterize them all.
+    const parameters = (new Collection(values))
+      .map((record: unknown) => '(' + this.parameterize(record) + ')')
+      .implode(', ')
+
+    return `insert into ${table} (${columns}) values ${parameters}`
+  }
+
+  /**
    * Compile a where exists clause.
    *
    * @param  \Illuminate\Database\Query\Builder  $query

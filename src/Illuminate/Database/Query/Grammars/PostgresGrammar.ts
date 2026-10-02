@@ -3,11 +3,11 @@ import { isNil } from 'es-toolkit'
 
 import type { Builder, WhereClause } from '../Builder'
 import type { Expression } from '../Expression'
+import type { JoinLateralClause } from '../JoinLateralClause'
 
 import { Collection } from '../../../Collections/Collection'
 import { Str } from '../../../Support'
 import { Grammar } from './Grammar'
-import type { JoinLateralClause } from '../JoinLateralClause'
 
 export class PostgresGrammar extends Grammar {
   /**
@@ -88,7 +88,7 @@ export class PostgresGrammar extends Grammar {
    * @param  array  $columns
    * @return string|null
    */
-  protected override compileColumns(
+  protected override compileColumns (
     query: Builder,
     columns: Array<Expression | string>
   ): string {
@@ -121,7 +121,7 @@ export class PostgresGrammar extends Grammar {
    * @param  array  $where
    * @return string
    */
-  protected override dateBasedWhere(
+  protected override dateBasedWhere (
     type: string,
     _query: Builder,
     where: WhereClause
@@ -147,7 +147,7 @@ export class PostgresGrammar extends Grammar {
    * @param  array  $where
    * @return string
    */
-  protected override whereDate(_query: Builder, where: WhereClause): string {
+  protected override whereDate (_query: Builder, where: WhereClause): string {
     let column = this.wrap(where.column ?? '')
     const value = this.parameter(where.value)
 
@@ -165,7 +165,7 @@ export class PostgresGrammar extends Grammar {
    * @param  array  $where
    * @return string
    */
-  protected override whereTime(_query: Builder, where: WhereClause): string {
+  protected override whereTime (_query: Builder, where: WhereClause): string {
     let column = this.wrap(where.column ?? '')
     const value = this.parameter(where.value)
 
@@ -181,7 +181,7 @@ export class PostgresGrammar extends Grammar {
    *
    * @return array
    */
-  protected validFullTextLanguages(): string[] {
+  protected validFullTextLanguages (): string[] {
     return [
       'simple',
       'arabic',
@@ -215,7 +215,7 @@ export class PostgresGrammar extends Grammar {
    * @param  array  $where
    * @return string
    */
-  public override whereFulltext(_query: Builder, where: WhereClause): string {
+  public override whereFulltext (_query: Builder, where: WhereClause): string {
     let language = where.options?.language ?? 'english'
 
     if (!this.validFullTextLanguages().includes(language)) {
@@ -255,7 +255,7 @@ export class PostgresGrammar extends Grammar {
    * @param  array  $where
    * @return string
    */
-  protected override whereBasic(query: Builder, where: WhereClause): string {
+  protected override whereBasic (query: Builder, where: WhereClause): string {
     if (where.operator?.toLowerCase().includes('like')) {
       return `${this.wrap(where.column ?? '')}::text ${where.operator} ${this.parameter(where.value)}`
     }
@@ -270,7 +270,7 @@ export class PostgresGrammar extends Grammar {
    * @param  array  $where
    * @return string
    */
-  protected override whereLike(query: Builder, where: WhereClause): string {
+  protected override whereLike (query: Builder, where: WhereClause): string {
     where.operator = where.not ? 'not ' : ''
     where.operator += where.caseSensitive ? 'like' : 'ilike'
 
@@ -283,7 +283,7 @@ export class PostgresGrammar extends Grammar {
    * @param  string  $value
    * @return string
    */
-  protected override wrapJsonSelector(value: string): string {
+  protected override wrapJsonSelector (value: string): string {
     const path = value.split('->')
 
     const field = this.wrapSegments(path.shift()?.split('.') ?? [])
@@ -305,7 +305,7 @@ export class PostgresGrammar extends Grammar {
    * @param  string  $value
    * @return string
    */
-  protected wrapJsonBooleanSelector(value: string): string {
+  protected wrapJsonBooleanSelector (value: string): string {
     const selector = this.wrapJsonSelector(value).replace('->>', '->')
 
     return '(' + selector + ')::jsonb'
@@ -317,7 +317,7 @@ export class PostgresGrammar extends Grammar {
    * @param  string  $value
    * @return string
    */
-  protected wrapJsonBooleanValue(value: string): string {
+  protected wrapJsonBooleanValue (value: string): string {
     return "'" + value + "'::jsonb"
   }
 
@@ -327,7 +327,7 @@ export class PostgresGrammar extends Grammar {
    * @param  array  $path
    * @return array
    */
-  protected wrapJsonPathAttributes(
+  protected wrapJsonPathAttributes (
     path: string[],
     quote: string = "'"
   ): string[] {
@@ -355,13 +355,13 @@ export class PostgresGrammar extends Grammar {
    * @param  string  $expression
    * @return string
    */
-  public override compileJoinLateral(
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  public override compileJoinLateral (
+
     join: JoinLateralClause,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
     expression: string
   ): string {
-    return String(`${join.type} join lateral ${expression} on true`).trim();
+    return String(`${join.type} join lateral ${expression} on true`).trim()
   }
 
   /**
@@ -370,7 +370,7 @@ export class PostgresGrammar extends Grammar {
    * @param  string  $attribute
    * @return array
    */
-  protected parseJsonPathArrayKeys(attribute: string): string[] {
+  protected parseJsonPathArrayKeys (attribute: string): string[] {
     const parts = attribute.match(/(\[[^\]]+\])+$/)
     const matched = parts?.[0]
 

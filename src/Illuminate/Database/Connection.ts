@@ -45,6 +45,13 @@ export class Connection extends DetectsLostConnections {
   protected postProcessor: Processor | undefined = undefined
 
   /**
+    * Indicates if changes have been made to the database.
+    *
+    * @var bool
+    */
+  protected recordsModified: boolean = false
+
+  /**
    * The active driver connection.
    *
    * @protected
@@ -199,6 +206,57 @@ export class Connection extends DetectsLostConnections {
    */
   public raw (value: string | number): Expression {
     return new Expression(value)
+  }
+
+  /**
+   * Indicate if any records have been modified.
+   *
+   * @param  bool  $value
+   * @return void
+   */
+  public recordsHaveBeenModified (value: boolean = true) {
+    if (!this.recordsModified) {
+      this.recordsModified = value
+    }
+  }
+
+  /**
+   * Run an insert statement against the database.
+   *
+   * @param  string  $query
+   * @param  array  $bindings
+   * @return bool
+   */
+  public insert (query: string, bindings: BindingValues = []): boolean {
+    return this.statement(query, bindings)
+  }
+
+  /**
+   * Execute an SQL statement and return the boolean result.
+   *
+   * @param  string  $query
+   * @param  array  $bindings
+   * @return bool
+   */
+  public async statement (
+    query: string,
+    bindings: BindingValues = []
+  ): Promise<boolean> {
+    return await this.run(query, bindings, (query: string, bindings: BindingValues) => {
+      if (this.pretending()) {
+        return true
+      }
+
+      const statement = this.getDriver().prepare(query)
+
+      this.bindValues(statement, this.prepareBindings(bindings))
+
+      const count = statement.rowCount()
+
+      this.recordsHaveBeenModified(count > 0)
+
+      return statement.execute()
+    })
   }
 
   /**

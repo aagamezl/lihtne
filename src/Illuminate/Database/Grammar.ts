@@ -123,7 +123,7 @@ export abstract class Grammar {
    */
   protected wrapAliasedTable (
     value: string,
-    prefix: string | null = null
+    prefix: string | undefined = undefined
   ): string {
     const segments = value.split(/\s+as\s+/i)
 
