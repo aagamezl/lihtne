@@ -177,6 +177,17 @@ export class PostgresGrammar extends Grammar {
   }
 
   /**
+   * Compile an insert ignore statement into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $values
+   * @return string
+   */
+  public override compileInsertOrIgnore (query: Builder, values: unknown[]): string {
+    return this.compileInsert(query, values) + ' on conflict do nothing'
+  }
+
+  /**
    * Get an array of valid full text languages.
    *
    * @return array

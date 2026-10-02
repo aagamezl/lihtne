@@ -1,5 +1,6 @@
 import type { Builder, WhereClause } from '../Builder'
 
+import { Str } from '../../../Support'
 import { Grammar } from './Grammar'
 
 export class SQLiteGrammar extends Grammar {
@@ -156,6 +157,17 @@ export class SQLiteGrammar extends Grammar {
    */
   protected override whereTime (query: Builder, where: WhereClause): string {
     return this.dateBasedWhere('%H:%M:%S', query, where)
+  }
+
+  /**
+   * Compile an insert ignore statement into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $values
+   * @return string
+   */
+  public override compileInsertOrIgnore (query: Builder, values: unknown[]): string {
+    return Str.replaceFirst('insert', 'insert or ignore', this.compileInsert(query, values))
   }
 
   /**

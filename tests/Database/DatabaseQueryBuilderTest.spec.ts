@@ -5,7 +5,7 @@ import type { Builder, JoinClause } from '../../src/Illuminate/Database/Query'
 import { collect } from '../../src/Illuminate/Collections/helpers'
 import { Builder as EloquentBuilder } from '../../src/Illuminate/Database/Eloquent/Builder'
 import { Expression, Expression as Raw } from '../../src/Illuminate/Database/Query/Expression'
-import { Carbon, DateInterval, DatePeriod, Str, value } from '../../src/Illuminate/Support'
+import { Carbon, DateInterval, DatePeriod, Str } from '../../src/Illuminate/Support'
 import { Bar } from '../../tests/Database/Fixtures/Enums/Bar'
 import { IntegerStatus, StringStatus } from './Fixtures/Enums'
 import { getBuilder } from './helpers/getBuilder'
@@ -3502,7 +3502,6 @@ describe('Database Query Builder', () => {
 
   test('testJoinWhereNotNull', () => {
     let builder = getBuilder()
-    builder = getBuilder()
     builder.select('*').from('users').join('contacts', (j: JoinClause) => {
       j.on('users.id', '=', 'contacts.id').whereNotNull('contacts.deleted_at')
     })
@@ -3517,7 +3516,6 @@ describe('Database Query Builder', () => {
 
   test('testJoinWhereIn', () => {
     let builder = getBuilder()
-    builder = getBuilder()
     builder.select('*').from('users').join('contacts', (j: JoinClause) => {
       j.on('users.id', '=', 'contacts.id').whereIn('contacts.name', [48, 'baz', null])
     })
@@ -3534,7 +3532,6 @@ describe('Database Query Builder', () => {
 
   test('testJoinWhereInSubquery', () => {
     let builder = getBuilder()
-    builder = getBuilder()
     builder.select('*').from('users').join('contacts', (j: JoinClause) => {
       const q = getBuilder()
       q.select('name').from('contacts').where('name', 'baz')
@@ -4314,10 +4311,78 @@ describe('Database Query Builder', () => {
   test('testInsertUsingMethod', async () => {
     const builder = getBuilder()
     const connection = builder.getConnection()
-    jest.spyOn(connection, 'insert').mockResolvedValue(true)
+    jest.spyOn(connection, 'affectingStatement').mockResolvedValue(1)
     const result = await builder.from('table1').insertUsing(['foo'], (query: Builder) => {
       query.select(['bar']).from('table2').where('foreign_id', '=', 5)
     })
-    expect(result).toBe(true)
+    expect(result).toBe(1)
+    expect(connection.affectingStatement).toHaveBeenCalledWith('insert into "table1" ("foo") select "bar" from "table2" where "foreign_id" = ?', [5])
+  })
+
+  test('testInsertUsingWithEmptyColumns', async () => {
+    const builder = getBuilder()
+    const connection = builder.getConnection()
+    jest.spyOn(connection, 'affectingStatement').mockResolvedValue(1)
+    const result = await builder.from('table1').insertUsing([], (query: Builder) => {
+      query.from('table2').where('foreign_id', '=', 5)
+    })
+    expect(result).toBe(1)
+    expect(connection.affectingStatement).toHaveBeenCalledWith('insert into "table1" select * from "table2" where "foreign_id" = ?', [5])
+  })
+
+  test('testInsertUsingInvalidSubquery', async () => {
+    const builder = getBuilder()
+    expect(() => {
+      builder.from('table1').insertUsing(['foo'], ['bar'])
+    }).toThrow(Error)
+  })
+
+  test('testInsertOrIgnoreMethod', async () => {
+    const builder = getBuilder()
+    expect(() => {
+      builder.from('users').insertOrIgnore({ email: 'foo' })
+    }).toThrow(new Error('RuntimeException: This database engine does not support inserting while ignoring errors.'))
+  })
+
+  test('testMySqlInsertOrIgnoreMethod', async () => {
+    const builder = getMySqlBuilder()
+    const connection = builder.getConnection()
+    jest.spyOn(connection, 'affectingStatement').mockResolvedValue(1)
+    const result = await builder.from('users').insertOrIgnore({ email: 'foo' })
+    expect(result).toBe(1)
+    expect(connection.affectingStatement).toHaveBeenCalledWith('insert ignore into `users` (`email`) values (?)', ['foo'])
+  })
+
+  test('testPostgresInsertOrIgnoreMethod', async () => {
+    const builder = getPostgresBuilder()
+    const connection = builder.getConnection()
+    jest.spyOn(connection, 'affectingStatement').mockResolvedValue(1)
+
+    const result = await builder.from('users').insertOrIgnore({ email: 'foo' })
+    expect(result).toBe(1)
+    expect(connection.affectingStatement).toHaveBeenCalledWith('insert into "users" ("email") values (?) on conflict do nothing', ['foo'])
+  })
+
+  test('testSQLiteInsertOrIgnoreMethod', async () => {
+    const builder = getSQLiteBuilder()
+    const connection = builder.getConnection()
+    jest.spyOn(connection, 'affectingStatement').mockResolvedValue(1)
+    const result = await builder.from('users').insertOrIgnore({ email: 'foo' })
+    expect(result).toBe(1)
+    expect(connection.affectingStatement).toHaveBeenCalledWith('insert or ignore into "users" ("email") values (?)', ['foo'])
+  })
+
+  test('testSqlServerInsertOrIgnoreMethod', async () => {
+    const builder = getSqlServerBuilder()
+    expect(() => {
+      builder.from('users').insertOrIgnore({ email: 'foo' })
+    }).toThrow(new Error('RuntimeException: This database engine does not support inserting while ignoring errors.'))
+  })
+
+  test('testInsertOrIgnoreReturningMethod', async () => {
+    const builder = getBuilder()
+    expect(() => {
+      builder.from('users').insertOrIgnoreReturning({ email: 'foo' })
+    }).toThrow(new Error('RuntimeException: This database engine does not support insert or ignore with returning.'))
   })
 })

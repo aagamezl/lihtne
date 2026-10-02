@@ -38,6 +38,30 @@ export class Str {
   }
 
   /**
+   * Replace the first occurrence of a given value in the string.
+   *
+   * @param  string  $search
+   * @param  string  $replace
+   * @param  string  $subject
+   * @return string
+   */
+  public static replaceFirst (search: string, replace: string, subject: string): string {
+    search = String(search)
+
+    if (search === '') {
+      return subject
+    }
+
+    const position = subject.indexOf(search)
+
+    if (position !== false) {
+      return subject.substring(0, position) + replace + subject.substring(position + search.length)
+    }
+
+    return subject
+  }
+
+  /**
    * Replace a given value in the string sequentially with an array.
    *
    * @param  string  $search

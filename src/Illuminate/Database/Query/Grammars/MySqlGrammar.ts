@@ -1,7 +1,7 @@
 import type { Builder, WhereClause } from '../Builder'
 import type { JoinLateralClause } from '../JoinLateralClause'
 
-import { isNumeric } from '../../../Support'
+import { isNumeric, Str } from '../../../Support'
 import { Grammar } from './Grammar'
 
 export class MySqlGrammar extends Grammar {
@@ -34,14 +34,48 @@ export class MySqlGrammar extends Grammar {
     * @return string
     */
   public override compileJoinLateral (
-    // @ts-expect-error expected error; join is not used in this method
-
     join: JoinLateralClause,
-    // @ts-expect-error expected error; expression is not used in this method
-
     expression: string
   ): string {
     return `${join.type} join lateral ${expression} on true`
+  }
+
+  /**
+   * Compile an insert statement into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $values
+   * @return string
+   */
+  public override compileInsert (query: Builder, values: unknown[]): string {
+    if (values.length === 0) {
+      values = [[]]
+    }
+
+    return super.compileInsert(query, values)
+  }
+
+  /**
+   * Compile an insert ignore statement into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $values
+   * @return string
+   */
+  public override compileInsertOrIgnore (query: Builder, values: unknown[]): string {
+    return Str.replaceFirst('insert', 'insert ignore', this.compileInsert(query, values))
+  }
+
+  /**
+   * Compile an insert ignore statement using a subquery into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $columns
+   * @param  string  $sql
+   * @return string
+   */
+  public compileInsertOrIgnoreUsing (query: Builder, columns: string[], sql: string): string {
+    return Str.replaceFirst('insert', 'insert ignore', this.compileInsertUsing(query, columns, sql))
   }
 
   /**

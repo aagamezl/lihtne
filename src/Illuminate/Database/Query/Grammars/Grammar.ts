@@ -818,20 +818,74 @@ export class Grammar
       return `insert into ${table} default values`
     }
 
-    if (!Array.isArray(values[0])) {
+    if (!Array.isArray(values) && !Array.isArray(values[0])) {
       values = [values]
     }
 
-    const columns = this.columnize(Object.keys(values[0]))
+    const recordKeys = Object.keys(values[0] as Record<string, unknown>)
+    const columns = this.columnize(recordKeys)
 
     // We need to build a list of parameter place-holders of values that are bound
     // to the query. Each insert should have the exact same number of parameter
     // bindings so we will loop through the record and parameterize them all.
     const parameters = (new Collection(values))
-      .map((record: unknown) => '(' + this.parameterize(record) + ')')
+      .map((record: unknown) => {
+        return '(' + this.parameterize(recordKeys.map((key) => record[key])) + ')'
+      })
       .implode(', ')
 
     return `insert into ${table} (${columns}) values ${parameters}`
+  }
+
+  /**
+   * Compile an insert or ignore statement with a returning clause into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $values
+   * @param  array  $returning
+   * @param  array|null  $uniqueBy
+   * @return string
+   *
+   * @throws \RuntimeException
+   */
+  public compileInsertOrIgnoreReturning (
+    query: Builder,
+    values: unknown[],
+    returning: string[],
+    uniqueBy: string[] | undefined
+  ): string {
+    throw new Error('RuntimeException: This database engine does not support insert or ignore with returning.')
+  }
+
+  /**
+   * Compile an insert statement using a subquery into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $columns
+   * @param  string  $sql
+   * @return string
+   */
+  public compileInsertUsing (query: Builder, columns: string[], sql: string): string {
+    const table = this.wrapTable(query.fromProperty)
+
+    if (columns.length === 0 || columns.includes('*')) {
+      return `insert into ${table} ${sql}`
+    }
+
+    return `insert into ${table} (${this.columnize(columns)}) ${sql}`
+  }
+
+  /**
+   * Compile an insert ignore statement into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $values
+   * @return string
+   *
+   * @throws \RuntimeException
+   */
+  public compileInsertOrIgnore (query: Builder, values: unknown[]): string {
+    throw new Error('RuntimeException: This database engine does not support inserting while ignoring errors.')
   }
 
   /**

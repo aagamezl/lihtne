@@ -232,6 +232,38 @@ export class Connection extends DetectsLostConnections {
   }
 
   /**
+   * Run an SQL statement and get the number of rows affected.
+   *
+   * @param  string  $query
+   * @param  array  $bindings
+   * @return int
+   */
+  public async affectingStatement (query: string, bindings: BindingValues = []): Promise<number> {
+    return await this.run<number>(query, bindings, (
+      query: string,
+      bindings: BindingValues
+    ): Promise<number> => {
+      if (this.pretending()) {
+        return 0
+      }
+
+      // For update or delete statements, we want to get the number of rows affected
+      // by the statement and return that back to the developer. We'll first need
+      // to execute the statement and then we'll use PDO to fetch the affected.
+      const statement = this.getDriver().prepare(query)
+
+      this.bindValues(statement, this.prepareBindings(bindings))
+
+      statement.execute()
+
+      const count = statement.rowCount()
+      this.recordsHaveBeenModified(count > 0)
+
+      return count
+    })
+  }
+
+  /**
    * Execute an SQL statement and return the boolean result.
    *
    * @param  string  $query
@@ -599,7 +631,7 @@ export class Connection extends DetectsLostConnections {
    *
    * @return {Driver}
    */
-  getDriver () {
+  getDriver (): Driver {
     if (typeof this.driver === 'function') {
       return this.driver()
     }

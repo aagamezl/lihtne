@@ -15,10 +15,10 @@ import { enumValue } from '../../Collections/functions'
 import { head, last } from '../../Collections/helpers'
 import { Conditionable } from '../../Conditionable/Traits/Conditionable'
 import { Macroable } from '../../Macroable/Traits/Macroable'
-import { DatePeriod, instanceProxy, isSet, mixing, type Prettify } from '../../Support'
+import { DatePeriod, isSet, mixing, type Prettify } from '../../Support'
 // import { registry } from './internal'
 import { resolveClass } from '../../Support/class-registry'
-import { changeKeyCase, isEmpty, isNumeric, tap } from '../../Support/helpers'
+import { changeKeyCase, isNumeric, tap } from '../../Support/helpers'
 import { ForwardsCalls } from '../../Support/Traits'
 import { BuildsQueries } from '../Concerns'
 import { BuildsWhereDateClauses } from '../Concerns/BuildsWhereDateClauses'
@@ -990,12 +990,10 @@ export class Builder extends mixing().useTrait([
         this.addDynamic(segment, connector, parameters, index)
 
         index++
-      }
-
-      // Otherwise, we will store the connector so we know how the next where clause we
-      // find in the query should be connected to the previous ones, meaning we will
-      // have the proper boolean connector to connect the next where clause found.
-      else {
+      } else {
+        // Otherwise, we will store the connector so we know how the next where clause we
+        // find in the query should be connected to the previous ones, meaning we will
+        // have the proper boolean connector to connect the next where clause found.
         connector = segment
       }
     }
@@ -4476,12 +4474,10 @@ export class Builder extends mixing().useTrait([
 
     if (!Array.isArray(values[0])) {
       values = [values]
-    }
-
-    // Here, we will sort the insert keys for every record so that each insert is
-    // in the same order for the record. We need to make sure this is the case
-    // so there are not any errors or problems when inserting these records.
-    else {
+    } else {
+      // Here, we will sort the insert keys for every record so that each insert is
+      // in the same order for the record. We need to make sure this is the case
+      // so there are not any errors or problems when inserting these records.
       for (const [key, value] of values.entries()) {
         const sortedKeys = Object.keys(value).sort()
         const sortedValue = {}
@@ -4503,6 +4499,96 @@ export class Builder extends mixing().useTrait([
       this.grammar.compileInsert(this, values),
       this.cleanBindings(Arr.flatten(values, 1))
     )
+  }
+
+  /**
+   * Insert new records into the database while ignoring errors.
+   *
+   * @return int<0, max>
+   */
+  public insertOrIgnore (values: unknown[]): number {
+    if (values.length === 0) {
+      return 0
+    }
+
+    if (!Array.isArray(values[0])) {
+      values = [values]
+    } else {
+      for (const [key, value] of values.entries()) {
+        const sortedKeys = Object.keys(value).sort()
+        const sortedValue = {}
+
+        for (const key of sortedKeys) {
+          sortedValue[key] = value[key]
+        }
+
+        values[key] = sortedValue
+      }
+    }
+
+    this.applyBeforeQueryCallbacks()
+
+    return this.connection.affectingStatement(
+      this.grammar.compileInsertOrIgnore(this, values),
+      this.cleanBindings(Arr.flatten(values, 1))
+    )
+  }
+
+  /**
+   * Insert new records into the database and returning specified columns with optional ignoring specific conflicts.
+   *
+   * @param  non-empty-array<non-empty-string>  $returning
+   * @param  non-empty-string|non-empty-array<non-empty-string>|null  $uniqueBy
+   * @return \Illuminate\Support\Collection
+   */
+  public insertOrIgnoreReturning (
+    values: unknown[],
+    returning: string[] = ['*'],
+    uniqueBy?: string | string[] | undefined
+  ): Collection {
+    if (values.length === 0) {
+      return new Collection()
+    }
+
+    if ((Array.isArray(uniqueBy) && uniqueBy.length === 0) || uniqueBy === '') {
+      throw new Error('InvalidArgumentException: The unique columns must not be empty.')
+    }
+
+    if (Array.isArray(returning) && returning.length === 0) {
+      throw new Error('InvalidArgumentException: The returning columns must not be empty.')
+    }
+
+    if (!Array.isArray(values[0])) {
+      values = [values]
+    } else {
+      for (const [key, value] of values.entries()) {
+        const sortedKeys = Object.keys(value).sort()
+        const sortedValue = {}
+
+        for (const key of sortedKeys) {
+          sortedValue[key] = value[key]
+        }
+
+        values[key] = sortedValue
+      }
+    }
+
+    this.applyBeforeQueryCallbacks()
+
+    const sql = this.grammar.compileInsertOrIgnoreReturning(
+      this,
+      values,
+      returning,
+      uniqueBy === undefined ? undefined : Arr.wrap(uniqueBy)
+    )
+
+    const result = new Collection<unknown, unknown>(
+      this.connection.selectFromWriteConnection(sql, this.cleanBindings(Arr.flatten(values, 1)))
+    )
+
+    this.connection.recordsHaveBeenModified(result.isNotEmpty())
+
+    return result
   }
 
   /**
