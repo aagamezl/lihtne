@@ -159,7 +159,9 @@ export abstract class Grammar {
    * @return string
    */
   public parameterize (values: unknown[]): string {
-    return values.map((value) => this.parameter(value)).join(', ')
+    // return values.map((value) => this.parameter(value)).join(', ')
+    return (Array.isArray(values) ? values : Object.values(values))
+      .map((value) => this.parameter(value)).join(', ')
   }
 
   /**

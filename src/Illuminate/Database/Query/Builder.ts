@@ -4541,12 +4541,12 @@ export class Builder extends mixing().useTrait([
    * @param  non-empty-string|non-empty-array<non-empty-string>|null  $uniqueBy
    * @return \Illuminate\Support\Collection
    */
-  public insertOrIgnoreReturning (
+  public async insertOrIgnoreReturning (
     values: unknown[],
     returning: string[] = ['*'],
     uniqueBy?: string | string[] | undefined
-  ): Collection {
-    if (values.length === 0) {
+  ): Promise<Collection> {
+    if (Array.isArray(values) && values.length === 0) {
       return new Collection()
     }
 
@@ -4558,7 +4558,7 @@ export class Builder extends mixing().useTrait([
       throw new Error('InvalidArgumentException: The returning columns must not be empty.')
     }
 
-    if (!Array.isArray(values[0])) {
+    if (!Array.isArray(values[0]) && !isPlainObject(values[0])) {
       values = [values]
     } else {
       for (const [key, value] of values.entries()) {
@@ -4582,9 +4582,12 @@ export class Builder extends mixing().useTrait([
       uniqueBy === undefined ? undefined : Arr.wrap(uniqueBy)
     )
 
-    const result = new Collection<unknown, unknown>(
-      this.connection.selectFromWriteConnection(sql, this.cleanBindings(Arr.flatten(values, 1)))
+    const rows = await this.connection.selectFromWriteConnection(
+      sql,
+      this.cleanBindings(Arr.flatten(values, 1))
     )
+
+    const result = new Collection<unknown, unknown>(rows)
 
     this.connection.recordsHaveBeenModified(result.isNotEmpty())
 
@@ -4607,6 +4610,26 @@ export class Builder extends mixing().useTrait([
 
     return this.connection.affectingStatement(
       this.grammar.compileInsertUsing(this, columns, sql),
+      this.cleanBindings(bindings)
+    )
+  }
+
+  /**
+   * Insert new records into the table using a subquery while ignoring errors.
+   *
+   * @param  \Closure|\Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder<*>|string  $query
+   * @return int
+   */
+  public insertOrIgnoreUsing (
+    columns: string[] | Record<string, unknown>,
+    query: QueryCallback | Builder | EloquentBuilder | string
+  ): number {
+    this.applyBeforeQueryCallbacks()
+
+    const [sql, bindings] = this.createSub(query)
+
+    return this.connection.affectingStatement(
+      this.grammar.compileInsertOrIgnoreUsing(this, columns, sql),
       this.cleanBindings(bindings)
     )
   }

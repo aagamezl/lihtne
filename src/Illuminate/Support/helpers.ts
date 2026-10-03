@@ -148,3 +148,23 @@ export const isObject = (
 ): value is Record<PropertyKey, unknown> => {
   return value !== null && typeof value === 'object'
 }
+
+/**
+ * Get the first element of an array. Useful for method chaining.
+ *
+ * @param  {any}  value
+ * @return {unknown}
+ */
+export const head = <TValue>(value: TValue[] | Record<string, TValue>): TValue => {
+  return Array.isArray(value) ? value[0] : Array.from(Object.values(value))[0]
+}
+
+/**
+ * Get the first element of an array. Useful for method chaining.
+ *
+ * @param  {any}  array
+ * @return {any}
+ */
+export const reset = (value: unknown): unknown => {
+  return head(value)
+}

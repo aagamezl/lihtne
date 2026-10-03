@@ -656,6 +656,20 @@ export class Connection extends DetectsLostConnections {
   }
 
   /**
+   * Run a select statement against the database.
+   *
+   * @param  string  $query
+   * @param  array  $bindings
+   * @return array
+   */
+  public selectFromWriteConnection (
+    query: string,
+    bindings: BindingValues = []
+  ): Promise<Record<string, unknown>[]> {
+    return this.select(query, bindings)
+  }
+
+  /**
    * Fire the given event if possible.
    *
    * @param  mixed  event

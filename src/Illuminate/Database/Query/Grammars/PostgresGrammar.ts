@@ -177,6 +177,46 @@ export class PostgresGrammar extends Grammar {
   }
 
   /**
+   * Compile an insert or ignore statement with a returning clause into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $values
+   * @param  array  $returning
+   * @param  array|null  $uniqueBy
+   * @return string
+   */
+  public override compileInsertOrIgnoreReturning (
+    query: Builder,
+    values: unknown[],
+    returning: string[],
+    uniqueBy: string[] | undefined
+  ): string {
+    const insert = this.compileInsert(query, values)
+
+    if (uniqueBy === undefined) {
+      return `${insert} on conflict do nothing returning ${this.columnize(returning)}`
+    }
+
+    return `${insert} on conflict (${this.columnize(uniqueBy)}) do nothing returning ${this.columnize(returning)}`
+  }
+
+  /**
+   * Compile an insert ignore statement using a subquery into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $columns
+   * @param  string  $sql
+   * @return string
+   */
+  public override compileInsertOrIgnoreUsing (
+    query: Builder,
+    columns: string[],
+    sql: string
+  ): string {
+    return this.compileInsertUsing(query, columns, sql) + ' on conflict do nothing'
+  }
+
+  /**
    * Compile an insert ignore statement into SQL.
    *
    * @param  \Illuminate\Database\Query\Builder  $query

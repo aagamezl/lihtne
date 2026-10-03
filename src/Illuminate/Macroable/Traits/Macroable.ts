@@ -1,3 +1,5 @@
+import { isNil } from '@devnetic/utils'
+
 export class Macroable {
   /**
    * The registered string macros.
@@ -34,9 +36,15 @@ export class Macroable {
 
     if (typeof macro === 'function') {
       try {
-        macro = macro.bind(this) ?? (() => { throw new Error('RuntimeException: Unable to bind macro to instance.') })()
+        const boundMacro = macro.bindTo(this)
+
+        if (isNil(boundMacro)) {
+          throw new Error('RuntimeException: Unable to bind macro to instance.')
+        }
+
+        macro = boundMacro
       } catch (error) {
-        macro = macro.bind(null) ?? (() => { throw new Error('RuntimeException: Unable to bind macro to instance.') })()
+        macro = macro.bind(null)
       }
     }
 

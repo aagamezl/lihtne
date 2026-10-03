@@ -30,6 +30,21 @@ export class EnumeratesValues<TKey extends PropertyKey, TValue> {
   }
 
   /**
+   * Determine if the collection is not empty.
+   *
+   * @phpstan-assert-if-true TValue $this->first()
+   * @phpstan-assert-if-true TValue $this->last()
+   *
+   * @phpstan-assert-if-false null $this->first()
+   * @phpstan-assert-if-false null $this->last()
+   *
+   * @return bool
+   */
+  public isNotEmpty (): boolean {
+    return !this.isEmpty()
+  }
+
+  /**
    * Create a collection of all elements that do not pass a given truth test.
    *
    * @param  (callable(TValue, TKey): bool)|bool|TValue  $callback
@@ -59,7 +74,7 @@ export class EnumeratesValues<TKey extends PropertyKey, TValue> {
    * back to the caller's declared key type. See the matching helper on
    * `Arr` for why this cast — the one in this file — is unavoidable.
    */
-  private static toKey<TKey extends PropertyKey> (key: string): TKey {
+  private static toKey<TKey extends PropertyKey>(key: string): TKey {
     return key as unknown as TKey
   }
 

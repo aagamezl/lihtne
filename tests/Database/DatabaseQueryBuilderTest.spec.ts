@@ -2,6 +2,7 @@ import { describe, expect, jest, test } from '@jest/globals'
 
 import type { Builder, JoinClause } from '../../src/Illuminate/Database/Query'
 
+import { Collection } from '../../src/Illuminate/Collections'
 import { collect } from '../../src/Illuminate/Collections/helpers'
 import { Builder as EloquentBuilder } from '../../src/Illuminate/Database/Eloquent/Builder'
 import { Expression, Expression as Raw } from '../../src/Illuminate/Database/Query/Expression'
@@ -4381,8 +4382,267 @@ describe('Database Query Builder', () => {
 
   test('testInsertOrIgnoreReturningMethod', async () => {
     const builder = getBuilder()
-    expect(() => {
+    await expect(
       builder.from('users').insertOrIgnoreReturning({ email: 'foo' })
-    }).toThrow(new Error('RuntimeException: This database engine does not support insert or ignore with returning.'))
+    ).rejects.toThrow(new Error('RuntimeException: This database engine does not support insert or ignore with returning.'))
+  })
+
+  test('testInsertOrIgnoreReturningMethodWithEmptyValues', async () => {
+    const builder = getPostgresBuilder()
+    const result = await builder.from('users').insertOrIgnoreReturning([])
+    expect(result).toBeInstanceOf(Collection)
+    expect(result.isEmpty()).toBe(true)
+  })
+
+  test('testMySqlInsertOrIgnoreReturningMethod', async () => {
+    const builder = getMySqlBuilder()
+    await expect(
+      builder.from('users').insertOrIgnoreReturning({ email: 'foo' })
+    ).rejects.toThrow(new Error('RuntimeException: This database engine does not support insert or ignore with returning.'))
+  })
+
+  test('testPostgresInsertOrIgnoreReturningMethod', async () => {
+    const builder = getPostgresBuilder()
+    const connection = builder.getConnection()
+    jest.spyOn(connection, 'recordsHaveBeenModified').mockResolvedValue(true)
+    jest.spyOn(connection, 'selectFromWriteConnection').mockResolvedValue([{ id: 1 }])
+    const result = await builder.from('users').insertOrIgnoreReturning({ email: 'foo' }, ['id'])
+    expect(result).toBeInstanceOf(Collection)
+    expect(result.all()).toEqual([{ id: 1 }])
+    expect(connection.selectFromWriteConnection).toHaveBeenCalledWith('insert into "users" ("email") values (?) on conflict do nothing returning "id"', ['foo'])
+  })
+
+  test('testPostgresInsertOrIgnoreReturningMethodWithUniqueByColumn', async () => {
+    const builder = getPostgresBuilder()
+    const connection = builder.getConnection()
+    jest.spyOn(connection, 'recordsHaveBeenModified').mockResolvedValue(true)
+    jest.spyOn(connection, 'selectFromWriteConnection').mockResolvedValue([{ id: 1, email: 'foo', name: 'bar' }])
+    const result = await builder.from('users').insertOrIgnoreReturning({ email: 'foo', name: 'bar' }, ['*'], 'email')
+    expect(result).toBeInstanceOf(Collection)
+    expect(result.all()).toEqual([{ id: 1, email: 'foo', name: 'bar' }])
+    expect(connection.selectFromWriteConnection).toHaveBeenCalledWith('insert into "users" ("email", "name") values (?, ?) on conflict ("email") do nothing returning *', ['foo', 'bar'])
+  })
+
+  test('testPostgresInsertOrIgnoreReturningMethodWithMultipleRecords', async () => {
+    const builder = getPostgresBuilder()
+    const connection = builder.getConnection()
+    jest.spyOn(connection, 'recordsHaveBeenModified').mockResolvedValue(true)
+    jest.spyOn(connection, 'selectFromWriteConnection').mockResolvedValue([{ id: 1, email: 'foo' }])
+
+    const result = await builder.from('users').insertOrIgnoreReturning([{ email: 'foo' }, { email: 'bar' }], ['id', 'email'])
+
+    expect(result).toBeInstanceOf(Collection)
+    expect(result.all()).toEqual([{ id: 1, email: 'foo' }])
+    expect(connection.selectFromWriteConnection).toHaveBeenCalledWith('insert into "users" ("email") values (?), (?) on conflict do nothing returning "id", "email"', ['foo', 'bar'])
+  })
+
+  test('testSqliteInsertOrIgnoreReturningMethod', async () => {
+    const builder = getSQLiteBuilder()
+    const connection = builder.getConnection()
+    jest.spyOn(connection, 'recordsHaveBeenModified').mockResolvedValue(true)
+    jest.spyOn(connection, 'selectFromWriteConnection').mockResolvedValue([{ id: 1 }])
+
+    const result = await builder.from('users').insertOrIgnoreReturning({ email: 'foo' }, ['id'])
+
+    expect(result).toBeInstanceOf(Collection)
+    expect(result.all()).toEqual([{ id: 1 }])
+    expect(connection.selectFromWriteConnection).toHaveBeenCalledWith('insert into "users" ("email") values (?) on conflict do nothing returning "id"', ['foo'])
+  })
+
+  test('testSqliteInsertOrIgnoreReturningMethodWithUniqueByColumn', async () => {
+    const builder = getSQLiteBuilder()
+    const connection = builder.getConnection()
+    jest.spyOn(connection, 'recordsHaveBeenModified').mockResolvedValue(true)
+    jest.spyOn(connection, 'selectFromWriteConnection').mockResolvedValue([{ id: 1, email: 'foo', name: 'bar' }])
+
+    const result = await builder.from('users').insertOrIgnoreReturning({ email: 'foo', name: 'bar' }, ['*'], 'email')
+
+    expect(result).toBeInstanceOf(Collection)
+    expect(result.all()).toEqual([{ id: 1, email: 'foo', name: 'bar' }])
+    expect(connection.selectFromWriteConnection).toHaveBeenCalledWith('insert into "users" ("email", "name") values (?, ?) on conflict ("email") do nothing returning *', ['foo', 'bar'])
+  })
+
+  test('testSqliteInsertOrIgnoreReturningMethodWithUniqueByColumns', async () => {
+    const builder = getSQLiteBuilder()
+    const connection = builder.getConnection()
+    jest.spyOn(connection, 'recordsHaveBeenModified').mockResolvedValue(true)
+    jest.spyOn(connection, 'selectFromWriteConnection').mockResolvedValue([{ id: 1, email: 'foo', name: 'bar' }])
+    const result = await builder.from('users').insertOrIgnoreReturning({ email: 'foo', name: 'bar' }, ['*'], ['email', 'name'])
+    expect(result).toBeInstanceOf(Collection)
+    expect(result.all()).toEqual([{ id: 1, email: 'foo', name: 'bar' }])
+    expect(connection.selectFromWriteConnection).toHaveBeenCalledWith('insert into "users" ("email", "name") values (?, ?) on conflict ("email", "name") do nothing returning *', ['foo', 'bar'])
+  })
+
+  test('testSqliteInsertOrIgnoreReturningMethodWithMultipleRecords', async () => {
+    const builder = getSQLiteBuilder()
+    const connection = builder.getConnection()
+    jest.spyOn(connection, 'recordsHaveBeenModified').mockResolvedValue(true)
+    jest.spyOn(connection, 'selectFromWriteConnection').mockResolvedValue([{ id: 1, email: 'foo' }])
+
+    const result = await builder.from('users').insertOrIgnoreReturning([{ email: 'foo' }, { email: 'bar' }], ['id', 'email'])
+
+    expect(result).toBeInstanceOf(Collection)
+    expect(result.all()).toEqual([{ id: 1, email: 'foo' }])
+    expect(connection.selectFromWriteConnection).toHaveBeenCalledWith('insert into "users" ("email") values (?), (?) on conflict do nothing returning "id", "email"', ['foo', 'bar'])
+  })
+
+  test('testSqlServerInsertOrIgnoreReturningMethod', async () => {
+    const builder = getSqlServerBuilder()
+
+    await expect(
+      builder.from('users').insertOrIgnoreReturning({ email: 'foo' })
+    ).rejects.toThrow(new Error('RuntimeException: This database engine does not support insert or ignore with returning.'))
+  })
+
+  test('testInsertOrIgnoreReturningWithEmptyUniqueByArray', async () => {
+    const builder = getPostgresBuilder()
+
+    await expect(
+      builder.from('users').insertOrIgnoreReturning({ email: 'foo' }, ['*'], [])
+    ).rejects.toThrow(new Error('InvalidArgumentException: The unique columns must not be empty.'))
+  })
+
+  test('testInsertOrIgnoreReturningWithEmptyUniqueByString', async () => {
+    const builder = getPostgresBuilder()
+
+    await expect(
+      builder.from('users').insertOrIgnoreReturning({ email: 'foo' }, ['*'], '')
+    ).rejects.toThrow(new Error('InvalidArgumentException: The unique columns must not be empty.'))
+  })
+
+  test('testInsertOrIgnoreReturningWithEmptyReturning', async () => {
+    const builder = getPostgresBuilder()
+
+    await expect(
+      builder.from('users').insertOrIgnoreReturning({ email: 'foo' }, [])
+    ).rejects.toThrow(new Error('InvalidArgumentException: The returning columns must not be empty.'))
+  })
+
+  test('testInsertOrIgnoreReturningDoesNotMarkRecordsModifiedWhenNoRowsWereInserted', async () => {
+    const builder = getPostgresBuilder()
+    const connection = builder.getConnection()
+    jest.spyOn(connection, 'selectFromWriteConnection').mockResolvedValue([])
+    jest.spyOn(connection, 'recordsHaveBeenModified').mockResolvedValue(false)
+
+    const result = await builder.from('users').insertOrIgnoreReturning({ email: 'foo' })
+
+    expect(connection.selectFromWriteConnection).toHaveBeenCalledWith('insert into "users" ("email") values (?) on conflict do nothing returning *', ['foo'])
+    expect(result).toBeInstanceOf(Collection)
+    expect(result.isEmpty()).toBe(true)
+  })
+
+  test('testInsertOrIgnoreUsingMethod', async () => {
+    const builder = getBuilder()
+
+    expect(() => {
+      builder.from('users').insertOrIgnoreUsing({ email: 'foo' }, 'bar')
+    }).toThrow(new Error('RuntimeException: This database engine does not support inserting while ignoring errors.'))
+  })
+
+  test('testSqlServerInsertOrIgnoreUsingMethod', async () => {
+    const builder = getSqlServerBuilder()
+    expect(() => {
+      builder.from('users').insertOrIgnoreUsing({ email: 'foo' }, 'bar')
+    }).toThrow(new Error('RuntimeException: This database engine does not support inserting while ignoring errors.'))
+  })
+
+  test('testMySqlInsertOrIgnoreUsingMethod', async () => {
+    const builder = getMySqlBuilder()
+    const connection = builder.getConnection()
+    jest.spyOn(connection, 'affectingStatement').mockResolvedValue(1)
+
+    const result = await builder.from('table1').insertOrIgnoreUsing(
+      ['foo'],
+      (query: Builder) => {
+        query.select(['bar']).from('table2').where('foreign_id', '=', 5)
+      }
+    )
+
+    expect(result).toBe(1)
+    expect(connection.affectingStatement).toHaveBeenCalledWith('insert ignore into `table1` (`foo`) select `bar` from `table2` where `foreign_id` = ?', [5])
+  })
+
+  test('testMySqlInsertOrIgnoreUsingWithEmptyColumns', async () => {
+    const builder = getMySqlBuilder()
+    const connection = builder.getConnection()
+    jest.spyOn(connection, 'affectingStatement').mockResolvedValue(1)
+
+    const result = await builder.from('table1').insertOrIgnoreUsing([], (query: Builder) => {
+      query.from('table2').where('foreign_id', '=', 5)
+    })
+
+    expect(result).toBe(1)
+    expect(connection.affectingStatement).toHaveBeenCalledWith('insert ignore into `table1` select * from `table2` where `foreign_id` = ?', [5])
+  })
+
+  test('testMySqlInsertOrIgnoreUsingInvalidSubquery', async () => {
+    const builder = getMySqlBuilder()
+
+    expect(() => {
+      builder.from('table1').insertOrIgnoreUsing(['foo'], ['bar'])
+    }).toThrow(new Error('InvalidArgumentException: A subquery must be a query builder instance, a Closure, or a string.'))
+  })
+
+  test('testPostgresInsertOrIgnoreUsingMethod', async () => {
+    const builder = getPostgresBuilder()
+    const connection = builder.getConnection()
+    jest.spyOn(connection, 'affectingStatement').mockResolvedValue(1)
+
+    const result = await builder.from('table1').insertOrIgnoreUsing(
+      ['foo'],
+      (query: Builder) => {
+        query.select(['bar']).from('table2').where('foreign_id', '=', 5)
+      }
+    )
+
+    expect(result).toBe(1)
+    expect(connection.affectingStatement).toHaveBeenCalledWith('insert into "table1" ("foo") select "bar" from "table2" where "foreign_id" = ? on conflict do nothing', [5])
+  })
+
+  test('testPostgresInsertOrIgnoreUsingWithEmptyColumns', async () => {
+    const builder = getPostgresBuilder()
+    const connection = builder.getConnection()
+    jest.spyOn(connection, 'affectingStatement').mockResolvedValue(1)
+
+    const result = await builder.from('table1').insertOrIgnoreUsing([], (query: Builder) => {
+      query.from('table2').where('foreign_id', '=', 5)
+    })
+
+    expect(result).toBe(1)
+    expect(connection.affectingStatement).toHaveBeenCalledWith('insert into "table1" select * from "table2" where "foreign_id" = ? on conflict do nothing', [5])
+  })
+
+  test('testPostgresInsertOrIgnoreUsingInvalidSubquery', async () => {
+    const builder = getPostgresBuilder()
+
+    expect(() => {
+      builder.from('table1').insertOrIgnoreUsing(['foo'], ['bar'])
+    }).toThrow(new Error('InvalidArgumentException: A subquery must be a query builder instance, a Closure, or a string.'))
+  })
+
+  test('testSQLiteInsertOrIgnoreUsingMethod', async () => {
+    const builder = getSQLiteBuilder()
+    const connection = builder.getConnection()
+    jest.spyOn(connection, 'affectingStatement').mockResolvedValue(1)
+
+    const result = await builder.from('table1').insertOrIgnoreUsing(['foo'], (query: Builder) => {
+      query.select(['bar']).from('table2').where('foreign_id', '=', 5)
+    })
+
+    expect(result).toBe(1)
+    expect(connection.affectingStatement).toHaveBeenCalledWith('insert or ignore into "table1" ("foo") select "bar" from "table2" where "foreign_id" = ?', [5])
+  })
+
+  test('testSQLiteInsertOrIgnoreUsingWithEmptyColumns', async () => {
+    const builder = getSQLiteBuilder()
+    const connection = builder.getConnection()
+    jest.spyOn(connection, 'affectingStatement').mockResolvedValue(1)
+
+    const result = await builder.from('table1').insertOrIgnoreUsing([], (query: Builder) => {
+      query.from('table2').where('foreign_id', '=', 5)
+    })
+
+    expect(result).toBe(1)
+    expect(connection.affectingStatement).toHaveBeenCalledWith('insert or ignore into "table1" select * from "table2" where "foreign_id" = ?', [5])
   })
 })

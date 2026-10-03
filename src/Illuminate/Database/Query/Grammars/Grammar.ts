@@ -1,4 +1,4 @@
-import { isTruthy } from '@devnetic/utils'
+import { isPlainObject, isTruthy } from '@devnetic/utils'
 
 import type {
   Agregate,
@@ -388,6 +388,24 @@ export class Grammar
     }
 
     return ''
+  }
+
+  /**
+   * Compile an insert ignore statement using a subquery into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $columns
+   * @param  string  $sql
+   * @return string
+   *
+   * @throws \RuntimeException
+   */
+  public compileInsertOrIgnoreUsing (
+    query: Builder,
+    columns: string[],
+    sql: string
+  ): string {
+    throw new Error('RuntimeException: This database engine does not support inserting while ignoring errors.')
   }
 
   /**
@@ -818,19 +836,27 @@ export class Grammar
       return `insert into ${table} default values`
     }
 
-    if (!Array.isArray(values) && !Array.isArray(values[0])) {
+    // if (!Array.isArray(values) && !Array.isArray(values[0])) {
+    //   values = [values]
+    // }
+
+    // const recordKeys = Object.keys(values[0] as Record<string, unknown>)
+    // const columns = this.columnize(recordKeys)
+
+    if (!Array.isArray(values) && !isPlainObject(values[0])) {
       values = [values]
     }
 
-    const recordKeys = Object.keys(values[0] as Record<string, unknown>)
-    const columns = this.columnize(recordKeys)
+    const columns = this.columnize(Object.keys(values[0]))
+    // const columns = this.columnize(Object.keys(reset(values)))
 
     // We need to build a list of parameter place-holders of values that are bound
     // to the query. Each insert should have the exact same number of parameter
     // bindings so we will loop through the record and parameterize them all.
     const parameters = (new Collection(values))
       .map((record: unknown) => {
-        return '(' + this.parameterize(recordKeys.map((key) => record[key])) + ')'
+        // return '(' + this.parameterize(recordKeys.map((key) => record[key])) + ')'
+        return '(' + this.parameterize(record) + ')'
       })
       .implode(', ')
 
