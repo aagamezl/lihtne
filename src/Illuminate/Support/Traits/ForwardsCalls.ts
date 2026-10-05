@@ -9,6 +9,8 @@ export class ForwardsCalls {
      * @throws \BadMethodCallException
      */
   protected throwBadMethodCallException (method: string): never {
-    throw new Error(`BadMethodCallException: Call to undefined method ${this.constructor.name}::${method}()`)
+    throw new Error(
+      `BadMethodCallException: Call to undefined method ${this.constructor.name}::${method}()`
+    )
   }
 }

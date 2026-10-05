@@ -1,0 +1,200 @@
+
+> lihtne@1.0.0 typecheck
+> tsc --noEmit
+
+src/Illuminate/Collections/Arr.ts(56,5): error TS2740: Type 'Dictionary<unknown>' is missing the following properties from type 'unknown[]': length, pop, push, concat, and 35 more.
+src/Illuminate/Collections/Arr.ts(68,30): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'PropertyKey'.
+src/Illuminate/Collections/Arr.ts(69,15): error TS2538: Type 'unknown' cannot be used as an index type.
+src/Illuminate/Collections/Arr.ts(78,74): error TS7015: Element implicitly has an 'any' type because index expression is not of type 'number'.
+src/Illuminate/Collections/Arr.ts(79,11): error TS2322: Type 'unknown[] | Dictionary<unknown>' is not assignable to type 'unknown[]'.
+  Type 'Dictionary<unknown>' is missing the following properties from type 'unknown[]': length, pop, push, concat, and 35 more.
+src/Illuminate/Collections/Arr.ts(79,25): error TS7015: Element implicitly has an 'any' type because index expression is not of type 'number'.
+src/Illuminate/Collections/Arr.ts(86,13): error TS2538: Type 'undefined' cannot be used as an index type.
+src/Illuminate/Collections/EnumeratesValues.ts(44,18): error TS2339: Property 'isEmpty' does not exist on type 'EnumeratesValues<TKey, TValue>'.
+src/Illuminate/Database/Concerns/BuildsQueries.ts(35,17): error TS2339: Property 'limit' does not exist on type 'BuildsQueries'.
+src/Illuminate/Database/Connection.ts(231,5): error TS2322: Type 'Promise<boolean>' is not assignable to type 'boolean'.
+src/Illuminate/Database/Connection.ts(242,5): error TS2322: Type 'Record<string, unknown>[]' is not assignable to type 'number'.
+src/Illuminate/Database/Connection.ts(242,27): error TS2558: Expected 0 type arguments, but got 1.
+src/Illuminate/Database/Connection.ts(247,9): error TS2322: Type 'number' is not assignable to type 'Promise<number>'.
+src/Illuminate/Database/Connection.ts(262,7): error TS2322: Type 'number' is not assignable to type 'Promise<number>'.
+src/Illuminate/Database/Connection.ts(277,5): error TS2322: Type 'Record<string, unknown>[]' is not assignable to type 'boolean'.
+src/Illuminate/Database/Connection.ts(277,44): error TS2345: Argument of type '(query: string, bindings: BindingValues) => true | void' is not assignable to parameter of type 'QueryCallback'.
+  Type 'true | void' is not assignable to type 'Record<string, unknown>[] | Promise<Record<string, unknown>[]>'.
+    Type 'boolean' is not assignable to type 'Record<string, unknown>[] | Promise<Record<string, unknown>[]>'.
+src/Illuminate/Database/Query/Builder.ts(517,26): error TS2345: Argument of type 'BindingValues' is not assignable to parameter of type '(string | number | Expression | undefined)[]'.
+  Type 'BindingValue' is not assignable to type 'string | number | Expression | undefined'.
+    Type 'null' is not assignable to type 'string | number | Expression | undefined'.
+src/Illuminate/Database/Query/Builder.ts(547,36): error TS2345: Argument of type 'Expression | (string | Expression)[]' is not assignable to parameter of type 'Record<string, unknown>'.
+  Type 'Expression' is not assignable to type 'Record<string, unknown>'.
+    Index signature for type 'string' is missing in type 'Expression'.
+src/Illuminate/Database/Query/Builder.ts(646,35): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'string | Expression | undefined'.
+src/Illuminate/Database/Query/Builder.ts(748,7): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'string | number | Expression | undefined'.
+src/Illuminate/Database/Query/Builder.ts(782,41): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'string | number | Expression | undefined'.
+src/Illuminate/Database/Query/Builder.ts(802,7): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'string | number | Expression | undefined'.
+src/Illuminate/Database/Query/Builder.ts(828,7): error TS2322: Type 'Expression' is not assignable to type 'string | number'.
+src/Illuminate/Database/Query/Builder.ts(1024,41): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'string | number | Expression | undefined'.
+src/Illuminate/Database/Query/Builder.ts(1141,6): error TS2314: Generic type 'Collection<TKey, TValue>' requires 2 type argument(s).
+src/Illuminate/Database/Query/Builder.ts(1161,49): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string | Expression'.
+  Type 'undefined' is not assignable to type 'string | Expression'.
+src/Illuminate/Database/Query/Builder.ts(1165,37): error TS2345: Argument of type 'Record<string, unknown>[]' is not assignable to parameter of type 'unknown[][]'.
+  Type 'Record<string, unknown>' is missing the following properties from type 'unknown[]': length, pop, push, concat, and 35 more.
+src/Illuminate/Database/Query/Builder.ts(1166,51): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string | Expression'.
+  Type 'undefined' is not assignable to type 'string | Expression'.
+src/Illuminate/Database/Query/Builder.ts(1187,5): error TS2322: Type 'unknown' is not assignable to type 'string | undefined'.
+src/Illuminate/Database/Query/Builder.ts(1230,51): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(o: { [s: string]: unknown; } | ArrayLike<unknown>): unknown[]', gave the following error.
+    Argument of type 'Record<string, unknown> | undefined' is not assignable to parameter of type '{ [s: string]: unknown; } | ArrayLike<unknown>'.
+      Type 'undefined' is not assignable to type '{ [s: string]: unknown; } | ArrayLike<unknown>'.
+  Overload 2 of 2, '(o: {}): any[]', gave the following error.
+    Argument of type 'Record<string, unknown> | undefined' is not assignable to parameter of type '{}'.
+      Type 'undefined' is not assignable to type '{}'.
+src/Illuminate/Database/Query/Builder.ts(1240,38): error TS2322: Type 'string | Expression' is not assignable to type 'string'.
+  Type 'Expression' is not assignable to type 'string'.
+src/Illuminate/Database/Query/Builder.ts(1242,51): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(o: { [s: string]: unknown; } | ArrayLike<unknown>): unknown[]', gave the following error.
+    Argument of type 'Record<string, unknown> | undefined' is not assignable to parameter of type '{ [s: string]: unknown; } | ArrayLike<unknown>'.
+      Type 'undefined' is not assignable to type '{ [s: string]: unknown; } | ArrayLike<unknown>'.
+  Overload 2 of 2, '(o: {}): any[]', gave the following error.
+    Argument of type 'Record<string, unknown> | undefined' is not assignable to parameter of type '{}'.
+      Type 'undefined' is not assignable to type '{}'.
+src/Illuminate/Database/Query/Builder.ts(1275,26): error TS2538: Type 'Expression' cannot be used as an index type.
+src/Illuminate/Database/Query/Builder.ts(1275,26): error TS7015: Element implicitly has an 'any' type because index expression is not of type 'number'.
+src/Illuminate/Database/Query/Builder.ts(1279,21): error TS7015: Element implicitly has an 'any' type because index expression is not of type 'number'.
+src/Illuminate/Database/Query/Builder.ts(1279,33): error TS2538: Type 'Expression' cannot be used as an index type.
+src/Illuminate/Database/Query/Builder.ts(1279,33): error TS7015: Element implicitly has an 'any' type because index expression is not of type 'number'.
+src/Illuminate/Database/Query/Builder.ts(1297,5): error TS2322: Type 'Promise<Record<string, unknown> | undefined>' is not assignable to type 'Record<string, unknown>'.
+  Index signature for type 'string' is missing in type 'Promise<Record<string, unknown> | undefined>'.
+src/Illuminate/Database/Query/Builder.ts(1327,12): error TS2722: Cannot invoke an object which is possibly 'undefined'.
+src/Illuminate/Database/Query/Builder.ts(1345,59): error TS2345: Argument of type '"straight_join"' is not assignable to parameter of type '"left" | "inner" | undefined'.
+src/Illuminate/Database/Query/Builder.ts(1365,61): error TS2345: Argument of type '"straight_join"' is not assignable to parameter of type '"left" | "inner" | "right" | undefined'.
+src/Illuminate/Database/Query/Builder.ts(1421,59): error TS2345: Argument of type '"right"' is not assignable to parameter of type '"left" | "inner" | undefined'.
+src/Illuminate/Database/Query/Builder.ts(1452,51): error TS2345: Argument of type 'string | Expression | undefined' is not assignable to parameter of type 'string | Expression'.
+  Type 'undefined' is not assignable to type 'string | Expression'.
+src/Illuminate/Database/Query/Builder.ts(1522,5): error TS2322: Type 'Collection<PropertyKey, { value: unknown; bindings: unknown; }>' is not assignable to type 'Record<string, unknown>'.
+  Index signature for type 'string' is missing in type 'Collection<PropertyKey, { value: unknown; bindings: unknown; }>'.
+src/Illuminate/Database/Query/Builder.ts(1540,50): error TS18046: 'values.map' is of type 'unknown'.
+src/Illuminate/Database/Query/Builder.ts(1540,57): error TS4111: Property 'map' comes from an index signature, so it must be accessed with ['map'].
+src/Illuminate/Database/Query/Builder.ts(1540,62): error TS7006: Parameter 'value' implicitly has an 'any' type.
+src/Illuminate/Database/Query/Builder.ts(1542,28): error TS2339: Property 'update' does not exist on type 'Connection'.
+src/Illuminate/Database/Query/Builder.ts(1543,7): error TS2345: Argument of type 'unknown[]' is not assignable to parameter of type '(string | number | Expression | undefined)[]'.
+  Type 'unknown' is not assignable to type 'string | number | Expression | undefined'.
+src/Illuminate/Database/Query/Builder.ts(1543,60): error TS18046: 'values.map' is of type 'unknown'.
+src/Illuminate/Database/Query/Builder.ts(1543,67): error TS4111: Property 'map' comes from an index signature, so it must be accessed with ['map'].
+src/Illuminate/Database/Query/Builder.ts(1543,72): error TS7006: Parameter 'value' implicitly has an 'any' type.
+src/Illuminate/Database/Query/Builder.ts(1567,32): error TS2345: Argument of type 'string | number | Expression' is not assignable to parameter of type 'string | number'.
+  Type 'Expression' is not assignable to type 'string | number'.
+src/Illuminate/Database/Query/Builder.ts(1656,41): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'string | number | Expression | undefined'.
+src/Illuminate/Database/Query/Builder.ts(2109,22): error TS18048: 'result' is possibly 'undefined'.
+src/Illuminate/Database/Query/Builder.ts(2109,29): error TS4111: Property 'exists' comes from an index signature, so it must be accessed with ['exists'].
+src/Illuminate/Database/Query/Builder.ts(2122,5): error TS2322: Type 'unknown' is not assignable to type 'number'.
+src/Illuminate/Database/Query/Builder.ts(2122,35): error TS2322: Type 'string | Expression' is not assignable to type 'string'.
+  Type 'Expression' is not assignable to type 'string'.
+src/Illuminate/Database/Query/Builder.ts(2132,5): error TS2322: Type 'unknown' is not assignable to type 'number'.
+src/Illuminate/Database/Query/Builder.ts(2132,35): error TS2322: Type 'string | Expression' is not assignable to type 'string'.
+  Type 'Expression' is not assignable to type 'string'.
+src/Illuminate/Database/Query/Builder.ts(2142,49): error TS2322: Type 'string | Expression' is not assignable to type 'string'.
+  Type 'Expression' is not assignable to type 'string'.
+src/Illuminate/Database/Query/Builder.ts(2154,5): error TS2322: Type 'unknown' is not assignable to type 'number'.
+src/Illuminate/Database/Query/Builder.ts(2154,35): error TS2322: Type 'string | Expression' is not assignable to type 'string'.
+  Type 'Expression' is not assignable to type 'string'.
+src/Illuminate/Database/Query/Builder.ts(2190,5): error TS2322: Type 'unknown' is not assignable to type 'boolean'.
+src/Illuminate/Database/Query/Builder.ts(2205,5): error TS2322: Type 'unknown' is not assignable to type 'boolean'.
+src/Illuminate/Database/Query/Builder.ts(2966,36): error TS2345: Argument of type 'QueryCallback | (Scalar | Expression)[]' is not assignable to parameter of type 'Record<string, unknown>'.
+  Type 'QueryCallback' is not assignable to type 'Record<string, unknown>'.
+    Index signature for type 'string' is missing in type 'QueryCallback'.
+src/Illuminate/Database/Query/Builder.ts(3217,26): error TS2345: Argument of type 'unknown[]' is not assignable to parameter of type '(string | number | Expression | undefined)[]'.
+  Type 'unknown' is not assignable to type 'string | number | Expression | undefined'.
+src/Illuminate/Database/Query/Builder.ts(3327,41): error TS2339: Property 'aggregate' does not exist on type 'Expression'.
+src/Illuminate/Database/Query/Builder.ts(3330,42): error TS2532: Object is possibly 'undefined'.
+src/Illuminate/Database/Query/Builder.ts(3330,53): error TS2339: Property 'aggregate' does not exist on type 'string | number'.
+  Property 'aggregate' does not exist on type 'string'.
+src/Illuminate/Database/Query/Builder.ts(3359,14): error TS2352: Conversion of type 'Record<string, unknown>[] | Dictionary<Record<string, unknown>>' to type '(string | number | Expression)[]' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type 'Dictionary<Record<string, unknown>>' is missing the following properties from type '(string | number | Expression)[]': length, pop, push, concat, and 35 more.
+src/Illuminate/Database/Query/Builder.ts(3371,12): error TS2352: Conversion of type 'Record<string, unknown>[] | Dictionary<Record<string, unknown>>' to type '(string | number | Expression)[]' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type 'Dictionary<Record<string, unknown>>' is missing the following properties from type '(string | number | Expression)[]': length, pop, push, concat, and 35 more.
+src/Illuminate/Database/Query/Builder.ts(3908,9): error TS2345: Argument of type 'unknown[]' is not assignable to parameter of type '(string | number | Expression | undefined)[]'.
+  Type 'unknown' is not assignable to type 'string | number | Expression | undefined'.
+src/Illuminate/Database/Query/Builder.ts(4273,35): error TS2322: Type 'unknown' is not assignable to type 'string | number | Expression | undefined'.
+src/Illuminate/Database/Query/Builder.ts(4398,6): error TS7030: Not all code paths return a value.
+src/Illuminate/Database/Query/Builder.ts(4432,28): error TS2345: Argument of type 'Record<string, unknown> | undefined' is not assignable to parameter of type 'Record<string, unknown>'.
+  Type 'undefined' is not assignable to type 'Record<string, unknown>'.
+src/Illuminate/Database/Query/Builder.ts(4432,45): error TS4111: Property 'aggregate' comes from an index signature, so it must be accessed with ['aggregate'].
+src/Illuminate/Database/Query/Builder.ts(4482,40): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(o: {}): string[]', gave the following error.
+    Argument of type 'unknown' is not assignable to parameter of type '{}'.
+  Overload 2 of 2, '(o: object): string[]', gave the following error.
+    Argument of type 'unknown' is not assignable to parameter of type 'object'.
+src/Illuminate/Database/Query/Builder.ts(4486,11): error TS7053: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{}'.
+  No index signature with a parameter of type 'string' was found on type '{}'.
+src/Illuminate/Database/Query/Builder.ts(4486,30): error TS18046: 'value' is of type 'unknown'.
+src/Illuminate/Database/Query/Builder.ts(4500,26): error TS2345: Argument of type 'unknown[]' is not assignable to parameter of type '(string | number | Expression | undefined)[]'.
+  Type 'unknown' is not assignable to type 'string | number | Expression | undefined'.
+src/Illuminate/Database/Query/Builder.ts(4518,40): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(o: {}): string[]', gave the following error.
+    Argument of type 'unknown' is not assignable to parameter of type '{}'.
+  Overload 2 of 2, '(o: object): string[]', gave the following error.
+    Argument of type 'unknown' is not assignable to parameter of type 'object'.
+src/Illuminate/Database/Query/Builder.ts(4522,11): error TS7053: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{}'.
+  No index signature with a parameter of type 'string' was found on type '{}'.
+src/Illuminate/Database/Query/Builder.ts(4522,30): error TS18046: 'value' is of type 'unknown'.
+src/Illuminate/Database/Query/Builder.ts(4531,5): error TS2322: Type 'Promise<number>' is not assignable to type 'number'.
+src/Illuminate/Database/Query/Builder.ts(4533,26): error TS2345: Argument of type 'unknown[]' is not assignable to parameter of type '(string | number | Expression | undefined)[]'.
+  Type 'unknown' is not assignable to type 'string | number | Expression | undefined'.
+src/Illuminate/Database/Query/Builder.ts(4548,14): error TS2314: Generic type 'Collection<TKey, TValue>' requires 2 type argument(s).
+src/Illuminate/Database/Query/Builder.ts(4565,40): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(o: {}): string[]', gave the following error.
+    Argument of type 'unknown' is not assignable to parameter of type '{}'.
+  Overload 2 of 2, '(o: object): string[]', gave the following error.
+    Argument of type 'unknown' is not assignable to parameter of type 'object'.
+src/Illuminate/Database/Query/Builder.ts(4569,11): error TS7053: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{}'.
+  No index signature with a parameter of type 'string' was found on type '{}'.
+src/Illuminate/Database/Query/Builder.ts(4569,30): error TS18046: 'value' is of type 'unknown'.
+src/Illuminate/Database/Query/Builder.ts(4587,26): error TS2345: Argument of type 'unknown[]' is not assignable to parameter of type '(string | number | Expression | undefined)[]'.
+  Type 'unknown' is not assignable to type 'string | number | Expression | undefined'.
+src/Illuminate/Database/Query/Builder.ts(4590,35): error TS2344: Type 'unknown' does not satisfy the constraint 'PropertyKey'.
+src/Illuminate/Database/Query/Builder.ts(4611,5): error TS2322: Type 'Promise<number>' is not assignable to type 'boolean'.
+src/Illuminate/Database/Query/Builder.ts(4613,26): error TS2345: Argument of type 'BindingValues' is not assignable to parameter of type '(string | number | Expression | undefined)[]'.
+  Type 'BindingValue' is not assignable to type 'string | number | Expression | undefined'.
+    Type 'null' is not assignable to type 'string | number | Expression | undefined'.
+src/Illuminate/Database/Query/Builder.ts(4631,5): error TS2322: Type 'Promise<number>' is not assignable to type 'number'.
+src/Illuminate/Database/Query/Builder.ts(4632,53): error TS2345: Argument of type 'Record<string, unknown> | string[]' is not assignable to parameter of type 'string[]'.
+  Type 'Record<string, unknown>' is missing the following properties from type 'string[]': length, pop, push, concat, and 35 more.
+src/Illuminate/Database/Query/Builder.ts(4633,26): error TS2345: Argument of type 'BindingValues' is not assignable to parameter of type '(string | number | Expression | undefined)[]'.
+  Type 'BindingValue' is not assignable to type 'string | number | Expression | undefined'.
+    Type 'null' is not assignable to type 'string | number | Expression | undefined'.
+src/Illuminate/Database/Query/Grammars/Grammar.ts(856,48): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(o: {}): string[]', gave the following error.
+    Argument of type 'unknown' is not assignable to parameter of type '{}'.
+  Overload 2 of 2, '(o: object): string[]', gave the following error.
+    Argument of type 'unknown' is not assignable to parameter of type 'object'.
+src/Illuminate/Database/Query/Grammars/Grammar.ts(865,40): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'unknown[]'.
+src/Illuminate/Database/Query/Grammars/Grammar.ts(943,44): error TS2345: Argument of type 'Builder | undefined' is not assignable to parameter of type 'Builder'.
+  Type 'undefined' is not assignable to type 'Builder'.
+src/Illuminate/Database/Query/Grammars/Grammar.ts(956,48): error TS2345: Argument of type 'Builder | undefined' is not assignable to parameter of type 'Builder'.
+  Type 'undefined' is not assignable to type 'Builder'.
+src/Illuminate/Database/Query/Grammars/Grammar.ts(1511,38): error TS2345: Argument of type 'Record<string, unknown>' is not assignable to parameter of type 'unknown[]'.
+  Type 'Record<string, unknown>' is missing the following properties from type 'unknown[]': length, pop, push, concat, and 35 more.
+src/Illuminate/Database/Query/Grammars/Grammar.ts(1513,78): error TS18046: 'value' is of type 'unknown'.
+src/Illuminate/Database/Query/Grammars/Grammar.ts(1515,18): error TS2339: Property 'values' does not exist on type 'ArrayConstructor'.
+src/Illuminate/Database/Query/Grammars/Grammar.ts(1516,21): error TS2769: No overload matches this call.
+  Overload 1 of 4, '(target: {}, source1: unknown[], source2: unknown[]): unknown[]', gave the following error.
+    Argument of type 'unknown' is not assignable to parameter of type '{}'.
+  Overload 2 of 4, '(target: object, ...sources: any[]): any', gave the following error.
+    Argument of type 'unknown' is not assignable to parameter of type 'object'.
+src/Illuminate/Database/Query/Grammars/Grammar.ts(1516,30): error TS4111: Property 'join' comes from an index signature, so it must be accessed with ['join'].
+src/Illuminate/Database/Query/Grammars/Grammar.ts(1565,40): error TS6133: 'query' is declared but its value is never read.
+src/Illuminate/Database/Query/Grammars/Grammar.ts(1576,35): error TS6133: 'query' is declared but its value is never read.
+src/Illuminate/Database/Query/Grammars/Grammar.ts(1578,38): error TS2345: Argument of type 'PropertyKey' is not assignable to parameter of type 'string | Expression'.
+  Type 'number' is not assignable to type 'string | Expression'.
+src/Illuminate/Database/Query/Grammars/Grammar.ts(1590,40): error TS6133: 'query' is declared but its value is never read.
+src/Illuminate/Database/Query/Grammars/MySqlGrammar.ts(77,10): error TS4114: This member must have an 'override' modifier because it overrides a member in the base class 'Grammar'.
+src/Illuminate/Database/Query/Grammars/SqlServerGrammar.ts(148,5): error TS2578: Unused '@ts-expect-error' directive.
+src/Illuminate/Database/Query/Grammars/SqlServerGrammar.ts(151,5): error TS2578: Unused '@ts-expect-error' directive.
+src/Illuminate/Macroable/Traits/Macroable.ts(39,34): error TS2551: Property 'bindTo' does not exist on type 'Function'. Did you mean 'bind'?
+src/Illuminate/Macroable/Traits/Macroable.ts(47,17): error TS18046: 'macro' is of type 'unknown'.
+src/Illuminate/Support/helpers.ts(159,33): error TS2322: Type 'TValue | undefined' is not assignable to type 'TValue'.
+  'TValue' could be instantiated with an arbitrary type which could be unrelated to 'TValue | undefined'.
+src/Illuminate/Support/helpers.ts(159,44): error TS2322: Type 'TValue | undefined' is not assignable to type 'TValue'.
+  'TValue' could be instantiated with an arbitrary type which could be unrelated to 'TValue | undefined'.
+src/Illuminate/Support/helpers.ts(169,15): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'unknown[] | Record<string, unknown>'.
+src/Illuminate/Support/Str.ts(57,9): error TS2367: This comparison appears to be unintentional because the types 'number' and 'boolean' have no overlap.

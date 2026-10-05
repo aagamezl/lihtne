@@ -155,7 +155,9 @@ export const isObject = (
  * @param  {any}  value
  * @return {unknown}
  */
-export const head = <TValue>(value: TValue[] | Record<string, TValue>): TValue => {
+export const head = <TValue>(
+  value: TValue[] | Record<string, TValue>
+): TValue => {
   return Array.isArray(value) ? value[0] : Array.from(Object.values(value))[0]
 }
 

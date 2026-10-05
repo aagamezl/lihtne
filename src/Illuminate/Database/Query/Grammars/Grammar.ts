@@ -28,18 +28,18 @@ import { JoinLateralClause } from '../JoinLateralClause'
 
 export type SelectComponentName =
 
-  | 'aggregate' |
-  'columns' |
-  'from' |
-  'indexHint' |
-  'joins' |
-  'wheres' |
-  'groups' |
-  'havings' |
-  'orders' |
-  'limit' |
-  'offset' |
-  'lock'
+    | 'aggregate' |
+    'columns' |
+    'from' |
+    'indexHint' |
+    'joins' |
+    'wheres' |
+    'groups' |
+    'havings' |
+    'orders' |
+    'limit' |
+    'offset' |
+    'lock'
 
 export type SelectComponent = {
   name: SelectComponentName
@@ -60,7 +60,7 @@ export type WhereCompilers = Record<
 
 // Trait methods are merged onto the class. `mixing().useTrait()` copies them onto the prototype at runtime.
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export interface Grammar extends BaseGrammar, CompilesJsonPaths { }
+export interface Grammar extends BaseGrammar, CompilesJsonPaths {}
 
 // Trait methods are merged onto the class. `mixing().useTrait()` copies them onto the prototype at runtime.
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -401,11 +401,19 @@ export class Grammar
    * @throws \RuntimeException
    */
   public compileInsertOrIgnoreUsing (
+    // @ts-expect-error expected error; query is not used in this method
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     query: Builder,
+    // @ts-expect-error expected error; columns is not used in this method
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     columns: string[],
+    // @ts-expect-error expected error; sql is not used in this method
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     sql: string
   ): string {
-    throw new Error('RuntimeException: This database engine does not support inserting while ignoring errors.')
+    throw new Error(
+      'RuntimeException: This database engine does not support inserting while ignoring errors.'
+    )
   }
 
   /**
@@ -853,7 +861,7 @@ export class Grammar
     // We need to build a list of parameter place-holders of values that are bound
     // to the query. Each insert should have the exact same number of parameter
     // bindings so we will loop through the record and parameterize them all.
-    const parameters = (new Collection(values))
+    const parameters = new Collection(values)
       .map((record: unknown) => {
         // return '(' + this.parameterize(recordKeys.map((key) => record[key])) + ')'
         return '(' + this.parameterize(record) + ')'
@@ -875,12 +883,22 @@ export class Grammar
    * @throws \RuntimeException
    */
   public compileInsertOrIgnoreReturning (
+    // @ts-expect-error expected error; query is not used in this method
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     query: Builder,
+    // @ts-expect-error expected error; values is not used in this method
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     values: unknown[],
+    // @ts-expect-error expected error; returning is not used in this method
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     returning: string[],
+    // @ts-expect-error expected error; uniqueBy is not used in this method
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     uniqueBy: string[] | undefined
   ): string {
-    throw new Error('RuntimeException: This database engine does not support insert or ignore with returning.')
+    throw new Error(
+      'RuntimeException: This database engine does not support insert or ignore with returning.'
+    )
   }
 
   /**
@@ -891,7 +909,11 @@ export class Grammar
    * @param  string  $sql
    * @return string
    */
-  public compileInsertUsing (query: Builder, columns: string[], sql: string): string {
+  public compileInsertUsing (
+    query: Builder,
+    columns: string[],
+    sql: string
+  ): string {
     const table = this.wrapTable(query.fromProperty)
 
     if (columns.length === 0 || columns.includes('*')) {
@@ -910,8 +932,12 @@ export class Grammar
    *
    * @throws \RuntimeException
    */
+  // @ts-expect-error expected error; query is not used in this method
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   public compileInsertOrIgnore (query: Builder, values: unknown[]): string {
-    throw new Error('RuntimeException: This database engine does not support inserting while ignoring errors.')
+    throw new Error(
+      'RuntimeException: This database engine does not support inserting while ignoring errors.'
+    )
   }
 
   /**
@@ -1491,10 +1517,15 @@ export class Grammar
    * @param  array  $values
    * @return array
    */
-  public prepareBindingsForUpdate (bindings: Record<string, unknown>, values: Record<string, unknown>): unknown[] {
+  public prepareBindingsForUpdate (
+    bindings: Record<string, unknown>,
+    values: Record<string, unknown>
+  ): unknown[] {
     const cleanBindings = Arr.except(bindings, ['select', 'join'])
 
-    const flattenedValues = Arr.flatten(Object.values(values).map((value) => value()))
+    const flattenedValues = Arr.flatten(
+      Object.values(values).map((value) => value())
+    )
 
     return Array.values(
       Object.assign(bindings.join, flattenedValues, Arr.flatten(cleanBindings))
@@ -1508,7 +1539,10 @@ export class Grammar
    * @param  array  $values
    * @return string
    */
-  public compileUpdate (query: Builder, values: Record<string, unknown>): string {
+  public compileUpdate (
+    query: Builder,
+    values: Record<string, unknown>
+  ): string {
     const table = this.wrapTable(query.fromProperty)
 
     const columns = this.compileUpdateColumns(query, values)
@@ -1531,7 +1565,12 @@ export class Grammar
    * @param  string  $where
    * @return string
    */
-  protected compileUpdateWithJoins (query: Builder, table: string, columns: string, where: string): string {
+  protected compileUpdateWithJoins (
+    query: Builder,
+    table: string,
+    columns: string,
+    where: string
+  ): string {
     const joins = this.compileJoins(query, query.joins)
 
     return `update ${table} ${joins} set ${columns} ${where}`
@@ -1546,7 +1585,12 @@ export class Grammar
    * @param  string  $where
    * @return string
    */
-  protected compileUpdateWithoutJoins (query: Builder, table: string, columns: string, where: string): string {
+  protected compileUpdateWithoutJoins (
+    query: Builder,
+    table: string,
+    columns: string,
+    where: string
+  ): string {
     return `update ${table} set ${columns} ${where}`
   }
 
@@ -1557,7 +1601,10 @@ export class Grammar
    * @param  array  $values
    * @return string
    */
-  protected compileUpdateColumns (query: Builder, values: Record<string, unknown>): string {
+  protected compileUpdateColumns (
+    query: Builder,
+    values: Record<string, unknown>
+  ): string {
     return new Collection(values)
       .map((value, key) => this.wrap(key) + ' = ' + this.parameter(value))
       .implode(', ')
@@ -1571,7 +1618,11 @@ export class Grammar
    * @param  string  $where
    * @return string
    */
-  protected compileDeleteWithoutJoins (query: Builder, table: string, where: string): string {
+  protected compileDeleteWithoutJoins (
+    query: Builder,
+    table: string,
+    where: string
+  ): string {
     return `delete from ${table} ${where}`
   }
 

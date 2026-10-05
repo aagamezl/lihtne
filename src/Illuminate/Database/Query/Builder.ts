@@ -52,34 +52,34 @@ export type WhereOptions = {
 
 export type WhereClauseType =
 
-  | 'Basic' |
-  'Bitwise' |
-  'Binary' |
-  'Column' |
-  'Date' |
-  'Day' |
-  'Expression' |
-  'Exists' |
-  'NotExists' |
-  'Fulltext' |
-  'In' |
-  'InRaw' |
-  'JsonBoolean' |
-  'Like' |
-  'Month' |
-  'Nested' |
-  'NotIn' |
-  'NotInRaw' |
-  'NotNull' |
-  'Null' |
-  'NullSafeEquals' |
-  'Sub' |
-  'Time' |
-  'Year' |
-  'between' |
-  'betweenColumns' |
-  'raw' |
-  'valueBetween'
+    | 'Basic' |
+    'Bitwise' |
+    'Binary' |
+    'Column' |
+    'Date' |
+    'Day' |
+    'Expression' |
+    'Exists' |
+    'NotExists' |
+    'Fulltext' |
+    'In' |
+    'InRaw' |
+    'JsonBoolean' |
+    'Like' |
+    'Month' |
+    'Nested' |
+    'NotIn' |
+    'NotInRaw' |
+    'NotNull' |
+    'Null' |
+    'NullSafeEquals' |
+    'Sub' |
+    'Time' |
+    'Year' |
+    'between' |
+    'betweenColumns' |
+    'raw' |
+    'valueBetween'
 
 export type WhereClause = {
   caseSensitive?: boolean
@@ -112,15 +112,15 @@ export type Bindings = {
 
 export type HavingClauseType =
 
-  | 'Basic' |
-  'Bitwise' |
-  'Expression' |
-  'Nested' |
-  'NotNull' |
-  'Null' |
-  'Raw' |
-  'between' |
-  'bit'
+    | 'Basic' |
+    'Bitwise' |
+    'Expression' |
+    'Nested' |
+    'NotNull' |
+    'Null' |
+    'Raw' |
+    'between' |
+    'bit'
 
 export type Having = {
   type: HavingClauseType
@@ -177,7 +177,13 @@ export const BOOLEAN_OPERATORS: Record<BooleanOperator, BooleanOperator> = {
 
 // Trait methods are merged onto the class. `mixing().useTrait()` copies them onto the prototype at runtime.
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export interface Builder extends BuildsQueries, BuildsWhereDateClauses, Macroable, ForwardsCalls, Conditionable { }
+export interface Builder
+  extends
+  BuildsQueries,
+  BuildsWhereDateClauses,
+  Macroable,
+  ForwardsCalls,
+  Conditionable {}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Builder extends mixing().useTrait([
@@ -816,13 +822,20 @@ export class Builder extends mixing().useTrait([
    *
    * @throws \InvalidArgumentException
    */
-  public incrementEach (columns: Record<string, number | string>, extra: Record<string, unknown> = {}): number {
+  public incrementEach (
+    columns: Record<string, number | string>,
+    extra: Record<string, unknown> = {}
+  ): number {
     for (const [column, amount] of Object.entries(columns)) {
       if (!isNumeric(amount)) {
-        throw new Error(`InvalidArgumentException: Non-numeric value passed as increment amount for column: '${column}'.`)
+        throw new Error(
+          `InvalidArgumentException: Non-numeric value passed as increment amount for column: '${column}'.`
+        )
         // } else if (typeof column !== 'string') {
       } else if (isNumeric(column)) {
-        throw new Error('InvalidArgumentException: Non-associative array passed to incrementEach method.')
+        throw new Error(
+          'InvalidArgumentException: Non-associative array passed to incrementEach method.'
+        )
       }
 
       columns[column] = this.raw(`${this.grammar.wrap(column)} + ${amount}`)
@@ -917,7 +930,9 @@ export class Builder extends mixing().useTrait([
 
     this.addBinding(bindings, 'join')
 
-    this.joins.push(this.newJoinLateralClause(this, type, new Expression(expression)))
+    this.joins.push(
+      this.newJoinLateralClause(this, type, new Expression(expression))
+    )
 
     return this
   }
@@ -959,7 +974,8 @@ export class Builder extends mixing().useTrait([
     table: Expression | string
   ): JoinLateralClause {
     // return new JoinLateralClause(parentQuery, type, table);
-    const JoinLateralClauseCtor = resolveClass<JoinLateralClause>('JoinLateralClause')
+    const JoinLateralClauseCtor =
+      resolveClass<JoinLateralClause>('JoinLateralClause')
     return new JoinLateralClauseCtor(parentQuery, type, table)
   }
 
@@ -1041,7 +1057,9 @@ export class Builder extends mixing().useTrait([
 
     this.addBinding(bindings, 'join')
 
-    this.joins.push(this.newJoinClause(this, 'cross', new Expression(expression)))
+    this.joins.push(
+      this.newJoinClause(this, 'cross', new Expression(expression))
+    )
 
     return this
   }
@@ -1075,7 +1093,14 @@ export class Builder extends mixing().useTrait([
 
     this.addBinding(bindings, 'join')
 
-    return this.join(new Expression(expression), first, operator, second, type, where)
+    return this.join(
+      new Expression(expression),
+      first,
+      operator,
+      second,
+      type,
+      where
+    )
   }
 
   /**
@@ -1122,7 +1147,9 @@ export class Builder extends mixing().useTrait([
    * @param  array|string  $columns
    * @return TValue|null
    */
-  public async first (columns: string | Expression | string[] = ['*']): Promise<Record<string, unknown> | undefined> {
+  public async first (
+    columns: string | Expression | string[] = ['*']
+  ): Promise<Record<string, unknown> | undefined> {
     const result = await this.limit(1).get(columns)
 
     return result.first()
@@ -1173,16 +1200,19 @@ export class Builder extends mixing().useTrait([
    * @param  string  $column
    * @return string|null
    */
-  protected stripTableForPluck (column: string | Expression): string | undefined {
+  protected stripTableForPluck (
+    column: string | Expression
+  ): string | undefined {
     if (isNil(column)) {
       return column
     }
 
-    const columnString = column instanceof Expression
-      ? this.grammar.getValue(column)
-      : column
+    const columnString =
+      column instanceof Expression ? this.grammar.getValue(column) : column
 
-    const separator = columnString.toLowerCase().includes(' as ') ? ' as ' : '\.'
+    const separator = columnString.toLowerCase().includes(' as ')
+      ? ' as '
+      : '\\.'
 
     return last(columnString.split(new RegExp(`~${separator}~i`)))
   }
@@ -1236,7 +1266,9 @@ export class Builder extends mixing().useTrait([
    * @param  string  $column
    * @return mixed
    */
-  public async value (column: string | Expression): Promise<unknown | undefined> {
+  public async value (
+    column: string | Expression
+  ): Promise<unknown | undefined> {
     const result = await this.first([column])
 
     return !Array.isArray(result) ? Object.values(result)[0] : undefined
@@ -1249,7 +1281,10 @@ export class Builder extends mixing().useTrait([
    * @param  string  $glue
    * @return string
    */
-  public async implode (column: string | Expression, glue: string = ''): Promise<string> {
+  public async implode (
+    column: string | Expression,
+    glue: string = ''
+  ): Promise<string> {
     const results = await this.pluck(column)
 
     return results.implode(glue)
@@ -1284,12 +1319,12 @@ export class Builder extends mixing().useTrait([
   }
 
   /**
-    * Execute a query for a single record by ID.
-    *
-    * @param  int|string  $id
-    * @param  string|\Illuminate\Contracts\Database\Query\Expression|array<string|\Illuminate\Contracts\Database\Query\Expression>  $columns
-    * @return \stdClass|null
-    */
+   * Execute a query for a single record by ID.
+   *
+   * @param  int|string  $id
+   * @param  string|\Illuminate\Contracts\Database\Query\Expression|array<string|\Illuminate\Contracts\Database\Query\Expression>  $columns
+   * @return \stdClass|null
+   */
   public find (
     id: number | string,
     columns: string | Expression | string[] = ['*']
@@ -1310,7 +1345,7 @@ export class Builder extends mixing().useTrait([
   public async findOr (
     id: number | string,
     columns: string | Expression | string[] = ['*'],
-    callback?: Function
+    callback?: CallableFunction
   ): Promise<PropertyKey | unknown | undefined> {
     if (typeof columns === 'function') {
       callback = columns
@@ -1519,7 +1554,7 @@ export class Builder extends mixing().useTrait([
   public update (values: Record<string, unknown>): number {
     this.applyBeforeQueryCallbacks()
 
-    values = (new Collection(values)).map((value) => {
+    values = new Collection(values).map((value) => {
       if (
         !(value instanceof Builder) &&
         !(value instanceof EloquentBuilder) &&
@@ -1537,18 +1572,27 @@ export class Builder extends mixing().useTrait([
       return { value: new Expression(`(${query})`), bindings: () => bindings }
     })
 
-    const sql = this.grammar.compileUpdate(this, values.map((value) => value.value).all())
+    const sql = this.grammar.compileUpdate(
+      this,
+      values.map((value) => value.value).all()
+    )
 
-    return this.connection.update(sql, this.cleanBindings(
-      this.grammar.prepareBindingsForUpdate(this.bindings, values.map((value) => value.bindings).all())
-    ))
+    return this.connection.update(
+      sql,
+      this.cleanBindings(
+        this.grammar.prepareBindingsForUpdate(
+          this.bindings,
+          values.map((value) => value.bindings).all()
+        )
+      )
+    )
   }
 
   /**
- * Invoke the "before query" modification callbacks.
- *
- * @return void
- */
+   * Invoke the "before query" modification callbacks.
+   *
+   * @return void
+   */
   public applyBeforeQueryCallbacks (): void {
     for (const callback of this.beforeQueryCallbacks) {
       callback(this)
@@ -2052,7 +2096,7 @@ export class Builder extends mixing().useTrait([
    * @param  mixed  result
    * @return mixed
    */
-  public applyAfterQueryCallbacks<TResult>(result: TResult): TResult {
+  public applyAfterQueryCallbacks<TResult> (result: TResult): TResult {
     for (const afterQueryCallback of this.afterQueryCallbacks) {
       result = afterQueryCallback(result) ?? result
     }
@@ -2071,7 +2115,7 @@ export class Builder extends mixing().useTrait([
    * @param  callable(): TResult  $callback
    * @return TResult
    */
-  protected onceWithColumns<TResult>(
+  protected onceWithColumns<TResult> (
     columns: Array<string | Expression>,
     callback: () => TResult
   ): TResult {
@@ -2098,7 +2142,10 @@ export class Builder extends mixing().useTrait([
   public async exists (): Promise<boolean> {
     this.applyBeforeQueryCallbacks()
 
-    const results = await this.connection.select(this.grammar.compileExists(this), this.getBindings())
+    const results = await this.connection.select(
+      this.grammar.compileExists(this),
+      this.getBindings()
+    )
 
     // If the results have rows, we will get the row and see if the exists column is a
     // boolean true. If there are no results for this query we will return false as
@@ -2195,7 +2242,9 @@ export class Builder extends mixing().useTrait([
    *
    * @return mixed
    */
-  public async doesntExistOr (callback: () => Promise<unknown>): Promise<boolean> {
+  public async doesntExistOr (
+    callback: () => Promise<unknown>
+  ): Promise<boolean> {
     const doesntExist = await this.doesntExist()
 
     if (doesntExist) {
@@ -2877,7 +2926,7 @@ export class Builder extends mixing().useTrait([
    */
   protected prependDatabaseNameIfCrossDatabaseQuery<
     T extends Builder | EloquentBuilder | Relation
-  >(query: T): T {
+  > (query: T): T {
     const builder = this.toBaseQuery(query)
 
     if (
@@ -4423,8 +4472,12 @@ export class Builder extends mixing().useTrait([
 
     // return undefined
 
-    const results = await this.cloneWithout(this.unions.length > 0 || this.havings.length > 0 ? [] : ['columns'])
-      .cloneWithoutBindings(this.unions.length > 0 || this.havings.length > 0 ? [] : ['select'])
+    const results = await this.cloneWithout(
+      this.unions.length > 0 || this.havings.length > 0 ? [] : ['columns']
+    )
+      .cloneWithoutBindings(
+        this.unions.length > 0 || this.havings.length > 0 ? [] : ['select']
+      )
       .setAggregate(fn, columns)
       .get(columns)
 
@@ -4551,11 +4604,15 @@ export class Builder extends mixing().useTrait([
     }
 
     if ((Array.isArray(uniqueBy) && uniqueBy.length === 0) || uniqueBy === '') {
-      throw new Error('InvalidArgumentException: The unique columns must not be empty.')
+      throw new Error(
+        'InvalidArgumentException: The unique columns must not be empty.'
+      )
     }
 
     if (Array.isArray(returning) && returning.length === 0) {
-      throw new Error('InvalidArgumentException: The returning columns must not be empty.')
+      throw new Error(
+        'InvalidArgumentException: The returning columns must not be empty.'
+      )
     }
 
     if (!Array.isArray(values[0]) && !isPlainObject(values[0])) {

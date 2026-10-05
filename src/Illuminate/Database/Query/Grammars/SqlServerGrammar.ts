@@ -138,12 +138,12 @@ export class SqlServerGrammar extends Grammar {
   }
 
   /**
-    * Compile a "lateral join" clause.
-    *
-    * @param  \Illuminate\Database\Query\JoinLateralClause  $join
-    * @param  string  $expression
-    * @return string
-    */
+   * Compile a "lateral join" clause.
+   *
+   * @param  \Illuminate\Database\Query\JoinLateralClause  $join
+   * @param  string  $expression
+   * @return string
+   */
   public override compileJoinLateral (
     // @ts-expect-error expected error; join is not used in this method
 

@@ -45,10 +45,10 @@ export class Connection extends DetectsLostConnections {
   protected postProcessor: Processor | undefined = undefined
 
   /**
-    * Indicates if changes have been made to the database.
-    *
-    * @var bool
-    */
+   * Indicates if changes have been made to the database.
+   *
+   * @var bool
+   */
   protected recordsModified: boolean = false
 
   /**
@@ -105,7 +105,7 @@ export class Connection extends DetectsLostConnections {
    *
    * @var (callable(\Illuminate\Database\Connection): mixed)
    */
-  protected reconnector: Reconnector = () => { }
+  protected reconnector: Reconnector = () => {}
 
   /**
    * Indicates whether queries are being logged.
@@ -238,7 +238,10 @@ export class Connection extends DetectsLostConnections {
    * @param  array  $bindings
    * @return int
    */
-  public async affectingStatement (query: string, bindings: BindingValues = []): Promise<number> {
+  public async affectingStatement (
+    query: string,
+    bindings: BindingValues = []
+  ): Promise<number> {
     return await this.run<number>(query, bindings, (
       query: string,
       bindings: BindingValues
@@ -274,7 +277,10 @@ export class Connection extends DetectsLostConnections {
     query: string,
     bindings: BindingValues = []
   ): Promise<boolean> {
-    return await this.run(query, bindings, (query: string, bindings: BindingValues) => {
+    return await this.run(query, bindings, (
+      query: string,
+      bindings: BindingValues
+    ) => {
       if (this.pretending()) {
         return true
       }

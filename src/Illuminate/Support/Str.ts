@@ -45,7 +45,11 @@ export class Str {
    * @param  string  $subject
    * @return string
    */
-  public static replaceFirst (search: string, replace: string, subject: string): string {
+  public static replaceFirst (
+    search: string,
+    replace: string,
+    subject: string
+  ): string {
     search = String(search)
 
     if (search === '') {
@@ -55,7 +59,11 @@ export class Str {
     const position = subject.indexOf(search)
 
     if (position !== false) {
-      return subject.substring(0, position) + replace + subject.substring(position + search.length)
+      return (
+        subject.substring(0, position) +
+        replace +
+        subject.substring(position + search.length)
+      )
     }
 
     return subject

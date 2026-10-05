@@ -26,25 +26,28 @@ export class BuildsQueries extends Conditionable {
   }
 
   /**
- * Execute the query and get the first result.
- *
- * @param  array|string  $columns
- * @return TValue|null
- */
+   * Execute the query and get the first result.
+   *
+   * @param  array|string  $columns
+   * @return TValue|null
+   */
   public first (columns: Array<string> = ['*']): Promise<unknown> {
     return this.limit(1).get(columns).first()
   }
 
   /**
- * Execute the query and get the first result or throw an exception.
- *
- * @param  array|string  $columns
- * @param  string|null  $message
- * @return TValue
- *
- * @throws \Illuminate\Database\RecordNotFoundException
- */
-  public async firstOrFail ($columns = ['*'], message: string | undefined = undefined): Promise<unknown> {
+   * Execute the query and get the first result or throw an exception.
+   *
+   * @param  array|string  $columns
+   * @param  string|null  $message
+   * @return TValue
+   *
+   * @throws \Illuminate\Database\RecordNotFoundException
+   */
+  public async firstOrFail (
+    $columns = ['*'],
+    message: string | undefined = undefined
+  ): Promise<unknown> {
     const result = await this.first($columns)
 
     if (result !== undefined) {

@@ -167,20 +167,33 @@ export class SQLiteGrammar extends Grammar {
    * @param  string  $sql
    * @return string
    */
-  public override compileInsertOrIgnoreUsing (query: Builder, columns: string[], sql: string): string {
-    return Str.replaceFirst('insert', 'insert or ignore', this.compileInsertUsing(query, columns, sql))
+  public override compileInsertOrIgnoreUsing (
+    query: Builder,
+    columns: string[],
+    sql: string
+  ): string {
+    return Str.replaceFirst(
+      'insert',
+      'insert or ignore',
+      this.compileInsertUsing(query, columns, sql)
+    )
   }
 
   /**
-    * Compile an insert or ignore statement with a returning clause into SQL.
-    *
-    * @param  \Illuminate\Database\Query\Builder  $query
-    * @param  array  $values
-    * @param  array  $returning
-    * @param  array|null  $uniqueBy
-    * @return string
-    */
-  public override compileInsertOrIgnoreReturning (query: Builder, values: unknown[], returning: string[], uniqueBy?: string[] | undefined): string {
+   * Compile an insert or ignore statement with a returning clause into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $values
+   * @param  array  $returning
+   * @param  array|null  $uniqueBy
+   * @return string
+   */
+  public override compileInsertOrIgnoreReturning (
+    query: Builder,
+    values: unknown[],
+    returning: string[],
+    uniqueBy?: string[] | undefined
+  ): string {
     const insert = this.compileInsert(query, values)
 
     if (uniqueBy === undefined) {
@@ -197,8 +210,15 @@ export class SQLiteGrammar extends Grammar {
    * @param  array  $values
    * @return string
    */
-  public override compileInsertOrIgnore (query: Builder, values: unknown[]): string {
-    return Str.replaceFirst('insert', 'insert or ignore', this.compileInsert(query, values))
+  public override compileInsertOrIgnore (
+    query: Builder,
+    values: unknown[]
+  ): string {
+    return Str.replaceFirst(
+      'insert',
+      'insert or ignore',
+      this.compileInsert(query, values)
+    )
   }
 
   /**

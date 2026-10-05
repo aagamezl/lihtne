@@ -27,12 +27,12 @@ export class MySqlGrammar extends Grammar {
   }
 
   /**
-    * Compile a "lateral join" clause.
-    *
-    * @param  \Illuminate\Database\Query\JoinLateralClause  $join
-    * @param  string  $expression
-    * @return string
-    */
+   * Compile a "lateral join" clause.
+   *
+   * @param  \Illuminate\Database\Query\JoinLateralClause  $join
+   * @param  string  $expression
+   * @return string
+   */
   public override compileJoinLateral (
     join: JoinLateralClause,
     expression: string
@@ -62,8 +62,15 @@ export class MySqlGrammar extends Grammar {
    * @param  array  $values
    * @return string
    */
-  public override compileInsertOrIgnore (query: Builder, values: unknown[]): string {
-    return Str.replaceFirst('insert', 'insert ignore', this.compileInsert(query, values))
+  public override compileInsertOrIgnore (
+    query: Builder,
+    values: unknown[]
+  ): string {
+    return Str.replaceFirst(
+      'insert',
+      'insert ignore',
+      this.compileInsert(query, values)
+    )
   }
 
   /**
@@ -74,8 +81,16 @@ export class MySqlGrammar extends Grammar {
    * @param  string  $sql
    * @return string
    */
-  public compileInsertOrIgnoreUsing (query: Builder, columns: string[], sql: string): string {
-    return Str.replaceFirst('insert', 'insert ignore', this.compileInsertUsing(query, columns, sql))
+  public compileInsertOrIgnoreUsing (
+    query: Builder,
+    columns: string[],
+    sql: string
+  ): string {
+    return Str.replaceFirst(
+      'insert',
+      'insert ignore',
+      this.compileInsertUsing(query, columns, sql)
+    )
   }
 
   /**
@@ -140,7 +155,7 @@ export class MySqlGrammar extends Grammar {
 
     const expanded =
       (where.options?.expanded ?? false) &&
-        (where.options?.mode ?? '') !== 'boolean'
+      (where.options?.mode ?? '') !== 'boolean'
         ? ' with query expansion'
         : ''
 

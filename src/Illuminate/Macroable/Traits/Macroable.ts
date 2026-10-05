@@ -1,5 +1,6 @@
 import { isNil } from '@devnetic/utils'
 
+export type Macro = (...args: unknown[]) => unknown
 export class Macroable {
   /**
    * The registered string macros.
@@ -19,17 +20,19 @@ export class Macroable {
   }
 
   /**
- * Dynamically handle calls to the class.
- *
- * @param  string  $method
- * @param  array  $parameters
- * @return mixed
- *
- * @throws \BadMethodCallException
- */
+   * Dynamically handle calls to the class.
+   *
+   * @param  string  $method
+   * @param  array  $parameters
+   * @return mixed
+   *
+   * @throws \BadMethodCallException
+   */
   public macroCall (method: string, parameters: unknown[]): unknown {
     if (!this.hasMacro(method)) {
-      throw new Error(`BadMethodCallException: Method ${this.constructor.name}::${method}() does not exist.`)
+      throw new Error(
+        `BadMethodCallException: Method ${this.constructor.name}::${method}() does not exist.`
+      )
     }
 
     let macro = this.macros[method]
@@ -48,6 +51,6 @@ export class Macroable {
       }
     }
 
-    return (macro as Function)(...parameters)
+    return (macro as Macro)(...parameters)
   }
 }

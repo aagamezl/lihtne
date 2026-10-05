@@ -213,7 +213,9 @@ export class PostgresGrammar extends Grammar {
     columns: string[],
     sql: string
   ): string {
-    return this.compileInsertUsing(query, columns, sql) + ' on conflict do nothing'
+    return (
+      this.compileInsertUsing(query, columns, sql) + ' on conflict do nothing'
+    )
   }
 
   /**
@@ -223,7 +225,10 @@ export class PostgresGrammar extends Grammar {
    * @param  array  $values
    * @return string
    */
-  public override compileInsertOrIgnore (query: Builder, values: unknown[]): string {
+  public override compileInsertOrIgnore (
+    query: Builder,
+    values: unknown[]
+  ): string {
     return this.compileInsert(query, values) + ' on conflict do nothing'
   }
 
@@ -407,7 +412,6 @@ export class PostgresGrammar extends Grammar {
    * @return string
    */
   public override compileJoinLateral (
-
     join: JoinLateralClause,
 
     expression: string
