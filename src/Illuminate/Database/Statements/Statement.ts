@@ -1,11 +1,20 @@
+import { uuid } from '@devnetic/utils'
+
 import type { BindingValue, BindingValues } from '../Query'
 
 export type Result = {
   rows: Record<string, unknown>[]
 }
 
+export type PreparedStatement = {
+  name: string
+  text: string
+}
+
 export class Statement {
   protected bindings: Record<string, BindingValue> = {}
+
+  protected statement?: PreparedStatement
 
   /**
    * @protected
@@ -29,8 +38,32 @@ export class Statement {
     }
   }
 
+  prepare (query: string): Statement {
+    this.statement = {
+      // give the query a unique name
+      name: `prepared-statement-${uuid()}`,
+      text: this.parameterize(query)
+    }
+
+    this.bindings = {}
+
+    return this
+  }
+
+  parameterize (query: string): string {
+    const regex = /\?/gm
+
+    if (query.match(regex) === null) {
+      return query
+    }
+
+    let index = 0
+    return query.replace(regex, () => `$${++index}`)
+  }
+
+  // @ts-expect-error expected error; params is not used in this method
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base execute signature
-  public execute (_params?: BindingValues) {
+  public async execute (params?: BindingValues): Promise<boolean> {
     throw new Error(
       `RuntimeException: Implement execute method on concrete class.`
     )

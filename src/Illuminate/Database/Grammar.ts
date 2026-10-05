@@ -1,4 +1,5 @@
 import type { Connection } from './Connection'
+import type { Builder } from './Query'
 
 import { Collection } from '../Collections/Collection'
 import { Expression } from './Query/Expression'

@@ -1,6 +1,8 @@
-import type { Builder, WhereClause } from '../Builder'
+import type { Expression } from '../../../Contracts'
+import type { BindingValues, Builder, WhereClause } from '../Builder'
 
-import { Str } from '../../../Support'
+import { Collection } from '../../../Collections'
+import { isNumeric, Str } from '../../../Support'
 import { Grammar } from './Grammar'
 
 export class SQLiteGrammar extends Grammar {
@@ -34,10 +36,12 @@ export class SQLiteGrammar extends Grammar {
    * @return string
    */
   protected override compileLock (
+    // @ts-expect-error expected error; query is not used in this method
     // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base compileLock signature
-    _query: Builder,
+    query: Builder,
+    // @ts-expect-error expected error; value is not used in this method
     // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base compileLock signature
-    _value: boolean | string
+    value: boolean | string
   ): string {
     return ''
   }
@@ -157,6 +161,29 @@ export class SQLiteGrammar extends Grammar {
    */
   protected override whereTime (query: Builder, where: WhereClause): string {
     return this.dateBasedWhere('%H:%M:%S', query, where)
+  }
+
+  /**
+    * Compile an "upsert" statement into SQL.
+    *
+    * @param  \Illuminate\Database\Query\Builder  $query
+    * @param  array  $values
+    * @param  array  $uniqueBy
+    * @param  array  $update
+    * @return string
+    */
+  public override compileUpsert (query: Builder, values: unknown[], uniqueBy: string | string[], update: unknown[]): string {
+    let sql = this.compileInsert(query, values)
+
+    sql += ' on conflict (' + this.columnize(uniqueBy) + ') do update set '
+
+    const columns = (new Collection(update)).map((value: unknown, key: PropertyKey) => {
+      return isNumeric(key)
+        ? this.wrap(value) + ' = ' + this.wrapValue('excluded') + '.' + this.wrap(value)
+        : this.wrap(key) + ' = ' + this.parameter(value)
+    }).implode(', ')
+
+    return sql + columns
   }
 
   /**

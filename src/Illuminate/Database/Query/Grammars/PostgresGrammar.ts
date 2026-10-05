@@ -1,7 +1,7 @@
-import { isTruthy } from '@devnetic/utils'
+import { isNumeric, isTruthy } from '@devnetic/utils'
 import { isNil } from 'es-toolkit'
 
-import type { Builder, WhereClause } from '../Builder'
+import type { BindingValues, Builder, WhereClause } from '../Builder'
 import type { Expression } from '../Expression'
 import type { JoinLateralClause } from '../JoinLateralClause'
 
@@ -174,6 +174,45 @@ export class PostgresGrammar extends Grammar {
     }
 
     return column + '::time ' + where.operator + ' ' + value
+  }
+
+  /**
+   * Compile an insert and get ID statement into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $values
+   * @param  string|null  $sequence
+   * @return string
+   */
+  public override compileInsertGetId (
+    query: Builder,
+    values: BindingValues,
+    sequence: string | undefined = undefined
+  ): string {
+    return this.compileInsert(query, values) + ' returning ' + this.wrap(sequence ?? 'id')
+  }
+
+  /**
+   * Compile an "upsert" statement into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $values
+   * @param  array  $uniqueBy
+   * @param  array  $update
+   * @return string
+   */
+  public override compileUpsert (query: Builder, values: unknown[], uniqueBy: string | string[], update: unknown[]): string {
+    let sql = this.compileInsert(query, values)
+
+    sql += ' on conflict (' + this.columnize(uniqueBy) + ') do update set '
+
+    const columns = (new Collection(update)).map((value: unknown, key: PropertyKey) => {
+      return isNumeric(key)
+        ? this.wrap(value) + ' = ' + this.wrapValue('excluded') + '.' + this.wrap(value)
+        : this.wrap(key) + ' = ' + this.parameter(value)
+    }).implode(', ')
+
+    return sql + columns
   }
 
   /**

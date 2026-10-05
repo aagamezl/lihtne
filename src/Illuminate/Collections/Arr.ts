@@ -1,9 +1,7 @@
-import { isNumeric } from '../Support/helpers'
+import { iterationKey, value } from '../Support/helpers'
 import { Collection } from './Collection'
 import {
-  type ArrayableInput,
   type Dictionary,
-  isArrayable,
   resolveDefault
 } from './types'
 
@@ -13,8 +11,8 @@ const DOT_SEPARATOR = '.'
  * TypeScript port of `Illuminate\Support\Arr`.
  *
  * Only the subset of methods requested for this port is implemented:
- * wrap, get, collapse, accessible, exists, pluck, explode (as
- * `explodePluckParameters`), first, from, map.
+ * wrap, get, collapse, accessible, exists, except, forget, pluck,
+ * explode (as `explodePluckParameters`), first, from, map.
  *
  * PHP's `Arr` operates over a single associative-array type that mixes
  * list and dictionary shapes. TypeScript has no equivalent, so this port
@@ -23,21 +21,16 @@ const DOT_SEPARATOR = '.'
  */
 export class Arr {
   /**
-   * PHP array keys are integers for lists; `Object.entries()` only yields
-   * strings. Match legacy `Arr::map()` by coercing numeric string keys.
-   */
-  private static iterationKey<TKey extends PropertyKey> (key: string): TKey {
-    return (isNumeric(key) ? Number(key) : key) as unknown as TKey
-  }
-
-  /**
    * Get all of the given array except for a specified array of keys.
    *
    * @param  array  $array
    * @param  array|string|int|float  $keys
    * @return array
    */
-  public static except (array: unknown[], keys: unknown[]): unknown[] {
+  public static except<TValue, TKeys extends PropertyKey>(
+    array: TValue,
+    keys: TKeys[]
+  ): TValue {
     this.forget(array, keys)
 
     return array
@@ -50,51 +43,79 @@ export class Arr {
    * @param  array|string|int|float  $keys
    * @return void
    */
-  public static forget (array: unknown[], keys: unknown[]): void {
-    const original = array
+  public static forget<TValue, TKeys extends PropertyKey>(
+    array: TValue,
+    keys: TKeys[]
+  ): void {
+    if (Array.isArray(array)) {
+      if (array.length === 0) {
+        return
+      }
 
-    keys = Arr.from(keys)
+      // const normalizedKeys = Arr.from<TKeys>(keys)
 
-    if (keys.length === 0) {
-      return
+      if (keys.length === 0) {
+        return
+      }
     }
 
     // eslint-disable-next-line no-labels -- the label is used to break out of the loop 2 levels deep
     keys: for (const key of keys) {
       // clean up before each pass
-      array = original
+      // array = original
 
       // if the exact key exists in the top-level, remove it
       if (this.exists(array, key)) {
-        array[key] = undefined
+        // array[key] = undefined
         continue
       }
 
-      const parts = String(key).split('.')
+      const parts = String(key).split(DOT_SEPARATOR)
+
+      if (!Arr.accessible(array)) {
+        continue keys
+      }
+
+      let cursor: unknown[] | Dictionary<unknown> = array
 
       while (parts.length > 1) {
         const part = parts.shift()
 
-        if (
-          part !== undefined &&
-          part in array &&
-          this.accessible(array[part])
-        ) {
-          array = array[part]
-        } else {
-          // eslint-disable-next-line no-labels -- the label is used to break out of the loop 2 levels deep
+        if (part === undefined) {
           continue keys
         }
+
+        if (!Arr.exists(cursor, part)) {
+          continue keys
+        }
+
+        const next = Arr.readEntry<unknown>(cursor, part)
+
+        if (!Arr.accessible(next)) {
+          continue keys
+        }
+
+        cursor = next
       }
 
-      array[parts.shift()] = undefined
+      const finalKey = parts.shift()
+
+      if (finalKey === undefined || !Arr.exists(cursor, finalKey)) {
+        continue keys
+      }
+
+      if (Array.isArray(cursor)) {
+        cursor[Number(finalKey)] = undefined
+      } else {
+        cursor[finalKey] = undefined
+      }
     }
   }
 
   /**
    * True when dictionary keys are dense `0..n-1`, like a PHP list array.
    */
-  static isList<TValue> (dictionary: Dictionary<TValue>): boolean {
+  static isList<TValue>(dictionary: Dictionary<TValue>): boolean {
     const keys = Object.keys(dictionary)
 
     for (let index = 0; index < keys.length; index += 1) {
@@ -116,7 +137,7 @@ export class Arr {
    * @param  callable(TValue, TKey): bool  $callback
    * @return array<TKey, TValue>
    */
-  public static where<TValue> (
+  public static where<TValue>(
     array: Array<TValue>,
     callback: (value: TValue, key: number) => boolean
   ): TValue[] {
@@ -178,7 +199,7 @@ export class Arr {
   /**
    * Ordered values for a list-shaped dictionary (same order as PHP `array_values`).
    */
-  static listValues<TValue> (dictionary: Dictionary<TValue>): TValue[] {
+  static listValues<TValue>(dictionary: Dictionary<TValue>): TValue[] {
     return Object.values(dictionary)
   }
 
@@ -211,7 +232,7 @@ export class Arr {
    * `Collection` instances and arrays are collapsed; everything else is
    * skipped).
    */
-  static collapse<TValue> (array: Iterable<TValue[] | unknown>): TValue[] {
+  static collapse<TValue>(array: Iterable<TValue[] | unknown>): TValue[] {
     const results: TValue[] = []
 
     for (const values of array) {
@@ -230,26 +251,10 @@ export class Arr {
    * the element type as `TValue[]` (instead of the generic `unknown[]`
    * signature `Array.isArray` reports) without a cast at the call site.
    */
-  private static isValueArray<TValue> (
+  private static isValueArray<TValue>(
     value: TValue[] | unknown
   ): value is TValue[] {
     return Array.isArray(value)
-  }
-
-  /**
-   * Narrow helper for `from()`: reports whether an object value (already
-   * known not to be an array or Arrayable) exposes `Symbol.iterator`, and
-   * narrows it to `Iterable<TValue>` for the caller in the same step —
-   * avoiding a separate cast to check for the iterator function and
-   * another to iterate it.
-   */
-  private static isIterableObject<TValue> (
-    value: object
-  ): value is Iterable<TValue> {
-    return (
-      typeof (value as { [Symbol.iterator]?: unknown })[Symbol.iterator] ===
-      'function'
-    )
   }
 
   /**
@@ -261,9 +266,9 @@ export class Arr {
    * arrays (an index within `[0, length)` counts as existing, matching
    * PHP's `array_key_exists` for lists).
    */
-  static exists (
-    array: unknown[] | Dictionary<unknown>,
-    key: PropertyKey
+  static exists<TValue, TKey extends PropertyKey>(
+    array: TValue,
+    key: TKey
   ): boolean {
     if (Array.isArray(array)) {
       const index = Number(key)
@@ -285,33 +290,33 @@ export class Arr {
    * (or `default` if empty). With a callback, returns the first item for
    * which the callback returns `true` (or `default` if none match).
    */
-  static first<TValue, TKey extends PropertyKey, TDefault = undefined> (
-    array: ArrayableInput<TValue>,
+  static first<TValue, TKey extends PropertyKey, TDefault = undefined>(
+    // array: ArrayableInput<TValue>,
+    array: TValue[] | Record<string, TValue>,
     callback?: (value: TValue, key: TKey) => boolean,
     defaultValue?: TDefault | (() => TDefault)
   ): TValue | TDefault | undefined {
-    const normalized = Arr.from<TValue>(array)
-    const entries = Object.entries(normalized)
-
     if (callback === undefined) {
-      const firstEntry = entries[0]
-
-      if (firstEntry === undefined) {
-        return resolveDefault(defaultValue)
+      if (array.length === 0) {
+        return value(defaultValue as TValue)
       }
 
-      const [, firstValue] = firstEntry
-
-      return firstValue
-    }
-
-    for (const [key, value] of entries) {
-      if (callback(value, Arr.iterationKey<TKey>(key))) {
-        return value
+      if (Array.isArray(array)) {
+        return array[0]
       }
+
+      // for (const item of array) {
+      //   return item;
+      // }
+
+      return value(defaultValue as TValue)
     }
 
-    return resolveDefault(defaultValue)
+    array = this.from(array)
+
+    return Object.entries(array).find(([key, value]) => {
+      return callback(value, iterationKey<TKey>(key))
+    })?.[1] ?? value(defaultValue as TValue)
   }
 
   /**
@@ -326,48 +331,28 @@ export class Arr {
    * bare list, because callers that need list semantics work with plain
    * arrays directly and never need to call `from()` on them.
    */
-  static from<TValue> (items: ArrayableInput<TValue>): Dictionary<TValue> {
+  static from<TValue>(
+    // items: ArrayableInput<TValue>
+    // items: TValue[] | Dictionary<unknown> | Iterable<unknown> | Record<string, unknown>
+    items: TValue[] | Record<string, TValue> | Set<TValue>
+    // ): Dictionary<TValue> | TValue[] {
+  ): TValue[] | Record<string, TValue> {
     if (items === null || items === undefined) {
       throw new Error('Items cannot be represented by a scalar value.')
     }
-
-    const result: Dictionary<TValue> = {}
-
     if (Array.isArray(items)) {
-      items.forEach((value: TValue, index: number) => {
-        result[index] = value
-      })
-
-      return result
+      return items
     }
 
-    if (isArrayable<TValue>(items)) {
-      Object.entries(items.toArray()).forEach(([key, value]) => {
-        result[key] = value
-      })
-
-      return result
-    }
-
-    if (Arr.isIterableObject<TValue>(items)) {
-      let index = 0
-
-      for (const value of items) {
-        result[index] = value
-        index += 1
-      }
-
-      return result
+    if (items instanceof Set) {
+      return Array.from(items)
     }
 
     if (typeof items === 'object') {
-      const record: Dictionary<TValue> = items
-
-      Object.entries(record).forEach(([key, value]) => {
-        result[key] = value
-      })
-
-      return result
+      return Object.entries(items).reduce<Record<string, TValue>>((acc, [key, value]) => {
+        acc[key] = value
+        return acc
+      }, {})
     }
 
     throw new Error('Items cannot be represented by a scalar value.')
@@ -381,7 +366,7 @@ export class Arr {
    * (resolved via `resolveDefault`, matching PHP's `value()`) when the
    * path cannot be resolved.
    */
-  static get<TValue, TDefault = undefined> (
+  static get<TValue, TDefault = undefined>(
     array: unknown,
     key: string | number | null | undefined,
     defaultValue?: TDefault | (() => TDefault)
@@ -424,17 +409,19 @@ export class Arr {
    * entry and the result is rebuilt with the same keys, just like
    * `array_combine(array_keys($array), array_map(...))` in PHP.
    */
-  static map<TKey extends PropertyKey, TValue, TMapped> (
-    array: Dictionary<TValue>,
+  static map<TKey extends PropertyKey, TValue, TMapped>(
+    array: TValue[] | Record<string, TValue>,
     callback: (value: TValue, key: TKey) => TMapped
-  ): Dictionary<TMapped> {
-    const result: Dictionary<TMapped> = {}
+  ): TMapped[] | Record<string, TMapped> {
+    return Object.entries(array).reduce<TMapped[] | Record<PropertyKey, TMapped>>((acc, [key, value]) => {
+      if (Array.isArray(acc)) {
+        acc.push(callback(value, iterationKey<TKey>(key)))
+      } else {
+        acc[key] = callback(value, iterationKey<TKey>(key))
+      }
 
-    for (const [key, value] of Object.entries(array)) {
-      result[key] = callback(value, Arr.iterationKey<TKey>(key))
-    }
-
-    return result
+      return acc
+    }, Array.isArray(array) ? [] : {})
   }
 
   /**
@@ -449,13 +436,13 @@ export class Arr {
    * @param  TLastDefault|(\Closure(): TLastDefault)  $default
    * @return TValue|TLastDefault
    */
-  public static last<TValue, TKey extends PropertyKey, TDefault = undefined> (
-    array: ArrayableInput<TValue>,
+  public static last<TValue, TKey extends PropertyKey, TDefault = undefined>(
+    array: TValue[],
     callback?: (value: TValue, key: TKey) => boolean,
     defaultValue?: TDefault | (() => TDefault)
   ): TValue | TDefault | undefined {
-    if (array === null) {
-      return resolveDefault(defaultValue)
+    if (array === null || array === undefined) {
+      return value(defaultValue)
     }
 
     const normalized = Arr.from<TValue>(array)
@@ -481,7 +468,7 @@ export class Arr {
    * keyed by dot-path `key` (or a key-callback). Nested arrays produced
    * by wildcard-free single-level access are read via `dataGet`.
    */
-  static pluck<TItem, TValue> (
+  static pluck<TItem, TValue>(
     array: Iterable<TItem>,
     value: string | string[] | ((item: TItem) => TValue),
     key?: string | string[] | ((item: TItem) => PropertyKey) | null
@@ -514,7 +501,7 @@ export class Arr {
    * `dataGet`. Extracted from `pluck()` to avoid an inline function-type
    * cast at each call site.
    */
-  private static resolvePluckSegment<TItem, TResult> (
+  private static resolvePluckSegment<TItem, TResult>(
     item: TItem,
     path: string[] | ((item: TItem) => TResult)
   ): TResult | undefined {
@@ -532,12 +519,12 @@ export class Arr {
    * are split on `.` into segments; callbacks and already-exploded arrays
    * pass through unchanged; `null` stays `null`.
    */
-  static explodePluckParameters<TItem, TValue> (
+  static explodePluckParameters<TItem, TValue>(
     value: string | string[] | ((item: TItem) => TValue),
     key?: string | string[] | ((item: TItem) => PropertyKey) | null
   ): [
-    string[] | ((item: TItem) => TValue),
-    string[] | ((item: TItem) => PropertyKey) | null
+      string[] | ((item: TItem) => TValue),
+      string[] | ((item: TItem) => PropertyKey) | null
   ] {
     const explodedValue =
       typeof value === 'string' ? value.split(DOT_SEPARATOR) : value
@@ -561,8 +548,8 @@ export class Arr {
    *
    * Mirrors `Arr::wrap()`.
    */
-  static wrap<TValue> (value: TValue[] | TValue | null | undefined): TValue[] {
-    if (value === null || value === undefined) {
+  static wrap<TValue>(value?: TValue | TValue[]): TValue[] {
+    if (value === undefined) {
       return []
     }
 
@@ -578,7 +565,7 @@ export class Arr {
    * segments are intentionally out of scope here, since `pluck()` never
    * produces them for this port's use cases.
    */
-  static dataGet<TValue, TDefault = undefined> (
+  static dataGet<TValue, TDefault = undefined>(
     target: unknown,
     segments: string[],
     defaultValue?: TDefault | (() => TDefault)
@@ -621,7 +608,7 @@ export class Arr {
    * narrowing that goes with it) so callers never touch bracket access on
    * a `Dictionary` directly.
    */
-  private static readEntry<TValue> (
+  private static readEntry<TValue>(
     source: unknown[] | Dictionary<unknown>,
     key: PropertyKey
   ): TValue {

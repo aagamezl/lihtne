@@ -27,7 +27,7 @@ import { Relation } from '../Eloquent/Relations'
 import { SortDirection, type SortDirectionType } from './Enums/SortDirection'
 import { Expression } from './Expression'
 
-export type BindingValue = string | number | boolean | Date | null | Expression
+export type BindingValue = string | number | boolean | Date | Expression | Record<string, unknown>
 
 export type OrderClauseType = 'Basic' | 'Raw'
 
@@ -52,34 +52,34 @@ export type WhereOptions = {
 
 export type WhereClauseType =
 
-    | 'Basic' |
-    'Bitwise' |
-    'Binary' |
-    'Column' |
-    'Date' |
-    'Day' |
-    'Expression' |
-    'Exists' |
-    'NotExists' |
-    'Fulltext' |
-    'In' |
-    'InRaw' |
-    'JsonBoolean' |
-    'Like' |
-    'Month' |
-    'Nested' |
-    'NotIn' |
-    'NotInRaw' |
-    'NotNull' |
-    'Null' |
-    'NullSafeEquals' |
-    'Sub' |
-    'Time' |
-    'Year' |
-    'between' |
-    'betweenColumns' |
-    'raw' |
-    'valueBetween'
+  | 'Basic' |
+  'Bitwise' |
+  'Binary' |
+  'Column' |
+  'Date' |
+  'Day' |
+  'Expression' |
+  'Exists' |
+  'NotExists' |
+  'Fulltext' |
+  'In' |
+  'InRaw' |
+  'JsonBoolean' |
+  'Like' |
+  'Month' |
+  'Nested' |
+  'NotIn' |
+  'NotInRaw' |
+  'NotNull' |
+  'Null' |
+  'NullSafeEquals' |
+  'Sub' |
+  'Time' |
+  'Year' |
+  'between' |
+  'betweenColumns' |
+  'raw' |
+  'valueBetween'
 
 export type WhereClause = {
   caseSensitive?: boolean
@@ -112,15 +112,15 @@ export type Bindings = {
 
 export type HavingClauseType =
 
-    | 'Basic' |
-    'Bitwise' |
-    'Expression' |
-    'Nested' |
-    'NotNull' |
-    'Null' |
-    'Raw' |
-    'between' |
-    'bit'
+  | 'Basic' |
+  'Bitwise' |
+  'Expression' |
+  'Nested' |
+  'NotNull' |
+  'Null' |
+  'Raw' |
+  'between' |
+  'bit'
 
 export type Having = {
   type: HavingClauseType
@@ -183,7 +183,7 @@ export interface Builder
   BuildsWhereDateClauses,
   Macroable,
   ForwardsCalls,
-  Conditionable {}
+  Conditionable { }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Builder extends mixing().useTrait([
@@ -417,6 +417,25 @@ export class Builder extends mixing().useTrait([
     this.processor = processor ?? connection.getPostProcessor()
 
     // return instanceProxy(this)
+  }
+
+  /**
+   * Insert a new record and get the value of the primary key.
+   *
+   * @param  string|null  $sequence
+   * @return int
+   */
+  public insertGetId (
+    values: BindingValues,
+    sequence: string | undefined = undefined
+  ): number {
+    this.applyBeforeQueryCallbacks()
+
+    const sql = this.grammar.compileInsertGetId(this, values, sequence)
+
+    const cleanedValues = this.cleanBindings(values)
+
+    return this.processor.processInsertGetId(this, sql, cleanedValues, sequence)
   }
 
   // /**
@@ -1547,44 +1566,52 @@ export class Builder extends mixing().useTrait([
   }
 
   /**
-   * Update records in the database.
+   * Insert new records or update the existing ones.
    *
-   * @return int<0, max>
+   * @param  non-empty-string|non-empty-array<int, non-empty-string>  $uniqueBy
+   * @return int
    */
-  public update (values: Record<string, unknown>): number {
+  public upsert (
+    values: unknown[],
+    uniqueBy: string | string[],
+    update?: unknown[]
+  ): Promise<number> {
+    if (uniqueBy.length === 0 || uniqueBy === '') {
+      throw new Error('InvalidArgumentException: The unique columns must not be empty.')
+    }
+
+    if (values.length === 0) {
+      return 0
+    } else if (update?.length === 0) {
+      return this.insert(values)
+    }
+
+    if (!Array.isArray(values[0])) {
+      values = [values]
+    } else {
+      for (const [key, value] of values.entries()) {
+        ksort($value)
+
+        values[key] = value
+      }
+    }
+
+    if (update === undefined) {
+      update = Object.keys(values[0])
+    }
+
     this.applyBeforeQueryCallbacks()
 
-    values = new Collection(values).map((value) => {
-      if (
-        !(value instanceof Builder) &&
-        !(value instanceof EloquentBuilder) &&
-        !(value instanceof Relation)
-      ) {
-        if (value instanceof Collection) {
-          return { value: value.all(), bindings: value.all() }
-        } else {
-          return { value, bindings: value }
-        }
-      }
+    const bindings = this.cleanBindings(Array.concat(
+      Arr.flatten(values, 1),
+      (new Collection(update))
+        .reject((value: unknown, key: number) => typeof key === 'number')
+        .all()
+    ))
 
-      const [query, bindings] = this.parseSub(value)
-
-      return { value: new Expression(`(${query})`), bindings: () => bindings }
-    })
-
-    const sql = this.grammar.compileUpdate(
-      this,
-      values.map((value) => value.value).all()
-    )
-
-    return this.connection.update(
-      sql,
-      this.cleanBindings(
-        this.grammar.prepareBindingsForUpdate(
-          this.bindings,
-          values.map((value) => value.bindings).all()
-        )
-      )
+    return this.connection.affectingStatement(
+      this.grammar.compileUpsert(this, values, Array.isArray(uniqueBy) ? uniqueBy : [uniqueBy], update),
+      bindings
     )
   }
 
@@ -2096,7 +2123,7 @@ export class Builder extends mixing().useTrait([
    * @param  mixed  result
    * @return mixed
    */
-  public applyAfterQueryCallbacks<TResult> (result: TResult): TResult {
+  public applyAfterQueryCallbacks<TResult>(result: TResult): TResult {
     for (const afterQueryCallback of this.afterQueryCallbacks) {
       result = afterQueryCallback(result) ?? result
     }
@@ -2115,7 +2142,7 @@ export class Builder extends mixing().useTrait([
    * @param  callable(): TResult  $callback
    * @return TResult
    */
-  protected onceWithColumns<TResult> (
+  protected onceWithColumns<TResult>(
     columns: Array<string | Expression>,
     callback: () => TResult
   ): TResult {
@@ -2926,7 +2953,7 @@ export class Builder extends mixing().useTrait([
    */
   protected prependDatabaseNameIfCrossDatabaseQuery<
     T extends Builder | EloquentBuilder | Relation
-  > (query: T): T {
+  >(query: T): T {
     const builder = this.toBaseQuery(query)
 
     if (
@@ -3455,21 +3482,61 @@ export class Builder extends mixing().useTrait([
   }
 
   /**
+   * Update records in the database.
+   *
+   * @return int<0, max>
+   */
+  public update (values: Record<string, unknown>): Promise<number> {
+    this.applyBeforeQueryCallbacks()
+
+    const compiledValues = (new Collection(values)).map((value: unknown) => {
+      if (
+        !(value instanceof Builder) &&
+        !(value instanceof EloquentBuilder) &&
+        !(value instanceof Relation)
+      ) {
+        const bindings = value instanceof Collection ? value.all() : value
+
+        return { value, bindings }
+      }
+
+      const [query, bindings] = this.parseSub(value)
+
+      return { value: new Expression(`(${query})`), bindings: () => bindings }
+    })
+
+    const sql = this.grammar.compileUpdate(
+      this,
+      compiledValues.map((value: { value: Expression }) => value.value).all()
+    )
+
+    return this.connection.update(
+      sql,
+      this.cleanBindings(
+        this.grammar.prepareBindingsForUpdate(
+          this.bindings,
+          compiledValues.map((value) => value.bindings).all()
+        )
+      )
+    )
+  }
+
+  /**
    * Remove all of the expressions from a list of bindings.
    *
    * @param  array<mixed>  $bindings
    * @return list<mixed>
    */
   public cleanBindings (
-    bindings: Array<string | number | Expression | undefined>,
+    bindings: BindingValues,
     includeExpressions = false
   ): BindingValues {
     const cleaned = new Collection(bindings)
       .reject(
-        (binding: string | number | Expression | undefined) =>
+        (binding: BindingValue) =>
           binding instanceof Expression && !includeExpressions
       )
-      .map((binding: string | number | Expression | undefined) => {
+      .map((binding: BindingValue) => {
         if (binding instanceof Expression) {
           return this.castBinding(
             this.toBinding(binding.getValue(this.grammar))

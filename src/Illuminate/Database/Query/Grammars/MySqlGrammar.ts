@@ -1,6 +1,8 @@
 import type { Builder, WhereClause } from '../Builder'
+import type { Expression } from '../Expression'
 import type { JoinLateralClause } from '../JoinLateralClause'
 
+import { Collection } from '../../../Collections'
 import { isNumeric, Str } from '../../../Support'
 import { Grammar } from './Grammar'
 
@@ -24,6 +26,39 @@ export class MySqlGrammar extends Grammar {
       /^select\b/i,
       `select /*+ MAX_EXECUTION_TIME(${milliseconds}) */`
     )
+  }
+
+  /**
+   * Compile an "upsert" statement into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $values
+   * @param  array  $uniqueBy
+   * @param  array  $update
+   * @return string
+   */
+  public override compileUpsert (query: Builder, values: unknown[], uniqueBy: string | string[], update: unknown[]): string {
+    const useUpsertAlias = query.getConnection().getConfig('use_upsert_alias')
+
+    let sql = this.compileInsert(query, values)
+
+    if (useUpsertAlias) {
+      sql += ' as lihtne_upsert_alias'
+    }
+
+    sql += ' on duplicate key update '
+
+    const columns = (new Collection(update)).map((value: unknown, key: string | Expression) => {
+      if (!isNumeric(key)) {
+        return this.wrap(key) + ' = ' + this.parameter(value)
+      }
+
+      return useUpsertAlias
+        ? this.wrap(value) + ' = ' + this.wrap('lihtne_upsert_alias') + '.' + this.wrap(value)
+        : this.wrap(value) + ' = values(' + this.wrap(value) + ')'
+    }).implode(', ')
+
+    return sql + columns
   }
 
   /**
@@ -81,7 +116,7 @@ export class MySqlGrammar extends Grammar {
    * @param  string  $sql
    * @return string
    */
-  public compileInsertOrIgnoreUsing (
+  public overridecompileInsertOrIgnoreUsing (
     query: Builder,
     columns: string[],
     sql: string
@@ -155,7 +190,7 @@ export class MySqlGrammar extends Grammar {
 
     const expanded =
       (where.options?.expanded ?? false) &&
-      (where.options?.mode ?? '') !== 'boolean'
+        (where.options?.mode ?? '') !== 'boolean'
         ? ' with query expansion'
         : ''
 

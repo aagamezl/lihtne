@@ -2,7 +2,7 @@ import { describe, expect, test } from '@jest/globals'
 
 import { Collection } from '../../src/Illuminate/Collections'
 
-describe('CollectionNew', () => {
+describe('Collection', () => {
   test('constructor defaults to an empty list', () => {
     expect(new Collection().all()).toEqual([])
   })
@@ -105,7 +105,7 @@ describe('CollectionNew', () => {
   })
 
   test('all returns dictionary for non-list shapes after map', () => {
-    const keyed = new Collection({ x: 1, y: 2 }).map((n) => n + 1)
+    const keyed = new Collection<string, number>({ x: 1, y: 2 }).map((n) => n + 1)
 
     expect(keyed.all()).toEqual({ x: 2, y: 3 })
   })

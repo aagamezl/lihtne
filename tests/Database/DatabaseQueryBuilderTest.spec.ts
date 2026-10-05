@@ -4645,4 +4645,168 @@ describe('Database Query Builder', () => {
     expect(result).toBe(1)
     expect(connection.affectingStatement).toHaveBeenCalledWith('insert or ignore into "table1" select * from "table2" where "foreign_id" = ?', [5])
   })
+
+  test('testSQLiteInsertOrIgnoreUsingInvalidSubquery', async () => {
+    const builder = getSQLiteBuilder()
+
+    expect(() => {
+      builder.from('table1').insertOrIgnoreUsing(['foo'], ['bar'])
+    }).toThrow(new Error('InvalidArgumentException: A subquery must be a query builder instance, a Closure, or a string.'))
+  })
+
+  test('testInsertGetIdMethod', async () => {
+    const builder = getBuilder()
+    const processor = builder.getProcessor()
+    jest.spyOn(processor, 'processInsertGetId').mockResolvedValue(1)
+    const result = await builder.from('users').insertGetId({ email: 'foo' }, 'id')
+    expect(processor.processInsertGetId).toHaveBeenCalledWith(builder, 'insert into "users" ("email") values (?)', ['foo'], 'id')
+    expect(result).toBe(1)
+  })
+
+  test('testInsertGetIdMethodRemovesExpressions', async () => {
+    const builder = getBuilder()
+    const processor = builder.getProcessor()
+    jest.spyOn(processor, 'processInsertGetId').mockResolvedValue(1)
+    const result = await builder.from('users').insertGetId({ email: 'foo', bar: new Raw('bar') }, 'id')
+    expect(processor.processInsertGetId).toHaveBeenCalledWith(builder, 'insert into "users" ("email", "bar") values (?, bar)', ['foo'], 'id')
+    expect(result).toBe(1)
+  })
+
+  test.only('testInsertGetIdWithEmptyValues', async () => {
+    let builder = getMySqlBuilder()
+    let processor = builder.getProcessor()
+    jest.spyOn(processor, 'processInsertGetId').mockResolvedValue(1)
+
+    let result = await builder.from('users').insertGetId([])
+    expect(processor.processInsertGetId).toHaveBeenCalledWith(builder, 'insert into `users` () values ()', [], undefined)
+    expect(result).toBe(1)
+
+    builder = getPostgresBuilder()
+    processor = builder.getProcessor()
+    jest.spyOn(processor, 'processInsertGetId').mockResolvedValue(1)
+
+    result = await builder.from('users').insertGetId([])
+    expect(processor.processInsertGetId).toHaveBeenCalledWith(builder, 'insert into "users" default values returning "id"', [], undefined)
+    expect(result).toBe(1)
+
+    builder = getSQLiteBuilder()
+    processor = builder.getProcessor()
+    jest.spyOn(processor, 'processInsertGetId').mockResolvedValue(1)
+
+    result = await builder.from('users').insertGetId([])
+    expect(processor.processInsertGetId).toHaveBeenCalledWith(builder, 'insert into "users" default values', [], undefined)
+    expect(result).toBe(1)
+
+    builder = getSqlServerBuilder()
+    processor = builder.getProcessor()
+    jest.spyOn(processor, 'processInsertGetId').mockResolvedValue(1)
+
+    result = await builder.from('users').insertGetId([])
+    expect(processor.processInsertGetId).toHaveBeenCalledWith(builder, 'insert into [users] default values', [], undefined)
+    expect(result).toBe(1)
+  })
+
+  test('testInsertMethodRespectsRawBindings', async () => {
+    const builder = getBuilder()
+    const connection = builder.getConnection()
+    jest.spyOn(connection, 'insert').mockResolvedValue(true)
+
+    const result = await builder.from('users').insert({ email: new Raw('CURRENT TIMESTAMP') })
+    expect(connection.insert).toHaveBeenCalledWith('insert into "users" ("email") values (CURRENT TIMESTAMP)', [])
+    expect(result).toBe(true)
+  })
+
+  test('testMultipleInsertsWithExpressionValues', async () => {
+    const builder = getBuilder()
+    const connection = builder.getConnection()
+    jest.spyOn(connection, 'insert').mockResolvedValue(true)
+
+    const result = await builder.from('users').insert([{ email: new Raw("UPPER('Foo')") }, { email: new Raw("LOWER('Foo')") }])
+    expect(connection.insert).toHaveBeenCalledWith('insert into "users" ("email") values (UPPER(\'Foo\')), (LOWER(\'Foo\'))', [])
+    expect(result).toBe(true)
+  })
+
+  test('testUpdateMethod', async () => {
+    let builder = getBuilder()
+    let connection = builder.getConnection()
+    jest.spyOn(connection, 'update').mockResolvedValue(1)
+
+    let result = await builder.from('users').where('id', '=', 1).update({ email: 'foo', name: 'bar' })
+    expect(connection.update).toHaveBeenCalledWith('update "users" set "email" = ?, "name" = ? where "id" = ?', ['foo', 'bar', 1])
+    expect(result).toBe(1)
+
+    builder = getMySqlBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'update').mockResolvedValue(1)
+
+    result = await builder.from('users').where('id', '=', 1).orderBy('foo', 'desc').limit(5).update({ email: 'foo', name: 'bar' })
+    expect(connection.update).toHaveBeenCalledWith('update `users` set `email` = ?, `name` = ? where `id` = ? order by `foo` desc limit 5', ['foo', 'bar', 1])
+    expect(result).toBe(1)
+
+    builder = getSqlServerBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'update').mockResolvedValue(1)
+
+    result = await builder.from('users').where('id', '=', 1).update({ email: 'foo', name: 'bar' })
+    expect(connection.update).toHaveBeenCalledWith('update [users] set [email] = ?, [name] = ? where [id] = ?', ['foo', 'bar', 1])
+    expect(result).toBe(1)
+
+    builder = getSqlServerBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'update').mockResolvedValue(1)
+
+    result = await builder.from('users').where('id', '=', 1).limit(5).update({ email: 'foo', name: 'bar' })
+    expect(connection.update).toHaveBeenCalledWith('update top (5) [users] set [email] = ?, [name] = ? where [id] = ?', ['foo', 'bar', 1])
+    expect(result).toBe(1)
+
+    builder = getSqlServerBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'update').mockResolvedValue(1)
+
+    result = await builder.from('users').where('id', '=', 1).limit(5).offset(5).update({ email: 'foo', name: 'bar' })
+    expect(connection.update).toHaveBeenCalledWith('update [users] set [email] = ?, [name] = ? where [id] = ?', ['foo', 'bar', 1])
+    expect(result).toBe(1)
+  })
+
+  test('testUpsertMethod', async () => {
+    let builder = getMySqlBuilder()
+    let connection = builder.getConnection()
+    jest.spyOn(connection, 'affectingStatement').mockResolvedValue(2)
+
+    let result = await builder.from('users').upsert([{ email: 'foo', name: 'bar' }, { name: 'bar2', email: 'foo2' }], 'email')
+    expect(connection.affectingStatement).toHaveBeenCalledWith('insert into `users` (`email`, `name`) values (?, ?), (?, ?) on duplicate key update `email` = values(`email`), `name` = values(`name`)', ['foo', 'bar', 'foo2', 'bar2'])
+    expect(result).toBe(2)
+
+    builder = getMySqlBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'affectingStatement').mockResolvedValue(2)
+
+    result = await builder.from('users').upsert([{ email: 'foo', name: 'bar' }, { name: 'bar2', email: 'foo2' }], 'email')
+    expect(connection.affectingStatement).toHaveBeenCalledWith('insert into `users` (`email`, `name`) values (?, ?), (?, ?) as laravel_upsert_alias on duplicate key update `email` = `laravel_upsert_alias`.`email`, `name` = `laravel_upsert_alias`.`name`', ['foo', 'bar', 'foo2', 'bar2'])
+    expect(result).toBe(2)
+
+    builder = getPostgresBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'affectingStatement').mockResolvedValue(2)
+
+    result = await builder.from('users').upsert([{ email: 'foo', name: 'bar' }, { name: 'bar2', email: 'foo2' }], 'email')
+    expect(connection.affectingStatement).toHaveBeenCalledWith('insert into "users" ("email", "name") values (?, ?), (?, ?) on conflict ("email") do update set "email" = "excluded"."email", "name" = "excluded"."name"', ['foo', 'bar', 'foo2', 'bar2'])
+    expect(result).toBe(2)
+
+    builder = getSQLiteBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'affectingStatement').mockResolvedValue(2)
+
+    result = await builder.from('users').upsert([{ email: 'foo', name: 'bar' }, { name: 'bar2', email: 'foo2' }], 'email')
+    expect(connection.affectingStatement).toHaveBeenCalledWith('insert into "users" ("email", "name") values (?, ?), (?, ?) on conflict ("email") do update set "email" = "excluded"."email", "name" = "excluded"."name"', ['foo', 'bar', 'foo2', 'bar2'])
+    expect(result).toBe(2)
+
+    builder = getSqlServerBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'affectingStatement').mockResolvedValue(2)
+
+    result = await builder.from('users').upsert([{ email: 'foo', name: 'bar' }, { name: 'bar2', email: 'foo2' }], 'email')
+    expect(connection.affectingStatement).toHaveBeenCalledWith('merge [users] using (values (?, ?), (?, ?)) [laravel_source] ([email], [name]) on [laravel_source].[email] = [users].[email] when matched then update set [email] = [laravel_source].[email], [name] = [laravel_source].[name] when not matched then insert ([email], [name]) values ([email], [name]);', ['foo', 'bar', 'foo2', 'bar2'])
+    expect(result).toBe(2)
+  })
 })

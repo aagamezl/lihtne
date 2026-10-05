@@ -4,6 +4,8 @@ import type { Builder, WhereClause } from '../Builder'
 import type { Expression } from '../Expression'
 import type { JoinLateralClause } from '../JoinLateralClause'
 
+import { Collection } from '../../../Collections'
+import { isNumeric } from '../../../Support/helpers'
 import { Grammar, type SelectComponents } from './Grammar'
 
 export class SqlServerGrammar extends Grammar {
@@ -210,6 +212,47 @@ export class SqlServerGrammar extends Grammar {
     existsQuery.columns = []
 
     return this.compileSelect(existsQuery.selectRaw('1 [exists]').limit(1))
+  }
+
+  /**
+    * Compile an "upsert" statement into SQL.
+    *
+    * @param  \Illuminate\Database\Query\Builder  $query
+    * @param  array  $values
+    * @param  array  $uniqueBy
+    * @param  array  $update
+    * @return string
+    */
+  public override compileUpsert (query: Builder, values: unknown[], uniqueBy: string | string[], update: unknown[]): string {
+    const columns = this.columnize(Object.keys(values[0]))
+
+    let sql = 'merge ' + this.wrapTable(query.from) + ' '
+
+    const parameters = (new Collection(values))
+      .map((record: unknown) => '(' + this.parameterize(record) + ')')
+      .implode(', ')
+
+    sql += 'using (values ' + parameters + ') ' + this.wrapTable('laravel_source') + ' (' + columns + ') '
+
+    const on = (new Collection(uniqueBy))
+      .map((column: string) => this.wrap('lihtne_source.' + column) + ' = ' + this.wrap(query.from + '.' + column))
+      .implode(' and ')
+
+    sql += 'on ' + on + ' '
+
+    if (update) {
+      const update = (new Collection(update as unknown[])).map((value: unknown, key: PropertyKey) => {
+        return isNumeric(key)
+          ? this.wrap(value) + ' = ' + this.wrap('lihtne_source.' + value)
+          : this.wrap(key) + ' = ' + this.parameter(value)
+      }).implode(', ')
+
+      sql += 'when matched then update set ' + update + ' '
+    }
+
+    sql += 'when not matched then insert (' + columns + ') values (' + columns + ');'
+
+    return sql
   }
 
   /**

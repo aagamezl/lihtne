@@ -58,7 +58,7 @@ export class Str {
 
     const position = subject.indexOf(search)
 
-    if (position !== false) {
+    if (position !== -1) {
       return (
         subject.substring(0, position) +
         replace +

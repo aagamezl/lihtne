@@ -2,10 +2,14 @@ import { isPlainObject } from 'es-toolkit'
 
 import type { ArrayableInput, Dictionary } from './types'
 
+import { mixing } from '../Support'
 import { Arr } from './Arr'
 import { EnumeratesValues } from './EnumeratesValues'
 
 const EMPTY_GLUE = ''
+
+export interface Collection<TKey extends PropertyKey, TValue>
+  extends EnumeratesValues<TKey, TValue> { }
 
 /**
  * TypeScript port of `Illuminate\Support\Collection`.
@@ -21,18 +25,33 @@ const EMPTY_GLUE = ''
 export class Collection<
   TKey extends PropertyKey,
   TValue
-> extends EnumeratesValues<TKey, TValue> {
+// > extends EnumeratesValues<TKey, TValue> {
+> extends mixing().useTrait([EnumeratesValues]) {
   /**
    * Create a new collection.
    *
    * Mirrors `Collection::__construct()`: normalizes whatever was passed
    * in through `getArrayableItems()` before storing it.
    */
-  constructor (items: ArrayableInput<TValue> = []) {
-    super({})
+
+  /**
+ * Mirrors the underlying `$items` array every method in this trait
+ * reads from. Stored as a `Dictionary` so both list-like (numeric) and
+ * associative (string) keys behave the way PHP arrays do.
+ */
+  protected items: TValue[] | Record<string, TValue>
+
+  constructor (items: TValue[] | Record<string, TValue> = []) {
+    super()
 
     this.items = this.getArrayableItems(items)
   }
+
+  // constructor (items: ArrayableInput<TValue> = []) {
+  //   super()
+
+  //   this.items = this.getArrayableItems(items)
+  // }
 
   /**
    * Create a new instance of the collection.
@@ -44,8 +63,8 @@ export class Collection<
    * always builds a plain `Collection` — faithful for this port's scope,
    * since no subclassing is exercised here.
    */
-  protected newInstance<TNewValue = TValue> (
-    items: ArrayableInput<TNewValue> = []
+  protected newInstance<TNewValue = TValue>(
+    items: TNewValue[] | Record<string, TNewValue> = []
   ): Collection<TKey, TNewValue> {
     return new Collection<TKey, TNewValue>(items)
   }
@@ -66,6 +85,21 @@ export class Collection<
   }
 
   /**
+ * Determine if the collection is not empty.
+ *
+ * @phpstan-assert-if-true TValue $this->first()
+ * @phpstan-assert-if-true TValue $this->last()
+ *
+ * @phpstan-assert-if-false null $this->first()
+ * @phpstan-assert-if-false null $this->last()
+ *
+ * @return bool
+ */
+  public isNotEmpty (): boolean {
+    return !this.isEmpty()
+  }
+
+  /**
    * Get all of the items in the collection.
    *
    * Mirrors `Collection::all()`. List-shaped collections (dense numeric
@@ -73,9 +107,9 @@ export class Collection<
    * Associative collections keep the underlying dictionary.
    */
   all (): Dictionary<TValue> | TValue[] {
-    if (Arr.isList(this.items)) {
-      return Arr.listValues(this.items)
-    }
+    // if (Arr.isList(this.items)) {
+    //   return Arr.listValues(this.items)
+    // }
 
     return this.items
   }
@@ -102,7 +136,7 @@ export class Collection<
    * Mirrors `Collection::first()`, which delegates straight to
    * `Arr::first()` over the collection's underlying items.
    */
-  public first<TDefault = undefined> (
+  public first<TDefault = undefined>(
     callback?: (value: TValue, key: TKey) => boolean,
     defaultValue?: TDefault | (() => TDefault)
   ): TValue | TDefault | undefined {
@@ -213,7 +247,7 @@ export class Collection<
    *
    * Mirrors `Collection::map()`, which delegates to `Arr::map()`.
    */
-  map<TMapped> (
+  map<TMapped>(
     callback: (value: TValue, key: TKey) => TMapped
   ): Collection<TKey, TMapped> {
     const mapped = Arr.map<TKey, TValue, TMapped>(this.items, callback)
@@ -226,7 +260,7 @@ export class Collection<
    *
    * Mirrors `Collection::pluck()`, which delegates to `Arr::pluck()`.
    */
-  pluck<TPlucked> (
+  pluck<TPlucked>(
     value: string | string[] | ((item: TValue) => TPlucked),
     key?: string | string[] | ((item: TValue) => PropertyKey) | null
   ): Collection<PropertyKey, TPlucked | undefined> {

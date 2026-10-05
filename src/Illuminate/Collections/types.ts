@@ -78,10 +78,8 @@ export type ItemCallback<TKey extends PropertyKey, TValue, TReturn> = (
 export function resolveDefault<TValue> (
   value: TValue | (() => TValue)
 ): TValue {
-  if (typeof value === 'function') {
-    const resolver = value as () => TValue
-
-    return resolver()
+  if (value instanceof Function) {
+    return value()
   }
 
   return value

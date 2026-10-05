@@ -28,18 +28,18 @@ import { JoinLateralClause } from '../JoinLateralClause'
 
 export type SelectComponentName =
 
-    | 'aggregate' |
-    'columns' |
-    'from' |
-    'indexHint' |
-    'joins' |
-    'wheres' |
-    'groups' |
-    'havings' |
-    'orders' |
-    'limit' |
-    'offset' |
-    'lock'
+  | 'aggregate' |
+  'columns' |
+  'from' |
+  'indexHint' |
+  'joins' |
+  'wheres' |
+  'groups' |
+  'havings' |
+  'orders' |
+  'limit' |
+  'offset' |
+  'lock'
 
 export type SelectComponent = {
   name: SelectComponentName
@@ -60,7 +60,7 @@ export type WhereCompilers = Record<
 
 // Trait methods are merged onto the class. `mixing().useTrait()` copies them onto the prototype at runtime.
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export interface Grammar extends BaseGrammar, CompilesJsonPaths {}
+export interface Grammar extends BaseGrammar, CompilesJsonPaths { }
 
 // Trait methods are merged onto the class. `mixing().useTrait()` copies them onto the prototype at runtime.
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -872,6 +872,34 @@ export class Grammar
   }
 
   /**
+   * Compile an "upsert" statement into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $values
+   * @param  array  $uniqueBy
+   * @param  array  $update
+   * @return string
+   *
+   * @throws \RuntimeException
+   */
+  public compileUpsert (
+    // @ts-expect-error expected error; query is not used in this method
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base compileUpsert signature
+    query: Builder,
+    // @ts-expect-error expected error; values is not used in this method
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base compileUpsert signature
+    values: unknown[],
+    // @ts-expect-error expected error; uniqueBy is not used in this method
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base compileUpsert signature
+    uniqueBy: string | string[],
+    // @ts-expect-error expected error; update is not used in this method
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base compileUpsert signature
+    update: unknown[]
+  ): string {
+    throw new Error('RuntimeException: This database engine does not support upserts.')
+  }
+
+  /**
    * Compile an insert or ignore statement with a returning clause into SQL.
    *
    * @param  \Illuminate\Database\Query\Builder  $query
@@ -1530,6 +1558,24 @@ export class Grammar
     return Array.values(
       Object.assign(bindings.join, flattenedValues, Arr.flatten(cleanBindings))
     )
+  }
+
+  /**
+   * Compile an insert and get ID statement into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $values
+   * @param  string|null  $sequence
+   * @return string
+   */
+  public compileInsertGetId (
+    query: Builder,
+    values: BindingValues,
+    // @ts-expect-error expected error; sequence is not used in this method
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    sequence: string | undefined = undefined
+  ): string {
+    return this.compileInsert(query, values)
   }
 
   /**

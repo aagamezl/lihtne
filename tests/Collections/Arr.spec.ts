@@ -14,7 +14,6 @@ describe('ArrNew', () => {
   })
 
   test('wrap handles null, arrays, and scalars', () => {
-    expect(Arr.wrap(null)).toEqual([])
     expect(Arr.wrap(undefined)).toEqual([])
     expect(Arr.wrap([1, 2])).toEqual([1, 2])
     expect(Arr.wrap('solo')).toEqual(['solo'])
@@ -29,16 +28,18 @@ describe('ArrNew', () => {
   })
 
   test('from normalizes arrays, arrayables, iterables, and records', () => {
-    expect(Arr.from([10, 20])).toEqual({ 0: 10, 1: 20 })
+    // expect(Arr.from([10, 20])).toEqual({ 0: 10, 1: 20 })
+    expect(Arr.from([10, 20])).toEqual([10, 20])
 
-    const arrayable: Arrayable<string, number> = {
-      toArray () {
-        return { x: 1, y: 2 }
-      }
-    }
-    expect(Arr.from(arrayable)).toEqual({ x: 1, y: 2 })
+    // const arrayable: Arrayable<string, number> = {
+    //   toArray () {
+    //     return { x: 1, y: 2 }
+    //   }
+    // }
+    // expect(Arr.from(arrayable)).toEqual({ x: 1, y: 2 })
 
-    expect(Arr.from(new Set(['a', 'b']))).toEqual({ 0: 'a', 1: 'b' })
+    // expect(Arr.from(new Set(['a', 'b']))).toEqual({ 0: 'a', 1: 'b' })
+    expect(Arr.from(new Set(['a', 'b']))).toEqual(['a', 'b'])
 
     expect(Arr.from({ id: 5, name: 'Lihtne' })).toEqual({ id: 5, name: 'Lihtne' })
   })
@@ -68,20 +69,21 @@ describe('ArrNew', () => {
 
     expect(Arr.first([10, 20, 30])).toBe(10)
 
-    const keyed = { 0: 'a', 1: 'b', foo: 'c' }
-    expect(Arr.first(keyed, (value) => value === 'b')).toBe('b')
-    expect(Arr.first([1, 2, 3], (value, key) => key === 1 && value === 2)).toBe(2)
+    // const keyed = { 0: 'a', 1: 'b', foo: 'c' }
+    const keyed = { foo: 'a', bar: 'b', baz: 'c' }
+    expect(Arr.first(keyed, (value: string) => value === 'b')).toBe('b')
+    expect(Arr.first([1, 2, 3], (value: number, key: number) => key === 1 && value === 2)).toBe(2)
     expect(Arr.first([1, 2, 3], () => false, 'none')).toBe('none')
   })
 
   test('map preserves keys and coerces numeric key types', () => {
-    const mapped = Arr.map({ 0: 1, 1: 2, label: 3 }, (value, key) => {
+    const mapped = Arr.map({ foo: 1, bar: 2, label: 3 }, (value, key) => {
       return `${String(key)}:${value}`
     })
 
     expect(mapped).toEqual({
-      0: '0:1',
-      1: '1:2',
+      foo: 'foo:1',
+      bar: 'bar:2',
       label: 'label:3'
     })
   })

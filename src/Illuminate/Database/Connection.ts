@@ -29,10 +29,10 @@ export type BeforeExecutingCallback = (
   bindings: BindingValues,
   connection: Connection
 ) => unknown
-export type QueryCallback = (
+export type QueryCallback<TValue> = (
   query: string,
   bindings: BindingValues
-) => Record<string, unknown>[] | Promise<Record<string, unknown>[]>
+) => TValue | Promise<TValue>
 
 export class Connection extends DetectsLostConnections {
   // The query grammar implementation.
@@ -105,7 +105,7 @@ export class Connection extends DetectsLostConnections {
    *
    * @var (callable(\Illuminate\Database\Connection): mixed)
    */
-  protected reconnector: Reconnector = () => {}
+  protected reconnector: Reconnector = () => { }
 
   /**
    * Indicates whether queries are being logged.
@@ -227,7 +227,7 @@ export class Connection extends DetectsLostConnections {
    * @param  array  $bindings
    * @return bool
    */
-  public insert (query: string, bindings: BindingValues = []): boolean {
+  public async insert (query: string, bindings: BindingValues = []): Promise<boolean> {
     return this.statement(query, bindings)
   }
 
@@ -238,11 +238,11 @@ export class Connection extends DetectsLostConnections {
    * @param  array  $bindings
    * @return int
    */
-  public async affectingStatement (
+  public affectingStatement (
     query: string,
     bindings: BindingValues = []
   ): Promise<number> {
-    return await this.run<number>(query, bindings, (
+    return this.run<number>(query, bindings, async (
       query: string,
       bindings: BindingValues
     ): Promise<number> => {
@@ -403,11 +403,11 @@ export class Connection extends DetectsLostConnections {
    *
    * @throws \Illuminate\Database\QueryException
    */
-  protected async run (
+  protected async run<TValue>(
     query: string,
     bindings: BindingValues,
     callback: QueryCallback
-  ): Promise<Record<string, unknown>[]> {
+  ): Promise<TValue> {
     for (const beforeExecutingCallback of this.beforeExecutingCallbacks) {
       await beforeExecutingCallback(query, bindings, this)
     }
@@ -416,7 +416,7 @@ export class Connection extends DetectsLostConnections {
 
     const start = Date.now()
 
-    let result
+    let result: TValue
 
     // Here we will run this query. If an exception occurs we'll determine if it was
     // caused by a connection that has been lost. If that is the cause, we'll try
@@ -542,12 +542,12 @@ export class Connection extends DetectsLostConnections {
    *
    * @throws \Illuminate\Database\QueryException
    */
-  protected tryAgainIfCausedByLostConnection (
+  protected tryAgainIfCausedByLostConnection<TValue>(
     e: Error,
     query: string,
     bindings: BindingValues,
-    callback: QueryCallback
-  ) {
+    callback: QueryCallback<TValue>
+  ): Promise<TValue> {
     if (this.causedByLostConnection(e.cause as Error)) {
       this.reconnect()
 
@@ -555,6 +555,17 @@ export class Connection extends DetectsLostConnections {
     }
 
     throw e
+  }
+
+  /**
+   * Run an update statement against the database.
+   *
+   * @param  string  $query
+   * @param  array  $bindings
+   * @return int
+   */
+  public update (query: string, bindings: BindingValues = []): Promise<number> {
+    return this.affectingStatement(query, bindings)
   }
 
   /**
@@ -567,11 +578,11 @@ export class Connection extends DetectsLostConnections {
    *
    * @throws \Illuminate\Database\QueryException
    */
-  protected async runQueryCallback (
+  protected async runQueryCallback<TValue>(
     query: string,
     bindings: BindingValues,
-    callback: QueryCallback
-  ) {
+    callback: QueryCallback<TValue>
+  ): Promise<TValue> {
     // To execute the statement, we'll simply call the callback, which will actually
     // run the SQL against the PDO connection. Then we can calculate the time it
     // took to execute and log the query SQL, bindings and time in our memory.

@@ -1,8 +1,6 @@
 import { Arr } from './Arr'
 import { type ArrayableInput, type Dictionary, isArrayable } from './types'
 
-const CALLBACK_STOP_SIGNAL = false
-
 /**
  * TypeScript port of `Illuminate\Support\Traits\EnumeratesValues`.
  *
@@ -18,31 +16,16 @@ const CALLBACK_STOP_SIGNAL = false
  * with this class.
  */
 export class EnumeratesValues<TKey extends PropertyKey, TValue> {
-  /**
-   * Mirrors the underlying `$items` array every method in this trait
-   * reads from. Stored as a `Dictionary` so both list-like (numeric) and
-   * associative (string) keys behave the way PHP arrays do.
-   */
-  protected items: Dictionary<TValue>
+  // /**
+  //  * Mirrors the underlying `$items` array every method in this trait
+  //  * reads from. Stored as a `Dictionary` so both list-like (numeric) and
+  //  * associative (string) keys behave the way PHP arrays do.
+  //  */
+  // protected items: Dictionary<TValue>
 
-  constructor (items: Dictionary<TValue> = {}) {
-    this.items = items
-  }
-
-  /**
-   * Determine if the collection is not empty.
-   *
-   * @phpstan-assert-if-true TValue $this->first()
-   * @phpstan-assert-if-true TValue $this->last()
-   *
-   * @phpstan-assert-if-false null $this->first()
-   * @phpstan-assert-if-false null $this->last()
-   *
-   * @return bool
-   */
-  public isNotEmpty (): boolean {
-    return !this.isEmpty()
-  }
+  // constructor (items: Dictionary<TValue> = {}) {
+  //   this.items = items
+  // }
 
   /**
    * Create a collection of all elements that do not pass a given truth test.
@@ -59,9 +42,9 @@ export class EnumeratesValues<TKey extends PropertyKey, TValue> {
    */
   each (callback: (value: TValue, key: TKey) => unknown): this {
     for (const [key, value] of Object.entries(this.items)) {
-      const result = callback(value, EnumeratesValues.toKey<TKey>(key))
+      const result = callback(value, key)
 
-      if (result === CALLBACK_STOP_SIGNAL) {
+      if (result === false) {
         break
       }
     }
@@ -93,17 +76,24 @@ export class EnumeratesValues<TKey extends PropertyKey, TValue> {
    * equivalent, so that branch is omitted.
    */
   protected getArrayableItems (
-    items: ArrayableInput<TValue> | TValue
-  ): Dictionary<TValue> {
-    if (this.isScalarLike(items)) {
-      const wrapped = Arr.wrap(items)
-      const result: Dictionary<TValue> = {}
+    // items?: ArrayableInput<TValue> | TValue
+    items?: TValue[] | Record<string, TValue>
+  // ): Dictionary<TValue> {
+  ): TValue[] | Record<string, TValue> {
+    // if (this.isScalarLike(items)) {
+    //   const wrapped = Arr.wrap(items)
+    //   const result: Dictionary<TValue> = {}
 
-      wrapped.forEach((value, index) => {
-        result[index] = value
-      })
+    //   wrapped.forEach((value, index) => {
+    //     result[index] = value
+    //   })
 
-      return result
+    //   return result
+    // }
+
+    // return Arr.from(items)
+    if (items === undefined || this.isScalarLike(items)) {
+      return Arr.wrap(items)
     }
 
     return Arr.from(items)

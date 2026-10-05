@@ -14,6 +14,14 @@ export const isEmpty = (value: unknown): boolean => {
   return value === undefined || value === 0 || value === false || value === null
 }
 
+/**
+ * PHP array keys are integers for lists; `Object.entries()` only yields
+ * strings. Match legacy `Arr::map()` by coercing numeric string keys.
+ */
+export const iterationKey = <TKey extends PropertyKey>(key: PropertyKey): TKey => {
+  return (isNumeric(key) ? Number(key) : key) as TKey
+}
+
 export const isEnum = (value: unknown): boolean => {
   if (typeof value !== 'object' || value === null) {
     return false
@@ -28,7 +36,7 @@ export const isEnum = (value: unknown): boolean => {
   return values.every((v) => typeof v === 'string' || typeof v === 'number')
 }
 
-export const isNumeric = (value: string | number): boolean => {
+export const isNumeric = (value: PropertyKey): boolean => {
   return !Array.isArray(value) && Number(value) - Number(value) + 1 >= 0
 }
 
@@ -43,7 +51,10 @@ export const iterableValues = <TValue>(
   return Array.isArray(value) ? value : Object.values(value)
 }
 
-export const value = (value: unknown, ...args: unknown[]): unknown => {
+export const value = <TValue>(
+  value: TValue | ((...args: PropertyKey[]) => TValue),
+  ...args: PropertyKey[]
+): TValue => {
   return value instanceof Function ? value(...args) : value
 }
 
@@ -157,8 +168,12 @@ export const isObject = (
  */
 export const head = <TValue>(
   value: TValue[] | Record<string, TValue>
-): TValue => {
-  return Array.isArray(value) ? value[0] : Array.from(Object.values(value))[0]
+): TValue | undefined => {
+  if (Array.isArray(value)) {
+    return value[0]
+  }
+
+  return Object.values(value)[0]
 }
 
 /**
@@ -167,6 +182,8 @@ export const head = <TValue>(
  * @param  {any}  array
  * @return {any}
  */
-export const reset = (value: unknown): unknown => {
+export const reset = <TValue>(
+  value: TValue[] | Record<string, TValue>
+): TValue | undefined => {
   return head(value)
 }
