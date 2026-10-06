@@ -2,6 +2,7 @@ import { isPlainObject, isTruthy } from '@devnetic/utils'
 
 import type {
   Agregate,
+  Bindings,
   BindingValues,
   Builder,
   Having,
@@ -14,7 +15,7 @@ import type { IndexHint } from '../IndexHint'
 
 import { Arr, Collection } from '../../../Collections'
 import { head, last } from '../../../Collections/helpers'
-import { isValueSet, type Prettify } from '../../../Support'
+import { getValue, isValueSet, type Prettify } from '../../../Support'
 import { mixing } from '../../../Support/Traits'
 import { CompilesJsonPaths } from '../../Concerns/CompilesJsonPaths'
 import { Grammar as BaseGrammar } from '../../Grammar'
@@ -1546,18 +1547,21 @@ export class Grammar
    * @return array
    */
   public prepareBindingsForUpdate (
-    bindings: Record<string, unknown>,
-    values: Record<string, unknown>
-  ): unknown[] {
+    bindings: Bindings,
+    values: BindingValues
+  ): BindingValues {
     const cleanBindings = Arr.except(bindings, ['select', 'join'])
 
     const flattenedValues = Arr.flatten(
-      Object.values(values).map((value) => value())
+      (Array.isArray(values) ? values : Object.values(values)).map((value) =>
+        getValue(value))
     )
 
-    return Array.values(
-      Object.assign(bindings.join, flattenedValues, Arr.flatten(cleanBindings))
-    )
+    return [
+      ...bindings.join,
+      ...flattenedValues,
+      ...Arr.flatten(cleanBindings)
+    ]
   }
 
   /**

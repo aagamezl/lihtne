@@ -1,6 +1,6 @@
 import { isPlainObject } from 'es-toolkit'
 
-import type { ArrayableInput, Dictionary } from './types'
+import type { Dictionary } from './types'
 
 import { mixing } from '../Support'
 import { Arr } from './Arr'
@@ -8,6 +8,8 @@ import { EnumeratesValues } from './EnumeratesValues'
 
 const EMPTY_GLUE = ''
 
+// Merges EnumeratesValues members onto this class. The interface adds no fields of its own.
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface Collection<TKey extends PropertyKey, TValue>
   extends EnumeratesValues<TKey, TValue> { }
 
@@ -22,6 +24,7 @@ export interface Collection<TKey extends PropertyKey, TValue>
  * this port, `Collection` instead extends the `EnumeratesValues` base
  * class to obtain `each`, `getArrayableItems`, and `useAsCallable`.
  */
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Collection<
   TKey extends PropertyKey,
   TValue
@@ -150,16 +153,18 @@ export class Collection<
    * @return static
    */
   public filter (
-    callback?: (value: TValue, key: number) => boolean | TValue
+    callback?: (value: TValue, key: TKey) => boolean | TValue
   ): Collection<TKey, TValue> {
-    const values = Object.values(this.items)
+    if (typeof callback !== 'function') {
+      if (callback === undefined) {
+        return this.newInstance(Arr.filter(this.items))
+      }
 
-    if (callback === undefined) {
-      return this.newInstance(values.filter((value) => Boolean(value)))
+      return this.filter((value) => value !== callback)
     }
 
     return this.newInstance(
-      values.filter((value, key) => Boolean(callback(value, key)))
+      Arr.filter(this.items, (value, key) => Boolean(callback(value, key)))
     )
   }
 
@@ -168,7 +173,7 @@ export class Collection<
    */
   public reject (
     callback:
-      | ((value: TValue, key: number) => boolean | TValue) |
+      | ((value: TValue, key: TKey) => boolean | TValue) |
       boolean |
       TValue = true
   ): Collection<TKey, TValue> {

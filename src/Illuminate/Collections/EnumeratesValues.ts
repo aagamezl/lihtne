@@ -1,5 +1,5 @@
 import { Arr } from './Arr'
-import { type ArrayableInput, type Dictionary, isArrayable } from './types'
+import { type ArrayableInput, isArrayable } from './types'
 
 /**
  * TypeScript port of `Illuminate\Support\Traits\EnumeratesValues`.

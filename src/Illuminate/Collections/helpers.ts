@@ -2,7 +2,7 @@ import { isNil } from 'es-toolkit'
 
 import type { ArrayableInput } from './types'
 
-import { isObject, isSet, value } from '../Support'
+import { getValue, isObject, isSet } from '../Support'
 import { Arr } from './Arr'
 import { Collection } from './Collection'
 
@@ -54,7 +54,7 @@ export const dataGet = (
       } else if (isIterable(target)) {
         values = [...target]
       } else {
-        return value(defaultValue)
+        return getValue(defaultValue)
       }
 
       return explodedKey.includes('*') ? Arr.collapse(values) : values
@@ -86,7 +86,7 @@ export const dataGet = (
     }
 
     if (typeof segment !== 'string' && typeof segment !== 'number') {
-      return value(defaultValue)
+      return getValue(defaultValue)
     }
 
     if (Arr.accessible(target) && Arr.exists(target, segment)) {
@@ -94,7 +94,7 @@ export const dataGet = (
     } else if (isObject(target) && isSet(target[segment])) {
       target = target[segment]
     } else {
-      return value(defaultValue)
+      return getValue(defaultValue)
     }
   }
 

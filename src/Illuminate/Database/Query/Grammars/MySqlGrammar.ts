@@ -1,4 +1,6 @@
-import type { Builder, WhereClause } from '../Builder'
+import { isPlainObject } from '@devnetic/utils'
+
+import type { Bindings, BindingValues, Builder, WhereClause } from '../Builder'
 import type { Expression } from '../Expression'
 import type { JoinLateralClause } from '../JoinLateralClause'
 
@@ -109,6 +111,50 @@ export class MySqlGrammar extends Grammar {
   }
 
   /**
+   * Prepare the bindings for an update statement.
+   *
+   * Booleans, integers, and doubles are inserted into JSON updates as raw values.
+   *
+   * @param  array  $bindings
+   * @param  array  $values
+   * @return array
+   */
+  public override prepareBindingsForUpdate (
+    bindings: Bindings,
+    values: BindingValues
+  ): BindingValues {
+    values = (new Collection(values))
+      .reject((value: unknown, column: string | Expression) => this.isJsonSelector(column) && typeof value === 'boolean')
+      .map((value: unknown) => (Array.isArray(value) || isPlainObject(value)) ? JSON.stringify(value) : value)
+      .all()
+
+    return super.prepareBindingsForUpdate(bindings, values)
+  }
+
+  /**
+   * Compile an update statement without joins into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  string  $table
+   * @param  string  $columns
+   * @param  string  $where
+   * @return string
+   */
+  protected override compileUpdateWithoutJoins (query: Builder, table: string, columns: string, where: string): string {
+    let sql = super.compileUpdateWithoutJoins(query, table, columns, where)
+
+    if (query.orders.length > 0) {
+      sql += ' ' + this.compileOrders(query, query.orders)
+    }
+
+    if (query.limitProperty) {
+      sql += ' ' + this.compileLimit(query, query.limitProperty)
+    }
+
+    return sql
+  }
+
+  /**
    * Compile an insert ignore statement using a subquery into SQL.
    *
    * @param  \Illuminate\Database\Query\Builder  $query
@@ -116,7 +162,7 @@ export class MySqlGrammar extends Grammar {
    * @param  string  $sql
    * @return string
    */
-  public overridecompileInsertOrIgnoreUsing (
+  public override compileInsertOrIgnoreUsing (
     query: Builder,
     columns: string[],
     sql: string

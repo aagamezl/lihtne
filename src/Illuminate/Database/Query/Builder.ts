@@ -18,7 +18,7 @@ import { Macroable } from '../../Macroable/Traits/Macroable'
 import { DatePeriod, isSet, mixing, type Prettify } from '../../Support'
 // import { registry } from './internal'
 import { resolveClass } from '../../Support/class-registry'
-import { changeKeyCase, isNumeric, tap } from '../../Support/helpers'
+import { changeKeyCase, isNumeric, tap, typedEntries } from '../../Support/helpers'
 import { ForwardsCalls } from '../../Support/Traits'
 import { BuildsQueries } from '../Concerns'
 import { BuildsWhereDateClauses } from '../Concerns/BuildsWhereDateClauses'
@@ -1602,12 +1602,12 @@ export class Builder extends mixing().useTrait([
 
     this.applyBeforeQueryCallbacks()
 
-    const bindings = this.cleanBindings(Array.concat(
-      Arr.flatten(values, 1),
-      (new Collection(update))
+    const bindings = this.cleanBindings([
+      ...Arr.flatten(values, 1),
+      ...(new Collection(update))
         .reject((value: unknown, key: number) => typeof key === 'number')
         .all()
-    ))
+    ])
 
     return this.connection.affectingStatement(
       this.grammar.compileUpsert(this, values, Array.isArray(uniqueBy) ? uniqueBy : [uniqueBy], update),
@@ -4584,21 +4584,22 @@ export class Builder extends mixing().useTrait([
    *
    * @return bool
    */
-  public insert (values: unknown[]): boolean {
+  public insert (values: Array<Record<string, unknown>> | Record<string, unknown>): boolean {
     // Since every insert gets treated like a batch insert, we will make sure the
     // bindings are structured in a way that is convenient when building these
     // inserts statements by verifying these elements are actually an array.
-    if (values.length === 0) {
+    if (Object.keys(values).length === 0 || values.length === 0) {
       return true
     }
 
-    if (!Array.isArray(values[0])) {
+    // if (!Array.isArray(firstValue) && !isPlainObject(firstValue) && !isPlainObject(values)) {
+    if (!Array.isArray(head(values)) && !isPlainObject(head(values))) {
       values = [values]
     } else {
       // Here, we will sort the insert keys for every record so that each insert is
       // in the same order for the record. We need to make sure this is the case
       // so there are not any errors or problems when inserting these records.
-      for (const [key, value] of values.entries()) {
+      for (const [key, value] of typedEntries(values)) {
         const sortedKeys = Object.keys(value).sort()
         const sortedValue = {}
 

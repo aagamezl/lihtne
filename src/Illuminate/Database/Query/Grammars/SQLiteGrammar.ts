@@ -1,6 +1,3 @@
-import type { Expression } from '../../../Contracts'
-import type { BindingValues, Builder, WhereClause } from '../Builder'
-
 import { Collection } from '../../../Collections'
 import { isNumeric, Str } from '../../../Support'
 import { Grammar } from './Grammar'

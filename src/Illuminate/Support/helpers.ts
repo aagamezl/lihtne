@@ -51,15 +51,15 @@ export const iterableValues = <TValue>(
   return Array.isArray(value) ? value : Object.values(value)
 }
 
-export const value = <TValue>(
+export const getValue = <TValue>(
   value: TValue | ((...args: PropertyKey[]) => TValue),
   ...args: PropertyKey[]
 ): TValue => {
   return value instanceof Function ? value(...args) : value
 }
 
-export const typedEntries = <T extends object>(obj: T): Entries<T> => {
-  return Object.entries(obj) as Entries<T>
+export const typedEntries = <T extends object>(obj: T): [keyof T, T[keyof T]][] => {
+  return Object.entries(obj) as [keyof T, T[keyof T]][]
 }
 
 /**

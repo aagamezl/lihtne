@@ -1,4 +1,6 @@
-import { iterationKey, value } from '../Support/helpers'
+import { isPlainObject } from '@devnetic/utils'
+
+import { getValue, iterationKey } from '../Support/helpers'
 import { Collection } from './Collection'
 import {
   type Dictionary,
@@ -59,7 +61,7 @@ export class Arr {
       }
     }
 
-    // eslint-disable-next-line no-labels -- the label is used to break out of the loop 2 levels deep
+    /* eslint-disable no-labels -- continue keys skips to the next key from nested while */
     keys: for (const key of keys) {
       // clean up before each pass
       // array = original
@@ -110,6 +112,7 @@ export class Arr {
         cursor[finalKey] = undefined
       }
     }
+    /* eslint-enable no-labels */
   }
 
   /**
@@ -176,16 +179,36 @@ export class Arr {
     array: Iterable<unknown>,
     depth: number = Infinity
   ): unknown[] {
-    const result: unknown[] = []
+    // const result: unknown[] = []
 
-    for (let item of array) {
+    // for (let item of array) {
+    //   item = item instanceof Collection ? item.all() : item
+
+    //   if (!Arr.shouldFlattenAsArray(item)) {
+    //     result.push(item)
+    //   } else {
+    //     const nested = Array.isArray(item) ? item : Object.values(item)
+    //     const values = depth === 1 ? nested : Arr.flatten(nested, depth - 1)
+
+    //     for (const value of values) {
+    //       result.push(value)
+    //     }
+    //   }
+    // }
+
+    // return result
+    const result = []
+    const entries = Object.entries(array)
+
+    for (let [, item] of entries) {
       item = item instanceof Collection ? item.all() : item
 
-      if (!Arr.shouldFlattenAsArray(item)) {
+      if (!Array.isArray(item) && !isPlainObject(item)) {
         result.push(item)
       } else {
-        const nested = Array.isArray(item) ? item : Object.values(item)
-        const values = depth === 1 ? nested : Arr.flatten(nested, depth - 1)
+        const values = depth === 1
+          ? Object.values(item)
+          : this.flatten(item, depth - 1)
 
         for (const value of values) {
           result.push(value)
@@ -298,7 +321,7 @@ export class Arr {
   ): TValue | TDefault | undefined {
     if (callback === undefined) {
       if (array.length === 0) {
-        return value(defaultValue as TValue)
+        return getValue(defaultValue as TValue)
       }
 
       if (Array.isArray(array)) {
@@ -309,14 +332,14 @@ export class Arr {
       //   return item;
       // }
 
-      return value(defaultValue as TValue)
+      return getValue(defaultValue as TValue)
     }
 
     array = this.from(array)
 
     return Object.entries(array).find(([key, value]) => {
       return callback(value, iterationKey<TKey>(key))
-    })?.[1] ?? value(defaultValue as TValue)
+    })?.[1] ?? getValue(defaultValue as TValue)
   }
 
   /**
@@ -409,6 +432,33 @@ export class Arr {
    * entry and the result is rebuilt with the same keys, just like
    * `array_combine(array_keys($array), array_map(...))` in PHP.
    */
+  static filter<TKey extends PropertyKey, TValue>(
+    array: TValue[] | Record<string, TValue>,
+    callback?: (value: TValue, key: TKey) => boolean
+  ): TValue[] | Record<string, TValue> {
+    if (callback === undefined) {
+      if (Array.isArray(array)) {
+        return array.filter(Boolean)
+      }
+
+      return Object.fromEntries(
+        Object.entries(array).filter(([, value]) => Boolean(value))
+      )
+    }
+
+    if (Array.isArray(array)) {
+      return array.filter((value, index) => callback(value, index as TKey))
+    }
+
+    return Object.entries(array).reduce<Record<string, TValue>>((acc, [key, value]) => {
+      if (callback(value, iterationKey<TKey>(key))) {
+        acc[key] = value
+      }
+
+      return acc
+    }, {})
+  }
+
   static map<TKey extends PropertyKey, TValue, TMapped>(
     array: TValue[] | Record<string, TValue>,
     callback: (value: TValue, key: TKey) => TMapped
@@ -442,7 +492,7 @@ export class Arr {
     defaultValue?: TDefault | (() => TDefault)
   ): TValue | TDefault | undefined {
     if (array === null || array === undefined) {
-      return value(defaultValue)
+      return getValue(defaultValue)
     }
 
     const normalized = Arr.from<TValue>(array)

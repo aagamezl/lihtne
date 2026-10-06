@@ -5,6 +5,7 @@ import type { Expression } from '../Expression'
 import type { JoinLateralClause } from '../JoinLateralClause'
 
 import { Collection } from '../../../Collections'
+import { Str } from '../../../Support'
 import { isNumeric } from '../../../Support/helpers'
 import { Grammar, type SelectComponents } from './Grammar'
 
@@ -215,6 +216,40 @@ export class SqlServerGrammar extends Grammar {
   }
 
   /**
+   * Compile an update statement without joins into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  string  $table
+   * @param  string  $columns
+   * @param  string  $where
+   * @return string
+   */
+  protected override compileUpdateWithoutJoins (query: Builder, table: string, columns: string, where: string): string {
+    const sql = super.compileUpdateWithoutJoins(query, table, columns, where)
+
+    return query.limitProperty && query.limitProperty > 0 && (query.offsetProperty ?? 0) <= 0
+      ? Str.replaceFirst('update', 'update top (' + query.limitProperty + ')', sql)
+      : sql
+  }
+
+  /**
+   * Compile an update statement with joins into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  string  $table
+   * @param  string  $columns
+   * @param  string  $where
+   * @return string
+   */
+  protected override compileUpdateWithJoins (query: Builder, table: string, columns: string, where: string): string {
+    const alias = table.split(' as ').pop() ?? ''
+
+    const joins = this.compileJoins(query, query.joins)
+
+    return 'update ' + alias + ' set ' + columns + ' from ' + table + ' ' + joins + ' ' + where
+  }
+
+  /**
     * Compile an "upsert" statement into SQL.
     *
     * @param  \Illuminate\Database\Query\Builder  $query
@@ -223,7 +258,12 @@ export class SqlServerGrammar extends Grammar {
     * @param  array  $update
     * @return string
     */
-  public override compileUpsert (query: Builder, values: unknown[], uniqueBy: string | string[], update: unknown[]): string {
+  public override compileUpsert (
+    query: Builder,
+    values: unknown[],
+    uniqueBy: string | string[],
+    update: unknown[]
+  ): string {
     const columns = this.columnize(Object.keys(values[0]))
 
     let sql = 'merge ' + this.wrapTable(query.from) + ' '
@@ -241,13 +281,13 @@ export class SqlServerGrammar extends Grammar {
     sql += 'on ' + on + ' '
 
     if (update) {
-      const update = (new Collection(update as unknown[])).map((value: unknown, key: PropertyKey) => {
+      const updateColumns = (new Collection(update as unknown[])).map((value: unknown, key: PropertyKey) => {
         return isNumeric(key)
           ? this.wrap(value) + ' = ' + this.wrap('lihtne_source.' + value)
           : this.wrap(key) + ' = ' + this.parameter(value)
       }).implode(', ')
 
-      sql += 'when matched then update set ' + update + ' '
+      sql += 'when matched then update set ' + updateColumns + ' '
     }
 
     sql += 'when not matched then insert (' + columns + ') values (' + columns + ');'

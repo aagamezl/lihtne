@@ -4305,7 +4305,9 @@ describe('Database Query Builder', () => {
     const builder = getBuilder()
     const connection = builder.getConnection()
     jest.spyOn(connection, 'insert').mockResolvedValue(true)
+
     const result = await builder.from('users').insert({ email: 'foo' })
+    expect(connection.insert).toHaveBeenCalledWith('insert into "users" ("email") values (?)', ['foo'])
     expect(result).toBe(true)
   })
 
@@ -4672,7 +4674,7 @@ describe('Database Query Builder', () => {
     expect(result).toBe(1)
   })
 
-  test.only('testInsertGetIdWithEmptyValues', async () => {
+  test('testInsertGetIdWithEmptyValues', async () => {
     let builder = getMySqlBuilder()
     let processor = builder.getProcessor()
     jest.spyOn(processor, 'processInsertGetId').mockResolvedValue(1)

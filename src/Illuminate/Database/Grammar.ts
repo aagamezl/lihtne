@@ -1,5 +1,4 @@
 import type { Connection } from './Connection'
-import type { Builder } from './Query'
 
 import { Collection } from '../Collections/Collection'
 import { Expression } from './Query/Expression'
@@ -162,7 +161,9 @@ export abstract class Grammar {
   public parameterize (values: unknown[]): string {
     // return values.map((value) => this.parameter(value)).join(', ')
     return (Array.isArray(values) ? values : Object.values(values))
-      .map((value) => this.parameter(value))
+      .map((value) => {
+        return this.parameter(value)
+      })
       .join(', ')
   }
 

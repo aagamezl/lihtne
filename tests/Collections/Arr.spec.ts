@@ -1,7 +1,5 @@
 import { describe, expect, test } from '@jest/globals'
 
-import type { Arrayable } from '../../src/Illuminate/Collections/types'
-
 import { Arr } from '../../src/Illuminate/Collections/Arr'
 
 describe('ArrNew', () => {
