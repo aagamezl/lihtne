@@ -1,5 +1,8 @@
-import { Collection } from '../../../Collections'
-import { isNumeric, Str } from '../../../Support'
+import type { Bindings, BindingValues, Builder } from '../Builder'
+
+import { Arr, Collection } from '../../../Collections'
+import { last } from '../../../Collections/helpers'
+import { getValue, isNumeric, Str } from '../../../Support'
 import { Grammar } from './Grammar'
 
 export class SQLiteGrammar extends Grammar {
@@ -201,6 +204,124 @@ export class SQLiteGrammar extends Grammar {
       'insert or ignore',
       this.compileInsertUsing(query, columns, sql)
     )
+  }
+
+  /**
+   * Compile an update statement with joins or limit into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $values
+   * @return string
+   */
+  protected compileUpdateWithJoinsOrLimit (query: Builder, values: unknown[]): string {
+    const table = this.wrapTable(query.fromProperty)
+    const columns = this.compileUpdateColumns(query, values)
+    const alias = query.fromProperty.split(' as ').pop() ?? ''
+    const selectSql = this.compileSelect(query.select(`${alias}.rowid`))
+
+    return `update ${table} set ${columns} where ${this.wrap('rowid')} in (${selectSql})`
+  }
+
+  /**
+   * Compile the columns for an update statement.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $values
+   * @return string
+   */
+
+  // @ts-expect-error expected error; query is not used in this method
+  protected override compileUpdateColumns (query: Builder, values: unknown[]): string {
+    const jsonGroups = this.groupJsonColumnsForUpdate(values)
+
+    return (new Collection(values))
+      .reject((value: unknown, key: PropertyKey) => this.isJsonSelector(key))
+      .merge(jsonGroups)
+      .map((value: unknown, key: PropertyKey) => {
+        const column = last(key.split('.'))
+
+        value = jsonGroups[key] ? this.compileJsonPatch(column, value) : this.parameter(value)
+
+        return this.wrap(column) + ' = ' + value
+      })
+      .implode(', ')
+  }
+
+  /**
+   * Compile a "JSON" patch statement into SQL.
+   *
+   * @param  string  $column
+   * @param  mixed  $value
+   * @return string
+   */
+  protected compileJsonPatch (column: string, value: unknown): string {
+    return `json_patch(ifnull(${this.wrap(column)}, json('{}')), json(${this.parameter(value)}))`
+  }
+
+  /**
+   * Compile an update statement into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $values
+   * @return string
+   */
+  public override compileUpdate (
+    query: Builder,
+    values: Record<string, unknown>
+  ): string {
+    if (query.joins.length > 0 || query.limitProperty > 0) {
+      return this.compileUpdateWithJoinsOrLimit(query, values)
+    }
+
+    return super.compileUpdate(query, values)
+  }
+
+  /**
+   * Prepare the bindings for an update statement.
+   *
+   * @param  array  $bindings
+   * @param  array  $values
+   * @return array
+   */
+  public override prepareBindingsForUpdate (bindings: Bindings, values: BindingValues): BindingValues {
+    const groups = this.groupJsonColumnsForUpdate(values)
+
+    const preparedValues = (new Collection(values))
+      .reject((value: unknown, key: PropertyKey) => this.isJsonSelector(key))
+      .merge(groups)
+      .map((value: unknown) => Array.isArray(value) ? JSON.stringify(value) : value)
+      .all()
+
+    const cleanBindings = Arr.except(bindings, 'select')
+
+    // const flattenedValues = Arr.flatten(preparedValues.map((value: unknown) => getValue(value)))
+    const flattenedValues = Arr.flatten(
+      (Array.isArray(preparedValues) ? preparedValues : Object.values(preparedValues)).map((value) =>
+        getValue(value))
+    )
+
+    return [
+      ...flattenedValues,
+      ...Arr.flatten(cleanBindings)
+    ]
+  }
+
+  /**
+   * Group the nested JSON columns.
+   *
+   * @param  array  $values
+   * @return array
+   */
+  protected groupJsonColumnsForUpdate (values: unknown[]): Record<string, unknown> {
+    const groups: Record<string, unknown> = {}
+
+    for (const [key, value] of Object.entries(values)) {
+      if (this.isJsonSelector(key)) {
+        Arr.set(groups, Str.after(key, '.').replace('->', '.'), value)
+      }
+    }
+
+    return groups
   }
 
   /**

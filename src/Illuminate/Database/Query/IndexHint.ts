@@ -1,4 +1,4 @@
-export type IndexHintType = 'USE' | 'IGNORE' | 'FORCE'
+export type IndexHintType = 'use' | 'ignore' | 'force' | 'hint'
 
 export class IndexHint {
   /**

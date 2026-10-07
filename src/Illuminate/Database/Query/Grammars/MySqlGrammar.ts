@@ -127,8 +127,7 @@ export class MySqlGrammar extends Grammar {
       .reject((
         value: unknown,
         column: string | Expression
-      ): boolean => this.isJsonSelector(column) && typeof value === 'boolean'
-      )
+      ): boolean => this.isJsonSelector(column) && typeof value === 'boolean')
       .map((value: unknown) => (Array.isArray(value) || isPlainObject(value)) ? JSON.stringify(value) : value)
       .all()
 

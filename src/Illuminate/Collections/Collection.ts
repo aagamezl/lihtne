@@ -118,6 +118,18 @@ export class Collection<
   }
 
   /**
+   * Merge the collection with the given items.
+   *
+   * @template TMergeValue
+   *
+   * @param  \Illuminate\Contracts\Support\Arrayable<TKey, TMergeValue>|iterable<TKey, TMergeValue>  $items
+   * @return static<TKey, TValue|TMergeValue>
+   */
+  public merge (items: unknown[] | Record<string, unknown>): Collection<TKey, TValue | unknown> {
+    return this.newInstance(Object.assign({}, this.items, this.getArrayableItems(items)))
+  }
+
+  /**
    * Mirrors PHP's `IteratorAggregate`: iterating a collection yields its values.
    */
   * [Symbol.iterator] (): Iterator<TValue> {

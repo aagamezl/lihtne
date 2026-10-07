@@ -48,6 +48,34 @@ describe('ArrNew', () => {
     expect(() => Arr.from(42 as never)).toThrow('Items cannot be represented by a scalar value.')
   })
 
+  test('except and forget remove keys without mutating the source', () => {
+    const source = {
+      select: [1],
+      join: [2],
+      where: [3],
+      nested: { name: 'ada', city: 'tallinn' }
+    }
+
+    expect(Arr.except(source, ['select', 'join'])).toEqual({
+      where: [3],
+      nested: { name: 'ada', city: 'tallinn' }
+    })
+    expect(source.join).toEqual([2])
+
+    const nested = { user: { name: 'ada', city: 'tallinn' }, keep: 1 }
+    expect(Arr.except(nested, ['user.name'])).toEqual({
+      user: { city: 'tallinn' },
+      keep: 1
+    })
+    expect(nested.user.name).toBe('ada')
+
+    const list = ['a', 'b', 'c']
+    Arr.forget(list, [1])
+    expect(1 in list).toBe(false)
+    expect(list[0]).toBe('a')
+    expect(list[2]).toBe('c')
+  })
+
   test('exists on arrays and dictionaries', () => {
     expect(Arr.exists(['a', 'b'], 0)).toBe(true)
     expect(Arr.exists(['a', 'b'], 2)).toBe(false)

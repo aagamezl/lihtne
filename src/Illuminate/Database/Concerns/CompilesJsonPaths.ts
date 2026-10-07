@@ -64,7 +64,7 @@ export class CompilesJsonPaths {
    * Split the given JSON selector into the field and the optional path,
    * and wrap them separately.
    */
-  wrapJsonFieldAndPath (column: string): [string, string] {
+  public wrapJsonFieldAndPath (column: string): [string, string] {
     const JSON_FIELD_PATH_SEPARATOR = '->'
     const MAX_SPLIT_PARTS = 2
 
@@ -85,7 +85,7 @@ export class CompilesJsonPaths {
   /**
    * Wrap the given JSON path.
    */
-  wrapJsonPath (
+  public wrapJsonPath (
     value: string,
     delimiter: string = DEFAULT_JSON_PATH_DELIMITER
   ): string {
@@ -117,7 +117,7 @@ export class CompilesJsonPaths {
   /**
    * Wrap the given JSON path segment.
    */
-  wrapJsonPathSegment (segment: string): string {
+  public wrapJsonPathSegment (segment: string): string {
     const match = segment.match(TRAILING_ARRAY_INDEX_PATTERN)
 
     if (match !== null) {

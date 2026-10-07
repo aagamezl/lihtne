@@ -5,8 +5,10 @@ import type { BindingValues, Builder, WhereClause } from '../Builder'
 import type { Expression } from '../Expression'
 import type { JoinLateralClause } from '../JoinLateralClause'
 
+import { Arr } from '../../../Collections'
 import { Collection } from '../../../Collections/Collection'
-import { Str } from '../../../Support'
+import { last } from '../../../Collections/helpers'
+import { getValue, Str } from '../../../Support'
 import { Grammar } from './Grammar'
 
 export class PostgresGrammar extends Grammar {
@@ -156,6 +158,97 @@ export class PostgresGrammar extends Grammar {
     }
 
     return column + '::date ' + where.operator + ' ' + value
+  }
+
+  /**
+   * Compile an update statement into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $values
+   * @return string
+   */
+  public override compileUpdate (query: Builder, values: Record<string, unknown>): string {
+    if (query.joins.length > 0 || query.limitProperty > 0) {
+      return this.compileUpdateWithJoinsOrLimit(query, values)
+    }
+
+    return super.compileUpdate(query, values)
+  }
+
+  /**
+   * Compile an update statement with joins or limit into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $values
+   * @return string
+   */
+  protected compileUpdateWithJoinsOrLimit (query: Builder, values: Record<string, unknown>): string {
+    const table = this.wrapTable(query.fromProperty)
+
+    const columns = this.compileUpdateColumns(query, values)
+
+    const alias = last(query.fromProperty.split(/\s+as\s+/i))
+
+    const selectSql = this.compileSelect(query.select(`${alias}.ctid`))
+
+    return `update ${table} set ${columns} where ${this.wrap('ctid')} in (${selectSql})`
+  }
+
+  /**
+   * Substitute the given bindings into the given raw SQL query.
+   *
+   * @param  string  $sql
+   * @param  array  $bindings
+   * @return string
+   */
+  public override substituteBindingsIntoRawSql (sql: string, bindings: BindingValues): string {
+    let query = super.substituteBindingsIntoRawSql(sql, bindings)
+
+    for (const operator of this.operators) {
+      if (!operator.includes('?')) {
+        continue
+      }
+
+      query = query.replace(query.replace('?', '??', operator), operator)
+    }
+
+    return query
+  }
+
+  /**
+   * Compile the columns for an update statement.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $values
+   * @return string
+   */
+  protected override compileUpdateColumns (query: Builder, values: Record<string, unknown>): string {
+    return (new Collection(values)).map((value, key) => {
+      const column = last(key.split('.'))
+
+      if (this.isJsonSelector(key)) {
+        return this.compileJsonUpdateColumn(column, value)
+      }
+
+      return this.wrap(column) + ' = ' + this.parameter(value)
+    }).implode(', ')
+  }
+
+  /**
+   * Prepares a JSON column being updated using the JSONB_SET function.
+   *
+   * @param  string  $key
+   * @param  mixed  $value
+   * @return string
+   */
+  protected compileJsonUpdateColumn (key: string, value: unknown): string {
+    const segments = key.split('->')
+
+    const field = this.wrap(segments.shift() ?? '')
+
+    const path = "'{" + this.wrapJsonPathAttributes(segments, '"').join(',') + "}'"
+
+    return `${field} = jsonb_set(${field}::jsonb, ${path}, ${this.parameter(value)})`
   }
 
   /**
@@ -392,6 +485,82 @@ export class PostgresGrammar extends Grammar {
     }
 
     return field + '->>' + attribute
+  }
+
+  /**
+   * Compile the additional where clauses for updates with joins.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @return string
+   */
+  protected compileUpdateWheres (query: Builder): string {
+    const baseWheres = this.compileWheres(query)
+
+    if (!query.joins.length) {
+      return baseWheres
+    }
+
+    // Once we compile the join constraints, we will either use them as the where
+    // clause or append them to the existing base where clauses. If we need to
+    // strip the leading boolean we will do so when using as the only where.
+    const joinWheres = this.compileUpdateJoinWheres(query)
+
+    if (baseWheres.trim() === '') {
+      return 'where ' + this.removeLeadingBoolean(joinWheres)
+    }
+
+    return baseWheres + ' ' + joinWheres
+  }
+
+  /**
+     * Prepare the bindings for an update statement.
+     *
+     * @param  array  $bindings
+     * @param  array  $values
+     * @return array
+     */
+  public override prepareBindingsForUpdate (bindings: Bindings, values: BindingValues): BindingValues {
+    const preparedValues = (new Collection(values)).map((value: unknown, column: string) => {
+      return Array.isArray(value) || (this.isJsonSelector(column) && !this.isExpression(value))
+        ? JSON.stringify(value)
+        : value
+    }).all()
+
+    const cleanBindings = Arr.except(bindings, 'select')
+
+    const flattenedValues = Arr.flatten(Array.isArray(preparedValues) ? preparedValues : Object.values(preparedValues).map((value) => getValue(value)))
+
+    // return array_values(
+    //   array_merge($values, Arr:: flatten($cleanBindings))
+    // );
+
+    return [
+      ...flattenedValues,
+      ...Arr.flatten(cleanBindings)
+    ]
+  }
+
+  /**
+   * Compile the "join" clause where clauses for an update.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @return string
+   */
+  protected compileUpdateJoinWheres (query: Builder): string {
+    const joinWheres: string[] = []
+
+    // Here we will just loop through all of the join constraints and compile them
+    // all out then implode them. This should give us "where" like syntax after
+    // everything has been built and then we will join it to the real wheres.
+    for (const join of query.joins) {
+      for (const where of join.wheres) {
+        const method = `where${where.type}`
+
+        joinWheres.push(where.boolean + ' ' + this[method](query, where))
+      }
+    }
+
+    return joinWheres.join(' ')
   }
 
   /**

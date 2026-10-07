@@ -1,12 +1,14 @@
 import { cloneDeep } from 'es-toolkit'
 
-import type { Builder, WhereClause } from '../Builder'
+import type { Scalar } from '../../../Support/types'
+import type { Bindings, BindingValues, Builder, Having, WhereClause } from '../Builder'
 import type { Expression } from '../Expression'
+import type { IndexHint } from '../IndexHint'
 import type { JoinLateralClause } from '../JoinLateralClause'
 
-import { Collection } from '../../../Collections'
+import { Arr, Collection } from '../../../Collections'
 import { Str } from '../../../Support'
-import { isNumeric } from '../../../Support/helpers'
+import { getValue, isNumeric } from '../../../Support/helpers'
 import { Grammar, type SelectComponents } from './Grammar'
 
 export class SqlServerGrammar extends Grammar {
@@ -233,23 +235,6 @@ export class SqlServerGrammar extends Grammar {
   }
 
   /**
-   * Compile an update statement with joins into SQL.
-   *
-   * @param  \Illuminate\Database\Query\Builder  $query
-   * @param  string  $table
-   * @param  string  $columns
-   * @param  string  $where
-   * @return string
-   */
-  protected override compileUpdateWithJoins (query: Builder, table: string, columns: string, where: string): string {
-    const alias = table.split(' as ').pop() ?? ''
-
-    const joins = this.compileJoins(query, query.joins)
-
-    return 'update ' + alias + ' set ' + columns + ' from ' + table + ' ' + joins + ' ' + where
-  }
-
-  /**
     * Compile an "upsert" statement into SQL.
     *
     * @param  \Illuminate\Database\Query\Builder  $query
@@ -293,6 +278,83 @@ export class SqlServerGrammar extends Grammar {
     sql += 'when not matched then insert (' + columns + ') values (' + columns + ');'
 
     return sql
+  }
+
+  /**
+   * Compile a "JSON length" statement into SQL.
+   *
+   * @param  string  $column
+   * @param  string  $operator
+   * @param  string  $value
+   * @return string
+   */
+  protected compileJsonLength (column: string, operator: string, value: string): string {
+    const [field, path] = this.wrapJsonFieldAndPath(column)
+
+    return `json_length(${field}${path}) ${operator} ${value}`
+  }
+
+  /**
+   * Compile a row number clause.
+   *
+   * @param  string  $partition
+   * @param  string  $orders
+   * @return string
+   */
+  protected override compileRowNumber (partition: string, orders: string): string {
+    if (orders.length === 0) {
+      orders = 'order by (select 0)'
+    }
+
+    return super.compileRowNumber(partition, orders)
+  }
+
+  /**
+   * Compile the SQL statement to define a savepoint.
+   *
+   * @param  string  $name
+   * @return string
+   */
+  public compileSavepoint (name: string): string {
+    return `SAVE TRANSACTION ${name}`
+  }
+
+  /**
+   * Compile the SQL statement to execute a savepoint rollback.
+   *
+   * @param  string  $name
+   * @return string
+   */
+  public compileSavepointRollBack (name: string): string {
+    return `ROLLBACK TRANSACTION ${name}`
+  }
+
+  /**
+   * Compile a query to get the number of open connections for a database.
+   *
+   * @return string
+   */
+  public compileThreadCount (): string {
+    return `select count(*) Value from sys.dm_exec_sessions where status = N'running'`
+  }
+
+  /**
+   * Get the format for database stored dates.
+   *
+   * @return string
+   */
+  public getDateFormat (): string {
+    return 'Y-m-d H:i:s.v'
+  }
+
+  /**
+   * Compile a "JSON value cast" statement into SQL.
+   *
+   * @param  string  $value
+   * @return string
+   */
+  public compileJsonValueCast (value: string): string {
+    return `cast(${value} as json)`
   }
 
   /**
@@ -418,5 +480,147 @@ export class SqlServerGrammar extends Grammar {
     }
 
     return table
+  }
+
+  /**
+   * Prepare the bindings for an update statement.
+   *
+   * @param  array  $bindings
+   * @param  array  $values
+   * @return array
+   */
+  public override prepareBindingsForUpdate (bindings: Bindings, values: BindingValues): BindingValues {
+    const cleanBindings = Arr.except(bindings, 'select')
+
+    const flattenedValues = Arr.flatten(
+      (Array.isArray(values) ? values : Object.values(values)).map((value) =>
+        getValue(value))
+    )
+
+    return [
+      ...flattenedValues,
+      ...Arr.flatten(cleanBindings)
+    ]
+  }
+
+  /**
+    * Compile a delete statement without joins into SQL.
+    *
+    * @param  \Illuminate\Database\Query\Builder  $query
+    * @param  string  $table
+    * @param  string  $where
+    * @return string
+    */
+  protected override compileDeleteWithoutJoins (query: Builder, table: string, where: string): string {
+    const sql = super.compileDeleteWithoutJoins(query, table, where)
+
+    return query.limitProperty && query.limitProperty > 0 && (query.offsetProperty ?? 0) <= 0
+      ? Str.replaceFirst('delete', 'delete top (' + query.limitProperty + ')', sql)
+      : sql
+  }
+
+  /**
+   * Compile a single having clause.
+   *
+   * @param  array  $having
+   * @return string
+   */
+  protected override compileHaving (having: Having): string {
+    if (having.type === 'Bitwise') {
+      return this.compileHavingBitwise(having)
+    }
+
+    return parent.compileHaving(having)
+  }
+
+  /**
+   * Compile a having clause involving a bitwise operator.
+   *
+   * @param  array  $having
+   * @return string
+   */
+  protected compileHavingBitwise (having: Having): string {
+    const column = this.wrap(having.column ?? '')
+
+    const parameter = this.parameter(having.value)
+
+    return '(' + column + ' ' + having.operator + ' ' + parameter + ') != 0'
+  }
+
+  /**
+   * Compile the index hints for the query.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  \Illuminate\Database\Query\IndexHint  $indexHint
+   * @return string
+   *
+   * @throws \InvalidArgumentException
+   */
+  // @ts-expect-error expected error; query is not used in this method
+
+  protected override compileIndexHint (query: Builder, indexHint: IndexHint): string {
+    if (indexHint.type !== 'force') {
+      return ''
+    }
+
+    const index = indexHint.index
+
+    if (!/^[a-zA-Z0-9_$]+$/.test(index)) {
+      throw new Error('InvalidArgumentException: Index name contains invalid characters.')
+    }
+
+    return `with (index([${index}]))`
+  }
+
+  /**
+   * Compile a "JSON contains" statement into SQL.
+   *
+   * @param  string  $column
+   * @param  string  $value
+   * @return string
+   */
+  protected compileJsonContains (column: string, value: string): string {
+    const [field, path] = this.wrapJsonFieldAndPath(column)
+
+    return `json_contains(${field}, ${value}${path})`
+  }
+
+  /**
+   * Compile an update statement with joins into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  string  $table
+   * @param  string  $columns
+   * @param  string  $where
+   * @return string
+   */
+  protected override compileUpdateWithJoins (query: Builder, table: string, columns: string, where: string): string {
+    const alias = table.split(' as ').pop() ?? ''
+
+    const joins = this.compileJoins(query, query.joins)
+
+    return `update ${alias} set ${columns} from ${table} ${joins} ${where}`
+  }
+
+  /**
+   * Compile a "JSON contains key" statement into SQL.
+   *
+   * @param  string  $column
+   * @return string
+   */
+  protected compileJsonContainsKey (column: string): string {
+    const [field, path] = this.wrapJsonFieldAndPath(column)
+
+    return `ifnull(json_contains_path(${field}, 'one${path}), 0)`
+  }
+
+  /**
+  * Prepare the binding for a "JSON contains" statement.
+  *
+  * @param  mixed  $binding
+  * @return string
+  */
+  public prepareBindingForJsonContains (binding: Scalar): string {
+    return typeof binding === 'boolean' ? JSON.stringify(binding) : String(binding)
   }
 }

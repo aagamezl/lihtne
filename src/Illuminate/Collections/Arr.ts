@@ -33,7 +33,50 @@ export class Arr {
     array: TValue,
     keys: TKeys[]
   ): TValue {
-    this.forget(array, keys)
+    const copy = this.duplicate(array)
+
+    this.forget(copy, Array.isArray(keys) ? keys : [keys])
+
+    return copy
+  }
+
+  /**
+   * Set an array item to a given value using "dot" notation.
+   *
+   * If no key is given to the method, the entire array will be replaced.
+   *
+   * @param  array  $array
+   * @param  string|int|null  $key
+   * @param  mixed  $value
+   * @return array
+   */
+  public static set<TValue>(array: TValue, key: string | number | null, value: unknown): TValue {
+    if (key === undefined) {
+      array = value
+
+      return array
+    }
+
+    const keys = String(key).split(DOT_SEPARATOR)
+
+    for (let i = 0; i < keys.length; i += 1) {
+      if (keys.length === 1) {
+        break
+      }
+
+      delete keys[i]
+
+      // If the key doesn't exist at this depth, we will just create an empty array
+      // to hold the next value, allowing us to create the arrays to hold final
+      // values at the correct depth. Then we'll keep digging into the array.
+      if (!Arr.exists(array, key) || !Array.isArray(array[key])) {
+        array[key] = []
+      }
+
+      array = array[key]
+    }
+
+    array[keys.shift()] = value
 
     return array
   }
@@ -67,8 +110,9 @@ export class Arr {
       // array = original
 
       // if the exact key exists in the top-level, remove it
-      if (this.exists(array, key)) {
-        // array[key] = undefined
+      if (this.exists(array, key) && Arr.accessible(array)) {
+        this.unset(array, key)
+
         continue
       }
 
@@ -106,19 +150,54 @@ export class Arr {
         continue keys
       }
 
-      if (Array.isArray(cursor)) {
-        cursor[Number(finalKey)] = undefined
-      } else {
-        cursor[finalKey] = undefined
-      }
+      this.unset(cursor, finalKey)
     }
     /* eslint-enable no-labels */
   }
 
   /**
+   * Copy arrays and plain objects so `except()` can drop keys without
+   * mutating the input. PHP arrays are copy-on-write; class instances stay
+   * shared because `unset` only removes keys, it does not clone values.
+   */
+  public static duplicate<TValue>(value: TValue): TValue {
+    if (Array.isArray(value)) {
+      return value.map((item) => this.duplicate(item)) as TValue
+    }
+
+    if (isPlainObject(value)) {
+      const copy: Dictionary<unknown> = {}
+
+      for (const [key, item] of Object.entries(value)) {
+        copy[key] = this.duplicate(item)
+      }
+
+      return copy as TValue
+    }
+
+    return value
+  }
+
+  /**
+   * Remove a key the way PHP `unset` does: drop the property, leave array holes.
+   */
+  public static unset (
+    target: unknown[] | Dictionary<unknown>,
+    key: PropertyKey
+  ): void {
+    if (Array.isArray(target)) {
+      delete target[Number(key)]
+
+      return
+    }
+
+    delete target[String(key)]
+  }
+
+  /**
    * True when dictionary keys are dense `0..n-1`, like a PHP list array.
    */
-  static isList<TValue>(dictionary: Dictionary<TValue>): boolean {
+  public static isList<TValue>(dictionary: Dictionary<TValue>): boolean {
     const keys = Object.keys(dictionary)
 
     for (let index = 0; index < keys.length; index += 1) {

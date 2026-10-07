@@ -4817,5 +4817,228 @@ describe('Database Query Builder', () => {
   })
 
   test('testUpsertMethodWithUpdateColumns', async () => {
+    let builder = getMySqlBuilder()
+    let connection = builder.getConnection()
+    jest.spyOn(connection, 'affectingStatement').mockResolvedValue(2)
+    jest.spyOn(connection, 'getConfig').mockReturnValue(false)
+
+    let result = await builder.from('users').upsert([{ email: 'foo', name: 'bar' }, { name: 'bar2', email: 'foo2' }], 'email', ['name'])
+    expect(connection.affectingStatement).toHaveBeenCalledWith('insert into `users` (`email`, `name`) values (?, ?), (?, ?) on duplicate key update `name` = values(`name`)', ['foo', 'bar', 'foo2', 'bar2'])
+    expect(connection.getConfig).toHaveBeenCalledWith('use_upsert_alias')
+    expect(result).toBe(2)
+
+    builder = getMySqlBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'affectingStatement').mockResolvedValue(2)
+    jest.spyOn(connection, 'getConfig').mockReturnValue(true)
+
+    result = await builder.from('users').upsert([{ email: 'foo', name: 'bar' }, { name: 'bar2', email: 'foo2' }], 'email', ['name'])
+    expect(connection.affectingStatement).toHaveBeenCalledWith('insert into `users` (`email`, `name`) values (?, ?), (?, ?) as lihtne_upsert_alias on duplicate key update `name` = `lihtne_upsert_alias`.`name`', ['foo', 'bar', 'foo2', 'bar2'])
+    expect(connection.getConfig).toHaveBeenCalledWith('use_upsert_alias')
+    expect(result).toBe(2)
+
+    builder = getPostgresBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'affectingStatement').mockResolvedValue(2)
+
+    result = await builder.from('users').upsert([{ email: 'foo', name: 'bar' }, { name: 'bar2', email: 'foo2' }], 'email', ['name'])
+    expect(connection.affectingStatement).toHaveBeenCalledWith('insert into "users" ("email", "name") values (?, ?), (?, ?) on conflict ("email") do update set "name" = "excluded"."name"', ['foo', 'bar', 'foo2', 'bar2'])
+    expect(result).toBe(2)
+
+    builder = getSQLiteBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'affectingStatement').mockResolvedValue(2)
+
+    result = await builder.from('users').upsert([{ email: 'foo', name: 'bar' }, { name: 'bar2', email: 'foo2' }], 'email', ['name'])
+    expect(connection.affectingStatement).toHaveBeenCalledWith('insert into "users" ("email", "name") values (?, ?), (?, ?) on conflict ("email") do update set "name" = "excluded"."name"', ['foo', 'bar', 'foo2', 'bar2'])
+    expect(result).toBe(2)
+
+    builder = getSqlServerBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'affectingStatement').mockResolvedValue(2)
+
+    result = await builder.from('users').upsert([{ email: 'foo', name: 'bar' }, { name: 'bar2', email: 'foo2' }], 'email', ['name'])
+    expect(connection.affectingStatement).toHaveBeenCalledWith('merge [users] using (values (?, ?), (?, ?)) [lihtne_source] ([email], [name]) on [lihtne_source].[email] = [users].[email] when matched then update set [name] = [lihtne_source].[name] when not matched then insert ([email], [name]) values ([email], [name]);', ['foo', 'bar', 'foo2', 'bar2'])
+    expect(result).toBe(2)
+  })
+
+  test('testUpsertMethodWithEmptyUniqueByArray', async () => {
+    await expect(async () => {
+      await getPostgresBuilder().from('users').upsert([{ email: 'foo', name: 'bar' }], [])
+    }).rejects.toThrow(new Error('InvalidArgumentException: The unique columns must not be empty.'))
+  })
+
+  test('testUpsertMethodWithEmptyUniqueByString', async () => {
+    await expect(async () => {
+      await getPostgresBuilder().from('users').upsert([{ email: 'foo', name: 'bar' }], '')
+    }).rejects.toThrow(new Error('InvalidArgumentException: The unique columns must not be empty.'))
+  })
+
+  test('testUpdateMethodWithJoins', async () => {
+    let builder = getBuilder()
+    let connection = builder.getConnection()
+    jest.spyOn(connection, 'update').mockResolvedValue(1)
+
+    let result = await builder.from('users').join('orders', 'users.id', '=', 'orders.user_id').where('users.id', '=', 1).update({ email: 'foo', name: 'bar' })
+    expect(connection.update).toHaveBeenCalledWith('update "users" inner join "orders" on "users"."id" = "orders"."user_id" set "email" = ?, "name" = ? where "users"."id" = ?', ['foo', 'bar', 1])
+    expect(result).toBe(1)
+
+    builder = getBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'update').mockResolvedValue(1)
+
+    result = await builder.from('users').join('orders', (join: JoinClause) => {
+      join.on('users.id', '=', 'orders.user_id')
+        .where('users.id', '=', 1)
+    }).update({ email: 'foo', name: 'bar' })
+    expect(connection.update).toHaveBeenCalledWith('update "users" inner join "orders" on "users"."id" = "orders"."user_id" and "users"."id" = ? set "email" = ?, "name" = ?', [1, 'foo', 'bar'])
+    expect(result).toBe(1)
+  })
+
+  test('testUpdateMethodWithJoinsOnSqlServer', async () => {
+    let builder = getSqlServerBuilder()
+    let connection = builder.getConnection()
+    jest.spyOn(connection, 'update').mockResolvedValue(1)
+
+    let result = await builder.from('users').join('orders', 'users.id', '=', 'orders.user_id').where('users.id', '=', 1).update({ email: 'foo', name: 'bar' })
+    expect(connection.update).toHaveBeenCalledWith('update [users] set [email] = ?, [name] = ? from [users] inner join [orders] on [users].[id] = [orders].[user_id] where [users].[id] = ?', ['foo', 'bar', 1])
+    expect(result).toBe(1)
+
+    builder = getSqlServerBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'update').mockResolvedValue(1)
+
+    result = await builder.from('users').join('orders', (join: JoinClause) => {
+      join.on('users.id', '=', 'orders.user_id')
+        .where('users.id', '=', 1)
+    }).update({ email: 'foo', name: 'bar' })
+    expect(connection.update).toHaveBeenCalledWith('update [users] set [email] = ?, [name] = ? from [users] inner join [orders] on [users].[id] = [orders].[user_id] and [users].[id] = ?', ['foo', 'bar', 1])
+    expect(result).toBe(1)
+  })
+
+  test('testUpdateMethodWithJoinsOnMySql', async () => {
+    let builder = getMySqlBuilder()
+    let connection = builder.getConnection()
+    jest.spyOn(connection, 'update').mockResolvedValue(1)
+
+    let result = await builder.from('users').join('orders', 'users.id', '=', 'orders.user_id').where('users.id', '=', 1).update({ email: 'foo', name: 'bar' })
+    expect(connection.update).toHaveBeenCalledWith('update `users` inner join `orders` on `users`.`id` = `orders`.`user_id` set `email` = ?, `name` = ? where `users`.`id` = ?', ['foo', 'bar', 1])
+    expect(result).toBe(1)
+
+    builder = getMySqlBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'update').mockResolvedValue(1)
+
+    result = await builder.from('users').join('orders', (join: JoinClause) => {
+      join.on('users.id', '=', 'orders.user_id')
+        .where('users.id', '=', 1)
+    }).update({ email: 'foo', name: 'bar' })
+    expect(connection.update).toHaveBeenCalledWith('update `users` inner join `orders` on `users`.`id` = `orders`.`user_id` and `users`.`id` = ? set `email` = ?, `name` = ?', [1, 'foo', 'bar'])
+    expect(result).toBe(1)
+  })
+
+  test('testUpdateMethodWithJoinsOnSQLite', async () => {
+    let builder = getSQLiteBuilder()
+    let connection = builder.getConnection()
+    jest.spyOn(connection, 'update').mockResolvedValue(1)
+
+    let result = await builder.from('users').where('users.id', '>', 1).limit(3).oldest('id').update({ email: 'foo', name: 'bar' })
+    expect(connection.update).toHaveBeenCalledWith('update "users" set "email" = ?, "name" = ? where "rowid" in (select "users"."rowid" from "users" where "users"."id" > ? order by "id" asc limit 3)', ['foo', 'bar', 1])
+    expect(result).toBe(1)
+
+    builder = getSQLiteBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'update').mockResolvedValue(1)
+
+    result = await builder.from('users').join('orders', 'users.id', '=', 'orders.user_id').where('users.id', '=', 1).update({ email: 'foo', name: 'bar' })
+    expect(connection.update).toHaveBeenCalledWith('update "users" set "email" = ?, "name" = ? where "rowid" in (select "users"."rowid" from "users" inner join "orders" on "users"."id" = "orders"."user_id" where "users"."id" = ?)', ['foo', 'bar', 1])
+    expect(result).toBe(1)
+
+    builder = getSQLiteBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'update').mockResolvedValue(1)
+
+    result = await builder.from('users').join('orders', (join: JoinClause) => {
+      join.on('users.id', '=', 'orders.user_id')
+        .where('users.id', '=', 1)
+    }).update({ email: 'foo', name: 'bar' })
+    expect(connection.update).toHaveBeenCalledWith('update "users" set "email" = ?, "name" = ? where "rowid" in (select "users"."rowid" from "users" inner join "orders" on "users"."id" = "orders"."user_id" and "users"."id" = ?)', ['foo', 'bar', 1])
+    expect(result).toBe(1)
+
+    builder = getSQLiteBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'update').mockResolvedValue(1)
+
+    result = await builder.from('users as u').join('orders as o', 'u.id', '=', 'o.user_id').update({ email: 'foo', name: 'bar' })
+    expect(connection.update).toHaveBeenCalledWith('update "users" as "u" set "email" = ?, "name" = ? where "rowid" in (select "u"."rowid" from "users" as "u" inner join "orders" as "o" on "u"."id" = "o"."user_id")', ['foo', 'bar'])
+    expect(result).toBe(1)
+  })
+
+  test('testUpdateMethodWithJoinsAndAliasesOnSqlServer', async () => {
+    const builder = getSqlServerBuilder()
+    const connection = builder.getConnection()
+    jest.spyOn(connection, 'update').mockResolvedValue(1)
+
+    const result = await builder.from('users as u').join('orders', 'u.id', '=', 'orders.user_id').where('u.id', '=', 1).update({ email: 'foo', name: 'bar' })
+    expect(connection.update).toHaveBeenCalledWith('update [u] set [email] = ?, [name] = ? from [users] as [u] inner join [orders] on [u].[id] = [orders].[user_id] where [u].[id] = ?', ['foo', 'bar', 1])
+    expect(result).toBe(1)
+  })
+
+  test('testUpdateMethodWithoutJoinsOnPostgres', async () => {
+    let builder = getPostgresBuilder()
+    let connection = builder.getConnection()
+    jest.spyOn(connection, 'update').mockResolvedValue(1)
+
+    let result = await builder.from('users').where('id', '=', 1).update({ 'users.email': 'foo', name: 'bar' })
+    expect(connection.update).toHaveBeenCalledWith('update "users" set "email" = ?, "name" = ? where "id" = ?', ['foo', 'bar', 1])
+    expect(result).toBe(1)
+
+    builder = getPostgresBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'update').mockResolvedValue(1)
+
+    result = await builder.from('users').where('id', '=', 1).selectRaw('?', ['ignore']).update({ 'users.email': 'foo', name: 'bar' })
+    expect(connection.update).toHaveBeenCalledWith('update "users" set "email" = ?, "name" = ? where "id" = ?', ['foo', 'bar', 1])
+    expect(result).toBe(1)
+
+    builder = getPostgresBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'update').mockResolvedValue(1)
+
+    result = await builder.from('users.users').where('id', '=', 1).selectRaw('?', ['ignore']).update({ 'users.users.email': 'foo', name: 'bar' })
+    expect(connection.update).toHaveBeenCalledWith('update "users"."users" set "email" = ?, "name" = ? where "id" = ?', ['foo', 'bar', 1])
+    expect(result).toBe(1)
+  })
+
+  test('testUpdateMethodWithJoinsOnPostgres', async () => {
+    let builder = getPostgresBuilder()
+    let connection = builder.getConnection()
+    jest.spyOn(connection, 'update').mockResolvedValue(1)
+
+    let result = await builder.from('users').join('orders', 'users.id', '=', 'orders.user_id').where('users.id', '=', 1).update({ email: 'foo', name: 'bar' })
+    expect(connection.update).toHaveBeenCalledWith('update "users" set "email" = ?, "name" = ? where "ctid" in (select "users"."ctid" from "users" inner join "orders" on "users"."id" = "orders"."user_id" where "users"."id" = ?)', ['foo', 'bar', 1])
+    expect(result).toBe(1)
+
+    builder = getPostgresBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'update').mockResolvedValue(1)
+
+    result = await builder.from('users').join('orders', (join: JoinClause) => {
+      join.on('users.id', '=', 'orders.user_id')
+        .where('users.id', '=', 1)
+    }).update({ email: 'foo', name: 'bar' })
+    expect(connection.update).toHaveBeenCalledWith('update "users" set "email" = ?, "name" = ? where "ctid" in (select "users"."ctid" from "users" inner join "orders" on "users"."id" = "orders"."user_id" and "users"."id" = ?)', ['foo', 'bar', 1])
+    expect(result).toBe(1)
+
+    builder = getPostgresBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'update').mockResolvedValue(1)
+
+    result = await builder.from('users').join('orders', (join: JoinClause) => {
+      join.on('users.id', '=', 'orders.user_id')
+        .where('users.id', '=', 1)
+    }).where('name', 'baz').update({ email: 'foo', name: 'bar' })
+    expect(connection.update).toHaveBeenCalledWith('update "users" set "email" = ?, "name" = ? where "ctid" in (select "users"."ctid" from "users" inner join "orders" on "users"."id" = "orders"."user_id" and "users"."id" = ? where "name" = ?)', ['foo', 'bar', 1, 'baz'])
+    expect(result).toBe(1)
   })
 })
