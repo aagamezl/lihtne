@@ -4774,17 +4774,21 @@ describe('Database Query Builder', () => {
     let builder = getMySqlBuilder()
     let connection = builder.getConnection()
     jest.spyOn(connection, 'affectingStatement').mockResolvedValue(2)
+    jest.spyOn(connection, 'getConfig').mockReturnValue(false)
 
     let result = await builder.from('users').upsert([{ email: 'foo', name: 'bar' }, { name: 'bar2', email: 'foo2' }], 'email')
     expect(connection.affectingStatement).toHaveBeenCalledWith('insert into `users` (`email`, `name`) values (?, ?), (?, ?) on duplicate key update `email` = values(`email`), `name` = values(`name`)', ['foo', 'bar', 'foo2', 'bar2'])
+    expect(connection.getConfig).toHaveBeenCalledWith('use_upsert_alias')
     expect(result).toBe(2)
 
     builder = getMySqlBuilder()
     connection = builder.getConnection()
     jest.spyOn(connection, 'affectingStatement').mockResolvedValue(2)
+    jest.spyOn(connection, 'getConfig').mockReturnValue(true)
 
     result = await builder.from('users').upsert([{ email: 'foo', name: 'bar' }, { name: 'bar2', email: 'foo2' }], 'email')
-    expect(connection.affectingStatement).toHaveBeenCalledWith('insert into `users` (`email`, `name`) values (?, ?), (?, ?) as laravel_upsert_alias on duplicate key update `email` = `laravel_upsert_alias`.`email`, `name` = `laravel_upsert_alias`.`name`', ['foo', 'bar', 'foo2', 'bar2'])
+    expect(connection.affectingStatement).toHaveBeenCalledWith('insert into `users` (`email`, `name`) values (?, ?), (?, ?) as lihtne_upsert_alias on duplicate key update `email` = `lihtne_upsert_alias`.`email`, `name` = `lihtne_upsert_alias`.`name`', ['foo', 'bar', 'foo2', 'bar2'])
+    expect(connection.getConfig).toHaveBeenCalledWith('use_upsert_alias')
     expect(result).toBe(2)
 
     builder = getPostgresBuilder()
@@ -4808,7 +4812,10 @@ describe('Database Query Builder', () => {
     jest.spyOn(connection, 'affectingStatement').mockResolvedValue(2)
 
     result = await builder.from('users').upsert([{ email: 'foo', name: 'bar' }, { name: 'bar2', email: 'foo2' }], 'email')
-    expect(connection.affectingStatement).toHaveBeenCalledWith('merge [users] using (values (?, ?), (?, ?)) [laravel_source] ([email], [name]) on [laravel_source].[email] = [users].[email] when matched then update set [email] = [laravel_source].[email], [name] = [laravel_source].[name] when not matched then insert ([email], [name]) values ([email], [name]);', ['foo', 'bar', 'foo2', 'bar2'])
+    expect(connection.affectingStatement).toHaveBeenCalledWith('merge [users] using (values (?, ?), (?, ?)) [lihtne_source] ([email], [name]) on [lihtne_source].[email] = [users].[email] when matched then update set [email] = [lihtne_source].[email], [name] = [lihtne_source].[name] when not matched then insert ([email], [name]) values ([email], [name]);', ['foo', 'bar', 'foo2', 'bar2'])
     expect(result).toBe(2)
+  })
+
+  test('testUpsertMethodWithUpdateColumns', async () => {
   })
 })

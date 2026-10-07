@@ -37,7 +37,7 @@ type WhereLikeBindingGrammar = Grammar & {
   prepareWhereLikeBinding: (value: string, caseSensitive: boolean) => string
 }
 
-function isWhereLikeBindingGrammar (
+function isWhereLikeBindingGrammar(
   grammar: Grammar
 ): grammar is WhereLikeBindingGrammar {
   return typeof Reflect.get(grammar, 'prepareWhereLikeBinding') === 'function'
@@ -405,7 +405,7 @@ export class Builder extends mixing().useTrait([
   /**
    * Create a new query builder instance.
    */
-  public constructor (
+  public constructor(
     connection: Connection,
     grammar: Grammar,
     processor: Processor
@@ -425,7 +425,7 @@ export class Builder extends mixing().useTrait([
    * @param  string|null  $sequence
    * @return int
    */
-  public insertGetId (
+  public insertGetId(
     values: BindingValues,
     sequence: string | undefined = undefined
   ): number {
@@ -470,7 +470,7 @@ export class Builder extends mixing().useTrait([
    * @param  bool  $where
    * @return $this
    */
-  public join (
+  public join(
     table: string | Expression,
     first: JoinCallback | Expression | string,
     operator: string | undefined = undefined,
@@ -511,7 +511,7 @@ export class Builder extends mixing().useTrait([
    * @param  string|int  $seed
    * @return $this
    */
-  public inRandomOrder (seed: string | number = ''): this {
+  public inRandomOrder(seed: string | number = ''): this {
     return this.orderByRaw(this.grammar.compileRandom(seed))
   }
 
@@ -522,7 +522,7 @@ export class Builder extends mixing().useTrait([
    * @param  Arrayable<unknown> | Array<unknown>  values
    * @return $this
    */
-  public inOrderOf (column: Expression | string, values: BindingValues): this {
+  public inOrderOf(column: Expression | string, values: BindingValues): this {
     values = values.map((value) => value)
 
     if (values.length === 0) {
@@ -555,7 +555,7 @@ export class Builder extends mixing().useTrait([
    * @param  string|null  $boolean
    * @return $this
    */
-  public whereColumn (
+  public whereColumn(
     first: Expression | string | Array<Expression | string>,
     operator: string | undefined = undefined,
     second: string | Expression | undefined = undefined,
@@ -601,7 +601,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $operator
    * @return bool
    */
-  protected invalidOperator (operator: unknown): boolean {
+  protected invalidOperator(operator: unknown): boolean {
     if (typeof operator !== 'string') {
       return true
     }
@@ -622,7 +622,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $method
    * @return $this
    */
-  protected addArrayOfWheres (
+  protected addArrayOfWheres(
     column: Record<string, unknown>,
     boolean: WhereBoolean,
     method: 'where' | 'whereColumn' = 'where'
@@ -680,7 +680,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $boolean
    * @return $this
    */
-  public whereNested (
+  public whereNested(
     callback: QueryCallback,
     boolean: WhereBoolean = 'and'
   ): this {
@@ -695,7 +695,7 @@ export class Builder extends mixing().useTrait([
    *
    * @return \Illuminate\Database\Query\Builder
    */
-  public forNestedWhere (): Builder {
+  public forNestedWhere(): Builder {
     return this.newQuery().from(this.fromProperty)
   }
 
@@ -706,7 +706,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $boolean
    * @return $this
    */
-  public addNestedWhereQuery (
+  public addNestedWhereQuery(
     query: Builder,
     boolean: WhereBoolean = 'and'
   ): this {
@@ -728,7 +728,7 @@ export class Builder extends mixing().useTrait([
    * @param  \Illuminate\Contracts\Database\Query\Expression|string  $table
    * @return \Illuminate\Database\Query\JoinClause
    */
-  protected newJoinClause (
+  protected newJoinClause(
     parentQuery: Builder,
     type: string,
     table: Expression | string
@@ -750,7 +750,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $boolean
    * @return $this
    */
-  public having (
+  public having(
     column: Expression | QueryCallback | string,
     operator: unknown = undefined,
     value: unknown = undefined,
@@ -818,7 +818,7 @@ export class Builder extends mixing().useTrait([
    * @param  \Illuminate\Contracts\Database\Query\Expression|\DateTimeInterface|string|int|float|null  $value
    * @return $this
    */
-  public orHaving (
+  public orHaving(
     column: Expression | string,
     operator: unknown = undefined,
     value: unknown = undefined
@@ -841,7 +841,7 @@ export class Builder extends mixing().useTrait([
    *
    * @throws \InvalidArgumentException
    */
-  public incrementEach (
+  public incrementEach(
     columns: Record<string, number | string>,
     extra: Record<string, unknown> = {}
   ): number {
@@ -871,7 +871,7 @@ export class Builder extends mixing().useTrait([
    * @param  bool  $not
    * @return $this
    */
-  public whereExists (
+  public whereExists(
     callback: QueryCallback | Builder | EloquentBuilder,
     boolean: BooleanOperator = BOOLEAN_OPERATORS.and,
     not: boolean = false
@@ -899,7 +899,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $boolean
    * @return $this
    */
-  public whereNotExists (
+  public whereNotExists(
     callback: QueryCallback | Builder | EloquentBuilder,
     boolean: BooleanOperator = BOOLEAN_OPERATORS.and
   ): this {
@@ -912,7 +912,7 @@ export class Builder extends mixing().useTrait([
    * @param  \Closure|\Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder<*>  $callback
    * @return $this
    */
-  public orWhereNotExists (
+  public orWhereNotExists(
     callback: QueryCallback | Builder | EloquentBuilder
   ): this {
     return this.orWhereExists(callback, true)
@@ -925,7 +925,7 @@ export class Builder extends mixing().useTrait([
    * @param  bool  $not
    * @return $this
    */
-  public orWhereExists (
+  public orWhereExists(
     callback: QueryCallback | Builder | EloquentBuilder,
     not: boolean = false
   ): this {
@@ -938,7 +938,7 @@ export class Builder extends mixing().useTrait([
    * @param  \Closure|\Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder<*>|string  $query
    * @return $this
    */
-  public joinLateral (
+  public joinLateral(
     query: QueryCallback | Builder | EloquentBuilder | string,
     as: string,
     type: JoinType = 'inner'
@@ -965,7 +965,7 @@ export class Builder extends mixing().useTrait([
    * @param  \Illuminate\Contracts\Database\Query\Expression|string|null  $second
    * @return $this
    */
-  public crossJoin (
+  public crossJoin(
     table: string,
     first: string | Expression | undefined = undefined,
     operator: string | undefined = undefined,
@@ -987,7 +987,7 @@ export class Builder extends mixing().useTrait([
    * @param  \Illuminate\Contracts\Database\Query\Expression|string  $table
    * @return \Illuminate\Database\Query\JoinLateralClause
    */
-  protected newJoinLateralClause (
+  protected newJoinLateralClause(
     parentQuery: Builder,
     type: string,
     table: Expression | string
@@ -1005,7 +1005,7 @@ export class Builder extends mixing().useTrait([
    * @param  array  $parameters
    * @return $this
    */
-  public dynamicWhere (method: string, parameters: unknown[]): this {
+  public dynamicWhere(method: string, parameters: unknown[]): this {
     const finder = method.substring(5)
 
     const segments = finder.split(/(And|Or)(?=[A-Z])/)
@@ -1045,7 +1045,7 @@ export class Builder extends mixing().useTrait([
    * @param  int  $index
    * @return void
    */
-  protected addDynamic (
+  protected addDynamic(
     segment: string,
     connector: string,
     parameters: unknown[],
@@ -1066,7 +1066,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $as
    * @return $this
    */
-  public crossJoinSub (
+  public crossJoinSub(
     query: QueryCallback | Builder | EloquentBuilder | string,
     as: string
   ): this {
@@ -1097,7 +1097,7 @@ export class Builder extends mixing().useTrait([
    *
    * @throws \InvalidArgumentException
    */
-  public joinSub (
+  public joinSub(
     query: QueryCallback | Builder | EloquentBuilder | string,
     as: string,
     first: string | Expression,
@@ -1132,7 +1132,7 @@ export class Builder extends mixing().useTrait([
    * @param  \Illuminate\Contracts\Database\Query\Expression|string|null  $second
    * @return $this
    */
-  public leftJoinSub (
+  public leftJoinSub(
     query: QueryCallback | Builder | EloquentBuilder | string,
     as: string,
     first: string | Expression,
@@ -1151,7 +1151,7 @@ export class Builder extends mixing().useTrait([
    * @param  \Illuminate\Contracts\Database\Query\Expression|string|null  $second
    * @return $this
    */
-  public straightJoin (
+  public straightJoin(
     table: string,
     first: string | Expression,
     operator: string | undefined = undefined,
@@ -1166,7 +1166,7 @@ export class Builder extends mixing().useTrait([
    * @param  array|string  $columns
    * @return TValue|null
    */
-  public async first (
+  public async first(
     columns: string | Expression | string[] = ['*']
   ): Promise<Record<string, unknown> | undefined> {
     const result = await this.limit(1).get(columns)
@@ -1181,7 +1181,7 @@ export class Builder extends mixing().useTrait([
    * @param  string|null  $key
    * @return \Illuminate\Support\Collection<array-key, mixed>
    */
-  public async pluck (
+  public async pluck(
     column: string | Expression,
     key: string | undefined = undefined
   ): Collection<unknown> {
@@ -1219,7 +1219,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $column
    * @return string|null
    */
-  protected stripTableForPluck (
+  protected stripTableForPluck(
     column: string | Expression
   ): string | undefined {
     if (isNil(column)) {
@@ -1244,7 +1244,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $key
    * @return \Illuminate\Support\Collection
    */
-  protected pluckFromObjectColumn (
+  protected pluckFromObjectColumn(
     queryResult: Record<string, unknown>[],
     column: string | Expression,
     key: string | undefined = undefined
@@ -1270,7 +1270,7 @@ export class Builder extends mixing().useTrait([
    * @param  literal-string  $expression
    * @return mixed
    */
-  public async rawValue (
+  public async rawValue(
     expression: string,
     bindings: BindingValues = []
   ): Promise<unknown | undefined> {
@@ -1285,7 +1285,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $column
    * @return mixed
    */
-  public async value (
+  public async value(
     column: string | Expression
   ): Promise<unknown | undefined> {
     const result = await this.first([column])
@@ -1300,7 +1300,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $glue
    * @return string
    */
-  public async implode (
+  public async implode(
     column: string | Expression,
     glue: string = ''
   ): Promise<string> {
@@ -1317,7 +1317,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $key
    * @return \Illuminate\Support\Collection
    */
-  protected pluckFromArrayColumn (
+  protected pluckFromArrayColumn(
     queryResult: unknown[][],
     column: string | Expression,
     key: string | null = null
@@ -1344,7 +1344,7 @@ export class Builder extends mixing().useTrait([
    * @param  string|\Illuminate\Contracts\Database\Query\Expression|array<string|\Illuminate\Contracts\Database\Query\Expression>  $columns
    * @return \stdClass|null
    */
-  public find (
+  public find(
     id: number | string,
     columns: string | Expression | string[] = ['*']
   ): Record<string, unknown> | null {
@@ -1361,7 +1361,7 @@ export class Builder extends mixing().useTrait([
    * @param  (\Closure(): TValue)|null  $callback
    * @return \stdClass|TValue
    */
-  public async findOr (
+  public async findOr(
     id: number | string,
     columns: string | Expression | string[] = ['*'],
     callback?: CallableFunction
@@ -1390,7 +1390,7 @@ export class Builder extends mixing().useTrait([
    * @param  \Illuminate\Contracts\Database\Query\Expression|string  $second
    * @return $this
    */
-  public straightJoinWhere (
+  public straightJoinWhere(
     table: string,
     first: string | Expression,
     operator: string,
@@ -1409,7 +1409,7 @@ export class Builder extends mixing().useTrait([
    * @param  \Illuminate\Contracts\Database\Query\Expression|string|null  $second
    * @return $this
    */
-  public straightJoinSub (
+  public straightJoinSub(
     query: QueryCallback | Builder | EloquentBuilder | string,
     as: string,
     first: string | Expression,
@@ -1429,7 +1429,7 @@ export class Builder extends mixing().useTrait([
    * @param  \Illuminate\Contracts\Database\Query\Expression|string|null  $second
    * @return $this
    */
-  public rightJoinSub (
+  public rightJoinSub(
     query: QueryCallback | Builder | EloquentBuilder | string,
     as: string,
     first: string | Expression,
@@ -1448,7 +1448,7 @@ export class Builder extends mixing().useTrait([
    * @param  \Illuminate\Contracts\Database\Query\Expression|string|null  $second
    * @return $this
    */
-  public rightJoin (
+  public rightJoin(
     table: string,
     first: string | Expression,
     operator: string | undefined = undefined,
@@ -1466,7 +1466,7 @@ export class Builder extends mixing().useTrait([
    * @param  \Illuminate\Contracts\Database\Query\Expression|string  $second
    * @return $this
    */
-  public rightJoinWhere (
+  public rightJoinWhere(
     table: string,
     first: string | Expression,
     operator: string,
@@ -1481,7 +1481,7 @@ export class Builder extends mixing().useTrait([
    * @param  \Closure|\Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder<*>|string  $query
    * @return $this
    */
-  public leftJoinLateral (
+  public leftJoinLateral(
     query: QueryCallback | Builder | EloquentBuilder | string,
     as: string
   ): this {
@@ -1497,7 +1497,7 @@ export class Builder extends mixing().useTrait([
    * @param  \Illuminate\Contracts\Database\Query\Expression|string|null  $second
    * @return $this
    */
-  public leftJoinWhere (
+  public leftJoinWhere(
     table: string,
     first: string | Expression,
     operator: string,
@@ -1516,7 +1516,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $type
    * @return $this
    */
-  public joinWhere (
+  public joinWhere(
     table: string,
     first: string | Expression,
     operator: string,
@@ -1535,7 +1535,7 @@ export class Builder extends mixing().useTrait([
    * @param  \Illuminate\Contracts\Database\Query\Expression|string|null  $second
    * @return $this
    */
-  public leftJoin (
+  public leftJoin(
     table: string,
     first: string | Expression,
     operator: string | undefined = undefined,
@@ -1551,7 +1551,7 @@ export class Builder extends mixing().useTrait([
    * @param  bool  $not
    * @return $this
    */
-  public addWhereExistsQuery (
+  public addWhereExistsQuery(
     query: Builder,
     boolean: BooleanOperator = BOOLEAN_OPERATORS.and,
     not: boolean = false
@@ -1571,7 +1571,7 @@ export class Builder extends mixing().useTrait([
    * @param  non-empty-string|non-empty-array<int, non-empty-string>  $uniqueBy
    * @return int
    */
-  public upsert (
+  public upsert(
     values: unknown[],
     uniqueBy: string | string[],
     update?: unknown[]
@@ -1586,18 +1586,29 @@ export class Builder extends mixing().useTrait([
       return this.insert(values)
     }
 
-    if (!Array.isArray(values[0])) {
+    // if (!Array.isArray(values[0])) {
+    if (!Array.isArray(head(values)) && !isPlainObject(head(values))) {
       values = [values]
     } else {
-      for (const [key, value] of values.entries()) {
-        ksort($value)
+      // for (const [key, value] of values.entries()) {
+      //   ksort($value)
 
-        values[key] = value
+      //   values[key] = value
+      // }
+      for (const [key, value] of typedEntries(values)) {
+        const sortedKeys = Object.keys(value).sort()
+        const sortedValue = {}
+
+        for (const key of sortedKeys) {
+          sortedValue[key] = value[key]
+        }
+
+        values[key] = sortedValue
       }
     }
 
     if (update === undefined) {
-      update = Object.keys(values[0])
+      update = Object.keys(head(values))
     }
 
     this.applyBeforeQueryCallbacks()
@@ -1620,7 +1631,7 @@ export class Builder extends mixing().useTrait([
    *
    * @return void
    */
-  public applyBeforeQueryCallbacks (): void {
+  public applyBeforeQueryCallbacks(): void {
     for (const callback of this.beforeQueryCallbacks) {
       callback(this)
     }
@@ -1634,7 +1645,7 @@ export class Builder extends mixing().useTrait([
    * @param  literal-string|int|float  $value
    * @return \Illuminate\Contracts\Database\Query\Expression
    */
-  public raw (value: string | number | Expression): Expression {
+  public raw(value: string | number | Expression): Expression {
     return this.connection.raw(value)
   }
 
@@ -1644,7 +1655,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $boolean
    * @return $this
    */
-  public havingNested (
+  public havingNested(
     callback: QueryCallback,
     boolean: BooleanOperator = 'and'
   ): this {
@@ -1661,7 +1672,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $boolean
    * @return $this
    */
-  public addNestedHavingQuery (
+  public addNestedHavingQuery(
     query: Builder,
     boolean: BooleanOperator = 'and'
   ): this {
@@ -1686,7 +1697,7 @@ export class Builder extends mixing().useTrait([
    * @param  bool  $not
    * @return $this
    */
-  public whereLike (
+  public whereLike(
     column: Expression | string,
     value: string,
     caseSensitive: boolean = false,
@@ -1714,7 +1725,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $boolean
    * @return $this
    */
-  public whereNullSafeEquals (
+  public whereNullSafeEquals(
     column: Expression | string,
     value: unknown,
     boolean: BooleanOperator = 'and'
@@ -1736,7 +1747,7 @@ export class Builder extends mixing().useTrait([
    * @param  array|\Illuminate\Contracts\Database\Query\Expression|string  ...$groups
    * @return $this
    */
-  public groupBy (
+  public groupBy(
     ...groups: Array<Expression | string | Array<Expression | string>>
   ): this {
     for (const group of groups) {
@@ -1753,7 +1764,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $boolean
    * @return $this
    */
-  public havingRaw (
+  public havingRaw(
     sql: string,
     bindings: unknown[] = [],
     boolean: BooleanOperator = 'and'
@@ -1773,7 +1784,7 @@ export class Builder extends mixing().useTrait([
    * @param  \Closure|\Illuminate\Database\Query\Builder|\Illuminate\Contracts\Database\Query\Expression|string  $column
    * @return $this
    */
-  public latest (column: Expression | string = 'created_at'): this {
+  public latest(column: Expression | string = 'created_at'): this {
     return this.orderBy(column, SortDirection.Descending)
   }
 
@@ -1783,7 +1794,7 @@ export class Builder extends mixing().useTrait([
    * @param  \Closure|\Illuminate\Database\Query\Builder|\Illuminate\Contracts\Database\Query\Expression|string  $column
    * @return $this
    */
-  public oldest (column: Expression | string = 'created_at'): this {
+  public oldest(column: Expression | string = 'created_at'): this {
     return this.orderBy(column, SortDirection.Ascending)
   }
 
@@ -1793,7 +1804,7 @@ export class Builder extends mixing().useTrait([
    * @param  literal-string  $sql
    * @return $this
    */
-  public orHavingRaw (sql: string, bindings: unknown[] = []): this {
+  public orHavingRaw(sql: string, bindings: unknown[] = []): this {
     return this.havingRaw(sql, bindings, 'or')
   }
 
@@ -1803,7 +1814,7 @@ export class Builder extends mixing().useTrait([
    * @param  literal-string  $sql
    * @return $this
    */
-  public groupByRaw (sql: string, bindings: unknown[] = []): this {
+  public groupByRaw(sql: string, bindings: unknown[] = []): this {
     this.groups.push(new Expression(sql))
 
     this.addBinding(bindings, 'groupBy')
@@ -1817,7 +1828,7 @@ export class Builder extends mixing().useTrait([
    * @param  string|array|\Illuminate\Contracts\Database\Query\Expression  $column
    * @return $this
    */
-  public orWhereNull (
+  public orWhereNull(
     column: Expression | string | Array<Expression | string>
   ): this {
     return this.whereNull(column, BOOLEAN_OPERATORS.or)
@@ -1830,7 +1841,7 @@ export class Builder extends mixing().useTrait([
    * @param  mixed  $value
    * @return $this
    */
-  public orWhereNullSafeEquals (
+  public orWhereNullSafeEquals(
     column: Expression | string,
     value: unknown
   ): this {
@@ -1842,7 +1853,7 @@ export class Builder extends mixing().useTrait([
    *
    * @return string
    */
-  protected defaultKeyName (): string {
+  protected defaultKeyName(): string {
     return 'id'
   }
 
@@ -1854,7 +1865,7 @@ export class Builder extends mixing().useTrait([
    * @param  bool  $caseSensitive
    * @return $this
    */
-  public orWhereLike (
+  public orWhereLike(
     column: Expression | string,
     value: string,
     caseSensitive: boolean = false
@@ -1871,7 +1882,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $boolean
    * @return $this
    */
-  public whereNotLike (
+  public whereNotLike(
     column: Expression | string,
     value: string,
     caseSensitive: boolean = false,
@@ -1888,7 +1899,7 @@ export class Builder extends mixing().useTrait([
    * @param  bool  $caseSensitive
    * @return $this
    */
-  public orWhereNotLike (
+  public orWhereNotLike(
     column: Expression | string,
     value: string,
     caseSensitive: boolean = false
@@ -1902,7 +1913,7 @@ export class Builder extends mixing().useTrait([
    * @param  {string[]}  columns
    * @return {this}
    */
-  public distinct (...columns: string[]): this {
+  public distinct(...columns: string[]): this {
     if (columns.length > 0) {
       this.distinctProperty =
         Array.isArray(columns[0]) || typeof columns[0] === 'boolean'
@@ -1919,7 +1930,7 @@ export class Builder extends mixing().useTrait([
    *
    * @return \Illuminate\Database\Query\Processors\Processor
    */
-  public getProcessor (): Processor {
+  public getProcessor(): Processor {
     return this.processor
   }
 
@@ -1929,7 +1940,7 @@ export class Builder extends mixing().useTrait([
    * @param  mixed  $columns
    * @return $this
    */
-  public select (
+  public select(
     column: string | Expression | Array<string | Expression> = '*',
     ...columns: Array<string | Expression>
   ): this {
@@ -1964,7 +1975,7 @@ export class Builder extends mixing().useTrait([
    *      unionOrder: list<mixed>,
    * }
    */
-  public getRawBindings (): Bindings {
+  public getRawBindings(): Bindings {
     return this.bindings
   }
 
@@ -1977,7 +1988,7 @@ export class Builder extends mixing().useTrait([
    *
    * @throws \InvalidArgumentException
    */
-  public setBindings (
+  public setBindings(
     bindings: BindingValues,
     type: keyof Bindings = 'where'
   ): this {
@@ -1998,7 +2009,7 @@ export class Builder extends mixing().useTrait([
    * @param  string|\Illuminate\Contracts\Database\Query\Expression|array<string|\Illuminate\Contracts\Database\Query\Expression>  $columns
    * @return \Illuminate\Support\Collection<int, \stdClass>
    */
-  public async get (
+  public async get(
     columns: string | Expression | Array<string | Expression> = ['*']
   ): Promise<Collection<PropertyKey, Record<string, unknown>>> {
     const items = new Collection(
@@ -2017,7 +2028,7 @@ export class Builder extends mixing().useTrait([
    *
    * @return array
    */
-  protected runSelect (): Promise<Record<string, unknown>[]> {
+  protected runSelect(): Promise<Record<string, unknown>[]> {
     return this.connection.select(this.toSql(), this.getBindings())
   }
 
@@ -2027,7 +2038,7 @@ export class Builder extends mixing().useTrait([
    * @param  \Illuminate\Support\Collection  $items
    * @return \Illuminate\Support\Collection
    */
-  protected withoutGroupLimitKeys (
+  protected withoutGroupLimitKeys(
     items: Collection<PropertyKey, Record<string, unknown>>
   ): Collection<PropertyKey, Record<string, unknown>> {
     const keysToRemove: string[] = []
@@ -2056,7 +2067,7 @@ export class Builder extends mixing().useTrait([
    *
    * @return \Illuminate\Database\Query\Grammars\Grammar
    */
-  public getGrammar (): Grammar {
+  public getGrammar(): Grammar {
     return this.grammar
   }
 
@@ -2066,7 +2077,7 @@ export class Builder extends mixing().useTrait([
    * @param  \Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder<*>|\Illuminate\Contracts\Database\Query\Expression|string  $column
    * @return $this
    */
-  public orWhereBetween (
+  public orWhereBetween(
     column: Expression | string,
     values: Iterable<unknown>
   ): this {
@@ -2079,7 +2090,7 @@ export class Builder extends mixing().useTrait([
    * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
    * @return $this
    */
-  public orWhereBetweenColumns (
+  public orWhereBetweenColumns(
     column: Expression | string,
     values: Array<unknown>
   ): this {
@@ -2094,7 +2105,7 @@ export class Builder extends mixing().useTrait([
    * @param  bool  $not
    * @return $this
    */
-  public whereBetweenColumns (
+  public whereBetweenColumns(
     column: Expression | string,
     values: Array<unknown>,
     boolean: BooleanOperator = 'and',
@@ -2166,7 +2177,7 @@ export class Builder extends mixing().useTrait([
    *
    * @return bool
    */
-  public async exists (): Promise<boolean> {
+  public async exists(): Promise<boolean> {
     this.applyBeforeQueryCallbacks()
 
     const results = await this.connection.select(
@@ -2192,7 +2203,7 @@ export class Builder extends mixing().useTrait([
    * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
    * @return mixed
    */
-  public async min (column: Expression | string): Promise<number> {
+  public async min(column: Expression | string): Promise<number> {
     return this.aggregate('min', [column])
   }
 
@@ -2202,7 +2213,7 @@ export class Builder extends mixing().useTrait([
    * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
    * @return mixed
    */
-  public async max (column: Expression | string): Promise<number> {
+  public async max(column: Expression | string): Promise<number> {
     return this.aggregate('max', [column])
   }
 
@@ -2212,7 +2223,7 @@ export class Builder extends mixing().useTrait([
    * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
    * @return mixed
    */
-  public async sum (column: Expression | string): Promise<number> {
+  public async sum(column: Expression | string): Promise<number> {
     const result = await this.aggregate('sum', [column])
 
     return result ? Number(result) : 0
@@ -2224,7 +2235,7 @@ export class Builder extends mixing().useTrait([
    * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
    * @return mixed
    */
-  public async avg (column: Expression | string): Promise<number> {
+  public async avg(column: Expression | string): Promise<number> {
     return this.aggregate('avg', [column])
   }
 
@@ -2234,7 +2245,7 @@ export class Builder extends mixing().useTrait([
    * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
    * @return mixed
    */
-  public async average (column: Expression | string): Promise<number> {
+  public async average(column: Expression | string): Promise<number> {
     return this.avg(column)
   }
 
@@ -2243,7 +2254,7 @@ export class Builder extends mixing().useTrait([
    *
    * @return bool
    */
-  public async doesntExist (): Promise<boolean> {
+  public async doesntExist(): Promise<boolean> {
     const exists = await this.exists()
 
     return !exists
@@ -2254,7 +2265,7 @@ export class Builder extends mixing().useTrait([
    *
    * @return mixed
    */
-  public async existsOr (callback: () => Promise<unknown>): Promise<boolean> {
+  public async existsOr(callback: () => Promise<unknown>): Promise<boolean> {
     const exists = await this.exists()
 
     if (exists) {
@@ -2269,7 +2280,7 @@ export class Builder extends mixing().useTrait([
    *
    * @return mixed
    */
-  public async doesntExistOr (
+  public async doesntExistOr(
     callback: () => Promise<unknown>
   ): Promise<boolean> {
     const doesntExist = await this.doesntExist()
@@ -2288,7 +2299,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $boolean
    * @return $this
    */
-  public whereNotBetween (
+  public whereNotBetween(
     column: Expression | string,
     values: Iterable<unknown>,
     boolean: BooleanOperator = BOOLEAN_OPERATORS.and
@@ -2303,7 +2314,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $boolean
    * @return $this
    */
-  public whereNotBetweenColumns (
+  public whereNotBetweenColumns(
     column: Expression | string,
     values: Array<unknown>,
     boolean: BooleanOperator = BOOLEAN_OPERATORS.and
@@ -2317,7 +2328,7 @@ export class Builder extends mixing().useTrait([
    * @param  \Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder<*>|\Illuminate\Contracts\Database\Query\Expression|string  $column
    * @return $this
    */
-  public orWhereNotBetween (
+  public orWhereNotBetween(
     column: Expression | string,
     values: Iterable<unknown>
   ): this {
@@ -2330,7 +2341,7 @@ export class Builder extends mixing().useTrait([
    * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
    * @return $this
    */
-  public orWhereNotBetweenColumns (
+  public orWhereNotBetweenColumns(
     column: Expression | string,
     values: Array<unknown>
   ): this {
@@ -2346,7 +2357,7 @@ export class Builder extends mixing().useTrait([
    *
    * @throws \InvalidArgumentException
    */
-  public selectSub (
+  public selectSub(
     query: QueryCallback | Builder | EloquentBuilder | Relation | string,
     as: string
   ): this {
@@ -2367,7 +2378,7 @@ export class Builder extends mixing().useTrait([
    *
    * @throws \InvalidArgumentException
    */
-  public orderBy (
+  public orderBy(
     column: QueryCallback | Builder | EloquentBuilder | Expression | string,
     direction: SortDirectionType = SortDirection.Ascending
   ): this {
@@ -2413,7 +2424,7 @@ export class Builder extends mixing().useTrait([
    * @param  bool  $not
    * @return $this
    */
-  public havingNull (
+  public havingNull(
     columns: Expression | string | Array<Expression | string>,
     boolean: BooleanOperator = 'and',
     not: boolean = false
@@ -2433,7 +2444,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $column
    * @return $this
    */
-  public orHavingNull (
+  public orHavingNull(
     column: Expression | string | Array<Expression | string>
   ): this {
     return this.havingNull(column, 'or')
@@ -2446,7 +2457,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $boolean
    * @return $this
    */
-  public havingNotNull (
+  public havingNotNull(
     columns: Expression | string | Array<Expression | string>,
     boolean: BooleanOperator = 'and'
   ): this {
@@ -2459,7 +2470,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $column
    * @return $this
    */
-  public orHavingNotNull (
+  public orHavingNotNull(
     column: Expression | string | Array<Expression | string>
   ): this {
     return this.havingNotNull(column, 'or')
@@ -2482,7 +2493,7 @@ export class Builder extends mixing().useTrait([
    * @param  boolean  not
    * @return this
    */
-  public havingBetween (
+  public havingBetween(
     column: string,
     values: unknown[] | Iterable<unknown>,
     boolean: BooleanOperator = 'and',
@@ -2513,7 +2524,7 @@ export class Builder extends mixing().useTrait([
    * @param  \Closure|\Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder<*>|\Illuminate\Contracts\Database\Query\Expression|string  $column
    * @return $this
    */
-  public orderByDesc (column: QueryCallback | Expression | string): this {
+  public orderByDesc(column: QueryCallback | Expression | string): this {
     return this.orderBy(column, SortDirection.Descending)
   }
 
@@ -2523,7 +2534,7 @@ export class Builder extends mixing().useTrait([
    * @param  int  $value
    * @return $this
    */
-  public skip (value: number): this {
+  public skip(value: number): this {
     return this.offset(value)
   }
 
@@ -2533,7 +2544,7 @@ export class Builder extends mixing().useTrait([
    * @param  int  $value
    * @return $this
    */
-  public offset (value: number): this {
+  public offset(value: number): this {
     const offset = Math.max(
       0,
       value !== undefined ? parseInt(String(value), 10) : 0
@@ -2554,7 +2565,7 @@ export class Builder extends mixing().useTrait([
    * @param  int  $value
    * @return $this
    */
-  public take (value: number): this {
+  public take(value: number): this {
     return this.limit(value)
   }
 
@@ -2564,7 +2575,7 @@ export class Builder extends mixing().useTrait([
    * @param  int  $value
    * @return $this
    */
-  public limit (value: number): this {
+  public limit(value: number): this {
     const property = this.unions.length > 0 ? 'unionLimit' : 'limitProperty'
 
     if (value >= 0) {
@@ -2581,7 +2592,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $expression
    * @return $this
    */
-  public selectRaw (expression: string, bindings: BindingValues = []): this {
+  public selectRaw(expression: string, bindings: BindingValues = []): this {
     this.addSelect(new Expression(expression))
 
     if (bindings.length > 0) {
@@ -2598,7 +2609,7 @@ export class Builder extends mixing().useTrait([
    * @param  string|null  as
    * @return this
    */
-  public from (
+  public from(
     table: QueryCallback | Builder | EloquentBuilder | Expression | string,
     as: string | undefined = undefined
   ) {
@@ -2631,7 +2642,7 @@ export class Builder extends mixing().useTrait([
    *
    * @throws \InvalidArgumentException
    */
-  public fromSub (
+  public fromSub(
     query: QueryCallback | Builder | EloquentBuilder | Expression | string,
     as: string
   ) {
@@ -2650,7 +2661,7 @@ export class Builder extends mixing().useTrait([
    * @param  mixed  $bindings
    * @return $this
    */
-  public fromRaw (expression: string, bindings: BindingValues = []) {
+  public fromRaw(expression: string, bindings: BindingValues = []) {
     this.fromProperty = new Expression(expression)
 
     this.addBinding(bindings, 'from')
@@ -2667,7 +2678,7 @@ export class Builder extends mixing().useTrait([
    *
    * @throws \InvalidArgumentException
    */
-  public addBinding (value: unknown, type: keyof Bindings = 'where') {
+  public addBinding(value: unknown, type: keyof Bindings = 'where') {
     if (!(type in this.bindings)) {
       throw new Error(`Invalid binding type: ${type}.`)
     }
@@ -2682,7 +2693,7 @@ export class Builder extends mixing().useTrait([
     return this
   }
 
-  protected toBinding (value: unknown): BindingValue {
+  protected toBinding(value: unknown): BindingValue {
     if (
       typeof value === 'string' ||
       typeof value === 'number' ||
@@ -2706,7 +2717,7 @@ export class Builder extends mixing().useTrait([
    * @param  bool  $not
    * @return $this
    */
-  public whereBinary (
+  public whereBinary(
     column: string | Expression,
     value: string,
     boolean: BooleanOperator = BOOLEAN_OPERATORS.and,
@@ -2728,7 +2739,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $value
    * @return $this
    */
-  public orWhereBinary (column: string | Expression, value: string) {
+  public orWhereBinary(column: string | Expression, value: string) {
     return this.whereBinary(column, value, 'or')
   }
 
@@ -2740,7 +2751,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $boolean
    * @return $this
    */
-  public whereNotBinary (
+  public whereNotBinary(
     column: string | Expression,
     value: string,
     boolean: BooleanOperator = BOOLEAN_OPERATORS.and
@@ -2755,7 +2766,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $value
    * @return $this
    */
-  public orWhereNotBinary (column: string | Expression, value: string) {
+  public orWhereNotBinary(column: string | Expression, value: string) {
     return this.whereNotBinary(column, value, 'or')
   }
 
@@ -2765,7 +2776,7 @@ export class Builder extends mixing().useTrait([
    * @param  mixed  $value
    * @return mixed
    */
-  public castBinding (value: BindingValue): BindingValue {
+  public castBinding(value: BindingValue): BindingValue {
     return value
   }
 
@@ -2775,7 +2786,7 @@ export class Builder extends mixing().useTrait([
    * @param  mixed  $column
    * @return $this
    */
-  public addSelect (column: SelectColumn | SelectColumn[]): this {
+  public addSelect(column: SelectColumn | SelectColumn[]): this {
     const columns = Array.isArray(column) ? column : [column]
 
     for (const [as, selected] of Object.entries(columns)) {
@@ -2811,7 +2822,7 @@ export class Builder extends mixing().useTrait([
    * @param  \Closure|\Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder<*>|string  $query
    * @return array
    */
-  protected createSub (
+  protected createSub(
     query:
       QueryCallback | Builder | EloquentBuilder | Relation | Expression | string
   ): [string, BindingValues] {
@@ -2832,7 +2843,7 @@ export class Builder extends mixing().useTrait([
    *
    * @return \Illuminate\Database\Query\Builder
    */
-  protected forSubQuery () {
+  protected forSubQuery() {
     return this.newQuery()
   }
 
@@ -2841,7 +2852,7 @@ export class Builder extends mixing().useTrait([
    *
    * @return \Illuminate\Database\Query\Builder
    */
-  public newQuery () {
+  public newQuery() {
     return new Builder(this.connection, this.grammar, this.processor)
   }
 
@@ -2853,7 +2864,7 @@ export class Builder extends mixing().useTrait([
    *
    * @throws \InvalidArgumentException
    */
-  protected parseSub (
+  protected parseSub(
     query: Builder | EloquentBuilder | Relation | Expression | string
   ): [string, BindingValues] {
     if (
@@ -2880,7 +2891,7 @@ export class Builder extends mixing().useTrait([
    * @param  \DatePeriod  $period
    * @return array{\DateTimeInterface, \DateTimeInterface}
    */
-  protected resolveDatePeriodBounds (period: DatePeriod): [Date, Date] {
+  protected resolveDatePeriodBounds(period: DatePeriod): [Date, Date] {
     const start = period.getStartDate()
     let end = period.getEndDate()
 
@@ -2903,7 +2914,7 @@ export class Builder extends mixing().useTrait([
    *
    * @return string
    */
-  public toSql (): string {
+  public toSql(): string {
     return this.grammar.compileSelect(this)
   }
 
@@ -2912,7 +2923,7 @@ export class Builder extends mixing().useTrait([
    *
    * @return list<mixed>
    */
-  public getBindings (): BindingValues {
+  public getBindings(): BindingValues {
     return Arr.flatten(Object.values(this.bindings)) as BindingValues
   }
 
@@ -2923,7 +2934,7 @@ export class Builder extends mixing().useTrait([
    * @param  array  $bindings
    * @return $this
    */
-  public orderByRaw (sql: string, bindings: unknown[] = []): this {
+  public orderByRaw(sql: string, bindings: unknown[] = []): this {
     const type: OrderClauseType = 'Raw'
 
     const orderProperty = this.unions.length > 0 ? 'unionOrders' : 'orders'
@@ -2941,7 +2952,7 @@ export class Builder extends mixing().useTrait([
    * @param  \Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder<*>|\Illuminate\Database\Eloquent\Relations\Relation  query
    * @return \Illuminate\Database\Query\Builder
    */
-  protected toBaseQuery (query: Builder | EloquentBuilder | Relation): Builder {
+  protected toBaseQuery(query: Builder | EloquentBuilder | Relation): Builder {
     return query instanceof Builder ? query : query.toBase()
   }
 
@@ -2979,7 +2990,7 @@ export class Builder extends mixing().useTrait([
    *
    * @return \Illuminate\Database\ConnectionInterface
    */
-  public getConnection () {
+  public getConnection() {
     return this.connection
   }
 
@@ -2989,7 +3000,7 @@ export class Builder extends mixing().useTrait([
    * @param  {any}  value
    * @return {boolean}
    */
-  protected isQueryable (
+  protected isQueryable(
     value: unknown
   ): value is QueryCallback | Builder | EloquentBuilder | Relation {
     return (
@@ -3000,7 +3011,7 @@ export class Builder extends mixing().useTrait([
     )
   }
 
-  protected whereColumnName (column: unknown): string | Expression {
+  protected whereColumnName(column: unknown): string | Expression {
     if (typeof column === 'string' || column instanceof Expression) {
       return column
     }
@@ -3017,7 +3028,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $boolean
    * @return $this
    */
-  public where (
+  public where(
     column: Expression | Scalar | Array<Expression | Scalar> | QueryCallback,
     operator: string | undefined = undefined,
     value: string | number | Expression | undefined = undefined,
@@ -3160,7 +3171,7 @@ export class Builder extends mixing().useTrait([
    *
    * @throws \InvalidArgumentException
    */
-  public prepareValueAndOperator (
+  public prepareValueAndOperator(
     value: string | number | Expression | undefined,
     operator: string | undefined,
     useDefault: boolean = false
@@ -3188,7 +3199,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $boolean
    * @return $this
    */
-  public whereNot (
+  public whereNot(
     column: Expression | Scalar | Array<Expression | Scalar> | QueryCallback,
     operator?: string | undefined,
     value?: string | number | Expression | undefined,
@@ -3212,7 +3223,7 @@ export class Builder extends mixing().useTrait([
    * @param  mixed  $value
    * @return bool
    */
-  protected invalidOperatorAndValue (
+  protected invalidOperatorAndValue(
     operator: string,
     value: string | number | Expression | undefined
   ): boolean {
@@ -3233,7 +3244,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $boolean
    * @return $this
    */
-  protected addDateBasedWhere (
+  protected addDateBasedWhere(
     type: WhereClauseType,
     column: Expression | string,
     operator: string | undefined,
@@ -3259,7 +3270,7 @@ export class Builder extends mixing().useTrait([
    * @param  bool  $not
    * @return $this
    */
-  public whereBetween (
+  public whereBetween(
     column: Expression | string | QueryCallback | Builder | EloquentBuilder,
     values: Iterable<unknown>,
     boolean: BooleanOperator = BOOLEAN_OPERATORS.and,
@@ -3303,7 +3314,7 @@ export class Builder extends mixing().useTrait([
    * @param  self  $query
    * @return $this
    */
-  public mergeBindings (query: Builder): this {
+  public mergeBindings(query: Builder): this {
     this.bindings = { ...this.bindings, ...query.bindings }
 
     return this
@@ -3316,7 +3327,7 @@ export class Builder extends mixing().useTrait([
    * @param  int  $perPage
    * @return $this
    */
-  public forPage (page: number, perPage: number = 15): this {
+  public forPage(page: number, perPage: number = 15): this {
     return this.offset((page - 1) * perPage).limit(perPage)
   }
 
@@ -3328,7 +3339,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $column
    * @return $this
    */
-  public forPageBeforeId (
+  public forPageBeforeId(
     perPage: number = 15,
     lastId: number | undefined,
     column: string = 'id'
@@ -3352,7 +3363,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $column
    * @return $this
    */
-  public forPageAfterId (
+  public forPageAfterId(
     perPage: number = 15,
     lastId: number | undefined,
     column: string = 'id'
@@ -3374,7 +3385,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $column
    * @return array
    */
-  protected removeExistingOrdersFor (column: string): Order[] {
+  protected removeExistingOrdersFor(column: string): Order[] {
     const orders = new Collection(this.orders)
       .reject((order: Order) => order.column === column)
       .values()
@@ -3389,7 +3400,7 @@ export class Builder extends mixing().useTrait([
    * @param  array<string|\Illuminate\Contracts\Database\Query\Expression>  $columns
    * @return int<0, max>
    */
-  public async getCountForPagination (
+  public async getCountForPagination(
     columns: string[] = ['*']
   ): Promise<number> {
     const results = await this.runPaginationCountQuery(columns)
@@ -3412,7 +3423,7 @@ export class Builder extends mixing().useTrait([
    * @param  array<string|\Illuminate\Contracts\Database\Query\Expression>  $columns
    * @return array<string | number | Expression>
    */
-  protected async runPaginationCountQuery (
+  protected async runPaginationCountQuery(
     columns: string[] = ['*']
   ): Promise<Array<string | number | Expression>> {
     if (this.groups.length > 0 || this.havings.length > 0) {
@@ -3452,7 +3463,7 @@ export class Builder extends mixing().useTrait([
    *
    * @return self
    */
-  protected cloneForPaginationCount (): this {
+  protected cloneForPaginationCount(): this {
     return this.cloneWithout([
       'orders',
       'limit',
@@ -3466,7 +3477,7 @@ export class Builder extends mixing().useTrait([
    * @param  array<string|\Illuminate\Contracts\Database\Query\Expression>  $columns
    * @return array<string|\Illuminate\Contracts\Database\Query\Expression>
    */
-  protected withoutSelectAliases (
+  protected withoutSelectAliases(
     columns: Array<string | Expression>
   ): Array<string | Expression> {
     return columns.map((column: string | Expression) => {
@@ -3486,7 +3497,7 @@ export class Builder extends mixing().useTrait([
    *
    * @return int<0, max>
    */
-  public update (values: Record<string, unknown>): Promise<number> {
+  public update(values: Record<string, unknown>): Promise<number> {
     this.applyBeforeQueryCallbacks()
 
     const compiledValues = (new Collection(values)).map((value: unknown) => {
@@ -3527,7 +3538,7 @@ export class Builder extends mixing().useTrait([
    * @param  array<mixed>  $bindings
    * @return list<mixed>
    */
-  public cleanBindings (
+  public cleanBindings(
     bindings: BindingValues,
     includeExpressions = false
   ): BindingValues {
@@ -3560,7 +3571,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $boolean
    * @return $this
    */
-  public whereMonth (
+  public whereMonth(
     column: Expression | string,
     operator: string | undefined = undefined,
     value: string | number | Expression | undefined = undefined,
@@ -3602,7 +3613,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $boolean
    * @return $this
    */
-  public whereYear (
+  public whereYear(
     column: Expression | string,
     operator: string | undefined = undefined,
     value: string | number | Expression | undefined = undefined,
@@ -3639,7 +3650,7 @@ export class Builder extends mixing().useTrait([
    * @param  \DateTimeInterface|string|null  $value
    * @return $this
    */
-  public orWhereDate (
+  public orWhereDate(
     column: Expression | string,
     operator: string | undefined = undefined,
     value: string | number | Expression | undefined = undefined
@@ -3662,7 +3673,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $boolean
    * @return $this
    */
-  public whereTime (
+  public whereTime(
     column: Expression | string,
     operator: string | undefined = undefined,
     value: string | number | Expression | undefined = undefined,
@@ -3698,7 +3709,7 @@ export class Builder extends mixing().useTrait([
    * @param  \DateTimeInterface|string|null  $value
    * @return $this
    */
-  public orWhereTime (
+  public orWhereTime(
     column: Expression | string,
     operator: string | undefined = undefined,
     value: string | number | Expression | undefined = undefined
@@ -3720,7 +3731,7 @@ export class Builder extends mixing().useTrait([
    * @param  \DateTimeInterface|string|int|null  $value
    * @return $this
    */
-  public orWhereDay (
+  public orWhereDay(
     column: Expression | string,
     operator: string | undefined = undefined,
     value: string | number | Expression | undefined = undefined
@@ -3742,7 +3753,7 @@ export class Builder extends mixing().useTrait([
    * @param  \DateTimeInterface|string|int|null  $value
    * @return $this
    */
-  public orWhereMonth (
+  public orWhereMonth(
     column: Expression | string,
     operator: string | undefined = undefined,
     value: string | number | Expression | undefined = undefined
@@ -3764,7 +3775,7 @@ export class Builder extends mixing().useTrait([
    * @param  \DateTimeInterface|string|int|null  $value
    * @return $this
    */
-  public orWhereYear (
+  public orWhereYear(
     column: Expression | string,
     operator: string | undefined = undefined,
     value: string | number | Expression | undefined = undefined
@@ -3787,7 +3798,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $boolean
    * @return $this
    */
-  public whereDay (
+  public whereDay(
     column: Expression | string,
     operator: string | undefined = undefined,
     value: string | number | Expression | undefined = undefined,
@@ -3829,7 +3840,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $boolean
    * @return $this
    */
-  public whereDate (
+  public whereDate(
     column: Expression | string,
     operator: string | undefined = undefined,
     value: string | number | Expression | undefined = undefined,
@@ -3866,7 +3877,7 @@ export class Builder extends mixing().useTrait([
    * @param  bool  $not
    * @return $this
    */
-  public whereValueBetween (
+  public whereValueBetween(
     value: unknown,
     columns: Array<Expression | string>,
     boolean: BooleanOperator = BOOLEAN_OPERATORS.and,
@@ -3891,7 +3902,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $boolean
    * @return $this
    */
-  public whereValueNotBetween (
+  public whereValueNotBetween(
     value: unknown,
     columns: Array<Expression | string>,
     boolean: BooleanOperator = BOOLEAN_OPERATORS.and
@@ -3906,7 +3917,7 @@ export class Builder extends mixing().useTrait([
    * @param  array{\Illuminate\Contracts\Database\Query\Expression|string, \Illuminate\Contracts\Database\Query\Expression|string}  $columns
    * @return $this
    */
-  public orWhereValueNotBetween (
+  public orWhereValueNotBetween(
     value: unknown,
     columns: Array<Expression | string>
   ): this {
@@ -3919,7 +3930,7 @@ export class Builder extends mixing().useTrait([
    * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
    * @return $this
    */
-  public orWhereNotNull (column: Expression | string): this {
+  public orWhereNotNull(column: Expression | string): this {
     return this.whereNotNull(column, 'or')
   }
 
@@ -3930,7 +3941,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $boolean
    * @return $this
    */
-  public whereNotNull (
+  public whereNotNull(
     columns: Expression | string | Array<Expression | string>,
     boolean: BooleanOperator = BOOLEAN_OPERATORS.and
   ): this {
@@ -3944,7 +3955,7 @@ export class Builder extends mixing().useTrait([
    * @param  mixed  $bindings
    * @return $this
    */
-  public orWhereRaw (sql: string, bindings: unknown[] = []): this {
+  public orWhereRaw(sql: string, bindings: unknown[] = []): this {
     return this.whereRaw(sql, bindings, 'or')
   }
 
@@ -3956,7 +3967,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $boolean
    * @return $this
    */
-  public whereRaw (
+  public whereRaw(
     sql: string,
     bindings: unknown[] = [],
     boolean: BooleanOperator = BOOLEAN_OPERATORS.and
@@ -3979,7 +3990,7 @@ export class Builder extends mixing().useTrait([
    *
    * @throws \InvalidArgumentException
    */
-  public whereIn (
+  public whereIn(
     column: Expression | string,
     values: unknown[] | QueryCallback | Builder | EloquentBuilder | Relation,
     boolean: BooleanOperator = BOOLEAN_OPERATORS.and,
@@ -4038,7 +4049,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $boolean
    * @return $this
    */
-  public whereNotIn (
+  public whereNotIn(
     column: Expression | string,
     values: unknown[],
     boolean: BooleanOperator = BOOLEAN_OPERATORS.and
@@ -4055,7 +4066,7 @@ export class Builder extends mixing().useTrait([
    * @param  bool  $not
    * @return $this
    */
-  public whereIntegerInRaw (
+  public whereIntegerInRaw(
     column: Expression | string,
     values: unknown[],
     boolean: BooleanOperator = BOOLEAN_OPERATORS.and,
@@ -4080,7 +4091,7 @@ export class Builder extends mixing().useTrait([
    * @param  \Illuminate\Contracts\Support\Arrayable|array  $values
    * @return $this
    */
-  public orWhereIntegerNotInRaw (
+  public orWhereIntegerNotInRaw(
     column: Expression | string,
     values: unknown[]
   ): this {
@@ -4095,7 +4106,7 @@ export class Builder extends mixing().useTrait([
    * @param  string|null  $second
    * @return $this
    */
-  public orWhereColumn (
+  public orWhereColumn(
     first: Expression | string | Array<Expression | string>,
     operator: string | undefined = undefined,
     second: string | Expression | undefined = undefined
@@ -4111,7 +4122,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $boolean
    * @return $this
    */
-  public whereFullText (
+  public whereFullText(
     columns: string | Array<string>,
     value: string,
     options: WhereOptions = {},
@@ -4135,7 +4146,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $value
    * @return $this
    */
-  public orWhereFullText (
+  public orWhereFullText(
     columns: string | Array<string>,
     value: string,
     options: WhereOptions = {}
@@ -4152,7 +4163,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $boolean
    * @return $this
    */
-  public whereAll (
+  public whereAll(
     columns: Expression | string | Array<Expression | string>,
     operator: string | undefined = undefined,
     value: string | number | Expression | undefined = undefined,
@@ -4183,7 +4194,7 @@ export class Builder extends mixing().useTrait([
    * @param  mixed  $value
    * @return $this
    */
-  public orWhereAll (
+  public orWhereAll(
     columns: Expression | string | Array<Expression | string>,
     operator: string | undefined = undefined,
     value: string | number | Expression | undefined = undefined
@@ -4200,7 +4211,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $boolean
    * @return $this
    */
-  public whereAny (
+  public whereAny(
     columns: Expression | string | Array<Expression | string>,
     operator: string | undefined = undefined,
     value: string | number | Expression | undefined = undefined,
@@ -4231,7 +4242,7 @@ export class Builder extends mixing().useTrait([
    * @param  mixed  $value
    * @return $this
    */
-  public orWhereAny (
+  public orWhereAny(
     columns: Expression | string | Array<Expression | string>,
     operator: string | undefined = undefined,
     value: string | number | Expression | undefined = undefined
@@ -4248,7 +4259,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $boolean
    * @return $this
    */
-  public whereNone (
+  public whereNone(
     columns: Expression | string | Array<Expression | string>,
     operator: string | undefined = undefined,
     value: string | number | Expression | undefined = undefined,
@@ -4265,7 +4276,7 @@ export class Builder extends mixing().useTrait([
    * @param  mixed  $value
    * @return $this
    */
-  public orWhereNone (
+  public orWhereNone(
     columns: Expression | string | Array<Expression | string>,
     operator: string | undefined = undefined,
     value: string | number | Expression | undefined = undefined
@@ -4280,7 +4291,7 @@ export class Builder extends mixing().useTrait([
    * @param  \Illuminate\Contracts\Support\Arrayable|array  $values
    * @return $this
    */
-  public orWhereIntegerInRaw (
+  public orWhereIntegerInRaw(
     column: Expression | string,
     values: unknown[]
   ): this {
@@ -4295,7 +4306,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $boolean
    * @return $this
    */
-  public whereIntegerNotInRaw (
+  public whereIntegerNotInRaw(
     column: Expression | string,
     values: unknown[],
     boolean: BooleanOperator = BOOLEAN_OPERATORS.and
@@ -4310,7 +4321,7 @@ export class Builder extends mixing().useTrait([
    * @param  mixed  $values
    * @return $this
    */
-  public orWhereNotIn (column: Expression | string, values: unknown[]): this {
+  public orWhereNotIn(column: Expression | string, values: unknown[]): this {
     return this.whereNotIn(column, values, 'or')
   }
 
@@ -4321,7 +4332,7 @@ export class Builder extends mixing().useTrait([
    * @param  mixed  $values
    * @return $this
    */
-  public orWhereIn (column: Expression | string, values: unknown[]): this {
+  public orWhereIn(column: Expression | string, values: unknown[]): this {
     return this.whereIn(column, values, 'or')
   }
 
@@ -4333,7 +4344,7 @@ export class Builder extends mixing().useTrait([
    * @param  mixed  $value
    * @return $this
    */
-  public orWhereNot (
+  public orWhereNot(
     column: Expression | string | Array<Expression | string> | QueryCallback,
     operator?: string | undefined,
     value?: string | number | Expression | undefined
@@ -4349,7 +4360,7 @@ export class Builder extends mixing().useTrait([
    * @param  mixed  $value
    * @return $this
    */
-  public orWhere (
+  public orWhere(
     column: Expression | string | Array<Expression | string> | QueryCallback,
     operator?: string | undefined,
     value?: string | number | Expression | undefined
@@ -4370,7 +4381,7 @@ export class Builder extends mixing().useTrait([
    * @param  array{\Illuminate\Contracts\Database\Query\Expression|string, \Illuminate\Contracts\Database\Query\Expression|string}  $columns
    * @return $this
    */
-  public orWhereValueBetween (
+  public orWhereValueBetween(
     value: unknown,
     columns: Array<Expression | string>
   ): this {
@@ -4383,7 +4394,7 @@ export class Builder extends mixing().useTrait([
    * @param  mixed  $value
    * @return mixed
    */
-  protected flattenValue (
+  protected flattenValue(
     value: string | number | Expression | undefined
   ): string | number | Expression | undefined {
     return Array.isArray(value) ? head(Arr.flatten(value)) : value
@@ -4398,7 +4409,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $boolean
    * @return $this
    */
-  protected whereSub (
+  protected whereSub(
     column: Expression | string,
     operator: string | undefined,
     callback: QueryCallback | Builder | EloquentBuilder | Relation,
@@ -4442,7 +4453,7 @@ export class Builder extends mixing().useTrait([
    * @param  \Illuminate\Contracts\Database\Query\Expression|string  $columns
    * @return int<0, max>
    */
-  public count (columns: string = '*') {
+  public count(columns: string = '*') {
     return this.aggregate('count', Arr.wrap(columns))
   }
 
@@ -4451,7 +4462,7 @@ export class Builder extends mixing().useTrait([
    *
    * @return static
    */
-  public clone () {
+  public clone() {
     return cloneDeep(this)
   }
 
@@ -4460,7 +4471,7 @@ export class Builder extends mixing().useTrait([
    *
    * @return static
    */
-  public cloneWithout (properties: string[]) {
+  public cloneWithout(properties: string[]) {
     return tap(this.clone(), (clone: Builder) => {
       for (const property of properties) {
         Reflect.set(clone, property, undefined)
@@ -4473,7 +4484,7 @@ export class Builder extends mixing().useTrait([
    *
    * @return static
    */
-  public cloneWithoutBindings (except: string[]) {
+  public cloneWithoutBindings(except: string[]) {
     return tap(this.clone(), (clone: Builder) => {
       for (const type of except) {
         if (type in clone.bindings) {
@@ -4483,7 +4494,7 @@ export class Builder extends mixing().useTrait([
     })
   }
 
-  protected bindingKey (type: string): keyof Bindings {
+  protected bindingKey(type: string): keyof Bindings {
     if (
       type === 'select' ||
       type === 'from' ||
@@ -4508,7 +4519,7 @@ export class Builder extends mixing().useTrait([
    * @param  array  $columns
    * @return mixed
    */
-  public async aggregate (
+  public async aggregate(
     fn: string,
     columns: string[] = ['*']
   ): Promise<unknown> {
@@ -4553,7 +4564,7 @@ export class Builder extends mixing().useTrait([
     }
   }
 
-  protected isRecord (value: unknown): value is Record<string, unknown> {
+  protected isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value)
   }
 
@@ -4564,7 +4575,7 @@ export class Builder extends mixing().useTrait([
    * @param  array<\Illuminate\Contracts\Database\Query\Expression|string>  $columns
    * @return $this
    */
-  protected setAggregate (
+  protected setAggregate(
     functionName: string,
     columns: Array<Expression | string>
   ) {
@@ -4584,7 +4595,7 @@ export class Builder extends mixing().useTrait([
    *
    * @return bool
    */
-  public insert (values: Array<Record<string, unknown>> | Record<string, unknown>): boolean {
+  public insert(values: Array<Record<string, unknown>> | Record<string, unknown>): boolean {
     // Since every insert gets treated like a batch insert, we will make sure the
     // bindings are structured in a way that is convenient when building these
     // inserts statements by verifying these elements are actually an array.
@@ -4627,7 +4638,7 @@ export class Builder extends mixing().useTrait([
    *
    * @return int<0, max>
    */
-  public insertOrIgnore (values: unknown[]): number {
+  public insertOrIgnore(values: unknown[]): number {
     if (values.length === 0) {
       return 0
     }
@@ -4662,7 +4673,7 @@ export class Builder extends mixing().useTrait([
    * @param  non-empty-string|non-empty-array<non-empty-string>|null  $uniqueBy
    * @return \Illuminate\Support\Collection
    */
-  public async insertOrIgnoreReturning (
+  public async insertOrIgnoreReturning(
     values: unknown[],
     returning: string[] = ['*'],
     uniqueBy?: string | string[] | undefined
@@ -4725,7 +4736,7 @@ export class Builder extends mixing().useTrait([
    * @param  \Closure|\Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder<*>|string  $query
    * @return int
    */
-  public insertUsing (
+  public insertUsing(
     columns: string[],
     query: QueryCallback | Builder | EloquentBuilder
   ): boolean {
@@ -4745,7 +4756,7 @@ export class Builder extends mixing().useTrait([
    * @param  \Closure|\Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder<*>|string  $query
    * @return int
    */
-  public insertOrIgnoreUsing (
+  public insertOrIgnoreUsing(
     columns: string[] | Record<string, unknown>,
     query: QueryCallback | Builder | EloquentBuilder | string
   ): number {
@@ -4766,7 +4777,7 @@ export class Builder extends mixing().useTrait([
    * @param  bool  $all
    * @return $this
    */
-  public union (
+  public union(
     query: QueryCallback | Builder | EloquentBuilder,
     all: boolean = false
   ): this {
@@ -4789,7 +4800,7 @@ export class Builder extends mixing().useTrait([
    * @param  \Closure|\Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder<*>  $query
    * @return $this
    */
-  public unionAll (query: QueryCallback | Builder | EloquentBuilder): this {
+  public unionAll(query: QueryCallback | Builder | EloquentBuilder): this {
     return this.union(query, true)
   }
 
@@ -4800,7 +4811,7 @@ export class Builder extends mixing().useTrait([
    * @param  SortDirection | 'asc' | 'desc'  direction
    * @return $this
    */
-  public reorder (
+  public reorder(
     column?: QueryCallback | Builder | Expression | string,
     direction: SortDirectionType = SortDirection.Ascending
   ): this {
@@ -4822,7 +4833,7 @@ export class Builder extends mixing().useTrait([
    * @param  string  $operator
    * @return bool
    */
-  protected isBitwiseOperator (operator: unknown): boolean {
+  protected isBitwiseOperator(operator: unknown): boolean {
     if (typeof operator !== 'string') {
       return false
     }
@@ -4841,7 +4852,7 @@ export class Builder extends mixing().useTrait([
    * @param  bool  $not
    * @return $this
    */
-  public whereNull (
+  public whereNull(
     columns: Expression | string | Array<Expression | string>,
     boolean: WhereBoolean | string = BOOLEAN_OPERATORS.and,
     not: boolean = false

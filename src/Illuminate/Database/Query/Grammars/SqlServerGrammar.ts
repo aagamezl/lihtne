@@ -266,16 +266,16 @@ export class SqlServerGrammar extends Grammar {
   ): string {
     const columns = this.columnize(Object.keys(values[0]))
 
-    let sql = 'merge ' + this.wrapTable(query.from) + ' '
+    let sql = 'merge ' + this.wrapTable(query.fromProperty) + ' '
 
     const parameters = (new Collection(values))
       .map((record: unknown) => '(' + this.parameterize(record) + ')')
       .implode(', ')
 
-    sql += 'using (values ' + parameters + ') ' + this.wrapTable('laravel_source') + ' (' + columns + ') '
+    sql += 'using (values ' + parameters + ') ' + this.wrapTable('lihtne_source') + ' (' + columns + ') '
 
     const on = (new Collection(uniqueBy))
-      .map((column: string) => this.wrap('lihtne_source.' + column) + ' = ' + this.wrap(query.from + '.' + column))
+      .map((column: string) => this.wrap('lihtne_source.' + column) + ' = ' + this.wrap(query.fromProperty + '.' + column))
       .implode(' and ')
 
     sql += 'on ' + on + ' '

@@ -123,12 +123,16 @@ export class MySqlGrammar extends Grammar {
     bindings: Bindings,
     values: BindingValues
   ): BindingValues {
-    values = (new Collection(values))
-      .reject((value: unknown, column: string | Expression) => this.isJsonSelector(column) && typeof value === 'boolean')
+    const newValues = (new Collection(values))
+      .reject((
+        value: unknown,
+        column: string | Expression
+      ): boolean => this.isJsonSelector(column) && typeof value === 'boolean'
+      )
       .map((value: unknown) => (Array.isArray(value) || isPlainObject(value)) ? JSON.stringify(value) : value)
       .all()
 
-    return super.prepareBindingsForUpdate(bindings, values)
+    return super.prepareBindingsForUpdate(bindings, newValues)
   }
 
   /**
