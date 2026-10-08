@@ -128,7 +128,7 @@ export class Grammar
   protected get whereCompilers (): WhereCompilers {
     return {
       Basic: (query, where) => this.whereBasic(query, where),
-      Bitwise: (query, where) => this.whereBasic(query, where),
+      Bitwise: (query, where) => this.whereBitwise(query, where),
       Binary: (query, where) => this.whereBinary(query, where),
       Column: (query, where) => this.whereColumn(query, where),
       Date: (query, where) => this.whereDate(query, where),
@@ -138,7 +138,8 @@ export class Grammar
       Fulltext: (query, where) => this.whereFulltext(query, where),
       In: (query, where) => this.whereIn(query, where),
       InRaw: (query, where) => this.whereInRaw(query, where),
-      JsonBoolean: (query, where) => this.whereBasic(query, where),
+      JsonBoolean: (query, where) => this.whereJsonBoolean(query, where),
+      JsonLength: (query, where) => this.whereJsonLength(query, where),
       Like: (query, where) => this.whereLike(query, where),
       Month: (query, where) => this.whereMonth(query, where),
       Nested: (query, where) => this.whereNested(query, where),
@@ -777,6 +778,61 @@ export class Grammar
     const operator = where.operator?.replace('?', '??') ?? ''
 
     return this.wrap(where.column ?? '') + ' ' + operator + ' ' + value
+  }
+
+  /**
+   * Compile a bitwise operator where clause.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $where
+   * @return string
+   */
+  protected whereBitwise (query: Builder, where: WhereClause): string {
+    return this.whereBasic(query, where)
+  }
+
+  /**
+   * Compile a "where JSON boolean" clause.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $where
+   * @return string
+   */
+  protected whereJsonBoolean (_query: Builder, where: WhereClause): string {
+    const column = this.wrapJsonBooleanSelector(String(where.column ?? ''))
+    const value = this.wrapJsonBooleanValue(this.parameter(where.value))
+    const operator = where.operator?.replace('?', '??') ?? ''
+
+    return column + ' ' + operator + ' ' + value
+  }
+
+  /**
+   * Compile a "where JSON length" clause.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $where
+   * @return string
+   */
+  protected whereJsonLength (_query: Builder, where: WhereClause): string {
+    return this.compileJsonLength(
+      String(where.column ?? ''),
+      where.operator ?? '=',
+      this.parameter(where.value)
+    )
+  }
+
+  /**
+   * Compile a "JSON length" statement into SQL.
+   *
+   * @param  string  $column
+   * @param  string  $operator
+   * @param  string  $value
+   * @return string
+   */
+  // @ts-expect-error expected error; column is not used in this method
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  protected compileJsonLength (column: string, operator: string, value: string): string {
+    throw new Error('This database engine does not support JSON length operations.')
   }
 
   /**
@@ -1565,6 +1621,48 @@ export class Grammar
   }
 
   /**
+   * Compile a delete statement into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @return string
+   */
+  /**
+   * Compile a truncate table statement into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @return array
+   */
+  public compileTruncate (query: Builder): Record<string, BindingValues> {
+    return {
+      ['truncate table ' + this.wrapTable(query.fromProperty)]: []
+    }
+  }
+
+  public compileDelete (query: Builder): string {
+    const table = this.wrapTable(query.fromProperty)
+
+    const where = this.compileWheres(query)
+
+    return (
+      query.joins.length > 0
+        ? this.compileDeleteWithJoins(query, table, where)
+        : this.compileDeleteWithoutJoins(query, table, where)
+    ).trim()
+  }
+
+  /**
+   * Prepare the bindings for a delete statement.
+   *
+   * @param  array  $bindings
+   * @return array
+   */
+  public prepareBindingsForDelete (bindings: Bindings): BindingValues {
+    return Arr.flatten(
+      Arr.except(bindings, 'select')
+    )
+  }
+
+  /**
    * Compile an insert and get ID statement into SQL.
    *
    * @param  \Illuminate\Database\Query\Builder  $query
@@ -1807,5 +1905,25 @@ export class Grammar
 
   public getBitwiseOperators (): string[] {
     return this.bitwiseOperators
+  }
+
+  /**
+   * Wrap the given JSON selector for boolean values.
+   *
+   * @param  string  $value
+   * @return string
+   */
+  protected wrapJsonBooleanSelector (value: string): string {
+    return this.wrapJsonSelector(value)
+  }
+
+  /**
+   * Wrap the given JSON boolean value.
+   *
+   * @param  string  $value
+   * @return string
+   */
+  protected wrapJsonBooleanValue (value: string): string {
+    return value
   }
 }

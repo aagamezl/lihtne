@@ -525,12 +525,19 @@ export class SqlServerGrammar extends Grammar {
    * @param  array  $having
    * @return string
    */
+  protected override whereBitwise (_query: Builder, where: WhereClause): string {
+    const value = this.parameter(where.value)
+    const operator = where.operator?.replace('?', '??') ?? ''
+
+    return `(${this.wrap(where.column ?? '')} ${operator} ${value}) != 0`
+  }
+
   protected override compileHaving (having: Having): string {
     if (having.type === 'Bitwise') {
       return this.compileHavingBitwise(having)
     }
 
-    return parent.compileHaving(having)
+    return super.compileHaving(having)
   }
 
   /**
@@ -622,5 +629,27 @@ export class SqlServerGrammar extends Grammar {
   */
   public prepareBindingForJsonContains (binding: Scalar): string {
     return typeof binding === 'boolean' ? JSON.stringify(binding) : String(binding)
+  }
+
+  /**
+   * Wrap the given JSON selector.
+   *
+   * @param  string  $value
+   * @return string
+   */
+  protected override wrapJsonSelector (value: string): string {
+    const [field, path] = this.wrapJsonFieldAndPath(value)
+
+    return `json_value(${field}${path})`
+  }
+
+  /**
+   * Wrap the given JSON boolean value.
+   *
+   * @param  string  $value
+   * @return string
+   */
+  protected override wrapJsonBooleanValue (value: string): string {
+    return `'${value}'`
   }
 }

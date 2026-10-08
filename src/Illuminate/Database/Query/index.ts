@@ -1,4 +1,5 @@
 export * from './Builder'
+export * from './ConditionExpression'
 export * from './Expression'
 export * from './Grammars'
 export * from './JoinClause'

@@ -50,35 +50,38 @@ export class Arr {
    * @param  mixed  $value
    * @return array
    */
-  public static set<TValue>(array: TValue, key: string | number | null, value: unknown): TValue {
+  public static set<TValue>(
+    array: TValue,
+    key: string | number | null,
+    value: unknown,
+    separator: string = DOT_SEPARATOR
+  ): TValue {
+    let current = array
+
     if (key === undefined) {
       array = value
 
       return array
     }
 
-    const keys = String(key).split(DOT_SEPARATOR)
+    const keys = key.split(separator)
 
-    for (let i = 0; i < keys.length; i += 1) {
-      if (keys.length === 1) {
-        break
-      }
-
-      delete keys[i]
+    for (let i = 0; i < keys.length - 1; i++) {
+      const key = keys[i]
 
       // If the key doesn't exist at this depth, we will just create an empty array
       // to hold the next value, allowing us to create the arrays to hold final
       // values at the correct depth. Then we'll keep digging into the array.
-      if (!Arr.exists(array, key) || !Array.isArray(array[key])) {
-        array[key] = []
+      if (current[key] === undefined || typeof current[key] !== 'object') {
+        current[key] = {}
       }
 
-      array = array[key]
+      current = current[key]
     }
 
-    array[keys.shift()] = value
+    current[keys.pop()] = value
 
-    return array
+    return current
   }
 
   /**

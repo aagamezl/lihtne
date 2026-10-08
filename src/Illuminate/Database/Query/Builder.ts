@@ -1,7 +1,7 @@
 import { dateFormat } from '@devnetic/utils'
 import { cloneDeep, isNil, isPlainObject, snakeCase } from 'es-toolkit'
 
-import type { ConditionExpression } from '../../Contracts/Database/Query/ConditionExpression'
+import type { ConditionExpression as ConditionExpressionContract } from '../../Contracts/Database/Query/ConditionExpression'
 import type { Scalar } from '../../Support/types'
 import type { Connection } from '../Connection'
 import type { Grammar } from '../Query/Grammars/Grammar'
@@ -24,6 +24,7 @@ import { BuildsQueries } from '../Concerns'
 import { BuildsWhereDateClauses } from '../Concerns/BuildsWhereDateClauses'
 import { Builder as EloquentBuilder } from '../Eloquent'
 import { Relation } from '../Eloquent/Relations'
+import { ConditionExpression } from './ConditionExpression'
 import { SortDirection, type SortDirectionType } from './Enums/SortDirection'
 import { Expression } from './Expression'
 
@@ -65,6 +66,7 @@ export type WhereClauseType =
   'In' |
   'InRaw' |
   'JsonBoolean' |
+  'JsonLength' |
   'Like' |
   'Month' |
   'Nested' |
@@ -124,7 +126,7 @@ export type HavingClauseType =
 
 export type Having = {
   type: HavingClauseType
-  column?: string | Expression | ConditionExpression | QueryCallback
+  column?: string | Expression | ConditionExpressionContract | QueryCallback
   operator?: string
   value?: unknown
   boolean: string
@@ -447,17 +449,17 @@ export class Builder extends mixing().useTrait([
   //  *
   //  * @throws \BadMethodCallException
   //  */
-  // public __call(method: string, parameters: unknown[]): unknown {
-  //   if (this.hasMacro(method)) {
-  //     return this.macroCall(method, parameters);
-  //   }
+  public __call (method: string, parameters: unknown[]): unknown {
+    if (this.hasMacro(method)) {
+      return this.macroCall(method, parameters)
+    }
 
-  //   if (method.startsWith('where')) {
-  //     return this.dynamicWhere(method, Array.isArray(parameters) ? parameters : [parameters]);
-  //   }
+    if (method.startsWith('where')) {
+      return this.dynamicWhere(method, parameters)
+    }
 
-  //   this.throwBadMethodCallException(method);
-  // }
+    this.throwBadMethodCallException(method)
+  }
 
   /**
    * Add a "join" clause to the query.
@@ -615,6 +617,82 @@ export class Builder extends mixing().useTrait([
   }
 
   /**
+   * Update records in a PostgreSQL database using the update from syntax.
+   *
+   * @return int
+   *
+   * @throws \LogicException
+   */
+  public updateFrom (values: Record<string, unknown>): number {
+    if (!Reflect.has(this.grammar, 'compileUpdateFrom')) {
+      throw new Error('LogicException: This database engine does not support the updateFrom method.')
+    }
+
+    this.applyBeforeQueryCallbacks()
+
+    const sql = this.grammar.compileUpdateFrom(this, values)
+
+    return this.connection.update(sql, this.cleanBindings(
+      this.grammar.prepareBindingsForUpdateFrom(this.bindings, values)
+    ))
+  }
+
+  /**
+   * Insert or update a record matching the attributes, and fill it with values.
+   *
+   * @return bool
+   */
+  public async updateOrInsert (attributes: Record<string, unknown>, values: BindingValues | (() => BindingValues) = []): Promise<boolean> {
+    const exists = await this.where(attributes).exists()
+
+    if (values instanceof Function) {
+      values = await values(exists)
+    }
+
+    if (!exists) {
+      return this.insert(Object.assign({}, attributes, values))
+    }
+
+    if (Object.keys(values).length === 0) {
+      return true
+    }
+
+    return Boolean(this.limit(1).update(values))
+  }
+
+  /**
+   * Delete records from the database.
+   *
+   * @param  mixed  $id
+   * @return int
+   */
+  public delete (id?: unknown): number {
+    // If an ID is passed to the method, we will set the where clause to check the
+    // ID to let developers to simply and quickly remove a single row from this
+    // database without manually specifying the "where" clauses on the query.
+    if (id !== undefined) {
+      this.where(`${this.fromProperty}.id`, '=', id)
+    }
+
+    this.applyBeforeQueryCallbacks()
+
+    return this.connection.delete(this.grammar.compileDelete(this), this.cleanBindings(
+      this.grammar.prepareBindingsForDelete(this.bindings)
+    ))
+  }
+
+  /**
+   * Remove all rows from the table and reset any auto-incrementing IDs.
+   */
+  public async truncate (): Promise<void> {
+    this.applyBeforeQueryCallbacks()
+
+    for (const [sql, bindings] of Object.entries(this.grammar.compileTruncate(this))) {
+      await this.connection.statement(sql, bindings)
+    }
+  }
+
+  /**
    * Add an array of "where" clauses to the query.
    *
    * @param  array  $column
@@ -627,38 +705,6 @@ export class Builder extends mixing().useTrait([
     boolean: WhereBoolean,
     method: 'where' | 'whereColumn' = 'where'
   ): this {
-    // const whereBoolean: WhereBoolean =
-    //   boolean === 'or' || boolean === 'and not' || boolean === 'or not'
-    //     ? boolean
-    //     : BOOLEAN_OPERATORS.and
-
-    // return this.whereNested((query: Builder) => {
-    //   for (const [key, entry] of Object.entries(column)) {
-    //     if (isNumeric(key) && Array.isArray(entry)) {
-    //       if (method === 'whereColumn') {
-    //         query.whereColumn(
-    //           String(entry[0] ?? ''),
-    //           typeof entry[1] === 'string' ? entry[1] : undefined,
-    //           typeof entry[2] === 'string' ? entry[2] : undefined,
-    //           boolean
-    //         )
-    //       } else {
-    //         query.where(entry[0], entry[1], entry[2], whereBoolean)
-    //       }
-    //     } else if (method === 'whereColumn') {
-    //       query.whereColumn(
-    //         key,
-    //         '=',
-    //         typeof entry === 'string' || entry instanceof Expression
-    //           ? entry
-    //           : String(entry),
-    //         boolean
-    //       )
-    //     } else {
-    //       query.where(key, '=', entry, whereBoolean)
-    //     }
-    //   }
-    // }, boolean)
     return this.whereNested((query: Builder) => {
       for (const [key, value] of Object.entries(column)) {
         if (isNumeric(key) && Array.isArray(value)) {
@@ -758,7 +804,7 @@ export class Builder extends mixing().useTrait([
   ): this {
     let type: HavingClauseType = 'Basic'
 
-    if (column instanceof Expression) {
+    if (column instanceof ConditionExpression) {
       type = 'Expression'
 
       this.havings.push({ type, column, boolean })
@@ -1624,6 +1670,17 @@ export class Builder extends mixing().useTrait([
       this.grammar.compileUpsert(this, values, Array.isArray(uniqueBy) ? uniqueBy : [uniqueBy], update),
       bindings
     )
+  }
+
+  /**
+   * Register a closure to be invoked before the query is executed.
+   *
+   * @return $this
+   */
+  public beforeQuery (callback: QueryCallback): this {
+    this.beforeQueryCallbacks.push(callback)
+
+    return this
   }
 
   /**
@@ -2545,10 +2602,8 @@ export class Builder extends mixing().useTrait([
    * @return $this
    */
   public offset (value: number): this {
-    const offset = Math.max(
-      0,
-      value !== undefined ? parseInt(String(value), 10) : 0
-    )
+    const parsed = parseInt(String(value), 10)
+    const offset = Math.max(0, Number.isNaN(parsed) ? 0 : parsed)
 
     if (this.unions.length > 0) {
       this.unionOffset = offset
@@ -2915,6 +2970,8 @@ export class Builder extends mixing().useTrait([
    * @return string
    */
   public toSql (): string {
+    this.applyBeforeQueryCallbacks()
+
     return this.grammar.compileSelect(this)
   }
 
@@ -3020,6 +3077,24 @@ export class Builder extends mixing().useTrait([
   }
 
   /**
+   * Merge a set of where clauses and bindings.
+   *
+   * @param  array  $wheres
+   * @param  array  $bindings
+   * @return $this
+   */
+  public mergeWheres (wheres: WhereClause[], bindings: Record<number, unknown> | unknown[]): this {
+    this.wheres = [...this.wheres, ...wheres]
+
+    this.bindings.where = [
+      ...this.bindings.where,
+      ...Object.values(bindings as Record<number, unknown>)
+    ]
+
+    return this
+  }
+
+  /**
    * Add a basic "where" clause to the query.
    *
    * @param  \Closure|string|array|\Illuminate\Contracts\Database\Query\Expression  $column
@@ -3029,12 +3104,12 @@ export class Builder extends mixing().useTrait([
    * @return $this
    */
   public where (
-    column: Expression | Scalar | Array<Expression | Scalar> | QueryCallback,
+    column: Expression | Scalar | Array<Expression | Scalar> | QueryCallback | Record<string, unknown>,
     operator: string | undefined = undefined,
     value: string | number | Expression | undefined = undefined,
     boolean: WhereBoolean = BOOLEAN_OPERATORS.and
   ): this {
-    if (column instanceof Expression) {
+    if (column instanceof ConditionExpression) {
       const type = 'Expression'
 
       this.wheres.push({ type, column, boolean })
@@ -3159,6 +3234,70 @@ export class Builder extends mixing().useTrait([
     }
 
     return this
+  }
+
+  /**
+   * Add a "where JSON length" clause to the query.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
+   * @param  mixed  $operator
+   * @param  mixed  $value
+   * @param  string  $boolean
+   * @return $this
+   */
+  public whereJsonLength (
+    column: Expression | string,
+    operator: string | number | undefined = undefined,
+    value: unknown = undefined,
+    boolean: WhereBoolean = BOOLEAN_OPERATORS.and
+  ): this {
+    ;[value, operator] = this.prepareValueAndOperator(
+      value as string | number | Expression | undefined,
+      typeof operator === 'string' ? operator : undefined,
+      arguments.length === 2
+    )
+
+    if (this.invalidOperator(operator)) {
+      ;[value, operator] = [operator, '=']
+    }
+
+    this.wheres.push({
+      type: 'JsonLength',
+      column,
+      operator: typeof operator === 'string' ? operator : '=',
+      value,
+      boolean
+    })
+
+    if (!(value instanceof Expression)) {
+      this.addBinding(Number(this.flattenValue(value)), 'where')
+    }
+
+    return this
+  }
+
+  /**
+   * Add an "or where JSON length" clause to the query.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
+   * @param  mixed  $operator
+   * @param  mixed  $value
+   * @return $this
+   */
+  public orWhereJsonLength (
+    column: Expression | string,
+    operator: string | number | undefined = undefined,
+    value: unknown = undefined
+  ): this {
+    // [value, operator] = this.prepareValueAndOperator(
+    //   value as string | number | Expression | undefined,
+    //   typeof operator === 'string' ? operator : undefined,
+    //   arguments.length === 2
+    // )
+
+    [value, operator] = this.prepareValueAndOperator(value, operator, arguments.length === 2)
+
+    return this.whereJsonLength(column, operator, value, 'or')
   }
 
   /**

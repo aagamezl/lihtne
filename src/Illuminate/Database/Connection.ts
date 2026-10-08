@@ -5,6 +5,7 @@ import type { Dispatcher } from '../Contracts'
 import type { Driver } from './Drivers/Driver'
 import type { Grammar } from './Grammar'
 import type { BindingValues } from './Query/Builder'
+import type { Grammar as SchemaGrammar } from './Schema/Grammars'
 import type { Statement } from './Statements'
 
 import { Arr } from '../Collections'
@@ -50,6 +51,13 @@ export class Connection extends DetectsLostConnections {
    * @var bool
    */
   protected recordsModified: boolean = false
+
+  /**
+   * The schema grammar implementation.
+   *
+   * @var \Illuminate\Database\Schema\Grammars\Grammar
+   */
+  protected schemaGrammar: SchemaGrammar | undefined = undefined
 
   /**
    * The active driver connection.
@@ -229,6 +237,17 @@ export class Connection extends DetectsLostConnections {
    */
   public async insert (query: string, bindings: BindingValues = []): Promise<boolean> {
     return this.statement(query, bindings)
+  }
+
+  /**
+   * Run a delete statement against the database.
+   *
+   * @param  string  $query
+   * @param  array  $bindings
+   * @return int
+   */
+  public delete (query: string, bindings: BindingValues = []): Promise<number> {
+    return this.affectingStatement(query, bindings)
   }
 
   /**
@@ -725,6 +744,35 @@ export class Connection extends DetectsLostConnections {
   public getTablePrefix (): string {
     return this.tablePrefix
   }
+
+  /**
+   * Get a schema builder instance for the connection.
+   *
+   * @return \Illuminate\Database\Schema\Builder
+   */
+  public getSchemaBuilder (): SchemaBuilder {
+    if (this.schemaGrammar === undefined) {
+      this.useDefaultSchemaGrammar()
+    }
+
+    return new SchemaBuilder(this)
+  }
+
+  /**
+   * Set the schema grammar to the default implementation.
+   *
+   * @return void
+   */
+  public useDefaultSchemaGrammar () {
+    this.schemaGrammar = this.getDefaultSchemaGrammar()
+  }
+
+  /**
+ * Get the default schema grammar instance.
+ *
+ * @return \Illuminate\Database\Schema\Grammars\Grammar|null
+ */
+  protected getDefaultSchemaGrammar () { }
 
   /**
    * Get the query grammar used by the connection.

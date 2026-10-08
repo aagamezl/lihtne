@@ -16,7 +16,7 @@ export class Macroable {
    * @return bool
    */
   public hasMacro (name: string): boolean {
-    return this.macros[name] !== undefined
+    return (this.macros ?? {})[name] !== undefined
   }
 
   /**
@@ -35,7 +35,7 @@ export class Macroable {
       )
     }
 
-    let macro = this.macros[method]
+    let macro = (this.macros ?? {})[method]
 
     if (typeof macro === 'function') {
       try {

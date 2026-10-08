@@ -62,9 +62,15 @@ export abstract class Grammar {
     // prefix the last segment as the table name then wrap each segment alone
     // and eventually join them both back together using the dot connector.
     if (String(table).includes('.')) {
-      table = String(table).replace('.' + prefix, '.' + prefix)
+      const tableString = String(table)
+      const lastDot = tableString.lastIndexOf('.')
 
-      return new Collection(String(table).split('.'))
+      table =
+        tableString.slice(0, lastDot + 1) +
+        prefix +
+        tableString.slice(lastDot + 1)
+
+      return new Collection(table.split('.'))
         .map(this.wrapValue.bind(this))
         .implode('.')
     }

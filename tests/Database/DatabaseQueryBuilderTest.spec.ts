@@ -5,7 +5,8 @@ import type { Builder, JoinClause } from '../../src/Illuminate/Database/Query'
 import { Collection } from '../../src/Illuminate/Collections'
 import { collect } from '../../src/Illuminate/Collections/helpers'
 import { Builder as EloquentBuilder } from '../../src/Illuminate/Database/Eloquent/Builder'
-import { Expression, Expression as Raw } from '../../src/Illuminate/Database/Query/Expression'
+import { ConditionExpression } from '../../src/Illuminate/Database/Query/ConditionExpression'
+import { Expression as Raw } from '../../src/Illuminate/Database/Query/Expression'
 import { Carbon, DateInterval, DatePeriod, Str } from '../../src/Illuminate/Support'
 import { Bar } from '../../tests/Database/Fixtures/Enums/Bar'
 import { IntegerStatus, StringStatus } from './Fixtures/Enums'
@@ -1923,27 +1924,27 @@ describe('Database Query Builder', () => {
 
   test('testOrWhereAll', () => {
     let builder = getBuilder()
-    builder.select('*').from('users').where('first_name', 'like', '%Taylor%').orWhereAll(['last_name', 'email'], 'like', '%Otwell%')
+    builder.select('*').from('users').where('first_name', 'like', '%Alvaro%').orWhereAll(['last_name', 'email'], 'like', '%Otwell%')
     expect(builder.toSql()).toBe('select * from "users" where "first_name" like ? or ("last_name" like ? and "email" like ?)')
-    expect(builder.getBindings()).toEqual(['%Taylor%', '%Otwell%', '%Otwell%'])
+    expect(builder.getBindings()).toEqual(['%Alvaro%', '%Otwell%', '%Otwell%'])
 
     builder = getBuilder()
-    builder.select('*').from('users').where('first_name', 'like', '%Taylor%').whereAll(['last_name', 'email'], 'like', '%Otwell%', 'or')
+    builder.select('*').from('users').where('first_name', 'like', '%Alvaro%').whereAll(['last_name', 'email'], 'like', '%Otwell%', 'or')
     expect(builder.toSql()).toBe('select * from "users" where "first_name" like ? or ("last_name" like ? and "email" like ?)')
-    expect(builder.getBindings()).toEqual(['%Taylor%', '%Otwell%', '%Otwell%'])
+    expect(builder.getBindings()).toEqual(['%Alvaro%', '%Otwell%', '%Otwell%'])
 
     builder = getBuilder()
-    builder.select('*').from('users').where('first_name', 'like', '%Taylor%').orWhereAll(['last_name', 'email'], '%Otwell%')
+    builder.select('*').from('users').where('first_name', 'like', '%Alvaro%').orWhereAll(['last_name', 'email'], '%Otwell%')
     expect(builder.toSql()).toBe('select * from "users" where "first_name" like ? or ("last_name" = ? and "email" = ?)')
-    expect(builder.getBindings()).toEqual(['%Taylor%', '%Otwell%', '%Otwell%'])
+    expect(builder.getBindings()).toEqual(['%Alvaro%', '%Otwell%', '%Otwell%'])
 
     builder = getBuilder()
-    builder.select('*').from('users').where('first_name', 'like', '%Taylor%').orWhereAll([
+    builder.select('*').from('users').where('first_name', 'like', '%Alvaro%').orWhereAll([
       (query: Builder) => query.where('last_name', 'like', '%Otwell%'),
       (query: Builder) => query.where('email', 'like', '%Otwell%')
     ])
     expect(builder.toSql()).toBe('select * from "users" where "first_name" like ? or (("last_name" like ?) and ("email" like ?))')
-    expect(builder.getBindings()).toEqual(['%Taylor%', '%Otwell%', '%Otwell%'])
+    expect(builder.getBindings()).toEqual(['%Alvaro%', '%Otwell%', '%Otwell%'])
   })
 
   test('testWhereAny', () => {
@@ -1968,27 +1969,27 @@ describe('Database Query Builder', () => {
 
   test('testOrWhereAny', () => {
     let builder = getBuilder()
-    builder.select('*').from('users').where('first_name', 'like', '%Taylor%').orWhereAny(['last_name', 'email'], 'like', '%Otwell%')
+    builder.select('*').from('users').where('first_name', 'like', '%Alvaro%').orWhereAny(['last_name', 'email'], 'like', '%Otwell%')
     expect(builder.toSql()).toBe('select * from "users" where "first_name" like ? or ("last_name" like ? or "email" like ?)')
-    expect(builder.getBindings()).toEqual(['%Taylor%', '%Otwell%', '%Otwell%'])
+    expect(builder.getBindings()).toEqual(['%Alvaro%', '%Otwell%', '%Otwell%'])
 
     builder = getBuilder()
-    builder.select('*').from('users').where('first_name', 'like', '%Taylor%').whereAny(['last_name', 'email'], 'like', '%Otwell%', 'or')
+    builder.select('*').from('users').where('first_name', 'like', '%Alvaro%').whereAny(['last_name', 'email'], 'like', '%Otwell%', 'or')
     expect(builder.toSql()).toBe('select * from "users" where "first_name" like ? or ("last_name" like ? or "email" like ?)')
-    expect(builder.getBindings()).toEqual(['%Taylor%', '%Otwell%', '%Otwell%'])
+    expect(builder.getBindings()).toEqual(['%Alvaro%', '%Otwell%', '%Otwell%'])
 
     builder = getBuilder()
-    builder.select('*').from('users').where('first_name', 'like', '%Taylor%').orWhereAny(['last_name', 'email'], '%Otwell%')
+    builder.select('*').from('users').where('first_name', 'like', '%Alvaro%').orWhereAny(['last_name', 'email'], '%Otwell%')
     expect(builder.toSql()).toBe('select * from "users" where "first_name" like ? or ("last_name" = ? or "email" = ?)')
-    expect(builder.getBindings()).toEqual(['%Taylor%', '%Otwell%', '%Otwell%'])
+    expect(builder.getBindings()).toEqual(['%Alvaro%', '%Otwell%', '%Otwell%'])
 
     builder = getBuilder()
-    builder.select('*').from('users').where('first_name', 'like', '%Taylor%').orWhereAny([
+    builder.select('*').from('users').where('first_name', 'like', '%Alvaro%').orWhereAny([
       (query: Builder) => query.where('last_name', 'like', '%Otwell%'),
       (query: Builder) => query.where('email', 'like', '%Otwell%')
     ])
     expect(builder.toSql()).toBe('select * from "users" where "first_name" like ? or (("last_name" like ?) or ("email" like ?))')
-    expect(builder.getBindings()).toEqual(['%Taylor%', '%Otwell%', '%Otwell%'])
+    expect(builder.getBindings()).toEqual(['%Alvaro%', '%Otwell%', '%Otwell%'])
   })
 
   test('testWhereNone', () => {
@@ -2003,9 +2004,9 @@ describe('Database Query Builder', () => {
     expect(builder.getBindings()).toEqual(['Otwell', 'Otwell'])
 
     builder = getBuilder()
-    builder.select('*').from('users').where('first_name', 'like', '%Taylor%').whereNone(['last_name', 'email'], 'like', '%Otwell%')
+    builder.select('*').from('users').where('first_name', 'like', '%Alvaro%').whereNone(['last_name', 'email'], 'like', '%Otwell%')
     expect(builder.toSql()).toBe('select * from "users" where "first_name" like ? and not ("last_name" like ? or "email" like ?)', builder.toSql())
-    expect(builder.getBindings()).toEqual(['%Taylor%', '%Otwell%', '%Otwell%'])
+    expect(builder.getBindings()).toEqual(['%Alvaro%', '%Otwell%', '%Otwell%'])
 
     builder = getBuilder()
     builder.select('*').from('users').whereNone([
@@ -2018,27 +2019,27 @@ describe('Database Query Builder', () => {
 
   test('testOrWhereNone', () => {
     let builder = getBuilder()
-    builder.select('*').from('users').where('first_name', 'like', '%Taylor%').orWhereNone(['last_name', 'email'], 'like', '%Otwell%')
+    builder.select('*').from('users').where('first_name', 'like', '%Alvaro%').orWhereNone(['last_name', 'email'], 'like', '%Otwell%')
     expect(builder.toSql()).toBe('select * from "users" where "first_name" like ? or not ("last_name" like ? or "email" like ?)')
-    expect(builder.getBindings()).toEqual(['%Taylor%', '%Otwell%', '%Otwell%'])
+    expect(builder.getBindings()).toEqual(['%Alvaro%', '%Otwell%', '%Otwell%'])
 
     builder = getBuilder()
-    builder.select('*').from('users').where('first_name', 'like', '%Taylor%').whereNone(['last_name', 'email'], 'like', '%Otwell%', 'or')
+    builder.select('*').from('users').where('first_name', 'like', '%Alvaro%').whereNone(['last_name', 'email'], 'like', '%Otwell%', 'or')
     expect(builder.toSql()).toBe('select * from "users" where "first_name" like ? or not ("last_name" like ? or "email" like ?)')
-    expect(builder.getBindings()).toEqual(['%Taylor%', '%Otwell%', '%Otwell%'])
+    expect(builder.getBindings()).toEqual(['%Alvaro%', '%Otwell%', '%Otwell%'])
 
     builder = getBuilder()
-    builder.select('*').from('users').where('first_name', 'like', '%Taylor%').orWhereNone(['last_name', 'email'], '%Otwell%')
+    builder.select('*').from('users').where('first_name', 'like', '%Alvaro%').orWhereNone(['last_name', 'email'], '%Otwell%')
     expect(builder.toSql()).toBe('select * from "users" where "first_name" like ? or not ("last_name" = ? or "email" = ?)')
-    expect(builder.getBindings()).toEqual(['%Taylor%', '%Otwell%', '%Otwell%'])
+    expect(builder.getBindings()).toEqual(['%Alvaro%', '%Otwell%', '%Otwell%'])
 
     builder = getBuilder()
-    builder.select('*').from('users').where('first_name', 'like', '%Taylor%').orWhereNone([
+    builder.select('*').from('users').where('first_name', 'like', '%Alvaro%').orWhereNone([
       (query: Builder) => query.where('last_name', 'like', '%Otwell%'),
       (query: Builder) => query.where('email', 'like', '%Otwell%')
     ])
     expect(builder.toSql()).toBe('select * from "users" where "first_name" like ? or not (("last_name" like ?) or ("email" like ?))')
-    expect(builder.getBindings()).toEqual(['%Taylor%', '%Otwell%', '%Otwell%'])
+    expect(builder.getBindings()).toEqual(['%Alvaro%', '%Otwell%', '%Otwell%'])
   })
 
   test('testUnions', () => {
@@ -2750,17 +2751,7 @@ describe('Database Query Builder', () => {
   test('testHavingExpression', () => {
     const builder = getBuilder()
 
-    const expression = new (class extends Expression {
-      constructor () {
-        super('1 = 1')
-      }
-
-      public getValue () {
-        return '1 = 1'
-      }
-    })()
-
-    builder.select('*').from('users').having(expression)
+    builder.select('*').from('users').having(new ConditionExpression('1 = 1'))
 
     expect(builder.toSql()).toBe('select * from "users" having 1 = 1')
     expect(builder.getBindings()).toEqual([])
@@ -5040,5 +5031,1210 @@ describe('Database Query Builder', () => {
     }).where('name', 'baz').update({ email: 'foo', name: 'bar' })
     expect(connection.update).toHaveBeenCalledWith('update "users" set "email" = ?, "name" = ? where "ctid" in (select "users"."ctid" from "users" inner join "orders" on "users"."id" = "orders"."user_id" and "users"."id" = ? where "name" = ?)', ['foo', 'bar', 1, 'baz'])
     expect(result).toBe(1)
+  })
+
+  test('testUpdateFromMethodWithJoinsOnPostgres', async () => {
+    let builder = getPostgresBuilder()
+    let connection = builder.getConnection()
+    jest.spyOn(connection, 'update').mockResolvedValue(1)
+
+    let result = await builder.from('users').join('orders', 'users.id', '=', 'orders.user_id').where('users.id', '=', 1).updateFrom({ email: 'foo', name: 'bar' })
+    expect(connection.update).toHaveBeenCalledWith('update "users" set "email" = ?, "name" = ? from "orders" where "users"."id" = ? and "users"."id" = "orders"."user_id"', ['foo', 'bar', 1])
+    expect(result).toBe(1)
+
+    builder = getPostgresBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'update').mockResolvedValue(1)
+
+    result = await builder.from('users').join('orders', (join: JoinClause) => {
+      join.on('users.id', '=', 'orders.user_id')
+        .where('users.id', '=', 1)
+    }).updateFrom({ email: 'foo', name: 'bar' })
+    expect(connection.update).toHaveBeenCalledWith('update "users" set "email" = ?, "name" = ? from "orders" where "users"."id" = "orders"."user_id" and "users"."id" = ?', ['foo', 'bar', 1])
+    expect(result).toBe(1)
+
+    builder = getPostgresBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'update').mockResolvedValue(1)
+
+    builder = getPostgresBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'update').mockResolvedValue(1)
+
+    result = await builder.from('users').join('orders', (join: JoinClause) => {
+      join.on('users.id', '=', 'orders.user_id')
+        .where('users.id', '=', 1)
+    }).where('name', 'baz').updateFrom({ email: 'foo', name: 'bar' })
+    expect(connection.update).toHaveBeenCalledWith('update "users" set "email" = ?, "name" = ? from "orders" where "name" = ? and "users"."id" = "orders"."user_id" and "users"."id" = ?', ['foo', 'bar', 'baz', 1])
+    expect(result).toBe(1)
+  })
+
+  test('testUpdateMethodRespectsRaw', async () => {
+    const builder = getBuilder()
+    const connection = builder.getConnection()
+    jest.spyOn(connection, 'update').mockResolvedValue(1)
+
+    const result = await builder.from('users').where('id', '=', 1).update({ email: new Raw('foo'), name: 'bar' })
+    expect(connection.update).toHaveBeenCalledWith('update "users" set "email" = foo, "name" = ? where "id" = ?', ['bar', 1])
+    expect(result).toBe(1)
+  })
+
+  test('testUpdateMethodWorksWithQueryAsValue', async () => {
+    let builder = getBuilder()
+    let connection = builder.getConnection()
+    jest.spyOn(connection, 'update').mockResolvedValue(1)
+
+    let subQueryBuilder = getBuilder()
+    let result = await builder.from('users').where('id', '=', 1).update({ credits: subQueryBuilder.from('transactions').selectRaw('sum(credits)').whereColumn('transactions.user_id', 'users.id').where('type', 'foo') })
+
+    expect(connection.update).toHaveBeenCalledWith('update "users" set "credits" = (select sum(credits) from "transactions" where "transactions"."user_id" = "users"."id" and "type" = ?) where "id" = ?', ['foo', 1])
+    expect(result).toBe(1)
+
+    builder = getBuilder()
+    subQueryBuilder = new EloquentBuilder(getBuilder())
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'update').mockResolvedValue(1)
+
+    result = await builder.from('users').where('id', '=', 1).update({ credits: subQueryBuilder.from('transactions').selectRaw('sum(credits)').whereColumn('transactions.user_id', 'users.id').where('type', 'foo') })
+    expect(connection.update).toHaveBeenCalledWith('update "users" set "credits" = (select sum(credits) from "transactions" where "transactions"."user_id" = "users"."id" and "type" = ?) where "id" = ?', ['foo', 1])
+    expect(result).toBe(1)
+  })
+
+  test('testUpdateOrInsertMethod', async () => {
+    let builder = getMockQueryBuilder()
+
+    jest.spyOn(builder, 'where').mockReturnValue(builder)
+    jest.spyOn(builder, 'exists').mockResolvedValue(false)
+    jest.spyOn(builder, 'insert').mockReturnValue(true)
+
+    let result = await builder.updateOrInsert({ email: 'foo' }, { name: 'bar' })
+    expect(result).toBe(true)
+
+    expect(builder.where).toHaveBeenCalledWith({ email: 'foo' })
+    expect(builder.insert).toHaveBeenCalledWith({ email: 'foo', name: 'bar' })
+
+    builder = getMockQueryBuilder()
+
+    jest.spyOn(builder, 'where').mockReturnValue(builder)
+    jest.spyOn(builder, 'exists').mockResolvedValue(true)
+    jest.spyOn(builder, 'update').mockResolvedValue(1)
+
+    result = await builder.updateOrInsert({ email: 'foo' }, { name: 'bar' })
+    expect(result).toBe(true)
+
+    expect(builder.where).toHaveBeenCalledWith({ email: 'foo' })
+    expect(builder.update).toHaveBeenCalledWith({ name: 'bar' })
+  })
+
+  test('testUpdateOrInsertMethodWorksWithEmptyUpdateValues', async () => {
+    const builder = getMockQueryBuilder()
+
+    jest.spyOn(builder, 'where').mockReturnValue(builder)
+    jest.spyOn(builder, 'exists').mockResolvedValue(true)
+    jest.spyOn(builder, 'update').mockResolvedValue(1)
+
+    const result = await builder.updateOrInsert({ email: 'foo' })
+    expect(result).toBe(true)
+
+    expect(builder.where).toHaveBeenCalledWith({ email: 'foo' })
+    expect(builder.update).not.toHaveBeenCalled()
+  })
+
+  test('testDeleteMethod', async () => {
+    let builder = getBuilder()
+    let connection = builder.getConnection()
+    jest.spyOn(connection, 'delete').mockResolvedValue(1)
+
+    let result = await builder.from('users').where('email', '=', 'foo').delete()
+    expect(connection.delete).toHaveBeenCalledWith('delete from "users" where "email" = ?', ['foo'])
+    expect(result).toBe(1)
+
+    builder = getBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'delete').mockResolvedValue(1)
+
+    result = await builder.from('users').delete(1)
+    expect(connection.delete).toHaveBeenCalledWith('delete from "users" where "users"."id" = ?', [1])
+    expect(result).toBe(1)
+
+    builder = getBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'delete').mockResolvedValue(1)
+
+    result = await builder.from('users').selectRaw('?', ['ignore']).delete(1)
+    expect(connection.delete).toHaveBeenCalledWith('delete from "users" where "users"."id" = ?', [1])
+    expect(result).toBe(1)
+
+    builder = getSQLiteBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'delete').mockResolvedValue(1)
+
+    result = await builder.from('users').where('email', '=', 'foo').orderBy('id').limit(1).delete()
+    expect(connection.delete).toHaveBeenCalledWith('delete from "users" where "rowid" in (select "users"."rowid" from "users" where "email" = ? order by "id" asc limit 1)', ['foo'])
+    expect(result).toBe(1)
+
+    builder = getMySqlBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'delete').mockResolvedValue(1)
+
+    result = await builder.from('users').where('email', '=', 'foo').orderBy('id').limit(1).delete()
+    expect(connection.delete).toHaveBeenCalledWith('delete from `users` where `email` = ? order by `id` asc limit 1', ['foo'])
+    expect(result).toBe(1)
+
+    builder = getSqlServerBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'delete').mockResolvedValue(1)
+
+    result = await builder.from('users').where('email', '=', 'foo').delete()
+    expect(connection.delete).toHaveBeenCalledWith('delete from [users] where [email] = ?', ['foo'])
+    expect(result).toBe(1)
+
+    builder = getSqlServerBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'delete').mockResolvedValue(1)
+
+    result = await builder.from('users').where('email', '=', 'foo').orderBy('id').limit(1).delete()
+    expect(connection.delete).toHaveBeenCalledWith('delete top (1) from [users] where [email] = ?', ['foo'])
+    expect(result).toBe(1)
+  })
+
+  test('testDeleteWithJoinMethod', async () => {
+    let builder = getSQLiteBuilder()
+    let connection = builder.getConnection()
+    jest.spyOn(connection, 'delete').mockResolvedValue(1)
+
+    let result = await builder.from('users').join('contacts', 'users.id', '=', 'contacts.id').where('users.email', '=', 'foo').orderBy('users.id').limit(1).delete()
+    expect(connection.delete).toHaveBeenCalledWith('delete from "users" where "rowid" in (select "users"."rowid" from "users" inner join "contacts" on "users"."id" = "contacts"."id" where "users"."email" = ? order by "users"."id" asc limit 1)', ['foo'])
+    expect(result).toBe(1)
+
+    builder = getSQLiteBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'delete').mockResolvedValue(1)
+
+    result = await builder.from('users as u').join('contacts as c', 'u.id', '=', 'c.id').delete()
+    expect(connection.delete).toHaveBeenCalledWith('delete from "users" as "u" where "rowid" in (select "u"."rowid" from "users" as "u" inner join "contacts" as "c" on "u"."id" = "c"."id")', [])
+    expect(result).toBe(1)
+
+    builder = getMySqlBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'delete').mockResolvedValue(1)
+
+    result = await builder.from('users').join('contacts', 'users.id', '=', 'contacts.id').where('email', '=', 'foo').delete()
+    expect(connection.delete).toHaveBeenCalledWith('delete `users` from `users` inner join `contacts` on `users`.`id` = `contacts`.`id` where `email` = ?', ['foo'])
+    expect(result).toBe(1)
+
+    builder = getMySqlBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'delete').mockResolvedValue(1)
+
+    result = await builder.from('users AS a').join('users AS b', 'a.id', '=', 'b.user_id').where('email', '=', 'foo').delete()
+    expect(connection.delete).toHaveBeenCalledWith('delete `a` from `users` as `a` inner join `users` as `b` on `a`.`id` = `b`.`user_id` where `email` = ?', ['foo'])
+    expect(result).toBe(1)
+
+    builder = getMySqlBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'delete').mockResolvedValue(1)
+
+    result = await builder.from('users').join('contacts', 'users.id', '=', 'contacts.id').delete(1)
+    expect(connection.delete).toHaveBeenCalledWith('delete `users` from `users` inner join `contacts` on `users`.`id` = `contacts`.`id` where `users`.`id` = ?', [1])
+    expect(result).toBe(1)
+
+    builder = getSqlServerBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'delete').mockResolvedValue(1)
+
+    result = await builder.from('users').join('contacts', 'users.id', '=', 'contacts.id').where('email', '=', 'foo').delete()
+    expect(connection.delete).toHaveBeenCalledWith('delete [users] from [users] inner join [contacts] on [users].[id] = [contacts].[id] where [email] = ?', ['foo'])
+    expect(result).toBe(1)
+
+    builder = getSqlServerBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'delete').mockResolvedValue(1)
+
+    result = await builder.from('users AS a').join('users AS b', 'a.id', '=', 'b.user_id').where('email', '=', 'foo').orderBy('id').limit(1).delete()
+    expect(connection.delete).toHaveBeenCalledWith('delete [a] from [users] as [a] inner join [users] as [b] on [a].[id] = [b].[user_id] where [email] = ?', ['foo'])
+    expect(result).toBe(1)
+
+    builder = getSqlServerBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'delete').mockResolvedValue(1)
+
+    result = await builder.from('users').join('contacts', 'users.id', '=', 'contacts.id').delete(1)
+    expect(connection.delete).toHaveBeenCalledWith('delete [users] from [users] inner join [contacts] on [users].[id] = [contacts].[id] where [users].[id] = ?', [1])
+    expect(result).toBe(1)
+
+    builder = getPostgresBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'delete').mockResolvedValue(1)
+
+    result = await builder.from('users').join('contacts', 'users.id', '=', 'contacts.id').where('users.email', '=', 'foo').delete()
+    expect(connection.delete).toHaveBeenCalledWith('delete from "users" where "ctid" in (select "users"."ctid" from "users" inner join "contacts" on "users"."id" = "contacts"."id" where "users"."email" = ?)', ['foo'])
+    expect(result).toBe(1)
+
+    builder = getPostgresBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'delete').mockResolvedValue(1)
+
+    result = await builder.from('users AS a').join('users AS b', 'a.id', '=', 'b.user_id').where('email', '=', 'foo').orderBy('id').limit(1).delete()
+    expect(connection.delete).toHaveBeenCalledWith('delete from "users" as "a" where "ctid" in (select "a"."ctid" from "users" as "a" inner join "users" as "b" on "a"."id" = "b"."user_id" where "email" = ? order by "id" asc limit 1)', ['foo'])
+    expect(result).toBe(1)
+
+    builder = getPostgresBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'delete').mockResolvedValue(1)
+
+    result = await builder.from('users').join('contacts', 'users.id', '=', 'contacts.id').orderBy('id').limit(1).delete(1)
+    expect(connection.delete).toHaveBeenCalledWith('delete from "users" where "ctid" in (select "users"."ctid" from "users" inner join "contacts" on "users"."id" = "contacts"."id" where "users"."id" = ? order by "id" asc limit 1)', [1])
+    expect(result).toBe(1)
+
+    builder = getPostgresBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'delete').mockResolvedValue(1)
+
+    result = await builder.from('users').join('contacts', (join: JoinClause) => {
+      join.on('users.id', '=', 'contacts.user_id')
+        .where('users.id', '=', 1)
+    }).where('name', 'baz').delete()
+    expect(connection.delete).toHaveBeenCalledWith('delete from "users" where "ctid" in (select "users"."ctid" from "users" inner join "contacts" on "users"."id" = "contacts"."user_id" and "users"."id" = ? where "name" = ?)', [1, 'baz'])
+    expect(result).toBe(1)
+
+    builder = getPostgresBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'delete').mockResolvedValue(1)
+
+    result = await builder.from('users').join('contacts', 'users.id', '=', 'contacts.id').delete()
+    expect(connection.delete).toHaveBeenCalledWith('delete from "users" where "ctid" in (select "users"."ctid" from "users" inner join "contacts" on "users"."id" = "contacts"."id")', [])
+    expect(result).toBe(1)
+  })
+
+  test('testTruncateMethod', async () => {
+    let builder = getBuilder()
+    let connection = builder.getConnection()
+    jest.spyOn(connection, 'statement').mockResolvedValue(true)
+
+    await builder.from('users').truncate()
+    expect(connection.statement).toHaveBeenCalledWith('truncate table "users"', [])
+
+    builder = getSQLiteBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'getSchemaBuilder').mockReturnValue({
+      parseSchemaAndTable: () => [null, 'users']
+    })
+
+    builder.from('users')
+    expect(builder.getGrammar().compileTruncate(builder)).toEqual({
+      'delete from sqlite_sequence where name = ?': ['users'],
+      'delete from "users"': []
+    })
+  })
+
+  test('testTruncateMethodWithPrefix', async () => {
+    let builder = getBuilder('prefix_')
+    let connection = builder.getConnection()
+    jest.spyOn(connection, 'statement').mockResolvedValue(true)
+
+    await builder.from('users').truncate()
+    expect(connection.statement).toHaveBeenCalledWith('truncate table "prefix_users"', [])
+
+    builder = getSQLiteBuilder('prefix_')
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'getSchemaBuilder').mockReturnValue({
+      parseSchemaAndTable: () => [null, 'users']
+    })
+
+    builder.from('users')
+    expect(builder.getGrammar().compileTruncate(builder)).toEqual({
+      'delete from sqlite_sequence where name = ?': ['prefix_users'],
+      'delete from "prefix_users"': []
+    })
+  })
+
+  test('testTruncateMethodWithPrefixAndSchema', async () => {
+    let builder = getBuilder('prefix_')
+    let connection = builder.getConnection()
+    jest.spyOn(connection, 'statement').mockResolvedValue(true)
+
+    await builder.from('my_schema.users').truncate()
+    expect(connection.statement).toHaveBeenCalledWith('truncate table "my_schema"."prefix_users"', [])
+
+    builder = getSQLiteBuilder('prefix_')
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'getSchemaBuilder').mockReturnValue({
+      parseSchemaAndTable: () => ['my_schema', 'users']
+    })
+
+    builder.from('my_schema.users')
+    expect(builder.getGrammar().compileTruncate(builder)).toEqual({
+      'delete from "my_schema".sqlite_sequence where name = ?': ['prefix_users'],
+      'delete from "my_schema"."prefix_users"': []
+    })
+  })
+
+  test('testPreserveAddsClosureToArray', () => {
+    const builder = getBuilder()
+
+    builder.beforeQuery(() => {})
+
+    expect(builder.beforeQueryCallbacks).toHaveLength(1)
+    expect(typeof builder.beforeQueryCallbacks[0]).toBe('function')
+  })
+
+  test('testApplyPreserveCleansArray', () => {
+    const builder = getBuilder()
+
+    builder.beforeQuery(() => {})
+    expect(builder.beforeQueryCallbacks).toHaveLength(1)
+
+    builder.applyBeforeQueryCallbacks()
+    expect(builder.beforeQueryCallbacks).toHaveLength(0)
+  })
+
+  test('testPreservedAreAppliedByToSql', () => {
+    const builder = getBuilder()
+
+    builder.beforeQuery((query) => {
+      query.where('foo', 'bar')
+    })
+
+    expect(builder.toSql()).toBe('select * where "foo" = ?')
+    expect(builder.getBindings()).toEqual(['bar'])
+  })
+
+  test('testPreservedAreAppliedByInsert', async () => {
+    const builder = getBuilder()
+    const connection = builder.getConnection()
+    jest.spyOn(connection, 'insert').mockResolvedValue(true)
+
+    builder.beforeQuery((query) => {
+      query.from('users')
+    })
+
+    const result = await builder.insert({ email: 'foo' })
+    expect(connection.insert).toHaveBeenCalledWith('insert into "users" ("email") values (?)', ['foo'])
+    expect(result).toBe(true)
+  })
+
+  test('testPreservedAreAppliedByInsertGetId', async () => {
+    const builder = getBuilder()
+    const processor = builder.getProcessor()
+    jest.spyOn(processor, 'processInsertGetId').mockReturnValue(1)
+
+    builder.beforeQuery((query) => {
+      query.from('users')
+    })
+
+    const result = await builder.insertGetId({ email: 'foo' }, 'id')
+    expect(processor.processInsertGetId).toHaveBeenCalledWith(builder, 'insert into "users" ("email") values (?)', ['foo'], 'id')
+    expect(result).toBe(1)
+  })
+
+  test('testPreservedAreAppliedByInsertUsing', async () => {
+    const builder = getBuilder()
+    const connection = builder.getConnection()
+    jest.spyOn(connection, 'affectingStatement').mockResolvedValue(1)
+
+    builder.beforeQuery((query) => {
+      query.from('users')
+    })
+
+    const result = await builder.insertUsing(['email'], getBuilder())
+    expect(connection.affectingStatement).toHaveBeenCalledWith('insert into "users" ("email") select *', [])
+    expect(result).toBe(1)
+  })
+
+  test('testPreservedAreAppliedByUpsert', async () => {
+    let builder = getMySqlBuilder()
+    let connection = builder.getConnection()
+    jest.spyOn(connection, 'affectingStatement').mockResolvedValue(1)
+    jest.spyOn(connection, 'getConfig').mockReturnValue(false)
+
+    builder.beforeQuery((query) => {
+      query.from('users')
+    })
+
+    let result = await builder.upsert({ email: 'foo' }, 'id')
+    expect(connection.affectingStatement).toHaveBeenCalledWith('insert into `users` (`email`) values (?) on duplicate key update `email` = values(`email`)', ['foo'])
+    expect(connection.getConfig).toHaveBeenCalledWith('use_upsert_alias')
+    expect(result).toBe(1)
+
+    builder = getMySqlBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'affectingStatement').mockResolvedValue(1)
+    jest.spyOn(connection, 'getConfig').mockReturnValue(true)
+
+    builder.beforeQuery((query) => {
+      query.from('users')
+    })
+
+    result = await builder.upsert({ email: 'foo' }, 'id')
+    expect(connection.affectingStatement).toHaveBeenCalledWith('insert into `users` (`email`) values (?) as lihtne_upsert_alias on duplicate key update `email` = `lihtne_upsert_alias`.`email`', ['foo'])
+    expect(connection.getConfig).toHaveBeenCalledWith('use_upsert_alias')
+    expect(result).toBe(1)
+  })
+
+  test('testPreservedAreAppliedByUpdate', async () => {
+    const builder = getBuilder()
+    const connection = builder.getConnection()
+    jest.spyOn(connection, 'update').mockResolvedValue(1)
+
+    builder.from('users').beforeQuery((query) => {
+      query.where('id', 1)
+    })
+
+    const result = await builder.update({ email: 'foo' })
+    expect(connection.update).toHaveBeenCalledWith('update "users" set "email" = ? where "id" = ?', ['foo', 1])
+    expect(result).toBe(1)
+  })
+
+  test('testPreservedAreAppliedByDelete', async () => {
+    const builder = getBuilder()
+    const connection = builder.getConnection()
+    jest.spyOn(connection, 'delete').mockResolvedValue(1)
+
+    builder.beforeQuery((query) => {
+      query.from('users')
+    })
+
+    const result = await builder.delete()
+    expect(connection.delete).toHaveBeenCalledWith('delete from "users"', [])
+    expect(result).toBe(1)
+  })
+
+  test('testPreservedAreAppliedByTruncate', async () => {
+    const builder = getBuilder()
+    const connection = builder.getConnection()
+    jest.spyOn(connection, 'statement').mockResolvedValue(true)
+
+    builder.beforeQuery((query) => {
+      query.from('users')
+    })
+
+    await builder.truncate()
+    expect(connection.statement).toHaveBeenCalledWith('truncate table "users"', [])
+  })
+
+  test('testPreservedAreAppliedByExists', async () => {
+    const builder = getBuilder()
+    const connection = builder.getConnection()
+    jest.spyOn(connection, 'select').mockResolvedValue([{ exists: 1 }])
+
+    builder.beforeQuery((query) => {
+      query.from('users')
+    })
+
+    const result = await builder.exists()
+    expect(connection.select).toHaveBeenCalledWith('select exists(select * from "users") as "exists"', [])
+    expect(result).toBe(true)
+  })
+
+  test('testPostgresInsertGetId', async () => {
+    const builder = getPostgresBuilder()
+    const processor = builder.getProcessor()
+    jest.spyOn(processor, 'processInsertGetId').mockReturnValue(1)
+
+    const result = await builder.from('users').insertGetId({ email: 'foo' }, 'id')
+    expect(processor.processInsertGetId).toHaveBeenCalledWith(builder, 'insert into "users" ("email") values (?) returning "id"', ['foo'], 'id')
+    expect(result).toBe(1)
+  })
+
+  test('testMySqlWrapping', () => {
+    const builder = getMySqlBuilder()
+    builder.select('*').from('users')
+    expect(builder.toSql()).toBe('select * from `users`')
+  })
+
+  test('testMySqlUpdateWrappingJson', async () => {
+    const builder = getMySqlBuilder()
+    const connection = builder.getConnection()
+    jest.spyOn(connection, 'update').mockResolvedValue(1)
+
+    const result = await builder.from('users').where('active', '=', 1).update({
+      'name->first_name': 'John',
+      'name->last_name': 'Doe'
+    })
+    expect(connection.update).toHaveBeenCalledWith(
+      'update `users` set `name` = json_set(`name`, \'$."first_name"\', ?), `name` = json_set(`name`, \'$."last_name"\', ?) where `active` = ?',
+      ['John', 'Doe', 1]
+    )
+    expect(result).toBe(1)
+  })
+
+  test('testMySqlUpdateWrappingNestedJson', async () => {
+    const builder = getMySqlBuilder()
+    const connection = builder.getConnection()
+    jest.spyOn(connection, 'update').mockResolvedValue(1)
+
+    const result = await builder.from('users').where('active', '=', 1).update({
+      'meta->name->first_name': 'John',
+      'meta->name->last_name': 'Doe'
+    })
+    expect(connection.update).toHaveBeenCalledWith(
+      'update `users` set `meta` = json_set(`meta`, \'$."name"."first_name"\', ?), `meta` = json_set(`meta`, \'$."name"."last_name"\', ?) where `active` = ?',
+      ['John', 'Doe', 1]
+    )
+    expect(result).toBe(1)
+  })
+
+  test('testMySqlUpdateWrappingJsonArray', async () => {
+    const builder = getMySqlBuilder()
+    const connection = builder.getConnection()
+    jest.spyOn(connection, 'update').mockResolvedValue(1)
+
+    const createdAt = new Date('2019-08-06')
+
+    const result = await builder.from('users').where('active', '=', 1).update({
+      options: { '2fa': false, presets: ['lihtne', 'vue'] },
+      'meta->tags': ['white', 'large'],
+      group_id: new Raw('45'),
+      created_at: createdAt
+    })
+    expect(connection.update).toHaveBeenCalledWith(
+      'update `users` set `options` = ?, `meta` = json_set(`meta`, \'$."tags"\', cast(? as json)), `group_id` = 45, `created_at` = ? where `active` = ?',
+      [
+        JSON.stringify({ '2fa': false, presets: ['lihtne', 'vue'] }),
+        JSON.stringify(['white', 'large']),
+        createdAt,
+        1
+      ]
+    )
+    expect(result).toBe(1)
+  })
+
+  test('testMySqlUpdateWrappingJsonPathArrayIndex', async () => {
+    const builder = getMySqlBuilder()
+    const connection = builder.getConnection()
+    jest.spyOn(connection, 'update').mockResolvedValue(1)
+
+    const result = await builder.from('users').where('active', '=', 1).update({
+      'options->[1]->2fa': false,
+      'meta->tags[0][2]': 'large'
+    })
+    expect(connection.update).toHaveBeenCalledWith(
+      'update `users` set `options` = json_set(`options`, \'$[1]."2fa"\', false), `meta` = json_set(`meta`, \'$."tags"[0][2]\', ?) where `active` = ?',
+      ['large', 1]
+    )
+    expect(result).toBe(1)
+  })
+
+  test('testMySqlUpdateWithJsonPreparesBindingsCorrectly', async () => {
+    let builder = getMySqlBuilder()
+    let connection = builder.getConnection()
+    jest.spyOn(connection, 'update').mockResolvedValue(1)
+
+    await builder.from('users').where('id', '=', 0).update({
+      'options->enable': false,
+      updated_at: '2015-05-26 22:02:06'
+    })
+    expect(connection.update).toHaveBeenCalledWith(
+      'update `users` set `options` = json_set(`options`, \'$."enable"\', false), `updated_at` = ? where `id` = ?',
+      ['2015-05-26 22:02:06', 0]
+    )
+
+    builder = getMySqlBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'update').mockResolvedValue(1)
+
+    await builder.from('users').where('id', '=', 0).update({
+      'options->size': 45,
+      updated_at: '2015-05-26 22:02:06'
+    })
+    expect(connection.update).toHaveBeenCalledWith(
+      'update `users` set `options` = json_set(`options`, \'$."size"\', ?), `updated_at` = ? where `id` = ?',
+      [45, '2015-05-26 22:02:06', 0]
+    )
+
+    builder = getMySqlBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'update').mockResolvedValue(1)
+
+    await builder.from('users').update({ 'options->size': null })
+    expect(connection.update).toHaveBeenCalledWith(
+      'update `users` set `options` = json_set(`options`, \'$."size"\', ?)',
+      [null]
+    )
+
+    builder = getMySqlBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'update').mockResolvedValue(1)
+
+    await builder.from('users').update({ 'options->size': new Raw('45') })
+    expect(connection.update).toHaveBeenCalledWith(
+      'update `users` set `options` = json_set(`options`, \'$."size"\', 45)',
+      []
+    )
+  })
+
+  test('testPostgresUpdateWrappingJson', async () => {
+    let builder = getPostgresBuilder()
+    let connection = builder.getConnection()
+    jest.spyOn(connection, 'update').mockResolvedValue(1)
+
+    await builder.from('users').update({ 'users.options->name->first_name': 'John' })
+    expect(connection.update).toHaveBeenCalledWith(
+      'update "users" set "options" = jsonb_set("options"::jsonb, \'{"name","first_name"}\', ?)',
+      ['"John"']
+    )
+
+    builder = getPostgresBuilder()
+    connection = builder.getConnection()
+    jest.spyOn(connection, 'update').mockResolvedValue(1)
+
+    await builder.from('users').update({ 'options->language': new Raw("'null'") })
+    expect(connection.update).toHaveBeenCalledWith(
+      'update "users" set "options" = jsonb_set("options"::jsonb, \'{"language"}\', \'null\')',
+      []
+    )
+  })
+
+  test('testPostgresUpdateWrappingJsonArray', async () => {
+    const builder = getPostgresBuilder()
+    const connection = builder.getConnection()
+    jest.spyOn(connection, 'update').mockResolvedValue(1)
+
+    const createdAt = new Date('2019-08-06')
+
+    const result = await builder.from('users').update({
+      options: { '2fa': false, presets: ['lihtne', 'vue'] },
+      'meta->tags': ['white', 'large'],
+      group_id: new Raw('45'),
+      created_at: createdAt
+    })
+    expect(connection.update).toHaveBeenCalledWith(
+      'update "users" set "options" = ?, "meta" = jsonb_set("meta"::jsonb, \'{"tags"}\', ?), "group_id" = 45, "created_at" = ?',
+      [
+        JSON.stringify({ '2fa': false, presets: ['lihtne', 'vue'] }),
+        JSON.stringify(['white', 'large']),
+        createdAt
+      ]
+    )
+    expect(result).toBe(1)
+  })
+
+  test('testPostgresUpdateWrappingJsonPathArrayIndex', async () => {
+    const builder = getPostgresBuilder()
+    const connection = builder.getConnection()
+    jest.spyOn(connection, 'update').mockResolvedValue(1)
+
+    const result = await builder.from('users').where('options->[1]->2fa', true).update({
+      'options->[1]->2fa': false,
+      'meta->tags[0][2]': 'large'
+    })
+    expect(connection.update).toHaveBeenCalledWith(
+      'update "users" set "options" = jsonb_set("options"::jsonb, \'{1,"2fa"}\', ?), "meta" = jsonb_set("meta"::jsonb, \'{"tags",0,2}\', ?) where ("options"->1->\'2fa\')::jsonb = \'true\'::jsonb',
+      ['false', '"large"']
+    )
+    expect(result).toBe(1)
+  })
+
+  test('testSQLiteUpdateWrappingJsonArray', async () => {
+    const builder = getSQLiteBuilder()
+    const connection = builder.getConnection()
+    jest.spyOn(connection, 'update').mockResolvedValue(1)
+
+    const createdAt = new Date('2019-08-06')
+
+    const result = await builder.from('users').update({
+      options: { '2fa': false, presets: ['lihtne', 'vue'] },
+      group_id: new Raw('45'),
+      created_at: createdAt
+    })
+    expect(connection.update).toHaveBeenCalledWith(
+      'update "users" set "options" = ?, "group_id" = 45, "created_at" = ?',
+      [
+        JSON.stringify({ '2fa': false, presets: ['lihtne', 'vue'] }),
+        createdAt
+      ]
+    )
+    expect(result).toBe(1)
+  })
+
+  test('testSQLiteUpdateWrappingNestedJsonArray', async () => {
+    const builder = getSQLiteBuilder()
+    const connection = builder.getConnection()
+    jest.spyOn(connection, 'update').mockResolvedValue(1)
+
+    const createdAt = new Date('2019-08-06')
+
+    const result = await builder.from('users').update({
+      'options->name': 'Alvaro',
+      group_id: new Raw('45'),
+      'options->security': { '2fa': false, presets: ['lihtne', 'vue'] },
+      'options->sharing->twitter': 'username',
+      created_at: createdAt
+    })
+    expect(connection.update).toHaveBeenCalledWith(
+      'update "users" set "group_id" = 45, "created_at" = ?, "options" = json_patch(ifnull("options", json(\'{}\')), json(?))',
+      [
+        createdAt,
+        JSON.stringify({
+          name: 'Alvaro',
+          security: { '2fa': false, presets: ['lihtne', 'vue'] },
+          sharing: { twitter: 'username' }
+        })
+      ]
+    )
+    expect(result).toBe(1)
+  })
+
+  test('testSQLiteUpdateWrappingJsonPathArrayIndex', async () => {
+    const builder = getSQLiteBuilder()
+    const connection = builder.getConnection()
+    jest.spyOn(connection, 'update').mockResolvedValue(1)
+
+    const result = await builder.from('users').where('options->[1]->2fa', true).update({
+      'options->[1]->2fa': false,
+      'meta->tags[0][2]': 'large'
+    })
+    expect(connection.update).toHaveBeenCalledWith(
+      'update "users" set "options" = json_patch(ifnull("options", json(\'{}\')), json(?)), "meta" = json_patch(ifnull("meta", json(\'{}\')), json(?)) where json_extract("options", \'$[1]."2fa"\') = true',
+      ['{"[1]":{"2fa":false}}', '{"tags[0][2]":"large"}']
+    )
+    expect(result).toBe(1)
+  })
+
+  test('testMySqlWrappingJsonWithString', () => {
+    const builder = getMySqlBuilder()
+    builder.select('*').from('users').where('items->sku', '=', 'foo-bar')
+    expect(builder.toSql()).toBe(
+      'select * from `users` where json_unquote(json_extract(`items`, \'$."sku"\')) = ?'
+    )
+    expect(builder.getRawBindings().where).toHaveLength(1)
+    expect(builder.getRawBindings().where[0]).toBe('foo-bar')
+  })
+
+  test('testMySqlWrappingJsonWithInteger', () => {
+    const builder = getMySqlBuilder()
+    builder.select('*').from('users').where('items->price', '=', 1)
+    expect(builder.toSql()).toBe(
+      'select * from `users` where json_unquote(json_extract(`items`, \'$."price"\')) = ?'
+    )
+  })
+
+  test('testMySqlWrappingJsonWithDouble', () => {
+    const builder = getMySqlBuilder()
+    builder.select('*').from('users').where('items->price', '=', 1.5)
+    expect(builder.toSql()).toBe(
+      'select * from `users` where json_unquote(json_extract(`items`, \'$."price"\')) = ?'
+    )
+  })
+
+  test('testMySqlWrappingJsonWithBoolean', () => {
+    let builder = getMySqlBuilder()
+    builder.select('*').from('users').where('items->available', '=', true)
+    expect(builder.toSql()).toBe(
+      'select * from `users` where json_extract(`items`, \'$."available"\') = true'
+    )
+
+    builder = getMySqlBuilder()
+    builder.select('*').from('users').where(new Raw("items->'$.available'"), '=', true)
+    expect(builder.toSql()).toBe("select * from `users` where items->'$.available' = true")
+  })
+
+  test('testMySqlWrappingJsonWithBooleanAndIntegerThatLooksLikeOne', () => {
+    const builder = getMySqlBuilder()
+    builder
+      .select('*')
+      .from('users')
+      .where('items->available', '=', true)
+      .where('items->active', '=', false)
+      .where('items->number_available', '=', 0)
+    expect(builder.toSql()).toBe(
+      'select * from `users` where json_extract(`items`, \'$."available"\') = true and json_extract(`items`, \'$."active"\') = false and json_unquote(json_extract(`items`, \'$."number_available"\')) = ?'
+    )
+  })
+
+  test('testJsonPathEscaping', () => {
+    const expectedWithJsonEscaped =
+      'select json_unquote(json_extract(`json`, \'$."\'\'))#"\'))'
+
+    let builder = getMySqlBuilder()
+    builder.select("json->'))#")
+    expect(builder.toSql()).toBe(expectedWithJsonEscaped)
+
+    builder = getMySqlBuilder()
+    builder.select("json->\\'))#")
+    expect(builder.toSql()).toBe(expectedWithJsonEscaped)
+
+    builder = getMySqlBuilder()
+    builder.select("json->\\\\'))#")
+    expect(builder.toSql()).toBe(expectedWithJsonEscaped)
+
+    builder = getMySqlBuilder()
+    builder.select("json->\\\\\\'))#")
+    expect(builder.toSql()).toBe(expectedWithJsonEscaped)
+  })
+
+  test('testPostgresJsonPathEscaping', () => {
+    let builder = getPostgresBuilder()
+    builder.select("json->'))#")
+    expect(builder.toSql()).toBe('select "json"->>\'\'\'))#\'')
+
+    builder = getPostgresBuilder()
+    builder.select('*').from('users').where("json->'))#", '=', 1)
+    expect(builder.toSql()).toBe('select * from "users" where "json"->>\'\'\'))#\' = ?')
+
+    builder = getPostgresBuilder()
+    builder.select('*').from('users').orderBy("json->'))#")
+    expect(builder.toSql()).toBe('select * from "users" order by "json"->>\'\'\'))#\' asc')
+
+    builder = getPostgresBuilder()
+    builder.select('*').from('users').whereJsonLength("json->'))#", 1)
+    expect(builder.toSql()).toBe(
+      'select * from "users" where jsonb_array_length(("json"->\'\'\'))#\')::jsonb) = ?'
+    )
+  })
+
+  test('testPostgresUpdateJsonPathEscaping', async () => {
+    const builder = getPostgresBuilder()
+    const connection = builder.getConnection()
+    jest.spyOn(connection, 'update').mockResolvedValue(1)
+
+    await builder.from('users').update({ "options->'))#": 'John' })
+    expect(connection.update).toHaveBeenCalledWith(
+      'update "users" set "options" = jsonb_set("options"::jsonb, \'{"\'\'))#"}\', ?)',
+      ['"John"']
+    )
+  })
+
+  test('testMySqlWrappingJson', () => {
+    let builder = getMySqlBuilder()
+    builder.select('*').from('users').whereRaw('items->\'$."price"\' = 1')
+    expect(builder.toSql()).toBe('select * from `users` where items->\'$."price"\' = 1')
+
+    builder = getMySqlBuilder()
+    builder
+      .select('items->price')
+      .from('users')
+      .where('users.items->price', '=', 1)
+      .orderBy('items->price')
+    expect(builder.toSql()).toBe(
+      'select json_unquote(json_extract(`items`, \'$."price"\')) from `users` where json_unquote(json_extract(`users`.`items`, \'$."price"\')) = ? order by json_unquote(json_extract(`items`, \'$."price"\')) asc'
+    )
+
+    builder = getMySqlBuilder()
+    builder.select('*').from('users').where('items->price->in_usd', '=', 1)
+    expect(builder.toSql()).toBe(
+      'select * from `users` where json_unquote(json_extract(`items`, \'$."price"."in_usd"\')) = ?'
+    )
+
+    builder = getMySqlBuilder()
+    builder
+      .select('*')
+      .from('users')
+      .where('items->price->in_usd', '=', 1)
+      .where('items->age', '=', 2)
+    expect(builder.toSql()).toBe(
+      'select * from `users` where json_unquote(json_extract(`items`, \'$."price"."in_usd"\')) = ? and json_unquote(json_extract(`items`, \'$."age"\')) = ?'
+    )
+  })
+
+  test('testPostgresWrappingJson', () => {
+    let builder = getPostgresBuilder()
+    builder
+      .select('items->price')
+      .from('users')
+      .where('users.items->price', '=', 1)
+      .orderBy('items->price')
+    expect(builder.toSql()).toBe(
+      'select "items"->>\'price\' from "users" where "users"."items"->>\'price\' = ? order by "items"->>\'price\' asc'
+    )
+
+    builder = getPostgresBuilder()
+    builder.select('*').from('users').where('items->price->in_usd', '=', 1)
+    expect(builder.toSql()).toBe(
+      'select * from "users" where "items"->\'price\'->>\'in_usd\' = ?'
+    )
+
+    builder = getPostgresBuilder()
+    builder
+      .select('*')
+      .from('users')
+      .where('items->price->in_usd', '=', 1)
+      .where('items->age', '=', 2)
+    expect(builder.toSql()).toBe(
+      'select * from "users" where "items"->\'price\'->>\'in_usd\' = ? and "items"->>\'age\' = ?'
+    )
+
+    builder = getPostgresBuilder()
+    builder
+      .select('*')
+      .from('users')
+      .where('items->prices->0', '=', 1)
+      .where('items->age', '=', 2)
+    expect(builder.toSql()).toBe(
+      'select * from "users" where "items"->\'prices\'->>0 = ? and "items"->>\'age\' = ?'
+    )
+
+    builder = getPostgresBuilder()
+    builder.select('*').from('users').where('items->available', '=', true)
+    expect(builder.toSql()).toBe(
+      'select * from "users" where ("items"->\'available\')::jsonb = \'true\'::jsonb'
+    )
+  })
+
+  test('testSqlServerWrappingJson', () => {
+    let builder = getSqlServerBuilder()
+    builder
+      .select('items->price')
+      .from('users')
+      .where('users.items->price', '=', 1)
+      .orderBy('items->price')
+    expect(builder.toSql()).toBe(
+      'select json_value([items], \'$."price"\') from [users] where json_value([users].[items], \'$."price"\') = ? order by json_value([items], \'$."price"\') asc'
+    )
+
+    builder = getSqlServerBuilder()
+    builder.select('*').from('users').where('items->price->in_usd', '=', 1)
+    expect(builder.toSql()).toBe(
+      'select * from [users] where json_value([items], \'$."price"."in_usd"\') = ?'
+    )
+
+    builder = getSqlServerBuilder()
+    builder
+      .select('*')
+      .from('users')
+      .where('items->price->in_usd', '=', 1)
+      .where('items->age', '=', 2)
+    expect(builder.toSql()).toBe(
+      'select * from [users] where json_value([items], \'$."price"."in_usd"\') = ? and json_value([items], \'$."age"\') = ?'
+    )
+
+    builder = getSqlServerBuilder()
+    builder.select('*').from('users').where('items->available', '=', true)
+    expect(builder.toSql()).toBe(
+      "select * from [users] where json_value([items], '$.\"available\"') = 'true'"
+    )
+  })
+
+  test('testSqliteWrappingJson', () => {
+    let builder = getSQLiteBuilder()
+    builder
+      .select('items->price')
+      .from('users')
+      .where('users.items->price', '=', 1)
+      .orderBy('items->price')
+    expect(builder.toSql()).toBe(
+      'select json_extract("items", \'$."price"\') from "users" where json_extract("users"."items", \'$."price"\') = ? order by json_extract("items", \'$."price"\') asc'
+    )
+
+    builder = getSQLiteBuilder()
+    builder.select('*').from('users').where('items->price->in_usd', '=', 1)
+    expect(builder.toSql()).toBe(
+      'select * from "users" where json_extract("items", \'$."price"."in_usd"\') = ?'
+    )
+
+    builder = getSQLiteBuilder()
+    builder
+      .select('*')
+      .from('users')
+      .where('items->price->in_usd', '=', 1)
+      .where('items->age', '=', 2)
+    expect(builder.toSql()).toBe(
+      'select * from "users" where json_extract("items", \'$."price"."in_usd"\') = ? and json_extract("items", \'$."age"\') = ?'
+    )
+
+    builder = getSQLiteBuilder()
+    builder.select('*').from('users').where('items->available', '=', true)
+    expect(builder.toSql()).toBe(
+      'select * from "users" where json_extract("items", \'$."available"\') = true'
+    )
+  })
+
+  test('testSQLiteOrderBy', () => {
+    const builder = getSQLiteBuilder()
+    builder.select('*').from('users').orderBy('email', 'desc')
+    expect(builder.toSql()).toBe('select * from "users" order by "email" desc')
+  })
+
+  test('testSqlServerLimitsAndOffsets', () => {
+    let builder = getSqlServerBuilder()
+    builder.select('*').from('users').limit(10)
+    expect(builder.toSql()).toBe('select top 10 * from [users]')
+
+    builder = getSqlServerBuilder()
+    builder.select('*').from('users').offset(10).orderBy('email', 'desc')
+    expect(builder.toSql()).toBe('select * from [users] order by [email] desc offset 10 rows')
+
+    builder = getSqlServerBuilder()
+    builder.select('*').from('users').offset(10).limit(10)
+    expect(builder.toSql()).toBe(
+      'select * from [users] order by (SELECT 0) offset 10 rows fetch next 10 rows only'
+    )
+
+    builder = getSqlServerBuilder()
+    builder.select('*').from('users').offset(11).limit(10).orderBy('email', 'desc')
+    expect(builder.toSql()).toBe(
+      'select * from [users] order by [email] desc offset 11 rows fetch next 10 rows only'
+    )
+
+    builder = getSqlServerBuilder()
+    const subQuery = (query: Builder) => {
+      return query
+        .select('created_at')
+        .from('logins')
+        .where('users.name', 'nameBinding')
+        .whereColumn('user_id', 'users.id')
+        .limit(1)
+    }
+    builder
+      .select('*')
+      .from('users')
+      .where('email', 'emailBinding')
+      .orderBy(subQuery)
+      .offset(10)
+      .limit(10)
+    expect(builder.toSql()).toBe(
+      'select * from [users] where [email] = ? order by (select top 1 [created_at] from [logins] where [users].[name] = ? and [user_id] = [users].[id]) asc offset 10 rows fetch next 10 rows only'
+    )
+    expect(builder.getBindings()).toEqual(['emailBinding', 'nameBinding'])
+
+    builder = getSqlServerBuilder()
+    builder.select('*').from('users').limit('foo' as unknown as number)
+    expect(builder.toSql()).toBe('select * from [users]')
+
+    builder = getSqlServerBuilder()
+    builder
+      .select('*')
+      .from('users')
+      .limit('foo' as unknown as number)
+      .offset('bar' as unknown as number)
+    expect(builder.toSql()).toBe('select * from [users]')
+
+    builder = getSqlServerBuilder()
+    builder.select('*').from('users').offset('bar' as unknown as number)
+    expect(builder.toSql()).toBe('select * from [users]')
+  })
+
+  test('testMySqlSoundsLikeOperator', () => {
+    const builder = getMySqlBuilder()
+    builder.select('*').from('users').where('name', 'sounds like', 'John Doe')
+    expect(builder.toSql()).toBe('select * from `users` where `name` sounds like ?')
+    expect(builder.getBindings()).toEqual(['John Doe'])
+  })
+
+  test('testBitwiseOperators', () => {
+    let builder = getBuilder()
+    builder.select('*').from('users').where('bar', '&', 1)
+    expect(builder.toSql()).toBe('select * from "users" where "bar" & ?')
+
+    builder = getPostgresBuilder()
+    builder.select('*').from('users').where('bar', '#', 1)
+    expect(builder.toSql()).toBe('select * from "users" where ("bar" # ?)::bool')
+
+    builder = getPostgresBuilder()
+    builder
+      .select('*')
+      .from('users')
+      .where('range', '>>', '[2022-01-08 00:00:00,2022-01-09 00:00:00)')
+    expect(builder.toSql()).toBe('select * from "users" where ("range" >> ?)::bool')
+
+    builder = getSqlServerBuilder()
+    builder.select('*').from('users').where('bar', '&', 1)
+    expect(builder.toSql()).toBe('select * from [users] where ([bar] & ?) != 0')
+
+    builder = getBuilder()
+    builder.select('*').from('users').having('bar', '&', 1)
+    expect(builder.toSql()).toBe('select * from "users" having "bar" & ?')
+
+    builder = getPostgresBuilder()
+    builder.select('*').from('users').having('bar', '#', 1)
+    expect(builder.toSql()).toBe('select * from "users" having ("bar" # ?)::bool')
+
+    builder = getPostgresBuilder()
+    builder
+      .select('*')
+      .from('users')
+      .having('range', '>>', '[2022-01-08 00:00:00,2022-01-09 00:00:00)')
+    expect(builder.toSql()).toBe('select * from "users" having ("range" >> ?)::bool')
+
+    builder = getSqlServerBuilder()
+    builder.select('*').from('users').having('bar', '&', 1)
+    expect(builder.toSql()).toBe('select * from [users] having ([bar] & ?) != 0')
+  })
+
+  test('testMergeWheresCanMergeWheresAndBindings', () => {
+    const builder = getBuilder()
+    builder.wheres = [{ type: 'Basic', column: 'foo', operator: '=', value: 1, boolean: 'and' } as const]
+    builder.mergeWheres(
+      [{ type: 'Basic', column: 'wheres', operator: '=', value: 2, boolean: 'and' } as const],
+      { 12: 'foo', 13: 'bar' }
+    )
+    expect(builder.wheres).toEqual([
+      { type: 'Basic', column: 'foo', operator: '=', value: 1, boolean: 'and' },
+      { type: 'Basic', column: 'wheres', operator: '=', value: 2, boolean: 'and' }
+    ])
+    expect(builder.getBindings()).toEqual(['foo', 'bar'])
+  })
+
+  test('testPrepareValueAndOperator', () => {
+    let builder = getBuilder()
+    let result = builder.prepareValueAndOperator('>', '20')
+    expect(result[0]).toBe('>')
+    expect(result[1]).toBe('20')
+
+    builder = getBuilder()
+    result = builder.prepareValueAndOperator('>', '20', true)
+    expect(result[0]).toBe('20')
+    expect(result[1]).toBe('=')
+  })
+
+  test('testPrepareValueAndOperatorExpectException', () => {
+    const builder = getBuilder()
+    expect(() => builder.prepareValueAndOperator(undefined, 'like')).toThrow(
+      'Illegal operator and value combination.'
+    )
+  })
+
+  test('testProvidingNullWithOperatorsBuildsCorrectly', () => {
+    let builder = getBuilder()
+    builder.select('*').from('users').where('foo', null as unknown as string)
+    expect(builder.toSql()).toBe('select * from "users" where "foo" is null')
+
+    builder = getBuilder()
+    builder.select('*').from('users').where('foo', '=', null as unknown as string)
+    expect(builder.toSql()).toBe('select * from "users" where "foo" is null')
+
+    builder = getBuilder()
+    builder.select('*').from('users').where('foo', '!=', null as unknown as string)
+    expect(builder.toSql()).toBe('select * from "users" where "foo" is not null')
+
+    builder = getBuilder()
+    builder.select('*').from('users').where('foo', '<>', null as unknown as string)
+    expect(builder.toSql()).toBe('select * from "users" where "foo" is not null')
+
+    builder = getBuilder()
+    builder.select('*').from('users').where('foo', '<=>', null as unknown as string)
+    expect(builder.toSql()).toBe('select * from "users" where "foo" is null')
+  })
+
+  test('testDynamicWhere', () => {
+    const builder = getBuilder()
+    const whereSpy = jest.spyOn(builder, 'where').mockReturnValue(builder)
+
+    expect(builder.dynamicWhere('whereFooBarAndBazOrQux', ['corge', 'waldo', 'fred'])).toBe(builder)
+    expect(whereSpy).toHaveBeenNthCalledWith(1, 'foo_bar', '=', 'corge', 'and')
+    expect(whereSpy).toHaveBeenNthCalledWith(2, 'baz', '=', 'waldo', 'and')
+    expect(whereSpy).toHaveBeenNthCalledWith(3, 'qux', '=', 'fred', 'or')
+  })
+
+  test('testDynamicWhereIsNotGreedy', () => {
+    const builder = getBuilder()
+    const whereSpy = jest.spyOn(builder, 'where').mockReturnValue(builder)
+
+    builder.dynamicWhere('whereIosVersionAndAndroidVersionOrOrientation', [
+      '6.1',
+      '4.2',
+      'Vertical'
+    ])
+    expect(whereSpy).toHaveBeenNthCalledWith(1, 'ios_version', '=', '6.1', 'and')
+    expect(whereSpy).toHaveBeenNthCalledWith(2, 'android_version', '=', '4.2', 'and')
+    expect(whereSpy).toHaveBeenNthCalledWith(3, 'orientation', '=', 'Vertical', 'or')
+  })
+
+  test('testCallTriggersDynamicWhere', () => {
+    const builder = getBuilder()
+
+    expect(builder.__call('whereFooAndBar', ['baz', 'qux'])).toBe(builder)
+    expect(builder.wheres).toHaveLength(2)
   })
 })

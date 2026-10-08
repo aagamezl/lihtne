@@ -1,8 +1,10 @@
+import { isPlainObject } from 'es-toolkit'
+
 import type { Bindings, BindingValues, Builder } from '../Builder'
 
 import { Arr, Collection } from '../../../Collections'
 import { last } from '../../../Collections/helpers'
-import { getValue, isNumeric, Str } from '../../../Support'
+import { isNumeric, Str } from '../../../Support'
 import { Grammar } from './Grammar'
 
 export class SQLiteGrammar extends Grammar {
@@ -240,7 +242,9 @@ export class SQLiteGrammar extends Grammar {
       .map((value: unknown, key: PropertyKey) => {
         const column = last(key.split('.'))
 
-        value = jsonGroups[key] ? this.compileJsonPatch(column, value) : this.parameter(value)
+        value = Object.hasOwn(jsonGroups, String(key))
+          ? this.compileJsonPatch(String(column), value)
+          : this.parameter(value)
 
         return this.wrap(column) + ' = ' + value
       })
@@ -287,23 +291,66 @@ export class SQLiteGrammar extends Grammar {
     const groups = this.groupJsonColumnsForUpdate(values)
 
     const preparedValues = (new Collection(values))
-      .reject((value: unknown, key: PropertyKey) => this.isJsonSelector(key))
+      .reject((value: unknown, key: PropertyKey) => this.isJsonSelector(String(key)))
       .merge(groups)
-      .map((value: unknown) => Array.isArray(value) ? JSON.stringify(value) : value)
+      .map((value: unknown) => (Array.isArray(value) || isPlainObject(value)) ? JSON.stringify(value) : value)
       .all()
 
     const cleanBindings = Arr.except(bindings, 'select')
 
-    // const flattenedValues = Arr.flatten(preparedValues.map((value: unknown) => getValue(value)))
-    const flattenedValues = Arr.flatten(
-      (Array.isArray(preparedValues) ? preparedValues : Object.values(preparedValues)).map((value) =>
-        getValue(value))
-    )
+    const updateBindings = Array.isArray(preparedValues)
+      ? preparedValues
+      : Object.values(preparedValues)
 
     return [
-      ...flattenedValues,
+      ...updateBindings,
       ...Arr.flatten(cleanBindings)
     ]
+  }
+
+  /**
+   * Compile a delete statement into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @return string
+   */
+  /**
+   * Compile a truncate table statement into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @return array
+   */
+  public override compileTruncate (query: Builder): Record<string, BindingValues> {
+    let [schema, table] = query.getConnection().getSchemaBuilder().parseSchemaAndTable(query.fromProperty)
+
+    schema = schema ? this.wrapValue(schema) + '.' : ''
+
+    return {
+      ['delete from ' + schema + 'sqlite_sequence where name = ?']: [query.getConnection().getTablePrefix() + table],
+      ['delete from ' + this.wrapTable(query.fromProperty)]: []
+    }
+  }
+
+  public override compileDelete (query: Builder): string {
+    if (query.joins.length > 0 || query.limitProperty > 0) {
+      return this.compileDeleteWithJoinsOrLimit(query)
+    }
+
+    return super.compileDelete(query)
+  }
+
+  /**
+   * Compile a delete statement with joins or limit into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @return string
+   */
+  protected compileDeleteWithJoinsOrLimit (query: Builder): string {
+    const table = this.wrapTable(query.fromProperty)
+    const alias = last(query.fromProperty.split(' as ') ?? '')
+    const selectSql = this.compileSelect(query.select(`${alias}.rowid`))
+
+    return `delete from ${table} where ${this.wrap('rowid')} in (${selectSql})`
   }
 
   /**
@@ -312,13 +359,17 @@ export class SQLiteGrammar extends Grammar {
    * @param  array  $values
    * @return array
    */
-  protected groupJsonColumnsForUpdate (values: unknown[]): Record<string, unknown> {
+  protected groupJsonColumnsForUpdate (values: unknown[] | Record<string, unknown>): Record<string, unknown> {
     const groups: Record<string, unknown> = {}
 
-    for (const [key, value] of Object.entries(values)) {
-      if (this.isJsonSelector(key)) {
-        Arr.set(groups, Str.after(key, '.').replace('->', '.'), value)
+    for (const [key, value] of Object.entries(values as Record<string, unknown>)) {
+      if (!this.isJsonSelector(key)) {
+        continue
       }
+
+      const path = Str.after(key, '.').replaceAll('->', '.')
+
+      Arr.set(groups, path, value)
     }
 
     return groups
@@ -364,6 +415,18 @@ export class SQLiteGrammar extends Grammar {
       'insert or ignore',
       this.compileInsert(query, values)
     )
+  }
+
+  /**
+   * Wrap the given JSON selector.
+   *
+   * @param  string  $value
+   * @return string
+   */
+  protected override wrapJsonSelector (value: string): string {
+    const [field, path] = this.wrapJsonFieldAndPath(value)
+
+    return `json_extract(${field}${path})`
   }
 
   /**

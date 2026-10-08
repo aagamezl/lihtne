@@ -10,6 +10,13 @@ import { Grammar } from './Grammar'
 
 export class MySqlGrammar extends Grammar {
   /**
+   * The grammar specific operators.
+   *
+   * @var string[]
+   */
+  protected override operators = ['sounds like']
+
+  /**
    * Compile a select query into SQL.
    *
    * @param  \Illuminate\Database\Query\Builder  $query
@@ -111,6 +118,49 @@ export class MySqlGrammar extends Grammar {
   }
 
   /**
+   * Compile the columns for an update statement.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $values
+   * @return string
+   */
+  protected override compileUpdateColumns (
+    query: Builder,
+    values: Record<string, unknown>
+  ): string {
+    return new Collection(values)
+      .map((value, key) => {
+        if (this.isJsonSelector(String(key))) {
+          return this.compileJsonUpdateColumn(String(key), value)
+        }
+
+        return this.wrap(key) + ' = ' + this.parameter(value)
+      })
+      .implode(', ')
+  }
+
+  /**
+   * Prepare a JSON column being updated using the JSON_SET function.
+   *
+   * @param  string  $key
+   * @param  mixed  $value
+   * @return string
+   */
+  protected compileJsonUpdateColumn (key: string, value: unknown): string {
+    if (typeof value === 'boolean') {
+      value = value ? 'true' : 'false'
+    } else if (Array.isArray(value)) {
+      value = 'cast(? as json)'
+    } else {
+      value = this.parameter(value)
+    }
+
+    const [field, path] = this.wrapJsonFieldAndPath(key)
+
+    return `${field} = json_set(${field}${path}, ${value})`
+  }
+
+  /**
    * Prepare the bindings for an update statement.
    *
    * Booleans, integers, and doubles are inserted into JSON updates as raw values.
@@ -132,6 +182,54 @@ export class MySqlGrammar extends Grammar {
       .all()
 
     return super.prepareBindingsForUpdate(bindings, newValues)
+  }
+
+  /**
+   * Compile a delete statement without joins into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  string  $table
+   * @param  string  $where
+   * @return string
+   */
+  protected override compileDeleteWithoutJoins (query: Builder, table: string, where: string): string {
+    let sql = super.compileDeleteWithoutJoins(query, table, where)
+
+    if (query.orders.length > 0) {
+      sql += ' ' + this.compileOrders(query, query.orders)
+    }
+
+    if (query.limitProperty) {
+      sql += ' ' + this.compileLimit(query, query.limitProperty)
+    }
+
+    return sql
+  }
+
+  /**
+   * Compile a delete statement with joins into SQL.
+   *
+   * Adds ORDER BY and LIMIT if present, for platforms that allow them (e.g., PlanetScale).
+   *
+   * Standard MySQL does not support ORDER BY or LIMIT with joined deletes and will throw a syntax error.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  string  $table
+   * @param  string  $where
+   * @return string
+   */
+  protected override compileDeleteWithJoins (query: Builder, table: string, where: string): string {
+    let sql = super.compileDeleteWithJoins(query, table, where)
+
+    if (query.orders.length > 0) {
+      sql += ' ' + this.compileOrders(query, query.orders)
+    }
+
+    if (query.limitProperty) {
+      sql += ' ' + this.compileLimit(query, query.limitProperty)
+    }
+
+    return sql
   }
 
   /**
@@ -311,6 +409,30 @@ export class MySqlGrammar extends Grammar {
     where: WhereClause
   ): string {
     return this.wrap(where.column ?? '') + ' <=> ' + this.parameter(where.value)
+  }
+
+  /**
+   * Wrap the given JSON selector.
+   *
+   * @param  string  $value
+   * @return string
+   */
+  protected override wrapJsonSelector (value: string): string {
+    const [field, path] = this.wrapJsonFieldAndPath(value)
+
+    return `json_unquote(json_extract(${field}${path}))`
+  }
+
+  /**
+   * Wrap the given JSON selector for boolean values.
+   *
+   * @param  string  $value
+   * @return string
+   */
+  protected override wrapJsonBooleanSelector (value: string): string {
+    const [field, path] = this.wrapJsonFieldAndPath(value)
+
+    return `json_extract(${field}${path})`
   }
 
   /**
