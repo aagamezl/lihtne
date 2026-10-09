@@ -357,9 +357,9 @@ export class Connection extends DetectsLostConnections {
    *
    * @throws \RuntimeException
    */
-  // The value is part of the override signature; this base connection cannot escape binary data.
+  // @ts-expect-error - expected error, value is not used in this method
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  protected escapeBinary (_value: string | number | boolean): string {
+  protected escapeBinary (value: string | number | boolean): string {
     throw new Error(
       'RuntimeException: The database connection does not support escaping binary values.'
     )

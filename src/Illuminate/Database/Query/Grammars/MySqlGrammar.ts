@@ -2,6 +2,7 @@ import { isPlainObject } from '@devnetic/utils'
 
 import type { Bindings, BindingValues, Builder, WhereClause } from '../Builder'
 import type { Expression } from '../Expression'
+import type { IndexHint } from '../IndexHint'
 import type { JoinLateralClause } from '../JoinLateralClause'
 
 import { Collection } from '../../../Collections'
@@ -115,6 +116,26 @@ export class MySqlGrammar extends Grammar {
       'insert ignore',
       this.compileInsert(query, values)
     )
+  }
+
+  /**
+   * Compile the lock into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  bool|string  $value
+   * @return string
+   */
+  protected override compileLock (
+    // @ts-expect-error - query is not used
+
+    query: Builder,
+    value: boolean | string
+  ): string {
+    if (typeof value === 'string') {
+      return value
+    }
+
+    return value ? 'for update' : 'lock in share mode'
   }
 
   /**
@@ -409,6 +430,96 @@ export class MySqlGrammar extends Grammar {
     where: WhereClause
   ): string {
     return this.wrap(where.column ?? '') + ' <=> ' + this.parameter(where.value)
+  }
+
+  /**
+   * Compile a "JSON contains" statement into SQL.
+   *
+   * @param  string  $column
+   * @param  string  $value
+   * @return string
+   */
+  /**
+   * Compile the index hints for the query.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  \Illuminate\Database\Query\IndexHint  $indexHint
+   * @return string
+   *
+   * @throws \InvalidArgumentException
+   */
+  protected override compileIndexHint (_query: Builder, indexHint?: IndexHint): string {
+    if (indexHint === undefined) {
+      return ''
+    }
+
+    const index = indexHint.index
+
+    const indexes = index.split(',').map((index) => index.trim())
+
+    for (const index of indexes) {
+      if (!/^[a-zA-Z0-9_$]+$/.test(index)) {
+        throw new Error('InvalidArgumentException: Index name contains invalid characters.')
+      }
+    }
+
+    switch (indexHint.type) {
+      case 'hint':
+        return 'use index (' + index + ')'
+      case 'force':
+        return 'force index (' + index + ')'
+      default:
+        return 'ignore index (' + index + ')'
+    }
+  }
+
+  protected override compileJsonContains (column: string, value: string): string {
+    const [field, path] = this.wrapJsonFieldAndPath(column)
+
+    return 'json_contains(' + field + ', ' + value + path + ')'
+  }
+
+  /**
+   * Compile a "JSON overlaps" statement into SQL.
+   *
+   * @param  string  $column
+   * @param  string  $value
+   * @return string
+   */
+  protected override compileJsonOverlaps (column: string, value: string): string {
+    const [field, path] = this.wrapJsonFieldAndPath(column)
+
+    return 'json_overlaps(' + field + ', ' + value + path + ')'
+  }
+
+  /**
+   * Compile a "JSON contains key" statement into SQL.
+   *
+   * @param  string  $column
+   * @return string
+   */
+  protected override compileJsonContainsKey (column: string): string {
+    const [field, path] = this.wrapJsonFieldAndPath(column)
+
+    return 'ifnull(json_contains_path(' + field + ", 'one'" + path + '), 0)'
+  }
+
+  /**
+   * Compile a "JSON length" statement into SQL.
+   *
+   * @param  string  $column
+   * @param  string  $operator
+   * @param  string  $value
+   * @return string
+   */
+  protected override compileJsonLength (
+    column: string,
+    operator: string,
+    value: string
+  ): string {
+    const [field, path] = this.wrapJsonFieldAndPath(column)
+
+    return 'json_length(' + field + path + ') ' + operator + ' ' + value
   }
 
   /**

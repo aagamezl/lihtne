@@ -182,6 +182,39 @@ export class Arr {
   }
 
   /**
+   * Check if an item or items exist in an array using "dot" notation.
+   *
+   * @param  \ArrayAccess|array  $array
+   * @param  string|array  $keys
+   * @return bool
+   */
+  public static has (array: unknown, keys: string[]): boolean {
+    keys = Array.isArray(keys) ? keys : [keys]
+
+    if (!array || keys.length === 0) {
+      return false
+    }
+
+    for (const key of keys) {
+      let subKeyArray = array
+
+      if (this.exists(array, key)) {
+        continue
+      }
+
+      for (const segment of key.split('.')) {
+        if (this.accessible(subKeyArray) && this.exists(subKeyArray, segment)) {
+          subKeyArray = subKeyArray[segment]
+        } else {
+          return false
+        }
+      }
+    }
+
+    return true
+  }
+
+  /**
    * Remove a key the way PHP `unset` does: drop the property, leave array holes.
    */
   public static unset (

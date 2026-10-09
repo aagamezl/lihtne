@@ -1,6 +1,7 @@
 import { isPlainObject } from 'es-toolkit'
 
 import type { Bindings, BindingValues, Builder } from '../Builder'
+import type { IndexHint } from '../IndexHint'
 
 import { Arr, Collection } from '../../../Collections'
 import { last } from '../../../Collections/helpers'
@@ -415,6 +416,89 @@ export class SQLiteGrammar extends Grammar {
       'insert or ignore',
       this.compileInsert(query, values)
     )
+  }
+
+  /**
+   * Compile a "JSON contains" statement into SQL.
+   *
+   * @param  string  $column
+   * @param  mixed  $value
+   * @return string
+   */
+  /**
+   * Compile the index hints for the query.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  \Illuminate\Database\Query\IndexHint  $indexHint
+   * @return string
+   *
+   * @throws \InvalidArgumentException
+   */
+  protected override compileIndexHint (_query: Builder, indexHint?: IndexHint): string {
+    if (indexHint === undefined || indexHint.type !== 'force') {
+      return ''
+    }
+
+    if (!/^[a-zA-Z0-9_$]+$/.test(indexHint.index)) {
+      throw new Error('InvalidArgumentException: Index name contains invalid characters.')
+    }
+
+    return 'indexed by ' + indexHint.index
+  }
+
+  /**
+   * Compile a "JSON length" statement into SQL.
+   *
+   * @param  string  $column
+   * @param  string  $operator
+   * @param  string  $value
+   * @return string
+   */
+  protected override compileJsonLength (
+    column: string,
+    operator: string,
+    value: string
+  ): string {
+    const [field, path] = this.wrapJsonFieldAndPath(column)
+
+    return `json_array_length(${field}${path}) ${operator} ${value}`
+  }
+
+  protected override compileJsonContains (column: string, value: string): string {
+    const [field, path] = this.wrapJsonFieldAndPath(column)
+
+    return (
+      'exists (select 1 from json_each(' +
+      field +
+      path +
+      ') where ' +
+      this.wrap('json_each.value') +
+      ' is ' +
+      value +
+      ')'
+    )
+  }
+
+  /**
+   * Prepare the binding for a "JSON contains" statement.
+   *
+   * @param  mixed  $binding
+   * @return mixed
+   */
+  public override prepareBindingForJsonContains (binding: unknown): unknown {
+    return binding
+  }
+
+  /**
+   * Compile a "JSON contains key" statement into SQL.
+   *
+   * @param  string  $column
+   * @return string
+   */
+  protected override compileJsonContainsKey (column: string): string {
+    const [field, path] = this.wrapJsonFieldAndPath(column)
+
+    return 'json_type(' + field + path + ') is not null'
   }
 
   /**

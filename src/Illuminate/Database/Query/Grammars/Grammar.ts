@@ -139,7 +139,10 @@ export class Grammar
       In: (query, where) => this.whereIn(query, where),
       InRaw: (query, where) => this.whereInRaw(query, where),
       JsonBoolean: (query, where) => this.whereJsonBoolean(query, where),
+      JsonContains: (query, where) => this.whereJsonContains(query, where),
+      JsonContainsKey: (query, where) => this.whereJsonContainsKey(query, where),
       JsonLength: (query, where) => this.whereJsonLength(query, where),
+      JsonOverlaps: (query, where) => this.whereJsonOverlaps(query, where),
       Like: (query, where) => this.whereLike(query, where),
       Month: (query, where) => this.whereMonth(query, where),
       Nested: (query, where) => this.whereNested(query, where),
@@ -149,6 +152,7 @@ export class Grammar
       NotNull: (query, where) => this.whereNotNull(query, where),
       Null: (query, where) => this.whereNull(query, where),
       NullSafeEquals: (query, where) => this.whereNullSafeEquals(query, where),
+      RowValues: (query, where) => this.whereRowValues(query, where),
       Sub: (query, where) => this.whereSub(query, where),
       Time: (query, where) => this.whereTime(query, where),
       Year: (query, where) => this.whereYear(query, where),
@@ -485,7 +489,12 @@ export class Grammar
    * @param  bool|string  $value
    * @return string
    */
-  protected compileLock (_query: Builder, value: boolean | string): string {
+  protected compileLock (
+    // @ts-expect-error - query is not used
+
+    query: Builder,
+    value: boolean | string
+  ): string {
     return typeof value === 'string' ? value : ''
   }
 
@@ -807,6 +816,134 @@ export class Grammar
   }
 
   /**
+   * Compile a where row values condition.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $where
+   * @return string
+   */
+  protected whereRowValues (_query: Builder, where: WhereClause): string {
+    const columns = this.columnize(where.columns ?? [])
+
+    const values = this.parameterize(
+      Array.isArray(where.values) ? where.values : []
+    )
+
+    return '(' + columns + ') ' + (where.operator ?? '') + ' (' + values + ')'
+  }
+
+  /**
+   * Compile a "where JSON contains" clause.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $where
+   * @return string
+   */
+  protected whereJsonContains (_query: Builder, where: WhereClause): string {
+    const not = where.not ? 'not ' : ''
+
+    return (
+      not +
+      this.compileJsonContains(
+        String(where.column ?? ''),
+        this.parameter(where.value)
+      )
+    )
+  }
+
+  /**
+   * Compile a "JSON contains" statement into SQL.
+   *
+   * @param  string  $column
+   * @param  string  $value
+   * @return string
+   *
+   * @throws \RuntimeException
+   */
+  // @ts-expect-error expected error; column is not used in this method
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  protected compileJsonContains (column: string, value: string): string {
+    throw new Error(
+      'RuntimeException: This database engine does not support JSON contains operations.'
+    )
+  }
+
+  /**
+   * Compile a "where JSON overlaps" clause.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $where
+   * @return string
+   */
+  protected whereJsonOverlaps (_query: Builder, where: WhereClause): string {
+    const not = where.not ? 'not ' : ''
+
+    return (
+      not +
+      this.compileJsonOverlaps(
+        String(where.column ?? ''),
+        this.parameter(where.value)
+      )
+    )
+  }
+
+  /**
+   * Compile a "JSON overlaps" statement into SQL.
+   *
+   * @param  string  $column
+   * @param  string  $value
+   * @return string
+   *
+   * @throws \RuntimeException
+   */
+  // @ts-expect-error expected error; column is not used in this method
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  protected compileJsonOverlaps (column: string, value: string): string {
+    throw new Error(
+      'RuntimeException: This database engine does not support JSON overlaps operations.'
+    )
+  }
+
+  /**
+   * Prepare the binding for a "JSON contains" statement.
+   *
+   * @param  mixed  $binding
+   * @return string
+   */
+  public prepareBindingForJsonContains (binding: unknown): unknown {
+    return JSON.stringify(binding)
+  }
+
+  /**
+   * Compile a "where JSON contains key" clause.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $where
+   * @return string
+   */
+  protected whereJsonContainsKey (_query: Builder, where: WhereClause): string {
+    const not = where.not ? 'not ' : ''
+
+    return not + this.compileJsonContainsKey(String(where.column ?? ''))
+  }
+
+  /**
+   * Compile a "JSON contains key" statement into SQL.
+   *
+   * @param  string  $column
+   * @return string
+   *
+   * @throws \RuntimeException
+   */
+  // @ts-expect-error expected error; column is not used in this method
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  protected compileJsonContainsKey (column: string): string {
+    throw new Error(
+      'RuntimeException: This database engine does not support JSON contains key operations.'
+    )
+  }
+
+  /**
    * Compile a "where JSON length" clause.
    *
    * @param  \Illuminate\Database\Query\Builder  $query
@@ -833,6 +970,31 @@ export class Grammar
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   protected compileJsonLength (column: string, operator: string, value: string): string {
     throw new Error('This database engine does not support JSON length operations.')
+  }
+
+  /**
+   * Compile a vector distance expression for the given column.
+   *
+   * @param  string  $column
+   * @return string
+   *
+   * @throws \RuntimeException
+   */
+  // @ts-expect-error expected error; column is not used in this method
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  public compileVectorDistanceExpression (column: string | Expression): string {
+    throw new Error(
+      'RuntimeException: This database engine does not support vector distance queries.'
+    )
+  }
+
+  /**
+   * Determine if the grammar supports vector distance queries.
+   *
+   * @return bool
+   */
+  public supportsVectorDistance (): boolean {
+    return false
   }
 
   /**

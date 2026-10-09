@@ -1,7 +1,9 @@
 import { isPlainObject } from 'es-toolkit'
 
+import type { ArrayableInput } from '../types'
+
 import { Collection } from '../Collection'
-export class EnumeratesValues {
+export class EnumeratesValues<TKey extends PropertyKey, TValue> {
   /**
    * The methods that can be proxied.
    */
@@ -48,9 +50,9 @@ export class EnumeratesValues {
    * @param  mixed  $items
    * @return array<TKey, TValue>
    */
-  public getArrayableItems /* <TValue> */ (
-    items: unknown
-  ) /* : Iterable<TValue> */ {
+  protected getArrayableItems (
+    items?: TValue[] | Record<string, TValue>
+  ) {
     // return isPrimitive(items) || isEnum(items)
     //   ? Arr.wrap<TValue>(items as TValue)
     //   : Arr.from(items)
@@ -67,6 +69,15 @@ export class EnumeratesValues {
     }
 
     return [items]
+  }
+
+  /**
+   * Narrow a runtime object key (always a `string`, per `Object.entries()`)
+   * back to the caller's declared key type. See the matching helper on
+   * `Arr` for why this cast — the one in this file — is unavoidable.
+   */
+  private static toKey<TKey extends PropertyKey> (key: string): TKey {
+    return key as unknown as TKey
   }
 
   /**
@@ -87,9 +98,7 @@ export class EnumeratesValues {
    * @param  callable(TValue, TKey): mixed  $callback
    * @return $this
    */
-  public each (
-    callback: (item: unknown, key: string | number) => unknown
-  ): this {
+  public each (callback: (value: TValue, key: TKey) => unknown): this {
     const items = (this as { items?: Iterable<unknown> }).items ?? []
 
     if (Array.isArray(items)) {
@@ -109,5 +118,39 @@ export class EnumeratesValues {
     }
 
     return this
+  }
+
+  /**
+   * Narrow helper used only to keep `getArrayableItems()` readable:
+   * reports whether a value is one of PHP's "scalar" types (or null),
+   * i.e. not an array/object/Arrayable that `Arr.from()` should handle.
+   */
+  private isScalarLike (
+    value: ArrayableInput<TValue> | TValue
+  ): value is TValue | null | undefined {
+    if (value === null || value === undefined) {
+      return true
+    }
+
+    if (isArrayable<TValue>(value)) {
+      return false
+    }
+
+    const scalarType = typeof value
+
+    return (
+      scalarType === 'string' ||
+      scalarType === 'number' ||
+      scalarType === 'boolean'
+    )
+  }
+
+  /**
+     * Get the collection of items as a plain array.
+     *
+     * @return array<TKey, mixed>
+     */
+  public toArray (): Array<TValue> {
+    return this.map((value: TValue) => value).all()
   }
 }

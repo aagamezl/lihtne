@@ -2,10 +2,10 @@ import { dateFormat } from '@devnetic/utils'
 import { cloneDeep, isNil, isPlainObject, snakeCase } from 'es-toolkit'
 
 import type { ConditionExpression as ConditionExpressionContract } from '../../Contracts/Database/Query/ConditionExpression'
+import type { CursorPaginator } from '../../Pagination/CursorPaginator'
 import type { Scalar } from '../../Support/types'
 import type { Connection } from '../Connection'
 import type { Grammar } from '../Query/Grammars/Grammar'
-import type { IndexHint } from './IndexHint'
 import type { JoinClause } from './JoinClause'
 import type { JoinLateralClause } from './JoinLateralClause'
 import type { Processor } from './Processors'
@@ -15,10 +15,15 @@ import { enumValue } from '../../Collections/functions'
 import { head, last } from '../../Collections/helpers'
 import { Conditionable } from '../../Conditionable/Traits/Conditionable'
 import { Macroable } from '../../Macroable/Traits/Macroable'
+import {
+  type Cursor,
+  type LengthAwarePaginator,
+  Paginator
+} from '../../Pagination'
 import { DatePeriod, isSet, mixing, type Prettify } from '../../Support'
 // import { registry } from './internal'
 import { resolveClass } from '../../Support/class-registry'
-import { changeKeyCase, isNumeric, tap, typedEntries } from '../../Support/helpers'
+import { changeKeyCase, getValue, isNumeric, tap, typedEntries } from '../../Support/helpers'
 import { ForwardsCalls } from '../../Support/Traits'
 import { BuildsQueries } from '../Concerns'
 import { BuildsWhereDateClauses } from '../Concerns/BuildsWhereDateClauses'
@@ -27,6 +32,7 @@ import { Relation } from '../Eloquent/Relations'
 import { ConditionExpression } from './ConditionExpression'
 import { SortDirection, type SortDirectionType } from './Enums/SortDirection'
 import { Expression } from './Expression'
+import { IndexHint } from './IndexHint'
 
 export type BindingValue = string | number | boolean | Date | Expression | Record<string, unknown>
 
@@ -66,7 +72,10 @@ export type WhereClauseType =
   'In' |
   'InRaw' |
   'JsonBoolean' |
+  'JsonContains' |
+  'JsonContainsKey' |
   'JsonLength' |
+  'JsonOverlaps' |
   'Like' |
   'Month' |
   'Nested' |
@@ -75,6 +84,7 @@ export type WhereClauseType =
   'NotNull' |
   'Null' |
   'NullSafeEquals' |
+  'RowValues' |
   'Sub' |
   'Time' |
   'Year' |
@@ -422,6 +432,15 @@ export class Builder extends mixing().useTrait([
   }
 
   /**
+   * Get the underlying query builder instance.
+   *
+   * @return \Illuminate\Database\Query\Builder
+   */
+  public getQuery (): this {
+    return this
+  }
+
+  /**
    * Insert a new record and get the value of the primary key.
    *
    * @param  string|null  $sequence
@@ -515,6 +534,35 @@ export class Builder extends mixing().useTrait([
    */
   public inRandomOrder (seed: string | number = ''): this {
     return this.orderByRaw(this.grammar.compileRandom(seed))
+  }
+
+  /**
+   * Add a vector-distance "order by" clause to the query.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
+   * @param  array<int, float>  $vector
+   * @return $this
+   */
+  public orderByVectorDistance (column: string | Expression, vector: number[]): this {
+    this.ensureConnectionSupportsVectors()
+
+    this.addBinding(
+      JSON.stringify(vector),
+      this.unions.length > 0 ? 'unionOrder' : 'order'
+    )
+
+    const order = {
+      column: new Expression(this.grammar.compileVectorDistanceExpression(column)),
+      direction: 'asc'
+    }
+
+    if (this.unions.length > 0) {
+      this.unionOrders.push(order)
+    } else {
+      this.orders.push(order)
+    }
+
+    return this
   }
 
   /**
@@ -854,6 +902,17 @@ export class Builder extends mixing().useTrait([
     }
 
     return this
+  }
+
+  /**
+   * Get all of the query builder's columns in a text-only array with all expressions evaluated.
+   *
+   * @return list<string>
+   */
+  public getColumns (): string[] {
+    return this.columns !== undefined
+      ? this.columns.map((column) => this.grammar.getValue(column))
+      : []
   }
 
   /**
@@ -1998,23 +2057,47 @@ export class Builder extends mixing().useTrait([
    * @return $this
    */
   public select (
-    column: string | Expression | Array<string | Expression> = '*',
+    column:
+      | string |
+      Expression |
+      Array<string | Expression> |
+      Record<string, string | Expression | Builder | EloquentBuilder | Relation>
+        = '*',
     ...columns: Array<string | Expression>
   ): this {
-    const selected = Array.isArray(column) ? column : [column, ...columns]
+    const selected = Array.isArray(column)
+      ? column
+      : typeof column === 'object' && column !== null && !(column instanceof Expression)
+        ? column
+        : [column, ...columns]
 
     this.columns = []
     this.bindings.select = []
 
     for (const [as, value] of Object.entries(selected)) {
-      if (typeof as === 'string' && this.isQueryable(value)) {
+      const isAssociativeKey = !/^\d+$/.test(as)
+
+      if (isAssociativeKey && this.isQueryable(value)) {
         this.selectSub(value, as)
       } else {
-        this.columns.push(value)
+        this.columns.push(value as string | Expression)
       }
     }
 
     return this
+  }
+
+  /**
+   * Add a select expression to the query.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression|literal-string  $expression
+   * @param  string  $as
+   * @return $this
+   */
+  public selectExpression (expression: Expression | string, as: string): this {
+    return this.selectRaw(
+      '(' + this.grammar.getValue(expression) + ') as ' + this.grammar.wrap(as)
+    )
   }
 
   /**
@@ -2126,6 +2209,21 @@ export class Builder extends mixing().useTrait([
    */
   public getGrammar (): Grammar {
     return this.grammar
+  }
+
+  /**
+   * Ensure the database connection supports vector queries.
+   *
+   * @return void
+   *
+   * @throws \RuntimeException
+   */
+  protected ensureConnectionSupportsVectors (): void {
+    if (!this.getGrammar().supportsVectorDistance()) {
+      throw new Error(
+        'RuntimeException: Vector distance queries are only supported by Postgres and MariaDB.'
+      )
+    }
   }
 
   /**
@@ -2658,6 +2756,32 @@ export class Builder extends mixing().useTrait([
   }
 
   /**
+   * Add a vector-similarity selection to the query.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
+   * @param  array<int, float>  $vector
+   * @param  string|null  $as
+   * @return $this
+   */
+  public selectVectorDistance (
+    column: string | Expression,
+    vector: number[],
+    as?: string
+  ): this {
+    this.ensureConnectionSupportsVectors()
+
+    this.addBinding(JSON.stringify(vector), 'select')
+
+    const alias = this.grammar.wrap(as ?? String(column) + '_distance')
+
+    return this.addSelect(
+      new Expression(
+        `${this.grammar.compileVectorDistanceExpression(column)} as ${alias}`
+      )
+    )
+  }
+
+  /**
    * Set the table which the query is targeting.
    *
    * @param  \Closure|\Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder<*>|\Illuminate\Contracts\Database\Query\Expression|string  table
@@ -2716,10 +2840,46 @@ export class Builder extends mixing().useTrait([
    * @param  mixed  $bindings
    * @return $this
    */
-  public fromRaw (expression: string, bindings: BindingValues = []) {
+  public fromRaw (expression: string | Expression, bindings: BindingValues = []) {
     this.fromProperty = new Expression(expression)
 
     this.addBinding(bindings, 'from')
+
+    return this
+  }
+
+  /**
+   * Add an index hint to suggest a query index.
+   *
+   * @param  string  $index
+   * @return $this
+   */
+  public useIndex (index: string): this {
+    this.indexHint = new IndexHint('hint', index)
+
+    return this
+  }
+
+  /**
+   * Add an index hint to force a query index.
+   *
+   * @param  string  $index
+   * @return $this
+   */
+  public forceIndex (index: string): this {
+    this.indexHint = new IndexHint('force', index)
+
+    return this
+  }
+
+  /**
+   * Add an index hint to ignore a query index.
+   *
+   * @param  string  $index
+   * @return $this
+   */
+  public ignoreIndex (index: string): this {
+    this.indexHint = new IndexHint('ignore', index)
 
     return this
   }
@@ -2735,32 +2895,17 @@ export class Builder extends mixing().useTrait([
    */
   public addBinding (value: unknown, type: keyof Bindings = 'where') {
     if (!(type in this.bindings)) {
-      throw new Error(`Invalid binding type: ${type}.`)
+      throw new Error(`InvalidArgumentException: Invalid binding type: ${type}.`)
     }
 
     const list = Array.isArray(value) ? value : [value]
 
     this.bindings[type] = [
       ...this.bindings[type],
-      ...list.map((entry) => this.castBinding(this.toBinding(entry)))
+      ...list.map((entry) => this.castBinding(entry as BindingValue))
     ]
 
     return this
-  }
-
-  protected toBinding (value: unknown): BindingValue {
-    if (
-      typeof value === 'string' ||
-      typeof value === 'number' ||
-      typeof value === 'boolean' ||
-      value === null ||
-      value instanceof Expression ||
-      value instanceof Date
-    ) {
-      return value
-    }
-
-    return String(value)
   }
 
   /**
@@ -2832,7 +2977,23 @@ export class Builder extends mixing().useTrait([
    * @return mixed
    */
   public castBinding (value: BindingValue): BindingValue {
-    return value
+    if (value instanceof Expression || value instanceof Date) {
+      return value
+    }
+
+    return enumValue(value) as BindingValue
+  }
+
+  /**
+   * Lock the selected rows in the table.
+   *
+   * @param  bool|string  $value
+   * @return $this
+   */
+  public lock (value: boolean | string = true): this {
+    this.lockProperty = value
+
+    return this
   }
 
   /**
@@ -2976,6 +3137,18 @@ export class Builder extends mixing().useTrait([
   }
 
   /**
+   * Get the raw SQL representation of the query with embedded bindings.
+   *
+   * @return string
+   */
+  public toRawSql (): string {
+    return this.grammar.substituteBindingsIntoRawSql(
+      this.toSql(),
+      this.connection.prepareBindings(this.getBindings())
+    )
+  }
+
+  /**
    * Get the current query value bindings in a flattened array.
    *
    * @return list<mixed>
@@ -3043,6 +3216,49 @@ export class Builder extends mixing().useTrait([
   }
 
   /**
+   * Paginate the given query into a simple paginator.
+   *
+   * @param  int|\Closure  $perPage
+   * @param  string|\Illuminate\Contracts\Database\Query\Expression|array<string|\Illuminate\Contracts\Database\Query\Expression>  $columns
+   * @param  string  $pageName
+   * @param  int|null  $page
+   * @param  \Closure|int|null  $total
+   * @return \Illuminate\Pagination\LengthAwarePaginator
+   */
+  public async paginate (
+    perPage: number | ((total: number) => number) = 15,
+    columns: string[] = ['*'],
+    pageName: string = 'page',
+    page: number | undefined = undefined,
+    total: number | (() => number | Promise<number>) | undefined = undefined
+  ): Promise<LengthAwarePaginator> {
+    page = page ?? Paginator.resolveCurrentPage(pageName)
+
+    total = await (getValue(total) ?? this.getCountForPagination())
+
+    perPage = getValue(perPage, total)
+
+    const results = total ? await this.forPage(page, perPage).get(columns) : new Collection()
+
+    return this.paginator(results, total, perPage, page, {
+      path: Paginator.resolveCurrentPath(),
+      pageName
+    })
+  }
+
+  /**
+   * Paginate the given query using a cursor paginator.
+   */
+  public async cursorPaginate (
+    perPage: number = 15,
+    columns: string[] = ['*'],
+    cursorName: string = 'cursor',
+    cursor: Cursor | string | undefined = undefined
+  ): Promise<CursorPaginator> {
+    return this.paginateUsingCursor(perPage, columns, cursorName, cursor)
+  }
+
+  /**
    * Get the database connection instance.
    *
    * @return \Illuminate\Database\ConnectionInterface
@@ -3105,9 +3321,9 @@ export class Builder extends mixing().useTrait([
    */
   public where (
     column: Expression | Scalar | Array<Expression | Scalar> | QueryCallback | Record<string, unknown>,
-    operator: string | undefined = undefined,
+    operator: string | number | undefined = undefined,
     value: string | number | Expression | undefined = undefined,
-    boolean: WhereBoolean = BOOLEAN_OPERATORS.and
+    boolean: WhereBoolean | string = BOOLEAN_OPERATORS.and
   ): this {
     if (column instanceof ConditionExpression) {
       const type = 'Expression'
@@ -3237,6 +3453,251 @@ export class Builder extends mixing().useTrait([
   }
 
   /**
+   * Adds a where condition using row values.
+   *
+   * @param  array  $columns
+   * @param  string  $operator
+   * @param  array  $values
+   * @param  string  $boolean
+   * @return $this
+   *
+   * @throws \InvalidArgumentException
+   */
+  public whereRowValues (
+    columns: Array<string | Expression>,
+    operator: string,
+    values: BindingValues,
+    boolean: WhereBoolean = BOOLEAN_OPERATORS.and
+  ): this {
+    if (columns.length !== values.length) {
+      throw new Error(
+        'InvalidArgumentException: The number of columns must match the number of values'
+      )
+    }
+
+    this.wheres.push({
+      type: 'RowValues',
+      columns,
+      operator,
+      values,
+      boolean
+    })
+
+    this.addBinding(this.cleanBindings(values))
+
+    return this
+  }
+
+  /**
+   * Adds an or where condition using row values.
+   *
+   * @param  array  $columns
+   * @param  string  $operator
+   * @param  array  $values
+   * @return $this
+   */
+  public orWhereRowValues (
+    columns: Array<string | Expression>,
+    operator: string,
+    values: BindingValues
+  ): this {
+    return this.whereRowValues(columns, operator, values, BOOLEAN_OPERATORS.or)
+  }
+
+  /**
+   * Add a "where JSON contains" clause to the query.
+   *
+   * @param  string  $column
+   * @param  mixed  $value
+   * @param  string  $boolean
+   * @param  bool  $not
+   * @return $this
+   */
+  public whereJsonContains (
+    column: string,
+    value: unknown,
+    boolean: WhereBoolean = BOOLEAN_OPERATORS.and,
+    not: boolean = false
+  ): this {
+    this.wheres.push({
+      type: 'JsonContains',
+      column,
+      value,
+      boolean,
+      not
+    })
+
+    if (!(value instanceof Expression)) {
+      this.addBinding(this.grammar.prepareBindingForJsonContains(value))
+    }
+
+    return this
+  }
+
+  /**
+   * Add an "or where JSON contains" clause to the query.
+   *
+   * @param  string  $column
+   * @param  mixed  $value
+   * @return $this
+   */
+  public orWhereJsonContains (column: string, value: unknown): this {
+    return this.whereJsonContains(column, value, BOOLEAN_OPERATORS.or)
+  }
+
+  /**
+   * Add a "where JSON not contains" clause to the query.
+   *
+   * @param  string  $column
+   * @param  mixed  $value
+   * @param  string  $boolean
+   * @return $this
+   */
+  public whereJsonDoesntContain (
+    column: string,
+    value: unknown,
+    boolean: WhereBoolean = BOOLEAN_OPERATORS.and
+  ): this {
+    return this.whereJsonContains(column, value, boolean, true)
+  }
+
+  /**
+   * Add an "or where JSON not contains" clause to the query.
+   *
+   * @param  string  $column
+   * @param  mixed  $value
+   * @return $this
+   */
+  public orWhereJsonDoesntContain (column: string, value: unknown): this {
+    return this.whereJsonDoesntContain(column, value, 'or')
+  }
+
+  /**
+   * Add a "where JSON overlaps" clause to the query.
+   *
+   * @param  string  $column
+   * @param  mixed  $value
+   * @param  string  $boolean
+   * @param  bool  $not
+   * @return $this
+   */
+  public whereJsonOverlaps (
+    column: string,
+    value: unknown,
+    boolean: WhereBoolean = BOOLEAN_OPERATORS.and,
+    not: boolean = false
+  ): this {
+    this.wheres.push({
+      type: 'JsonOverlaps',
+      column,
+      value,
+      boolean,
+      not
+    })
+
+    if (!(value instanceof Expression)) {
+      this.addBinding(this.grammar.prepareBindingForJsonContains(value))
+    }
+
+    return this
+  }
+
+  /**
+   * Add an "or where JSON overlaps" clause to the query.
+   *
+   * @param  string  $column
+   * @param  mixed  $value
+   * @return $this
+   */
+  public orWhereJsonOverlaps (column: string, value: unknown): this {
+    return this.whereJsonOverlaps(column, value, 'or')
+  }
+
+  /**
+   * Add a "where JSON not overlap" clause to the query.
+   *
+   * @param  string  $column
+   * @param  mixed  $value
+   * @param  string  $boolean
+   * @return $this
+   */
+  public whereJsonDoesntOverlap (
+    column: string,
+    value: unknown,
+    boolean: WhereBoolean = BOOLEAN_OPERATORS.and
+  ): this {
+    return this.whereJsonOverlaps(column, value, boolean, true)
+  }
+
+  /**
+   * Add an "or where JSON not overlap" clause to the query.
+   *
+   * @param  string  $column
+   * @param  mixed  $value
+   * @return $this
+   */
+  public orWhereJsonDoesntOverlap (column: string, value: unknown): this {
+    return this.whereJsonDoesntOverlap(column, value, BOOLEAN_OPERATORS.or)
+  }
+
+  /**
+   * Add a clause that determines if a JSON path exists to the query.
+   *
+   * @param  string  $column
+   * @param  string  $boolean
+   * @param  bool  $not
+   * @return $this
+   */
+  public whereJsonContainsKey (
+    column: string,
+    boolean: WhereBoolean = BOOLEAN_OPERATORS.and,
+    not: boolean = false
+  ): this {
+    this.wheres.push({
+      type: 'JsonContainsKey',
+      column,
+      boolean,
+      not
+    })
+
+    return this
+  }
+
+  /**
+   * Add an "or" clause that determines if a JSON path exists to the query.
+   *
+   * @param  string  $column
+   * @return $this
+   */
+  public orWhereJsonContainsKey (column: string): this {
+    return this.whereJsonContainsKey(column, BOOLEAN_OPERATORS.or)
+  }
+
+  /**
+   * Add a clause that determines if a JSON path does not exist to the query.
+   *
+   * @param  string  $column
+   * @param  string  $boolean
+   * @return $this
+   */
+  public whereJsonDoesntContainKey (
+    column: string,
+    boolean: WhereBoolean = BOOLEAN_OPERATORS.and
+  ): this {
+    return this.whereJsonContainsKey(column, boolean, true)
+  }
+
+  /**
+   * Add an "or" clause that determines if a JSON path does not exist to the query.
+   *
+   * @param  string  $column
+   * @return $this
+   */
+  public orWhereJsonDoesntContainKey (column: string): this {
+    return this.whereJsonDoesntContainKey(column, BOOLEAN_OPERATORS.or)
+  }
+
+  /**
    * Add a "where JSON length" clause to the query.
    *
    * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
@@ -3253,7 +3714,7 @@ export class Builder extends mixing().useTrait([
   ): this {
     ;[value, operator] = this.prepareValueAndOperator(
       value as string | number | Expression | undefined,
-      typeof operator === 'string' ? operator : undefined,
+      operator as string | undefined,
       arguments.length === 2
     )
 
@@ -3454,7 +3915,15 @@ export class Builder extends mixing().useTrait([
    * @return $this
    */
   public mergeBindings (query: Builder): this {
-    this.bindings = { ...this.bindings, ...query.bindings }
+    // for (const type of Object.keys(this.bindings) as (keyof Bindings)[]) {
+    //   this.bindings[type] = [
+    //     ...this.bindings[type],
+    //     ...(query.bindings[type] ?? [])
+    //   ]
+    // }
+    for (const [key, value] of Object.entries(query.bindings)) {
+      this.bindings[key] = this.bindings[key].concat(value)
+    }
 
     return this
   }
@@ -3466,7 +3935,7 @@ export class Builder extends mixing().useTrait([
    * @param  int  $perPage
    * @return $this
    */
-  public forPage (page: number, perPage: number = 15): this {
+  public forPage (page: number, perPage: number = 15): Builder {
     return this.offset((page - 1) * perPage).limit(perPage)
   }
 
@@ -3480,7 +3949,7 @@ export class Builder extends mixing().useTrait([
    */
   public forPageBeforeId (
     perPage: number = 15,
-    lastId: number | undefined,
+    lastId?: number,
     column: string = 'id'
   ): this {
     this.orders = this.removeExistingOrdersFor(column)
@@ -3504,7 +3973,7 @@ export class Builder extends mixing().useTrait([
    */
   public forPageAfterId (
     perPage: number = 15,
-    lastId: number | undefined,
+    lastId?: number,
     column: string = 'id'
   ): this {
     this.orders = this.removeExistingOrdersFor(column)
@@ -3516,6 +3985,88 @@ export class Builder extends mixing().useTrait([
     }
 
     return this.orderBy(column, SortDirection.Ascending).limit(perPage)
+  }
+
+  /**
+   * Get the "limit" value for the query or null if it's not set.
+   *
+   * @return int|null
+   */
+  public getLimit (): number | undefined {
+    const value =
+      this.unions.length > 0 ? this.unionLimit : this.limitProperty
+
+    return value !== undefined ? Number.parseInt(String(value), 10) : undefined
+  }
+
+  /**
+   * Get the query builder instances that are used in the union of the query.
+   */
+  protected getUnionBuilders (): Collection<PropertyKey, Builder> {
+    return this.unions.length > 0
+      ? (new Collection<PropertyKey, Builder>(this.unions)).pluck('query')
+      : new Collection<PropertyKey, Builder>()
+  }
+
+  /**
+   * Get the "offset" value for the query or null if it's not set.
+   *
+   * @return int|null
+   */
+  public getOffset (): number | undefined {
+    const value =
+      this.unions.length > 0 ? this.unionOffset : this.offsetProperty
+
+    return value !== undefined ? Number.parseInt(String(value), 10) : undefined
+  }
+
+  /**
+   * Throw an exception if the query doesn't have an orderBy clause.
+   *
+   * @throws \RuntimeException
+   */
+  protected enforceOrderBy (): void {
+    if (this.orders.length === 0 && this.unionOrders.length === 0) {
+      throw new Error(
+        'RuntimeException: You must specify an orderBy clause when using this function.'
+      )
+    }
+  }
+
+  /**
+   * Ensure the proper order by required for cursor pagination.
+   *
+   * @param  bool  $shouldReverse
+   * @return \Illuminate\Support\Collection
+   */
+  protected ensureOrderForCursorPagination (
+    shouldReverse: boolean = false
+  ): Collection<PropertyKey, Order> {
+    if (this.orders.length === 0 && this.unionOrders.length === 0) {
+      this.enforceOrderBy()
+    }
+
+    const reverseDirection = (order: Order): Order => {
+      if (order.direction === undefined) {
+        return order
+      }
+
+      order.direction = order.direction === 'asc' ? 'desc' : 'asc'
+
+      return order
+    }
+
+    if (shouldReverse) {
+      this.orders = (new Collection(this.orders)).map(reverseDirection).toArray()
+      this.unionOrders = (new Collection(this.unionOrders)).map(reverseDirection).toArray()
+    }
+
+    const orders =
+      this.unionOrders.length > 0 ? this.unionOrders : this.orders
+
+    return (new Collection(orders))
+      .filter((order: Order) => Arr.has(order, 'direction'))
+      .values()
   }
 
   /**
@@ -3689,11 +4240,11 @@ export class Builder extends mixing().useTrait([
       .map((binding: BindingValue) => {
         if (binding instanceof Expression) {
           return this.castBinding(
-            this.toBinding(binding.getValue(this.grammar))
+            binding.getValue(this.grammar)
           )
         }
 
-        return this.castBinding(this.toBinding(binding))
+        return this.castBinding(binding)
       })
       .values()
       .all()
@@ -4106,6 +4657,54 @@ export class Builder extends mixing().useTrait([
    * @param  string  $boolean
    * @return $this
    */
+  /**
+   * Add a vector similarity clause to the query, filtering by minimum similarity and ordering by similarity.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
+   * @param  array<int, float>  $vector
+   * @param  float  $minSimilarity
+   * @param  bool  $order
+   * @return $this
+   */
+  public whereVectorSimilarTo (
+    column: string | Expression,
+    vector: number[],
+    minSimilarity: number = 0.6,
+    order: boolean = true
+  ): this {
+    this.whereVectorDistanceLessThan(column, vector, 1 - minSimilarity)
+
+    if (order) {
+      this.orderByVectorDistance(column, vector)
+    }
+
+    return this
+  }
+
+  /**
+   * Add a vector distance "where" clause to the query.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
+   * @param  array<int, float>  $vector
+   * @param  float  $maxDistance
+   * @param  string  $boolean
+   * @return $this
+   */
+  public whereVectorDistanceLessThan (
+    column: string | Expression,
+    vector: number[],
+    maxDistance: number,
+    boolean: BooleanOperator = BOOLEAN_OPERATORS.and
+  ): this {
+    this.ensureConnectionSupportsVectors()
+
+    return this.whereRaw(
+      this.grammar.compileVectorDistanceExpression(column) + ' <= ?',
+      [JSON.stringify(vector), maxDistance],
+      boolean
+    )
+  }
+
   public whereRaw (
     sql: string,
     bindings: unknown[] = [],
@@ -4592,8 +5191,10 @@ export class Builder extends mixing().useTrait([
    * @param  \Illuminate\Contracts\Database\Query\Expression|string  $columns
    * @return int<0, max>
    */
-  public count (columns: string = '*') {
-    return this.aggregate('count', Arr.wrap(columns))
+  public async count (columns: string = '*'): Promise<number> {
+    const result = await this.aggregate('count', Arr.wrap(columns))
+
+    return Number.parseInt(String(result), 10)
   }
 
   /**

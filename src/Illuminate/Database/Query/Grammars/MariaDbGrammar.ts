@@ -49,7 +49,7 @@ export class MariaDbGrammar extends MySqlGrammar {
    * @param  string  $column
    * @return string
    */
-  public compileVectorDistanceExpression (column: string): string {
+  public override compileVectorDistanceExpression (column: string): string {
     return `vec_distance_cosine(${this.wrap(column)}, vec_fromtext(?))`
   }
 
@@ -58,7 +58,7 @@ export class MariaDbGrammar extends MySqlGrammar {
    *
    * @return bool
    */
-  public supportsVectorDistance (): boolean {
+  public override supportsVectorDistance (): boolean {
     return true
   }
 

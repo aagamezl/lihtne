@@ -474,6 +474,26 @@ export class PostgresGrammar extends Grammar {
    * @param  array  $where
    * @return string
    */
+  /**
+   * Compile the lock into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  bool|string  $value
+   * @return string
+   */
+  protected override compileLock (
+    // @ts-expect-error - query is not used
+
+    query: Builder,
+    value: boolean | string
+  ): string {
+    if (typeof value === 'string') {
+      return value
+    }
+
+    return value ? 'for update' : 'for share'
+  }
+
   protected override whereBasic (query: Builder, where: WhereClause): string {
     if (where.operator?.toLowerCase().includes('like')) {
       return `${this.wrap(where.column ?? '')}::text ${where.operator} ${this.parameter(where.value)}`
@@ -674,6 +694,82 @@ export class PostgresGrammar extends Grammar {
    */
   protected override wrapJsonBooleanValue (value: string): string {
     return "'" + value + "'::jsonb"
+  }
+
+  /**
+   * Compile a "JSON contains" statement into SQL.
+   *
+   * @param  string  $column
+   * @param  string  $value
+   * @return string
+   */
+  /**
+   * Compile a vector distance expression for the given column.
+   *
+   * @param  string  $column
+   * @return string
+   */
+  public override compileVectorDistanceExpression (column: string | Expression): string {
+    return `(${this.wrap(column)} <=> ?)`
+  }
+
+  /**
+   * Determine if the grammar supports vector distance queries.
+   *
+   * @return bool
+   */
+  public override supportsVectorDistance (): boolean {
+    return true
+  }
+
+  protected override compileJsonContains (column: string, value: string): string {
+    const wrappedColumn = this.wrap(column).replaceAll('->>', '->')
+
+    return '(' + wrappedColumn + ')::jsonb @> ' + value
+  }
+
+  /**
+   * Compile a "JSON contains key" statement into SQL.
+   *
+   * @param  string  $column
+   * @return string
+   */
+  protected override compileJsonContainsKey (column: string): string {
+    const segments = column.split('->')
+    const lastSegment = segments.pop() ?? ''
+
+    let index: number | undefined
+
+    if (/^-?\d+$/.test(lastSegment)) {
+      index = Number(lastSegment)
+    } else {
+      const match = lastSegment.match(/\[(-?[0-9]+)\]$/)
+
+      if (match !== null) {
+        segments.push(Str.beforeLast(lastSegment, match[0]))
+        index = Number(match[1])
+      }
+    }
+
+    const wrapped = this.wrap(segments.join('->')).replaceAll('->>', '->')
+
+    if (index !== undefined) {
+      const length = index < 0 ? Math.abs(index) : index + 1
+
+      return (
+        'case when jsonb_typeof((' +
+        wrapped +
+        ")::jsonb) = 'array' then jsonb_array_length((" +
+        wrapped +
+        ')::jsonb) >= ' +
+        String(length) +
+        ' else false end'
+      )
+    }
+
+    const key = "'" + lastSegment.replaceAll("'", "''") + "'"
+
+    return 'coalesce((' + wrapped + ')::jsonb ?? ' + key + ', false)'
   }
 
   /**

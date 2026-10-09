@@ -1,6 +1,5 @@
 import { cloneDeep } from 'es-toolkit'
 
-import type { Scalar } from '../../../Support/types'
 import type { Bindings, BindingValues, Builder, Having, WhereClause } from '../Builder'
 import type { Expression } from '../Expression'
 import type { IndexHint } from '../IndexHint'
@@ -288,10 +287,10 @@ export class SqlServerGrammar extends Grammar {
    * @param  string  $value
    * @return string
    */
-  protected compileJsonLength (column: string, operator: string, value: string): string {
+  protected override compileJsonLength (column: string, operator: string, value: string): string {
     const [field, path] = this.wrapJsonFieldAndPath(column)
 
-    return `json_length(${field}${path}) ${operator} ${value}`
+    return `(select count(*) from openjson(${field}${path})) ${operator} ${value}`
   }
 
   /**
@@ -586,10 +585,10 @@ export class SqlServerGrammar extends Grammar {
    * @param  string  $value
    * @return string
    */
-  protected compileJsonContains (column: string, value: string): string {
+  protected override compileJsonContains (column: string, value: string): string {
     const [field, path] = this.wrapJsonFieldAndPath(column)
 
-    return `json_contains(${field}, ${value}${path})`
+    return value + ' in (select [value] from openjson(' + field + path + '))'
   }
 
   /**
@@ -615,10 +614,23 @@ export class SqlServerGrammar extends Grammar {
    * @param  string  $column
    * @return string
    */
-  protected compileJsonContainsKey (column: string): string {
-    const [field, path] = this.wrapJsonFieldAndPath(column)
+  protected override compileJsonContainsKey (column: string): string {
+    const segments = column.split('->')
+    const lastSegment = segments.pop() ?? ''
+    const match = lastSegment.match(/\[([0-9]+)\]$/)
 
-    return `ifnull(json_contains_path(${field}, 'one${path}), 0)`
+    let key: string
+
+    if (match !== null) {
+      segments.push(Str.beforeLast(lastSegment, match[0]))
+      key = match[1] ?? ''
+    } else {
+      key = "'" + lastSegment.replaceAll("'", "''") + "'"
+    }
+
+    const [field, path] = this.wrapJsonFieldAndPath(segments.join('->'))
+
+    return key + ' in (select [key] from openjson(' + field + path + '))'
   }
 
   /**
@@ -627,8 +639,8 @@ export class SqlServerGrammar extends Grammar {
   * @param  mixed  $binding
   * @return string
   */
-  public prepareBindingForJsonContains (binding: Scalar): string {
-    return typeof binding === 'boolean' ? JSON.stringify(binding) : String(binding)
+  public override prepareBindingForJsonContains (binding: unknown): unknown {
+    return typeof binding === 'boolean' ? JSON.stringify(binding) : binding
   }
 
   /**

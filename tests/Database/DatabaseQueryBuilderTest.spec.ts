@@ -7,9 +7,15 @@ import { collect } from '../../src/Illuminate/Collections/helpers'
 import { Builder as EloquentBuilder } from '../../src/Illuminate/Database/Eloquent/Builder'
 import { ConditionExpression } from '../../src/Illuminate/Database/Query/ConditionExpression'
 import { Expression as Raw } from '../../src/Illuminate/Database/Query/Expression'
+import {
+  Cursor,
+  CursorPaginator,
+  LengthAwarePaginator,
+  Paginator
+} from '../../src/Illuminate/Pagination'
 import { Carbon, DateInterval, DatePeriod, Str } from '../../src/Illuminate/Support'
 import { Bar } from '../../tests/Database/Fixtures/Enums/Bar'
-import { IntegerStatus, StringStatus } from './Fixtures/Enums'
+import { IntegerStatus, NonBackedStatus, StringStatus } from './Fixtures/Enums'
 import { getBuilder } from './helpers/getBuilder'
 import { getMariaDbBuilder } from './helpers/getMariaDbBuilder'
 import { getMockQueryBuilder } from './helpers/getMockQueryBuilder'
@@ -6236,5 +6242,2423 @@ describe('Database Query Builder', () => {
 
     expect(builder.__call('whereFooAndBar', ['baz', 'qux'])).toBe(builder)
     expect(builder.wheres).toHaveLength(2)
+  })
+
+  test('testBuilderThrowsExpectedExceptionWithUndefinedMethod', () => {
+    const builder = getBuilder()
+
+    expect(() => builder.__call('noValidMethodHere', [])).toThrow(
+      'BadMethodCallException: Call to undefined method Builder::noValidMethodHere()'
+    )
+  })
+
+  test('testMySqlLock', () => {
+    let builder = getMySqlBuilder()
+    builder.select('*').from('foo').where('bar', '=', 'baz').lock()
+    expect(builder.toSql()).toBe('select * from `foo` where `bar` = ? for update')
+    expect(builder.getBindings()).toEqual(['baz'])
+
+    builder = getMySqlBuilder()
+    builder.select('*').from('foo').where('bar', '=', 'baz').lock(false)
+    expect(builder.toSql()).toBe('select * from `foo` where `bar` = ? lock in share mode')
+    expect(builder.getBindings()).toEqual(['baz'])
+
+    builder = getMySqlBuilder()
+    builder.select('*').from('foo').where('bar', '=', 'baz').lock('lock in share mode')
+    expect(builder.toSql()).toBe('select * from `foo` where `bar` = ? lock in share mode')
+    expect(builder.getBindings()).toEqual(['baz'])
+  })
+
+  test('testPostgresLock', () => {
+    let builder = getPostgresBuilder()
+    builder.select('*').from('foo').where('bar', '=', 'baz').lock()
+    expect(builder.toSql()).toBe('select * from "foo" where "bar" = ? for update')
+    expect(builder.getBindings()).toEqual(['baz'])
+
+    builder = getPostgresBuilder()
+    builder.select('*').from('foo').where('bar', '=', 'baz').lock(false)
+    expect(builder.toSql()).toBe('select * from "foo" where "bar" = ? for share')
+    expect(builder.getBindings()).toEqual(['baz'])
+
+    builder = getPostgresBuilder()
+    builder.select('*').from('foo').where('bar', '=', 'baz').lock('for key share')
+    expect(builder.toSql()).toBe('select * from "foo" where "bar" = ? for key share')
+    expect(builder.getBindings()).toEqual(['baz'])
+  })
+
+  test('testSqlServerLock', () => {
+    let builder = getSqlServerBuilder()
+    builder.select('*').from('foo').where('bar', '=', 'baz').lock()
+    expect(builder.toSql()).toBe('select * from [foo] with(rowlock,updlock,holdlock) where [bar] = ?')
+    expect(builder.getBindings()).toEqual(['baz'])
+
+    builder = getSqlServerBuilder()
+    builder.select('*').from('foo').where('bar', '=', 'baz').lock(false)
+    expect(builder.toSql()).toBe('select * from [foo] with(rowlock,holdlock) where [bar] = ?')
+    expect(builder.getBindings()).toEqual(['baz'])
+
+    builder = getSqlServerBuilder()
+    builder.select('*').from('foo').where('bar', '=', 'baz').lock('with(holdlock)')
+    expect(builder.toSql()).toBe('select * from [foo] with(holdlock) where [bar] = ?')
+    expect(builder.getBindings()).toEqual(['baz'])
+  })
+
+  test('testSelectWithLockUsesWritePdo', async () => {
+    let builder = getMySqlBuilderWithProcessor()
+    const selectSpy = jest.spyOn(builder.getConnection(), 'select').mockResolvedValue([])
+
+    await builder.select('*').from('foo').where('bar', '=', 'baz').lock().get()
+    expect(selectSpy).toHaveBeenCalledWith('select * from `foo` where `bar` = ? for update', ['baz'])
+
+    builder = getMySqlBuilderWithProcessor()
+    jest.spyOn(builder.getConnection(), 'select').mockResolvedValue([])
+
+    await builder.select('*').from('foo').where('bar', '=', 'baz').lock(false).get()
+    expect(builder.getConnection().select).toHaveBeenCalledWith('select * from `foo` where `bar` = ? lock in share mode', ['baz'])
+  })
+
+  test('testBindingOrder', () => {
+    const expectedSql =
+      'select * from "users" inner join "othertable" on "bar" = ? where "registered" = ? group by "city" having "population" > ? order by match ("foo") against(?)'
+    const expectedBindings = ['foo', 1, 3, 'bar']
+
+    let builder = getBuilder()
+    builder
+      .select('*')
+      .from('users')
+      .join('othertable', (join: JoinClause) => {
+        join.where('bar', '=', 'foo')
+      })
+      .where('registered', 1)
+      .groupBy('city')
+      .having('population', '>', 3)
+      .orderByRaw('match ("foo") against(?)', ['bar'])
+    expect(builder.toSql()).toBe(expectedSql)
+    expect(builder.getBindings()).toEqual(expectedBindings)
+
+    builder = getBuilder()
+    builder
+      .select('*')
+      .from('users')
+      .orderByRaw('match ("foo") against(?)', ['bar'])
+      .having('population', '>', 3)
+      .groupBy('city')
+      .where('registered', 1)
+      .join('othertable', (join: JoinClause) => {
+        join.where('bar', '=', 'foo')
+      })
+    expect(builder.toSql()).toBe(expectedSql)
+    expect(builder.getBindings()).toEqual(expectedBindings)
+  })
+
+  test('testAddBindingWithArrayMergesBindings', () => {
+    const builder = getBuilder()
+    builder.addBinding(['foo', 'bar'])
+    builder.addBinding(['baz'])
+    expect(builder.getBindings()).toEqual(['foo', 'bar', 'baz'])
+  })
+
+  test('testAddBindingWithArrayMergesBindingsInCorrectOrder', () => {
+    const builder = getBuilder()
+    builder.addBinding(['bar', 'baz'], 'having')
+    builder.addBinding(['foo'], 'where')
+    expect(builder.getBindings()).toEqual(['foo', 'bar', 'baz'])
+  })
+
+  test('testAddBindingWithEnum', () => {
+    const builder = getBuilder()
+    builder.addBinding(IntegerStatus.done)
+    builder.addBinding([NonBackedStatus.done])
+    expect(builder.getBindings()).toEqual([2, 'done'])
+  })
+
+  test('testMergeBuilders', () => {
+    const builder = getBuilder()
+    builder.addBinding(['foo', 'bar'])
+    const otherBuilder = getBuilder()
+    otherBuilder.addBinding(['baz'])
+    builder.mergeBindings(otherBuilder)
+    expect(builder.getBindings()).toEqual(['foo', 'bar', 'baz'])
+  })
+
+  test('testMergeBuildersBindingOrder', () => {
+    const builder = getBuilder()
+    builder.addBinding('foo', 'where')
+    builder.addBinding('baz', 'having')
+    const otherBuilder = getBuilder()
+    otherBuilder.addBinding('bar', 'where')
+    builder.mergeBindings(otherBuilder)
+    expect(builder.getBindings()).toEqual(['foo', 'bar', 'baz'])
+  })
+
+  test('testSubSelect', () => {
+    const expectedSql =
+      'select "foo", "bar", (select "baz" from "two" where "subkey" = ?) as "sub" from "one" where "key" = ?'
+    const expectedBindings = ['subval', 'val']
+
+    let builder = getPostgresBuilder()
+    builder.from('one').select(['foo', 'bar']).where('key', '=', 'val')
+    builder.selectSub((query: Builder) => {
+      query.from('two').select('baz').where('subkey', '=', 'subval')
+    }, 'sub')
+    expect(builder.toSql()).toBe(expectedSql)
+    expect(builder.getBindings()).toEqual(expectedBindings)
+
+    builder = getPostgresBuilder()
+    builder.from('one').select(['foo', 'bar']).where('key', '=', 'val')
+    const subBuilder = getPostgresBuilder()
+    subBuilder.from('two').select('baz').where('subkey', '=', 'subval')
+    builder.selectSub(subBuilder, 'sub')
+    expect(builder.toSql()).toBe(expectedSql)
+    expect(builder.getBindings()).toEqual(expectedBindings)
+
+    builder = getPostgresBuilder()
+    expect(() => builder.selectSub(['foo'] as unknown as string, 'sub')).toThrow(
+      'InvalidArgumentException: A subquery must be a query builder instance, a Closure, or a string.'
+    )
+  })
+
+  test('testSubSelectResetBindings', () => {
+    const builder = getPostgresBuilder()
+    builder.from('one').selectSub((query: Builder) => {
+      query.from('two').select('baz').where('subkey', '=', 'subval')
+    }, 'sub')
+
+    expect(builder.toSql()).toBe(
+      'select (select "baz" from "two" where "subkey" = ?) as "sub" from "one"'
+    )
+    expect(builder.getBindings()).toEqual(['subval'])
+
+    builder.select('*')
+
+    expect(builder.toSql()).toBe('select * from "one"')
+    expect(builder.getBindings()).toEqual([])
+  })
+
+  test('testSelectExpression', () => {
+    const builder = getBuilder()
+    builder
+      .from('one')
+      .selectExpression(new Raw('1 + 1'), 'expr')
+      .selectExpression('2 + 2', 'expr2')
+
+    expect(builder.toSql()).toBe(
+      'select (1 + 1) as "expr", (2 + 2) as "expr2" from "one"'
+    )
+  })
+
+  test('testSelect', () => {
+    const builder = getBuilder()
+    builder.from('one').select({
+      0: 'two',
+      three: 'threee as threeee',
+      four: getBuilder().from('tbl').select('col'),
+      five: new Raw('1 + 1')
+    })
+
+    expect(builder.toSql()).toBe(
+      'select "two", "threee" as "threeee", (select "col" from "tbl") as "four", 1 + 1 from "one"'
+    )
+  })
+
+  test('testSqlServerWhereDate', () => {
+    const builder = getSqlServerBuilder()
+    builder.select('*').from('users').whereDate('created_at', '=', '2015-09-23')
+    expect(builder.toSql()).toBe(
+      'select * from [users] where cast([created_at] as date) = ?'
+    )
+    expect(builder.getBindings()).toEqual(['2015-09-23'])
+  })
+
+  test('testUppercaseLeadingBooleansAreRemoved', () => {
+    const builder = getBuilder()
+    builder.select('*').from('users').where('name', '=', 'Alvaro', 'AND' as 'and')
+    expect(builder.toSql()).toBe('select * from "users" where "name" = ?')
+  })
+
+  test('testLowercaseLeadingBooleansAreRemoved', () => {
+    const builder = getBuilder()
+    builder.select('*').from('users').where('name', '=', 'Alvaro', 'and')
+    expect(builder.toSql()).toBe('select * from "users" where "name" = ?')
+  })
+
+  test('testCaseInsensitiveLeadingBooleansAreRemoved', () => {
+    const builder = getBuilder()
+    builder.select('*').from('users').where('name', '=', 'Alvaro', 'And' as 'and')
+    expect(builder.toSql()).toBe('select * from "users" where "name" = ?')
+  })
+
+  test('testTableValuedFunctionAsTableInSqlServer', () => {
+    let builder = getSqlServerBuilder()
+    builder.select('*').from('users()')
+    expect(builder.toSql()).toBe('select * from [users]()')
+
+    builder = getSqlServerBuilder()
+    builder.select('*').from('users(1,2)')
+    expect(builder.toSql()).toBe('select * from [users](1,2)')
+  })
+
+  test('testChunkWithLastChunkComplete', async () => {
+    const builder = getMockQueryBuilder()
+    builder.orders.push({ column: 'foobar', direction: 'asc' })
+    jest.spyOn(builder, 'clone').mockReturnValue(builder)
+
+    const chunk1 = collect(['foo1', 'foo2'])
+    const chunk2 = collect(['foo3', 'foo4'])
+    const chunk3 = collect([])
+
+    jest.spyOn(builder, 'getOffset').mockReturnValue(undefined)
+    jest.spyOn(builder, 'getLimit').mockReturnValue(undefined)
+    const offsetSpy = jest.spyOn(builder, 'offset').mockReturnValue(builder)
+    const limitSpy = jest.spyOn(builder, 'limit').mockReturnValue(builder)
+    const getSpy = jest
+      .spyOn(builder, 'get')
+      .mockResolvedValueOnce(chunk1)
+      .mockResolvedValueOnce(chunk2)
+      .mockResolvedValueOnce(chunk3)
+
+    const callbackAssertor = { doSomething: jest.fn() }
+
+    await builder.chunk(2, (results) => {
+      callbackAssertor.doSomething(results)
+    })
+
+    expect(offsetSpy).toHaveBeenNthCalledWith(1, 0)
+    expect(offsetSpy).toHaveBeenNthCalledWith(2, 2)
+    expect(offsetSpy).toHaveBeenNthCalledWith(3, 4)
+    expect(limitSpy).toHaveBeenCalledTimes(3)
+    expect(limitSpy).toHaveBeenCalledWith(2)
+    expect(getSpy).toHaveBeenCalledTimes(3)
+    expect(callbackAssertor.doSomething).toHaveBeenCalledWith(chunk1)
+    expect(callbackAssertor.doSomething).toHaveBeenCalledWith(chunk2)
+    expect(callbackAssertor.doSomething).not.toHaveBeenCalledWith(chunk3)
+  })
+
+  test('testChunkWithLastChunkPartial', async () => {
+    const builder = getMockQueryBuilder()
+    builder.orders.push({ column: 'foobar', direction: 'asc' })
+    jest.spyOn(builder, 'clone').mockReturnValue(builder)
+
+    const chunk1 = collect(['foo1', 'foo2'])
+    const chunk2 = collect(['foo3'])
+
+    jest.spyOn(builder, 'getOffset').mockReturnValue(undefined)
+    jest.spyOn(builder, 'getLimit').mockReturnValue(undefined)
+    jest.spyOn(builder, 'offset').mockReturnValue(builder)
+    jest.spyOn(builder, 'limit').mockReturnValue(builder)
+    jest
+      .spyOn(builder, 'get')
+      .mockResolvedValueOnce(chunk1)
+      .mockResolvedValueOnce(chunk2)
+
+    const callbackAssertor = { doSomething: jest.fn() }
+
+    await builder.chunk(2, (results) => {
+      callbackAssertor.doSomething(results)
+    })
+
+    expect(callbackAssertor.doSomething).toHaveBeenCalledWith(chunk1)
+    expect(callbackAssertor.doSomething).toHaveBeenCalledWith(chunk2)
+  })
+
+  test('testChunkCanBeStoppedByReturningFalse', async () => {
+    const builder = getMockQueryBuilder()
+    builder.orders.push({ column: 'foobar', direction: 'asc' })
+    jest.spyOn(builder, 'clone').mockReturnValue(builder)
+
+    const chunk1 = collect(['foo1', 'foo2'])
+    const chunk2 = collect(['foo3'])
+
+    jest.spyOn(builder, 'getOffset').mockReturnValue(undefined)
+    jest.spyOn(builder, 'getLimit').mockReturnValue(undefined)
+    jest.spyOn(builder, 'offset').mockReturnValue(builder)
+    jest.spyOn(builder, 'limit').mockReturnValue(builder)
+    jest.spyOn(builder, 'get').mockResolvedValueOnce(chunk1)
+
+    const callbackAssertor = { doSomething: jest.fn() }
+
+    await builder.chunk(2, (results) => {
+      callbackAssertor.doSomething(results)
+
+      return false
+    })
+
+    expect(callbackAssertor.doSomething).toHaveBeenCalledWith(chunk1)
+    expect(callbackAssertor.doSomething).not.toHaveBeenCalledWith(chunk2)
+  })
+
+  test('testChunkWithCountZero', async () => {
+    const builder = getMockQueryBuilder()
+    builder.orders.push({ column: 'foobar', direction: 'asc' })
+    jest.spyOn(builder, 'clone').mockReturnValue(builder)
+
+    jest.spyOn(builder, 'getOffset').mockReturnValue(undefined)
+    jest.spyOn(builder, 'getLimit').mockReturnValue(undefined)
+    const offsetSpy = jest.spyOn(builder, 'offset')
+    const limitSpy = jest.spyOn(builder, 'limit')
+    const getSpy = jest.spyOn(builder, 'get')
+
+    await builder.chunk(0, () => {
+      throw new Error('Should never be called.')
+    })
+
+    expect(offsetSpy).not.toHaveBeenCalled()
+    expect(limitSpy).not.toHaveBeenCalled()
+    expect(getSpy).not.toHaveBeenCalled()
+  })
+
+  test('testChunkByIdOnArrays', async () => {
+    const builder = getMockQueryBuilder()
+    builder.orders.push({ column: 'foobar', direction: 'asc' })
+    jest.spyOn(builder, 'clone').mockReturnValue(builder)
+
+    const chunk1 = collect([
+      { someIdField: 1 },
+      { someIdField: 2 }
+    ])
+    const chunk2 = collect([
+      { someIdField: 10 },
+      { someIdField: 11 }
+    ])
+    const chunk3 = collect([])
+
+    const forPageAfterIdSpy = jest.spyOn(builder, 'forPageAfterId').mockReturnValue(builder)
+    jest
+      .spyOn(builder, 'get')
+      .mockResolvedValueOnce(chunk1)
+      .mockResolvedValueOnce(chunk2)
+      .mockResolvedValueOnce(chunk3)
+
+    const callbackAssertor = { doSomething: jest.fn() }
+
+    await builder.chunkById(2, (results) => {
+      callbackAssertor.doSomething(results)
+    }, 'someIdField')
+
+    expect(forPageAfterIdSpy).toHaveBeenNthCalledWith(1, 2, undefined, 'someIdField')
+    expect(forPageAfterIdSpy).toHaveBeenNthCalledWith(2, 2, 2, 'someIdField')
+    expect(forPageAfterIdSpy).toHaveBeenNthCalledWith(3, 2, 11, 'someIdField')
+    expect(callbackAssertor.doSomething).toHaveBeenCalledWith(chunk1)
+    expect(callbackAssertor.doSomething).toHaveBeenCalledWith(chunk2)
+    expect(callbackAssertor.doSomething).not.toHaveBeenCalledWith(chunk3)
+  })
+
+  test('testChunkPaginatesUsingIdWithLastChunkComplete', async () => {
+    const builder = getMockQueryBuilder()
+    builder.orders.push({ column: 'foobar', direction: 'asc' })
+    jest.spyOn(builder, 'clone').mockReturnValue(builder)
+
+    const chunk1 = collect([
+      { someIdField: 1 },
+      { someIdField: 2 }
+    ])
+    const chunk2 = collect([
+      { someIdField: 10 },
+      { someIdField: 11 }
+    ])
+    const chunk3 = collect([])
+
+    const forPageAfterIdSpy = jest.spyOn(builder, 'forPageAfterId').mockReturnValue(builder)
+    jest
+      .spyOn(builder, 'get')
+      .mockResolvedValueOnce(chunk1)
+      .mockResolvedValueOnce(chunk2)
+      .mockResolvedValueOnce(chunk3)
+
+    const callbackAssertor = { doSomething: jest.fn() }
+
+    await builder.chunkById(2, (results) => {
+      callbackAssertor.doSomething(results)
+    }, 'someIdField')
+
+    expect(forPageAfterIdSpy).toHaveBeenNthCalledWith(1, 2, undefined, 'someIdField')
+    expect(forPageAfterIdSpy).toHaveBeenNthCalledWith(2, 2, 2, 'someIdField')
+    expect(forPageAfterIdSpy).toHaveBeenNthCalledWith(3, 2, 11, 'someIdField')
+    expect(callbackAssertor.doSomething).toHaveBeenCalledWith(chunk1)
+    expect(callbackAssertor.doSomething).toHaveBeenCalledWith(chunk2)
+    expect(callbackAssertor.doSomething).not.toHaveBeenCalledWith(chunk3)
+  })
+
+  test('testChunkPaginatesUsingIdWithLastChunkPartial', async () => {
+    const builder = getMockQueryBuilder()
+    builder.orders.push({ column: 'foobar', direction: 'asc' })
+    jest.spyOn(builder, 'clone').mockReturnValue(builder)
+
+    const chunk1 = collect([
+      { someIdField: 1 },
+      { someIdField: 2 }
+    ])
+    const chunk2 = collect([{ someIdField: 10 }])
+
+    jest.spyOn(builder, 'forPageAfterId').mockReturnValue(builder)
+    jest
+      .spyOn(builder, 'get')
+      .mockResolvedValueOnce(chunk1)
+      .mockResolvedValueOnce(chunk2)
+
+    const callbackAssertor = { doSomething: jest.fn() }
+
+    await builder.chunkById(2, (results) => {
+      callbackAssertor.doSomething(results)
+    }, 'someIdField')
+
+    expect(callbackAssertor.doSomething).toHaveBeenCalledWith(chunk1)
+    expect(callbackAssertor.doSomething).toHaveBeenCalledWith(chunk2)
+  })
+
+  test('testChunkPaginatesUsingIdWithCountZero', async () => {
+    const builder = getMockQueryBuilder()
+    builder.orders.push({ column: 'foobar', direction: 'asc' })
+
+    const forPageAfterIdSpy = jest.spyOn(builder, 'forPageAfterId')
+    const getSpy = jest.spyOn(builder, 'get')
+
+    await builder.chunkById(0, () => {
+      throw new Error('Should never be called.')
+    }, 'someIdField')
+
+    expect(forPageAfterIdSpy).not.toHaveBeenCalled()
+    expect(getSpy).not.toHaveBeenCalled()
+  })
+
+  test('testChunkPaginatesUsingIdWithAlias', async () => {
+    const builder = getMockQueryBuilder()
+    builder.orders.push({ column: 'foobar', direction: 'asc' })
+    jest.spyOn(builder, 'clone').mockReturnValue(builder)
+
+    const chunk1 = collect([
+      { table_id: 1 },
+      { table_id: 10 }
+    ])
+    const chunk2 = collect([])
+
+    const forPageAfterIdSpy = jest.spyOn(builder, 'forPageAfterId').mockReturnValue(builder)
+    jest.spyOn(builder, 'get').mockResolvedValueOnce(chunk1).mockResolvedValueOnce(chunk2)
+
+    const callbackAssertor = { doSomething: jest.fn() }
+
+    await builder.chunkById(2, (results) => {
+      callbackAssertor.doSomething(results)
+    }, 'table.id', 'table_id')
+
+    expect(forPageAfterIdSpy).toHaveBeenNthCalledWith(1, 2, undefined, 'table.id')
+    expect(forPageAfterIdSpy).toHaveBeenNthCalledWith(2, 2, 10, 'table.id')
+    expect(callbackAssertor.doSomething).toHaveBeenCalledWith(chunk1)
+    expect(callbackAssertor.doSomething).not.toHaveBeenCalledWith(chunk2)
+  })
+
+  test('testChunkPaginatesUsingIdDesc', async () => {
+    const builder = getMockQueryBuilder()
+    builder.orders.push({ column: 'foobar', direction: 'desc' })
+    jest.spyOn(builder, 'clone').mockReturnValue(builder)
+
+    const chunk1 = collect([
+      { someIdField: 10 },
+      { someIdField: 1 }
+    ])
+    const chunk2 = collect([])
+
+    const forPageBeforeIdSpy = jest.spyOn(builder, 'forPageBeforeId').mockReturnValue(builder)
+    jest.spyOn(builder, 'get').mockResolvedValueOnce(chunk1).mockResolvedValueOnce(chunk2)
+
+    const callbackAssertor = { doSomething: jest.fn() }
+
+    await builder.chunkByIdDesc(2, (results) => {
+      callbackAssertor.doSomething(results)
+    }, 'someIdField')
+
+    expect(forPageBeforeIdSpy).toHaveBeenNthCalledWith(1, 2, undefined, 'someIdField')
+    expect(forPageBeforeIdSpy).toHaveBeenNthCalledWith(2, 2, 1, 'someIdField')
+    expect(callbackAssertor.doSomething).toHaveBeenCalledWith(chunk1)
+    expect(callbackAssertor.doSomething).not.toHaveBeenCalledWith(chunk2)
+  })
+
+  test('testPaginate', async () => {
+    const perPage = 16
+    const columns = ['test']
+    const pageName = 'page-name'
+    const page = 1
+    const builder = getMockQueryBuilder()
+    const path = 'http://foo.bar?page=3'
+
+    const results = collect([{ test: 'foo' }, { test: 'bar' }])
+
+    jest.spyOn(builder, 'getCountForPagination').mockResolvedValue(2)
+    jest.spyOn(builder, 'forPage').mockReturnValue(builder)
+    jest.spyOn(builder, 'get').mockResolvedValue(results)
+
+    Paginator.currentPathResolver(() => path)
+
+    const result = await builder.paginate(perPage, columns, pageName, page)
+
+    expect(result).toBeInstanceOf(LengthAwarePaginator)
+    expect(result.total()).toBe(2)
+    expect(result.itemsCollection().all()).toEqual(results.all())
+    // Paginator.clearResolvers()
+  })
+
+  test('testPaginateWithDefaultArguments', async () => {
+    const perPage = 15
+    const page = 1
+    const builder = getMockQueryBuilder()
+    const path = 'http://foo.bar?page=3'
+    const results = collect([{ test: 'foo' }, { test: 'bar' }])
+
+    jest.spyOn(builder, 'getCountForPagination').mockResolvedValue(2)
+    jest.spyOn(builder, 'forPage').mockReturnValue(builder)
+    jest.spyOn(builder, 'get').mockResolvedValue(results)
+
+    Paginator.currentPageResolver(() => 1)
+    Paginator.currentPathResolver(() => path)
+
+    const result = await builder.paginate()
+
+    expect(result.total()).toBe(2)
+    expect(result.itemsCollection().all()).toEqual(results.all())
+    expect(builder.forPage).toHaveBeenCalledWith(page, perPage)
+  })
+
+  test('testPaginateWhenNoResults', async () => {
+    const builder = getMockQueryBuilder()
+    const path = 'http://foo.bar?page=3'
+
+    jest.spyOn(builder, 'getCountForPagination').mockResolvedValue(0)
+    const forPageSpy = jest.spyOn(builder, 'forPage')
+    const getSpy = jest.spyOn(builder, 'get')
+
+    Paginator.currentPageResolver(() => 1)
+    Paginator.currentPathResolver(() => path)
+
+    const result = await builder.paginate()
+
+    expect(result.total()).toBe(0)
+    expect(forPageSpy).not.toHaveBeenCalled()
+    expect(getSpy).not.toHaveBeenCalled()
+  })
+
+  test('testPaginateWithSpecificColumns', async () => {
+    const perPage = 16
+    const columns = ['id', 'name']
+    const pageName = 'page-name'
+    const page = 1
+    const builder = getMockQueryBuilder()
+    const path = 'http://foo.bar?page=3'
+    const results = collect([
+      { id: 3, name: 'Alvaro' },
+      { id: 5, name: 'Mohamed' }
+    ])
+
+    jest.spyOn(builder, 'getCountForPagination').mockResolvedValue(2)
+    jest.spyOn(builder, 'forPage').mockReturnValue(builder)
+    jest.spyOn(builder, 'get').mockResolvedValue(results)
+
+    Paginator.currentPathResolver(() => path)
+
+    const result = await builder.paginate(perPage, columns, pageName, page)
+
+    expect(result.total()).toBe(2)
+    expect(result.itemsCollection().all()).toEqual(results.all())
+  })
+
+  test('testPaginateWithTotalOverride', async () => {
+    const perPage = 16
+    const columns = ['id', 'name']
+    const pageName = 'page-name'
+    const page = 1
+    const builder = getMockQueryBuilder()
+    const path = 'http://foo.bar?page=3'
+    const results = collect([
+      { id: 3, name: 'Alvaro' },
+      { id: 5, name: 'Alice' }
+    ])
+
+    const countSpy = jest.spyOn(builder, 'getCountForPagination')
+    jest.spyOn(builder, 'forPage').mockReturnValue(builder)
+    jest.spyOn(builder, 'get').mockResolvedValue(results)
+
+    Paginator.currentPathResolver(() => path)
+
+    const result = await builder.paginate(perPage, columns, pageName, page, 10)
+
+    expect(countSpy).not.toHaveBeenCalled()
+    expect(result.total()).toBe(10)
+  })
+
+  test('testCursorPaginate', async () => {
+    const perPage = 16
+    const columns = ['test']
+    const cursorName = 'cursor-name'
+    const cursor = new Cursor({ test: 'bar' })
+    const builder = getMockQueryBuilder()
+    builder.from('foobar').orderBy('test')
+    jest.spyOn(builder, 'newQuery').mockImplementation(() => {
+      return getBuilder()
+    })
+
+    const path = `http://foo.bar?cursor=${cursor.encode()}`
+    const results = collect([{ test: 'foo' }, { test: 'bar' }])
+
+    jest.spyOn(builder, 'get').mockImplementation(async () => {
+      expect(builder.toSql()).toBe(
+        'select * from "foobar" where ("test" > ?) order by "test" asc limit 17'
+      )
+      expect(builder.getRawBindings().where).toEqual(['bar'])
+
+      return results
+    })
+
+    Paginator.currentPathResolver(() => path)
+
+    const result = await builder.cursorPaginate(
+      perPage,
+      columns,
+      cursorName,
+      cursor
+    )
+
+    expect(result).toEqual(
+      new CursorPaginator(results, perPage, cursor, {
+        path,
+        cursorName,
+        parameters: ['test']
+      })
+    )
+  })
+
+  test('testCursorPaginateMultipleOrderColumns', async () => {
+    const perPage = 16
+    const columns = ['test', 'another']
+    const cursorName = 'cursor-name'
+    const cursor = new Cursor({ test: 'bar', another: 'foo' })
+    const builder = getMockQueryBuilder()
+    builder.from('foobar').orderBy('test').orderBy('another')
+    jest.spyOn(builder, 'newQuery').mockImplementation(() => getBuilder())
+
+    const path = `http://foo.bar?cursor=${cursor.encode()}`
+    const results = collect([
+      { test: 'foo', another: 1 },
+      { test: 'bar', another: 2 }
+    ])
+
+    jest.spyOn(builder, 'get').mockImplementation(async () => {
+      expect(builder.toSql()).toBe(
+        'select * from "foobar" where ("test" > ? or ("test" = ? and ("another" > ?))) order by "test" asc, "another" asc limit 17'
+      )
+      expect(builder.getRawBindings().where).toEqual(['bar', 'bar', 'foo'])
+
+      return results
+    })
+
+    Paginator.currentPathResolver(() => path)
+
+    const result = await builder.cursorPaginate(
+      perPage,
+      columns,
+      cursorName,
+      cursor
+    )
+
+    expect(result).toEqual(
+      new CursorPaginator(results, perPage, cursor, {
+        path,
+        cursorName,
+        parameters: ['test', 'another']
+      })
+    )
+  })
+
+  test('testCursorPaginateWithDefaultArguments', async () => {
+    const perPage = 15
+    const cursorName = 'cursor'
+    const cursor = new Cursor({ test: 'bar' })
+    const builder = getMockQueryBuilder()
+    builder.from('foobar').orderBy('test')
+    jest.spyOn(builder, 'newQuery').mockImplementation(() => getBuilder())
+
+    const path = `http://foo.bar?cursor=${cursor.encode()}`
+    const results = collect([{ test: 'foo' }, { test: 'bar' }])
+
+    jest.spyOn(builder, 'get').mockImplementation(async () => {
+      expect(builder.toSql()).toBe(
+        'select * from "foobar" where ("test" > ?) order by "test" asc limit 16'
+      )
+      expect(builder.getRawBindings().where).toEqual(['bar'])
+
+      return results
+    })
+
+    CursorPaginator.currentCursorResolver(() => cursor)
+    Paginator.currentPathResolver(() => path)
+
+    const result = await builder.cursorPaginate()
+
+    expect(result).toEqual(
+      new CursorPaginator(results, perPage, cursor, {
+        path,
+        cursorName,
+        parameters: ['test']
+      })
+    )
+  })
+
+  test('testCursorPaginateWhenNoResults', async () => {
+    const perPage = 15
+    const cursorName = 'cursor'
+    const builder = getMockQueryBuilder().orderBy('test')
+    const path = 'http://foo.bar?cursor=3'
+    const results: Array<Record<string, unknown>> = []
+
+    jest.spyOn(builder, 'get').mockResolvedValue(results)
+
+    CursorPaginator.currentCursorResolver(() => undefined)
+    Paginator.currentPathResolver(() => path)
+
+    const result = await builder.cursorPaginate()
+
+    expect(result).toEqual(
+      new CursorPaginator(results, perPage, undefined, {
+        path,
+        cursorName,
+        parameters: ['test']
+      })
+    )
+  })
+
+  test('testCursorPaginateWithSpecificColumns', async () => {
+    const perPage = 16
+    const columns = ['id', 'name']
+    const cursorName = 'cursor-name'
+    const cursor = new Cursor({ id: 2 })
+    const builder = getMockQueryBuilder()
+    builder.from('foobar').orderBy('id')
+    jest.spyOn(builder, 'newQuery').mockImplementation(() => getBuilder())
+
+    const path = 'http://foo.bar?cursor=3'
+    const results = collect([
+      { id: 3, name: 'Taylor' },
+      { id: 5, name: 'Mohamed' }
+    ])
+
+    jest.spyOn(builder, 'get').mockImplementation(async () => {
+      expect(builder.toSql()).toBe(
+        'select * from "foobar" where ("id" > ?) order by "id" asc limit 17'
+      )
+      expect(builder.getRawBindings().where).toEqual([2])
+
+      return results
+    })
+
+    Paginator.currentPathResolver(() => path)
+
+    const result = await builder.cursorPaginate(
+      perPage,
+      columns,
+      cursorName,
+      cursor
+    )
+
+    expect(result).toEqual(
+      new CursorPaginator(results, perPage, cursor, {
+        path,
+        cursorName,
+        parameters: ['id']
+      })
+    )
+  })
+
+  test('testCursorPaginateWithMixedOrders', async () => {
+    const perPage = 16
+    const columns = ['foo', 'bar', 'baz']
+    const cursorName = 'cursor-name'
+    const cursor = new Cursor({ foo: 1, bar: 2, baz: 3 })
+    const builder = getMockQueryBuilder()
+    builder
+      .from('foobar')
+      .orderBy('foo')
+      .orderByDesc('bar')
+      .orderBy('baz')
+    jest.spyOn(builder, 'newQuery').mockImplementation(() => getBuilder())
+
+    const path = `http://foo.bar?cursor=${cursor.encode()}`
+    const results = collect([
+      { foo: 1, bar: 2, baz: 4 },
+      { foo: 1, bar: 1, baz: 1 }
+    ])
+
+    jest.spyOn(builder, 'get').mockImplementation(async () => {
+      expect(builder.toSql()).toBe(
+        'select * from "foobar" where ("foo" > ? or ("foo" = ? and ("bar" < ? or ("bar" = ? and ("baz" > ?))))) order by "foo" asc, "bar" desc, "baz" asc limit 17'
+      )
+      expect(builder.getRawBindings().where).toEqual([1, 1, 2, 2, 3])
+
+      return results
+    })
+
+    Paginator.currentPathResolver(() => path)
+
+    const result = await builder.cursorPaginate(
+      perPage,
+      columns,
+      cursorName,
+      cursor
+    )
+
+    expect(result).toEqual(
+      new CursorPaginator(results, perPage, cursor, {
+        path,
+        cursorName,
+        parameters: ['foo', 'bar', 'baz']
+      })
+    )
+  })
+
+  test('testCursorPaginateWithDynamicColumnInSelectRaw', async () => {
+    const perPage = 15
+    const cursorName = 'cursor'
+    const cursor = new Cursor({ test: 'bar' })
+    const builder = getMockQueryBuilder()
+    builder
+      .from('foobar')
+      .select('*')
+      .selectRaw("(CONCAT(firstname, ' ', lastname)) as test")
+      .orderBy('test')
+    jest.spyOn(builder, 'newQuery').mockImplementation(() => getBuilder())
+
+    const path = `http://foo.bar?cursor=${cursor.encode()}`
+    const results = collect([{ test: 'foo' }, { test: 'bar' }])
+
+    jest.spyOn(builder, 'get').mockImplementation(async () => {
+      expect(builder.toSql()).toBe(
+        "select *, (CONCAT(firstname, ' ', lastname)) as test from \"foobar\" where ((CONCAT(firstname, ' ', lastname)) > ?) order by \"test\" asc limit 16"
+      )
+      expect(builder.getRawBindings().where).toEqual(['bar'])
+
+      return results
+    })
+
+    CursorPaginator.currentCursorResolver(() => cursor)
+    Paginator.currentPathResolver(() => path)
+
+    const result = await builder.cursorPaginate()
+
+    expect(result).toEqual(
+      new CursorPaginator(results, perPage, cursor, {
+        path,
+        cursorName,
+        parameters: ['test']
+      })
+    )
+  })
+
+  test('testCursorPaginateWithDynamicColumnWithCastInSelectRaw', async () => {
+    const perPage = 15
+    const cursorName = 'cursor'
+    const cursor = new Cursor({ test: 'bar' })
+    const builder = getMockQueryBuilder()
+    builder
+      .from('foobar')
+      .select('*')
+      .selectRaw(
+        "(CAST(CONCAT(firstname, ' ', lastname) as VARCHAR)) as test"
+      )
+      .orderBy('test')
+    jest.spyOn(builder, 'newQuery').mockImplementation(() => getBuilder())
+
+    const path = `http://foo.bar?cursor=${cursor.encode()}`
+    const results = collect([{ test: 'foo' }, { test: 'bar' }])
+
+    jest.spyOn(builder, 'get').mockImplementation(async () => {
+      expect(builder.toSql()).toBe(
+        "select *, (CAST(CONCAT(firstname, ' ', lastname) as VARCHAR)) as test from \"foobar\" where ((CAST(CONCAT(firstname, ' ', lastname) as VARCHAR)) > ?) order by \"test\" asc limit 16"
+      )
+      expect(builder.getRawBindings().where).toEqual(['bar'])
+
+      return results
+    })
+
+    CursorPaginator.currentCursorResolver(() => cursor)
+    Paginator.currentPathResolver(() => path)
+
+    const result = await builder.cursorPaginate()
+
+    expect(result).toEqual(
+      new CursorPaginator(results, perPage, cursor, {
+        path,
+        cursorName,
+        parameters: ['test']
+      })
+    )
+  })
+
+  test('testCursorPaginateWithDynamicColumnInSelectSub', async () => {
+    const perPage = 15
+    const cursorName = 'cursor'
+    const cursor = new Cursor({ test: 'bar' })
+    const builder = getMockQueryBuilder()
+    builder
+      .from('foobar')
+      .select('*')
+      .selectSub("CONCAT(firstname, ' ', lastname)", 'test')
+      .orderBy('test')
+    jest.spyOn(builder, 'newQuery').mockImplementation(() => getBuilder())
+
+    const path = `http://foo.bar?cursor=${cursor.encode()}`
+    const results = collect([{ test: 'foo' }, { test: 'bar' }])
+
+    jest.spyOn(builder, 'get').mockImplementation(async () => {
+      expect(builder.toSql()).toBe(
+        "select *, (CONCAT(firstname, ' ', lastname)) as \"test\" from \"foobar\" where ((CONCAT(firstname, ' ', lastname)) > ?) order by \"test\" asc limit 16"
+      )
+      expect(builder.getRawBindings().where).toEqual(['bar'])
+
+      return results
+    })
+
+    CursorPaginator.currentCursorResolver(() => cursor)
+    Paginator.currentPathResolver(() => path)
+
+    const result = await builder.cursorPaginate()
+
+    expect(result).toEqual(
+      new CursorPaginator(results, perPage, cursor, {
+        path,
+        cursorName,
+        parameters: ['test']
+      })
+    )
+  })
+
+  test('testCursorPaginateWithUnionWheres', async () => {
+    const ts = '2024-01-15 12:00:00'
+    const perPage = 16
+    const columns = ['test']
+    const cursorName = 'cursor-name'
+    const cursor = new Cursor({ created_at: ts })
+    const builder = getMockQueryBuilder()
+    builder
+      .select('id', 'start_time as created_at')
+      .selectRaw("'video' as type")
+      .from('videos')
+    builder.union(
+      getBuilder()
+        .select('id', 'created_at')
+        .selectRaw("'news' as type")
+        .from('news')
+    )
+    builder.orderBy('created_at')
+    jest.spyOn(builder, 'newQuery').mockImplementation(() => getBuilder())
+
+    const path = `http://foo.bar?cursor=${cursor.encode()}`
+    const results = collect([
+      { id: 1, created_at: Carbon.now(), type: 'video' },
+      { id: 2, created_at: Carbon.now(), type: 'news' }
+    ])
+
+    jest.spyOn(builder, 'get').mockImplementation(async () => {
+      expect(builder.toSql()).toBe(
+        '(select "id", "start_time" as "created_at", \'video\' as type from "videos" where ("start_time" > ?)) union (select "id", "created_at", \'news\' as type from "news" where ("created_at" > ?)) order by "created_at" asc limit 17'
+      )
+      expect(builder.getRawBindings().where).toEqual([ts])
+      expect(builder.getRawBindings().union).toEqual([ts])
+
+      return results
+    })
+
+    Paginator.currentPathResolver(() => path)
+
+    const result = await builder.cursorPaginate(
+      perPage,
+      columns,
+      cursorName,
+      cursor
+    )
+
+    expect(result).toEqual(
+      new CursorPaginator(results, perPage, cursor, {
+        path,
+        cursorName,
+        parameters: ['created_at']
+      })
+    )
+  })
+
+  test('testCursorPaginateWithMultipleUnionsAndMultipleWheres', async () => {
+    const ts = '2024-01-15 12:00:00'
+    const perPage = 16
+    const columns = ['test']
+    const cursorName = 'cursor-name'
+    const cursor = new Cursor({ created_at: ts })
+    const builder = getMockQueryBuilder()
+    builder
+      .select('id', 'start_time as created_at')
+      .selectRaw("'video' as type")
+      .from('videos')
+    builder.union(
+      getBuilder()
+        .select('id', 'created_at')
+        .selectRaw("'news' as type")
+        .from('news')
+        .where('extra', 'first')
+    )
+    builder.union(
+      getBuilder()
+        .select('id', 'created_at')
+        .selectRaw("'podcast' as type")
+        .from('podcasts')
+        .where('extra', 'second')
+    )
+    builder.orderBy('created_at')
+    jest.spyOn(builder, 'newQuery').mockImplementation(() => getBuilder())
+
+    const path = `http://foo.bar?cursor=${cursor.encode()}`
+    const results = collect([
+      { id: 1, created_at: Carbon.now(), type: 'video' },
+      { id: 2, created_at: Carbon.now(), type: 'news' },
+      { id: 3, created_at: Carbon.now(), type: 'podcasts' }
+    ])
+
+    jest.spyOn(builder, 'get').mockImplementation(async () => {
+      expect(builder.toSql()).toBe(
+        '(select "id", "start_time" as "created_at", \'video\' as type from "videos" where ("start_time" > ?)) union (select "id", "created_at", \'news\' as type from "news" where "extra" = ? and ("created_at" > ?)) union (select "id", "created_at", \'podcast\' as type from "podcasts" where "extra" = ? and ("created_at" > ?)) order by "created_at" asc limit 17'
+      )
+      expect(builder.getRawBindings().where).toEqual([ts])
+      expect(builder.getRawBindings().union).toEqual(['first', ts, 'second', ts])
+
+      return results
+    })
+
+    Paginator.currentPathResolver(() => path)
+
+    const result = await builder.cursorPaginate(
+      perPage,
+      columns,
+      cursorName,
+      cursor
+    )
+
+    expect(result).toEqual(
+      new CursorPaginator(results, perPage, cursor, {
+        path,
+        cursorName,
+        parameters: ['created_at']
+      })
+    )
+  })
+
+  test('testCursorPaginateWithUnionMultipleWheresMultipleOrders', async () => {
+    const ts = '2024-01-15 12:00:00'
+    const perPage = 16
+    const columns = ['id', 'created_at', 'type']
+    const cursorName = 'cursor-name'
+    const cursor = new Cursor({ id: 1, created_at: ts, type: 'news' })
+    const builder = getMockQueryBuilder()
+    builder
+      .select('id', 'start_time as created_at', 'type')
+      .from('videos')
+      .where('extra', 'first')
+    builder.union(
+      getBuilder()
+        .select('id', 'created_at', 'type')
+        .from('news')
+        .where('extra', 'second')
+    )
+    builder.union(
+      getBuilder()
+        .select('id', 'created_at', 'type')
+        .from('podcasts')
+        .where('extra', 'third')
+    )
+    builder.orderBy('id').orderByDesc('created_at').orderBy('type')
+    jest.spyOn(builder, 'newQuery').mockImplementation(() => getBuilder())
+
+    const path = `http://foo.bar?cursor=${cursor.encode()}`
+    const results = collect([
+      { id: 1, created_at: Carbon.now().addDay(), type: 'video' },
+      { id: 1, created_at: Carbon.now(), type: 'news' },
+      { id: 1, created_at: Carbon.now(), type: 'podcast' },
+      { id: 2, created_at: Carbon.now(), type: 'podcast' }
+    ])
+
+    jest.spyOn(builder, 'get').mockImplementation(async () => {
+      expect(builder.toSql()).toBe(
+        '(select "id", "start_time" as "created_at", "type" from "videos" where "extra" = ? and ("id" > ? or ("id" = ? and ("start_time" < ? or ("start_time" = ? and ("type" > ?)))))) union (select "id", "created_at", "type" from "news" where "extra" = ? and ("id" > ? or ("id" = ? and ("start_time" < ? or ("start_time" = ? and ("type" > ?)))))) union (select "id", "created_at", "type" from "podcasts" where "extra" = ? and ("id" > ? or ("id" = ? and ("start_time" < ? or ("start_time" = ? and ("type" > ?)))))) order by "id" asc, "created_at" desc, "type" asc limit 17'
+      )
+      expect(builder.getRawBindings().where).toEqual([
+        'first',
+        1,
+        1,
+        ts,
+        ts,
+        'news'
+      ])
+      expect(builder.getRawBindings().union).toEqual([
+        'second',
+        1,
+        1,
+        ts,
+        ts,
+        'news',
+        'third',
+        1,
+        1,
+        ts,
+        ts,
+        'news'
+      ])
+
+      return results
+    })
+
+    Paginator.currentPathResolver(() => path)
+
+    const result = await builder.cursorPaginate(
+      perPage,
+      columns,
+      cursorName,
+      cursor
+    )
+
+    expect(result).toEqual(
+      new CursorPaginator(results, perPage, cursor, {
+        path,
+        cursorName,
+        parameters: ['id', 'created_at', 'type']
+      })
+    )
+  })
+
+  test('testCursorPaginateWithUnionWheresWithRawOrderExpression', async () => {
+    const ts = '2024-01-15 12:00:00'
+    const perPage = 16
+    const columns = ['test']
+    const cursorName = 'cursor-name'
+    const cursor = new Cursor({ created_at: ts })
+    const builder = getMockQueryBuilder()
+    builder
+      .select('id', 'is_published', 'start_time as created_at')
+      .selectRaw("'video' as type")
+      .where('is_published', true)
+      .from('videos')
+    builder.union(
+      getBuilder()
+        .select('id', 'is_published', 'created_at')
+        .selectRaw("'news' as type")
+        .where('is_published', true)
+        .from('news')
+    )
+    builder
+      .orderByRaw('case when (id = 3 and type="news" then 0 else 1 end)')
+      .orderBy('created_at')
+    jest.spyOn(builder, 'newQuery').mockImplementation(() => getBuilder())
+
+    const path = `http://foo.bar?cursor=${cursor.encode()}`
+    const results = collect([
+      {
+        id: 1,
+        created_at: Carbon.now(),
+        type: 'video',
+        is_published: true
+      },
+      {
+        id: 2,
+        created_at: Carbon.now(),
+        type: 'news',
+        is_published: true
+      }
+    ])
+
+    jest.spyOn(builder, 'get').mockImplementation(async () => {
+      expect(builder.toSql()).toBe(
+        '(select "id", "is_published", "start_time" as "created_at", \'video\' as type from "videos" where "is_published" = ? and ("start_time" > ?)) union (select "id", "is_published", "created_at", \'news\' as type from "news" where "is_published" = ? and ("created_at" > ?)) order by case when (id = 3 and type="news" then 0 else 1 end), "created_at" asc limit 17'
+      )
+      expect(builder.getRawBindings().where).toEqual([true, ts])
+      expect(builder.getRawBindings().union).toEqual([true, ts])
+
+      return results
+    })
+
+    Paginator.currentPathResolver(() => path)
+
+    const result = await builder.cursorPaginate(
+      perPage,
+      columns,
+      cursorName,
+      cursor
+    )
+
+    expect(result).toEqual(
+      new CursorPaginator(results, perPage, cursor, {
+        path,
+        cursorName,
+        parameters: ['created_at']
+      })
+    )
+  })
+
+  test('testCursorPaginateWithUnionWheresReverseOrder', async () => {
+    const ts = '2024-01-15 12:00:00'
+    const perPage = 16
+    const columns = ['test']
+    const cursorName = 'cursor-name'
+    const cursor = new Cursor({ created_at: ts }, false)
+    const builder = getMockQueryBuilder()
+    builder
+      .select('id', 'start_time as created_at')
+      .selectRaw("'video' as type")
+      .from('videos')
+    builder.union(
+      getBuilder()
+        .select('id', 'created_at')
+        .selectRaw("'news' as type")
+        .from('news')
+    )
+    builder.orderBy('created_at')
+    jest.spyOn(builder, 'newQuery').mockImplementation(() => getBuilder())
+
+    const path = `http://foo.bar?cursor=${cursor.encode()}`
+    const results = collect([
+      { id: 1, created_at: Carbon.now(), type: 'video' },
+      { id: 2, created_at: Carbon.now(), type: 'news' }
+    ])
+
+    jest.spyOn(builder, 'get').mockImplementation(async () => {
+      expect(builder.toSql()).toBe(
+        '(select "id", "start_time" as "created_at", \'video\' as type from "videos" where ("start_time" < ?)) union (select "id", "created_at", \'news\' as type from "news" where ("created_at" < ?)) order by "created_at" desc limit 17'
+      )
+      expect(builder.getRawBindings().where).toEqual([ts])
+      expect(builder.getRawBindings().union).toEqual([ts])
+
+      return results
+    })
+
+    Paginator.currentPathResolver(() => path)
+
+    const result = await builder.cursorPaginate(
+      perPage,
+      columns,
+      cursorName,
+      cursor
+    )
+
+    expect(result).toEqual(
+      new CursorPaginator(results, perPage, cursor, {
+        path,
+        cursorName,
+        parameters: ['created_at']
+      })
+    )
+  })
+
+  test('testCursorPaginateWithUnionWheresMultipleOrders', async () => {
+    const ts = '2024-01-15 12:00:00'
+    const perPage = 16
+    const columns = ['test']
+    const cursorName = 'cursor-name'
+    const cursor = new Cursor({ created_at: ts, id: 1 })
+    const builder = getMockQueryBuilder()
+    builder
+      .select('id', 'start_time as created_at')
+      .selectRaw("'video' as type")
+      .from('videos')
+    builder.union(
+      getBuilder()
+        .select('id', 'created_at')
+        .selectRaw("'news' as type")
+        .from('news')
+    )
+    builder.orderByDesc('created_at').orderBy('id')
+    jest.spyOn(builder, 'newQuery').mockImplementation(() => getBuilder())
+
+    const path = `http://foo.bar?cursor=${cursor.encode()}`
+    const results = collect([
+      { id: 1, created_at: Carbon.now(), type: 'video' },
+      { id: 2, created_at: Carbon.now(), type: 'news' }
+    ])
+
+    jest.spyOn(builder, 'get').mockImplementation(async () => {
+      expect(builder.toSql()).toBe(
+        '(select "id", "start_time" as "created_at", \'video\' as type from "videos" where ("start_time" < ? or ("start_time" = ? and ("id" > ?)))) union (select "id", "created_at", \'news\' as type from "news" where ("created_at" < ? or ("created_at" = ? and ("id" > ?)))) order by "created_at" desc, "id" asc limit 17'
+      )
+      expect(builder.getRawBindings().where).toEqual([ts, ts, 1])
+      expect(builder.getRawBindings().union).toEqual([ts, ts, 1])
+
+      return results
+    })
+
+    Paginator.currentPathResolver(() => path)
+
+    const result = await builder.cursorPaginate(
+      perPage,
+      columns,
+      cursorName,
+      cursor
+    )
+
+    expect(result).toEqual(
+      new CursorPaginator(results, perPage, cursor, {
+        path,
+        cursorName,
+        parameters: ['created_at', 'id']
+      })
+    )
+  })
+
+  test('testCursorPaginateWithUnionWheresAndAliassedOrderColumns', async () => {
+    const ts = '2024-01-15 12:00:00'
+    const perPage = 16
+    const columns = ['test']
+    const cursorName = 'cursor-name'
+    const cursor = new Cursor({ created_at: ts })
+    const builder = getMockQueryBuilder()
+    builder
+      .select('id', 'start_time as created_at')
+      .selectRaw("'video' as type")
+      .from('videos')
+    builder.union(
+      getBuilder()
+        .select('id', 'created_at')
+        .selectRaw("'news' as type")
+        .from('news')
+    )
+    builder.union(
+      getBuilder()
+        .select('id', 'init_at as created_at')
+        .selectRaw("'podcast' as type")
+        .from('podcasts')
+    )
+    builder.orderBy('created_at')
+    jest.spyOn(builder, 'newQuery').mockImplementation(() => getBuilder())
+
+    const path = `http://foo.bar?cursor=${cursor.encode()}`
+    const results = collect([
+      { id: 1, created_at: Carbon.now(), type: 'video' },
+      { id: 2, created_at: Carbon.now(), type: 'news' },
+      { id: 3, created_at: Carbon.now(), type: 'podcast' }
+    ])
+
+    jest.spyOn(builder, 'get').mockImplementation(async () => {
+      expect(builder.toSql()).toBe(
+        '(select "id", "start_time" as "created_at", \'video\' as type from "videos" where ("start_time" > ?)) union (select "id", "created_at", \'news\' as type from "news" where ("created_at" > ?)) union (select "id", "init_at" as "created_at", \'podcast\' as type from "podcasts" where ("init_at" > ?)) order by "created_at" asc limit 17'
+      )
+      expect(builder.getRawBindings().where).toEqual([ts])
+      expect(builder.getRawBindings().union).toEqual([ts, ts])
+
+      return results
+    })
+
+    Paginator.currentPathResolver(() => path)
+
+    const result = await builder.cursorPaginate(
+      perPage,
+      columns,
+      cursorName,
+      cursor
+    )
+
+    expect(result).toEqual(
+      new CursorPaginator(results, perPage, cursor, {
+        path,
+        cursorName,
+        parameters: ['created_at']
+      })
+    )
+  })
+
+  test('testWhereExpression', () => {
+    const builder = getBuilder()
+    builder.select('*').from('orders').where(
+      new (class extends ConditionExpression {
+        public override getValue (): string {
+          return '1 = 1'
+        }
+      })('')
+    )
+
+    expect(builder.toSql()).toBe('select * from "orders" where 1 = 1')
+    expect(builder.getBindings()).toEqual([])
+  })
+
+  test('testWhereRowValues', () => {
+    let builder = getBuilder()
+    builder
+      .select('*')
+      .from('orders')
+      .whereRowValues(['last_update', 'order_number'], '<', [1, 2])
+    expect(builder.toSql()).toBe(
+      'select * from "orders" where ("last_update", "order_number") < (?, ?)'
+    )
+
+    builder = getBuilder()
+    builder
+      .select('*')
+      .from('orders')
+      .where('company_id', 1)
+      .orWhereRowValues(['last_update', 'order_number'], '<', [1, 2])
+    expect(builder.toSql()).toBe(
+      'select * from "orders" where "company_id" = ? or ("last_update", "order_number") < (?, ?)'
+    )
+
+    builder = getBuilder()
+    builder
+      .select('*')
+      .from('orders')
+      .whereRowValues(['last_update', 'order_number'], '<', [1, new Raw('2')])
+    expect(builder.toSql()).toBe(
+      'select * from "orders" where ("last_update", "order_number") < (?, 2)'
+    )
+    expect(builder.getBindings()).toEqual([1])
+  })
+
+  test('testWhereRowValuesArityMismatch', () => {
+    const builder = getBuilder()
+
+    expect(() => {
+      builder
+        .select('*')
+        .from('orders')
+        .whereRowValues(['last_update'], '<', [1, 2])
+    }).toThrow(
+      'InvalidArgumentException: The number of columns must match the number of values'
+    )
+  })
+
+  test('testWhereJsonContainsMySql', () => {
+    let builder = getMySqlBuilder()
+    builder.select('*').from('users').whereJsonContains('options', ['en'])
+    expect(builder.toSql()).toBe(
+      'select * from `users` where json_contains(`options`, ?)'
+    )
+    expect(builder.getBindings()).toEqual(['["en"]'])
+
+    builder = getMySqlBuilder()
+    builder
+      .select('*')
+      .from('users')
+      .whereJsonContains('users.options->languages', ['en'])
+    expect(builder.toSql()).toBe(
+      'select * from `users` where json_contains(`users`.`options`, ?, \'$."languages"\')'
+    )
+    expect(builder.getBindings()).toEqual(['["en"]'])
+
+    builder = getMySqlBuilder()
+    builder
+      .select('*')
+      .from('users')
+      .where('id', '=', 1)
+      .orWhereJsonContains('options->languages', new Raw('\'["en"]\''))
+    expect(builder.toSql()).toBe(
+      'select * from `users` where `id` = ? or json_contains(`options`, \'["en"]\', \'$."languages"\')'
+    )
+    expect(builder.getBindings()).toEqual([1])
+  })
+
+  test('testWhereJsonOverlapsMySql', () => {
+    let builder = getMySqlBuilder()
+    builder
+      .select('*')
+      .from('users')
+      .whereJsonOverlaps('options', ['en', 'fr'])
+    expect(builder.toSql()).toBe(
+      'select * from `users` where json_overlaps(`options`, ?)'
+    )
+    expect(builder.getBindings()).toEqual(['["en","fr"]'])
+
+    builder = getMySqlBuilder()
+    builder
+      .select('*')
+      .from('users')
+      .whereJsonOverlaps('users.options->languages', ['en', 'fr'])
+    expect(builder.toSql()).toBe(
+      'select * from `users` where json_overlaps(`users`.`options`, ?, \'$."languages"\')'
+    )
+    expect(builder.getBindings()).toEqual(['["en","fr"]'])
+
+    builder = getMySqlBuilder()
+    builder
+      .select('*')
+      .from('users')
+      .where('id', '=', 1)
+      .orWhereJsonOverlaps('options->languages', new Raw('\'["en", "fr"]\''))
+    expect(builder.toSql()).toBe(
+      'select * from `users` where `id` = ? or json_overlaps(`options`, \'["en", "fr"]\', \'$."languages"\')'
+    )
+    expect(builder.getBindings()).toEqual([1])
+  })
+
+  test('testWhereJsonContainsPostgres', () => {
+    let builder = getPostgresBuilder()
+    builder.select('*').from('users').whereJsonContains('options', ['en'])
+    expect(builder.toSql()).toBe(
+      'select * from "users" where ("options")::jsonb @> ?'
+    )
+    expect(builder.getBindings()).toEqual(['["en"]'])
+
+    builder = getPostgresBuilder()
+    builder
+      .select('*')
+      .from('users')
+      .whereJsonContains('users.options->languages', ['en'])
+    expect(builder.toSql()).toBe(
+      'select * from "users" where ("users"."options"->\'languages\')::jsonb @> ?'
+    )
+    expect(builder.getBindings()).toEqual(['["en"]'])
+
+    builder = getPostgresBuilder()
+    builder
+      .select('*')
+      .from('users')
+      .where('id', '=', 1)
+      .orWhereJsonContains('options->languages', new Raw('\'["en"]\''))
+    expect(builder.toSql()).toBe(
+      'select * from "users" where "id" = ? or ("options"->\'languages\')::jsonb @> \'["en"]\''
+    )
+    expect(builder.getBindings()).toEqual([1])
+  })
+
+  test('testWhereJsonContainsSqlite', () => {
+    let builder = getSQLiteBuilder()
+    builder.select('*').from('users').whereJsonContains('options', 'en').toSql()
+    expect(builder.toSql()).toBe(
+      'select * from "users" where exists (select 1 from json_each("options") where "json_each"."value" is ?)'
+    )
+    expect(builder.getBindings()).toEqual(['en'])
+
+    builder = getSQLiteBuilder()
+    builder
+      .select('*')
+      .from('users')
+      .whereJsonContains('users.options->language', 'en')
+      .toSql()
+    expect(builder.toSql()).toBe(
+      'select * from "users" where exists (select 1 from json_each("users"."options", \'$."language"\') where "json_each"."value" is ?)'
+    )
+    expect(builder.getBindings()).toEqual(['en'])
+  })
+
+  test('testWhereJsonContainsSqlServer', () => {
+    let builder = getSqlServerBuilder()
+    builder.select('*').from('users').whereJsonContains('options', true)
+    expect(builder.toSql()).toBe(
+      'select * from [users] where ? in (select [value] from openjson([options]))'
+    )
+    expect(builder.getBindings()).toEqual(['true'])
+
+    builder = getSqlServerBuilder()
+    builder
+      .select('*')
+      .from('users')
+      .whereJsonContains('users.options->languages', 'en')
+    expect(builder.toSql()).toBe(
+      'select * from [users] where ? in (select [value] from openjson([users].[options], \'$."languages"\'))'
+    )
+    expect(builder.getBindings()).toEqual(['en'])
+
+    builder = getSqlServerBuilder()
+    builder
+      .select('*')
+      .from('users')
+      .where('id', '=', 1)
+      .orWhereJsonContains('options->languages', new Raw("'en'"))
+    expect(builder.toSql()).toBe(
+      'select * from [users] where [id] = ? or \'en\' in (select [value] from openjson([options], \'$."languages"\'))'
+    )
+    expect(builder.getBindings()).toEqual([1])
+  })
+
+  test('testWhereJsonDoesntContainMySql', () => {
+    let builder = getMySqlBuilder()
+    builder
+      .select('*')
+      .from('users')
+      .whereJsonDoesntContain('options->languages', ['en'])
+    expect(builder.toSql()).toBe(
+      'select * from `users` where not json_contains(`options`, ?, \'$."languages"\')'
+    )
+    expect(builder.getBindings()).toEqual(['["en"]'])
+
+    builder = getMySqlBuilder()
+    builder
+      .select('*')
+      .from('users')
+      .where('id', '=', 1)
+      .orWhereJsonDoesntContain('options->languages', new Raw('\'["en"]\''))
+    expect(builder.toSql()).toBe(
+      'select * from `users` where `id` = ? or not json_contains(`options`, \'["en"]\', \'$."languages"\')'
+    )
+    expect(builder.getBindings()).toEqual([1])
+  })
+
+  test('testWhereJsonDoesntOverlapMySql', () => {
+    let builder = getMySqlBuilder()
+    builder
+      .select('*')
+      .from('users')
+      .whereJsonDoesntOverlap('options->languages', ['en', 'fr'])
+    expect(builder.toSql()).toBe(
+      'select * from `users` where not json_overlaps(`options`, ?, \'$."languages"\')'
+    )
+    expect(builder.getBindings()).toEqual(['["en","fr"]'])
+
+    builder = getMySqlBuilder()
+    builder
+      .select('*')
+      .from('users')
+      .where('id', '=', 1)
+      .orWhereJsonDoesntOverlap(
+        'options->languages',
+        new Raw('\'["en", "fr"]\'')
+      )
+    expect(builder.toSql()).toBe(
+      'select * from `users` where `id` = ? or not json_overlaps(`options`, \'["en", "fr"]\', \'$."languages"\')'
+    )
+    expect(builder.getBindings()).toEqual([1])
+  })
+
+  test('testWhereJsonDoesntContainPostgres', () => {
+    let builder = getPostgresBuilder()
+    builder
+      .select('*')
+      .from('users')
+      .whereJsonDoesntContain('options->languages', ['en'])
+    expect(builder.toSql()).toBe(
+      'select * from "users" where not ("options"->\'languages\')::jsonb @> ?'
+    )
+    expect(builder.getBindings()).toEqual(['["en"]'])
+
+    builder = getPostgresBuilder()
+    builder
+      .select('*')
+      .from('users')
+      .where('id', '=', 1)
+      .orWhereJsonDoesntContain('options->languages', new Raw('\'["en"]\''))
+    expect(builder.toSql()).toBe(
+      'select * from "users" where "id" = ? or not ("options"->\'languages\')::jsonb @> \'["en"]\''
+    )
+    expect(builder.getBindings()).toEqual([1])
+  })
+
+  test('testWhereJsonDoesntContainSqlite', () => {
+    let builder = getSQLiteBuilder()
+    builder.select('*').from('users').whereJsonDoesntContain('options', 'en').toSql()
+    expect(builder.toSql()).toBe(
+      'select * from "users" where not exists (select 1 from json_each("options") where "json_each"."value" is ?)'
+    )
+    expect(builder.getBindings()).toEqual(['en'])
+
+    builder = getSQLiteBuilder()
+    builder
+      .select('*')
+      .from('users')
+      .whereJsonDoesntContain('users.options->language', 'en')
+      .toSql()
+    expect(builder.toSql()).toBe(
+      'select * from "users" where not exists (select 1 from json_each("users"."options", \'$."language"\') where "json_each"."value" is ?)'
+    )
+    expect(builder.getBindings()).toEqual(['en'])
+  })
+
+  test('testWhereJsonDoesntContainSqlServer', () => {
+    let builder = getSqlServerBuilder()
+    builder.select('*').from('users').whereJsonDoesntContain('options->languages', 'en')
+    expect(builder.toSql()).toBe(
+      'select * from [users] where not ? in (select [value] from openjson([options], \'$."languages"\'))'
+    )
+    expect(builder.getBindings()).toEqual(['en'])
+
+    builder = getSqlServerBuilder()
+    builder
+      .select('*')
+      .from('users')
+      .where('id', '=', 1)
+      .orWhereJsonDoesntContain('options->languages', new Raw("'en'"))
+    expect(builder.toSql()).toBe(
+      'select * from [users] where [id] = ? or not \'en\' in (select [value] from openjson([options], \'$."languages"\'))'
+    )
+    expect(builder.getBindings()).toEqual([1])
+  })
+
+  test('testWhereJsonContainsKeyMySql', () => {
+    let builder = getMySqlBuilder()
+    builder.select('*').from('users').whereJsonContainsKey('users.options->languages')
+    expect(builder.toSql()).toBe(
+      'select * from `users` where ifnull(json_contains_path(`users`.`options`, \'one\', \'$."languages"\'), 0)'
+    )
+
+    builder = getMySqlBuilder()
+    builder.select('*').from('users').whereJsonContainsKey('options->language->primary')
+    expect(builder.toSql()).toBe(
+      'select * from `users` where ifnull(json_contains_path(`options`, \'one\', \'$."language"."primary"\'), 0)'
+    )
+
+    builder = getMySqlBuilder()
+    builder
+      .select('*')
+      .from('users')
+      .where('id', '=', 1)
+      .orWhereJsonContainsKey('options->languages')
+    expect(builder.toSql()).toBe(
+      'select * from `users` where `id` = ? or ifnull(json_contains_path(`options`, \'one\', \'$."languages"\'), 0)'
+    )
+
+    builder = getMySqlBuilder()
+    builder.select('*').from('users').whereJsonContainsKey('options->languages[0][1]')
+    expect(builder.toSql()).toBe(
+      'select * from `users` where ifnull(json_contains_path(`options`, \'one\', \'$."languages"[0][1]\'), 0)'
+    )
+  })
+
+  test('testWhereJsonContainsKeyPostgres', () => {
+    let builder = getPostgresBuilder()
+    builder.select('*').from('users').whereJsonContainsKey('users.options->languages')
+    expect(builder.toSql()).toBe(
+      'select * from "users" where coalesce(("users"."options")::jsonb ?? \'languages\', false)'
+    )
+
+    builder = getPostgresBuilder()
+    builder.select('*').from('users').whereJsonContainsKey('options->language->primary')
+    expect(builder.toSql()).toBe(
+      'select * from "users" where coalesce(("options"->\'language\')::jsonb ?? \'primary\', false)'
+    )
+
+    builder = getPostgresBuilder()
+    builder
+      .select('*')
+      .from('users')
+      .where('id', '=', 1)
+      .orWhereJsonContainsKey('options->languages')
+    expect(builder.toSql()).toBe(
+      'select * from "users" where "id" = ? or coalesce(("options")::jsonb ?? \'languages\', false)'
+    )
+
+    builder = getPostgresBuilder()
+    builder.select('*').from('users').whereJsonContainsKey('options->languages[0][1]')
+    expect(builder.toSql()).toBe(
+      'select * from "users" where case when jsonb_typeof(("options"->\'languages\'->0)::jsonb) = \'array\' then jsonb_array_length(("options"->\'languages\'->0)::jsonb) >= 2 else false end'
+    )
+
+    builder = getPostgresBuilder()
+    builder.select('*').from('users').whereJsonContainsKey('options->languages[-1]')
+    expect(builder.toSql()).toBe(
+      'select * from "users" where case when jsonb_typeof(("options"->\'languages\')::jsonb) = \'array\' then jsonb_array_length(("options"->\'languages\')::jsonb) >= 1 else false end'
+    )
+  })
+
+  test('testWhereJsonContainsKeySqlite', () => {
+    let builder = getSQLiteBuilder()
+    builder.select('*').from('users').whereJsonContainsKey('users.options->languages')
+    expect(builder.toSql()).toBe(
+      'select * from "users" where json_type("users"."options", \'$."languages"\') is not null'
+    )
+
+    builder = getSQLiteBuilder()
+    builder.select('*').from('users').whereJsonContainsKey('options->language->primary')
+    expect(builder.toSql()).toBe(
+      'select * from "users" where json_type("options", \'$."language"."primary"\') is not null'
+    )
+
+    builder = getSQLiteBuilder()
+    builder
+      .select('*')
+      .from('users')
+      .where('id', '=', 1)
+      .orWhereJsonContainsKey('options->languages')
+    expect(builder.toSql()).toBe(
+      'select * from "users" where "id" = ? or json_type("options", \'$."languages"\') is not null'
+    )
+
+    builder = getSQLiteBuilder()
+    builder.select('*').from('users').whereJsonContainsKey('options->languages[0][1]')
+    expect(builder.toSql()).toBe(
+      'select * from "users" where json_type("options", \'$."languages"[0][1]\') is not null'
+    )
+  })
+
+  test('testWhereJsonContainsKeySqlServer', () => {
+    let builder = getSqlServerBuilder()
+    builder.select('*').from('users').whereJsonContainsKey('users.options->languages')
+    expect(builder.toSql()).toBe(
+      'select * from [users] where \'languages\' in (select [key] from openjson([users].[options]))'
+    )
+
+    builder = getSqlServerBuilder()
+    builder.select('*').from('users').whereJsonContainsKey('options->language->primary')
+    expect(builder.toSql()).toBe(
+      'select * from [users] where \'primary\' in (select [key] from openjson([options], \'$."language"\'))'
+    )
+
+    builder = getSqlServerBuilder()
+    builder
+      .select('*')
+      .from('users')
+      .where('id', '=', 1)
+      .orWhereJsonContainsKey('options->languages')
+    expect(builder.toSql()).toBe(
+      'select * from [users] where [id] = ? or \'languages\' in (select [key] from openjson([options]))'
+    )
+
+    builder = getSqlServerBuilder()
+    builder.select('*').from('users').whereJsonContainsKey('options->languages[0][1]')
+    expect(builder.toSql()).toBe(
+      'select * from [users] where 1 in (select [key] from openjson([options], \'$."languages"[0]\'))'
+    )
+  })
+
+  test('testWhereJsonDoesntContainKeyMySql', () => {
+    let builder = getMySqlBuilder()
+    builder.select('*').from('users').whereJsonDoesntContainKey('options->languages')
+    expect(builder.toSql()).toBe(
+      'select * from `users` where not ifnull(json_contains_path(`options`, \'one\', \'$."languages"\'), 0)'
+    )
+
+    builder = getMySqlBuilder()
+    builder
+      .select('*')
+      .from('users')
+      .where('id', '=', 1)
+      .orWhereJsonDoesntContainKey('options->languages')
+    expect(builder.toSql()).toBe(
+      'select * from `users` where `id` = ? or not ifnull(json_contains_path(`options`, \'one\', \'$."languages"\'), 0)'
+    )
+
+    builder = getMySqlBuilder()
+    builder.select('*').from('users').whereJsonDoesntContainKey('options->languages[0][1]')
+    expect(builder.toSql()).toBe(
+      'select * from `users` where not ifnull(json_contains_path(`options`, \'one\', \'$."languages"[0][1]\'), 0)'
+    )
+  })
+
+  test('testWhereJsonDoesntContainKeyPostgres', () => {
+    let builder = getPostgresBuilder()
+    builder.select('*').from('users').whereJsonDoesntContainKey('options->languages')
+    expect(builder.toSql()).toBe(
+      'select * from "users" where not coalesce(("options")::jsonb ?? \'languages\', false)'
+    )
+
+    builder = getPostgresBuilder()
+    builder
+      .select('*')
+      .from('users')
+      .where('id', '=', 1)
+      .orWhereJsonDoesntContainKey('options->languages')
+    expect(builder.toSql()).toBe(
+      'select * from "users" where "id" = ? or not coalesce(("options")::jsonb ?? \'languages\', false)'
+    )
+
+    builder = getPostgresBuilder()
+    builder.select('*').from('users').whereJsonDoesntContainKey('options->languages[0][1]')
+    expect(builder.toSql()).toBe(
+      'select * from "users" where not case when jsonb_typeof(("options"->\'languages\'->0)::jsonb) = \'array\' then jsonb_array_length(("options"->\'languages\'->0)::jsonb) >= 2 else false end'
+    )
+
+    builder = getPostgresBuilder()
+    builder.select('*').from('users').whereJsonDoesntContainKey('options->languages[-1]')
+    expect(builder.toSql()).toBe(
+      'select * from "users" where not case when jsonb_typeof(("options"->\'languages\')::jsonb) = \'array\' then jsonb_array_length(("options"->\'languages\')::jsonb) >= 1 else false end'
+    )
+  })
+
+  test('testWhereJsonDoesntContainKeySqlite', () => {
+    let builder = getSQLiteBuilder()
+    builder.select('*').from('users').whereJsonDoesntContainKey('options->languages')
+    expect(builder.toSql()).toBe(
+      'select * from "users" where not json_type("options", \'$."languages"\') is not null'
+    )
+
+    builder = getSQLiteBuilder()
+    builder
+      .select('*')
+      .from('users')
+      .where('id', '=', 1)
+      .orWhereJsonDoesntContainKey('options->languages')
+    expect(builder.toSql()).toBe(
+      'select * from "users" where "id" = ? or not json_type("options", \'$."languages"\') is not null'
+    )
+
+    builder = getSQLiteBuilder()
+    builder
+      .select('*')
+      .from('users')
+      .where('id', '=', 1)
+      .orWhereJsonDoesntContainKey('options->languages[0][1]')
+    expect(builder.toSql()).toBe(
+      'select * from "users" where "id" = ? or not json_type("options", \'$."languages"[0][1]\') is not null'
+    )
+  })
+
+  test('testWhereJsonDoesntContainKeySqlServer', () => {
+    let builder = getSqlServerBuilder()
+    builder.select('*').from('users').whereJsonDoesntContainKey('options->languages')
+    expect(builder.toSql()).toBe(
+      'select * from [users] where not \'languages\' in (select [key] from openjson([options]))'
+    )
+
+    builder = getSqlServerBuilder()
+    builder
+      .select('*')
+      .from('users')
+      .where('id', '=', 1)
+      .orWhereJsonDoesntContainKey('options->languages')
+    expect(builder.toSql()).toBe(
+      'select * from [users] where [id] = ? or not \'languages\' in (select [key] from openjson([options]))'
+    )
+
+    builder = getSqlServerBuilder()
+    builder
+      .select('*')
+      .from('users')
+      .where('id', '=', 1)
+      .orWhereJsonDoesntContainKey('options->languages[0][1]')
+    expect(builder.toSql()).toBe(
+      'select * from [users] where [id] = ? or not 1 in (select [key] from openjson([options], \'$."languages"[0]\'))'
+    )
+  })
+
+  test('testWhereJsonLengthMySql', () => {
+    let builder = getMySqlBuilder()
+    builder.select('*').from('users').whereJsonLength('options', 0)
+    expect(builder.toSql()).toBe(
+      'select * from `users` where json_length(`options`) = ?'
+    )
+    expect(builder.getBindings()).toEqual([0])
+
+    builder = getMySqlBuilder()
+    builder.select('*').from('users').whereJsonLength('users.options->languages', '>', 0)
+    expect(builder.toSql()).toBe(
+      'select * from `users` where json_length(`users`.`options`, \'$."languages"\') > ?'
+    )
+    expect(builder.getBindings()).toEqual([0])
+
+    builder = getMySqlBuilder()
+    builder
+      .select('*')
+      .from('users')
+      .where('id', '=', 1)
+      .orWhereJsonLength('options->languages', new Raw('0'))
+    expect(builder.toSql()).toBe(
+      'select * from `users` where `id` = ? or json_length(`options`, \'$."languages"\') = 0'
+    )
+    expect(builder.getBindings()).toEqual([1])
+
+    builder = getMySqlBuilder()
+    builder
+      .select('*')
+      .from('users')
+      .where('id', '=', 1)
+      .orWhereJsonLength('options->languages', '>', new Raw('0'))
+    expect(builder.toSql()).toBe(
+      'select * from `users` where `id` = ? or json_length(`options`, \'$."languages"\') > 0'
+    )
+    expect(builder.getBindings()).toEqual([1])
+  })
+
+  test('testWhereJsonLengthPostgres', () => {
+    let builder = getPostgresBuilder()
+    builder.select('*').from('users').whereJsonLength('options', 0)
+    expect(builder.toSql()).toBe(
+      'select * from "users" where jsonb_array_length(("options")::jsonb) = ?'
+    )
+    expect(builder.getBindings()).toEqual([0])
+
+    builder = getPostgresBuilder()
+    builder
+      .select('*')
+      .from('users')
+      .whereJsonLength('users.options->languages', '>', 0)
+    expect(builder.toSql()).toBe(
+      'select * from "users" where jsonb_array_length(("users"."options"->\'languages\')::jsonb) > ?'
+    )
+    expect(builder.getBindings()).toEqual([0])
+
+    builder = getPostgresBuilder()
+    builder
+      .select('*')
+      .from('users')
+      .where('id', '=', 1)
+      .orWhereJsonLength('options->languages', new Raw('0'))
+    expect(builder.toSql()).toBe(
+      'select * from "users" where "id" = ? or jsonb_array_length(("options"->\'languages\')::jsonb) = 0'
+    )
+    expect(builder.getBindings()).toEqual([1])
+
+    builder = getPostgresBuilder()
+    builder
+      .select('*')
+      .from('users')
+      .where('id', '=', 1)
+      .orWhereJsonLength('options->languages', '>', new Raw('0'))
+    expect(builder.toSql()).toBe(
+      'select * from "users" where "id" = ? or jsonb_array_length(("options"->\'languages\')::jsonb) > 0'
+    )
+    expect(builder.getBindings()).toEqual([1])
+  })
+
+  test('testWhereJsonLengthSqlite', () => {
+    let builder = getSQLiteBuilder()
+    builder.select('*').from('users').whereJsonLength('options', 0)
+    expect(builder.toSql()).toBe(
+      'select * from "users" where json_array_length("options") = ?'
+    )
+    expect(builder.getBindings()).toEqual([0])
+
+    builder = getSQLiteBuilder()
+    builder.select('*').from('users').whereJsonLength('users.options->languages', '>', 0)
+    expect(builder.toSql()).toBe(
+      'select * from "users" where json_array_length("users"."options", \'$."languages"\') > ?'
+    )
+    expect(builder.getBindings()).toEqual([0])
+
+    builder = getSQLiteBuilder()
+    builder
+      .select('*')
+      .from('users')
+      .where('id', '=', 1)
+      .orWhereJsonLength('options->languages', new Raw('0'))
+    expect(builder.toSql()).toBe(
+      'select * from "users" where "id" = ? or json_array_length("options", \'$."languages"\') = 0'
+    )
+    expect(builder.getBindings()).toEqual([1])
+
+    builder = getSQLiteBuilder()
+    builder
+      .select('*')
+      .from('users')
+      .where('id', '=', 1)
+      .orWhereJsonLength('options->languages', '>', new Raw('0'))
+    expect(builder.toSql()).toBe(
+      'select * from "users" where "id" = ? or json_array_length("options", \'$."languages"\') > 0'
+    )
+    expect(builder.getBindings()).toEqual([1])
+  })
+
+  test('testWhereJsonLengthSqlServer', () => {
+    let builder = getSqlServerBuilder()
+    builder.select('*').from('users').whereJsonLength('options', 0)
+    expect(builder.toSql()).toBe(
+      'select * from [users] where (select count(*) from openjson([options])) = ?'
+    )
+    expect(builder.getBindings()).toEqual([0])
+
+    builder = getSqlServerBuilder()
+    builder.select('*').from('users').whereJsonLength('users.options->languages', '>', 0)
+    expect(builder.toSql()).toBe(
+      'select * from [users] where (select count(*) from openjson([users].[options], \'$."languages"\')) > ?'
+    )
+    expect(builder.getBindings()).toEqual([0])
+
+    builder = getSqlServerBuilder()
+    builder
+      .select('*')
+      .from('users')
+      .where('id', '=', 1)
+      .orWhereJsonLength('options->languages', new Raw('0'))
+    expect(builder.toSql()).toBe(
+      'select * from [users] where [id] = ? or (select count(*) from openjson([options], \'$."languages"\')) = 0'
+    )
+    expect(builder.getBindings()).toEqual([1])
+
+    builder = getSqlServerBuilder()
+    builder
+      .select('*')
+      .from('users')
+      .where('id', '=', 1)
+      .orWhereJsonLength('options->languages', '>', new Raw('0'))
+    expect(builder.toSql()).toBe(
+      'select * from [users] where [id] = ? or (select count(*) from openjson([options], \'$."languages"\')) > 0'
+    )
+    expect(builder.getBindings()).toEqual([1])
+  })
+
+  test('testFrom', () => {
+    let builder = getBuilder()
+    builder.from(getBuilder().from('users'), 'u')
+    expect(builder.toSql()).toBe('select * from (select * from "users") as "u"')
+
+    builder = getBuilder()
+    const eloquentBuilder = new EloquentBuilder(getBuilder())
+    builder.from(eloquentBuilder.from('users'), 'u')
+    expect(builder.toSql()).toBe('select * from (select * from "users") as "u"')
+  })
+
+  test('testFromSub', () => {
+    const builder = getBuilder()
+    builder.fromSub((query) => {
+      query.select(new Raw('max(last_seen_at) as last_seen_at')).from('user_sessions').where('foo', '=', '1')
+    }, 'sessions').where('bar', '<', '10')
+    expect(builder.toSql()).toBe(
+      'select * from (select max(last_seen_at) as last_seen_at from "user_sessions" where "foo" = ?) as "sessions" where "bar" < ?'
+    )
+    expect(builder.getBindings()).toEqual(['1', '10'])
+
+    expect(() => {
+      getBuilder().fromSub(['invalid'] as never, 'sessions').where('bar', '<', '10')
+    }).toThrow('InvalidArgumentException: A subquery must be a query builder instance, a Closure, or a string.')
+  })
+
+  test('testFromSubWithPrefix', () => {
+    const builder = getBuilder('prefix_')
+    builder.fromSub((query) => {
+      query.select(new Raw('max(last_seen_at) as last_seen_at')).from('user_sessions').where('foo', '=', '1')
+    }, 'sessions').where('bar', '<', '10')
+    expect(builder.toSql()).toBe(
+      'select * from (select max(last_seen_at) as last_seen_at from "prefix_user_sessions" where "foo" = ?) as "prefix_sessions" where "bar" < ?'
+    )
+    expect(builder.getBindings()).toEqual(['1', '10'])
+  })
+
+  test('testFromSubWithoutBindings', () => {
+    const builder = getBuilder()
+    builder.fromSub((query) => {
+      query.select(new Raw('max(last_seen_at) as last_seen_at')).from('user_sessions')
+    }, 'sessions')
+    expect(builder.toSql()).toBe(
+      'select * from (select max(last_seen_at) as last_seen_at from "user_sessions") as "sessions"'
+    )
+
+    expect(() => {
+      getBuilder().fromSub(['invalid'] as never, 'sessions')
+    }).toThrow('InvalidArgumentException: A subquery must be a query builder instance, a Closure, or a string.')
+  })
+
+  test('testFromRaw', () => {
+    const builder = getBuilder()
+    builder.fromRaw(new Raw('(select max(last_seen_at) as last_seen_at from "user_sessions") as "sessions"'))
+    expect(builder.toSql()).toBe(
+      'select * from (select max(last_seen_at) as last_seen_at from "user_sessions") as "sessions"'
+    )
+  })
+
+  test('testFromRawOnSqlServer', () => {
+    const builder = getSqlServerBuilder()
+    builder.fromRaw('dbo.[SomeNameWithRoundBrackets (test)]')
+    expect(builder.toSql()).toBe('select * from dbo.[SomeNameWithRoundBrackets (test)]')
+  })
+
+  test('testFromRawWithWhereOnTheMainQuery', () => {
+    const builder = getBuilder()
+    builder
+      .fromRaw(new Raw('(select max(last_seen_at) as last_seen_at from "sessions") as "last_seen_at"'))
+      .where('last_seen_at', '>', '1520652582')
+    expect(builder.toSql()).toBe(
+      'select * from (select max(last_seen_at) as last_seen_at from "sessions") as "last_seen_at" where "last_seen_at" > ?'
+    )
+    expect(builder.getBindings()).toEqual(['1520652582'])
+  })
+
+  test('testFromQuestionMarkOperatorOnPostgres', () => {
+    let builder = getPostgresBuilder()
+    builder.select('*').from('users').where('roles', '?', 'superuser')
+    expect(builder.toSql()).toBe('select * from "users" where "roles" ?? ?')
+
+    builder = getPostgresBuilder()
+    builder.select('*').from('users').where('roles', '?|', 'superuser')
+    expect(builder.toSql()).toBe('select * from "users" where "roles" ??| ?')
+
+    builder = getPostgresBuilder()
+    builder.select('*').from('users').where('roles', '?&', 'superuser')
+    expect(builder.toSql()).toBe('select * from "users" where "roles" ??& ?')
+  })
+
+  test('testWhereColumnQuestionMarkOperatorOnPostgres', () => {
+    let builder = getPostgresBuilder()
+    builder.select('*').from('users').whereColumn('foo', '?', '_foo')
+    expect(builder.toSql()).toBe('select * from "users" where "foo" ?? "_foo"')
+
+    builder = getPostgresBuilder()
+    builder.select('*').from('users').whereColumn('foo', '?|', '_foo')
+    expect(builder.toSql()).toBe('select * from "users" where "foo" ??| "_foo"')
+
+    builder = getPostgresBuilder()
+    builder.select('*').from('users').whereColumn('foo', '?&', '_foo')
+    expect(builder.toSql()).toBe('select * from "users" where "foo" ??& "_foo"')
+  })
+
+  test('testJoinQuestionMarkOperatorOnPostgres', () => {
+    const builder = getPostgresBuilder()
+    builder
+      .select(['countries.*', new Raw('count(users.*) as "users"')])
+      .from('countries')
+      .join('users', 'users.country_codes', '?', 'countries.code')
+    expect(builder.toSql()).toBe(
+      'select "countries".*, count(users.*) as "users" from "countries" inner join "users" on "users"."country_codes" ?? "countries"."code"'
+    )
+  })
+
+  test('testUseIndexMySql', () => {
+    const builder = getMySqlBuilder()
+    builder.select('foo').from('users').useIndex('test_index')
+    expect(builder.toSql()).toBe('select `foo` from `users` use index (test_index)')
+  })
+
+  test('testForceIndexMySql', () => {
+    const builder = getMySqlBuilder()
+    builder.select('foo').from('users').forceIndex('test_index')
+    expect(builder.toSql()).toBe('select `foo` from `users` force index (test_index)')
+  })
+
+  test('testIgnoreIndexMySql', () => {
+    const builder = getMySqlBuilder()
+    builder.select('foo').from('users').ignoreIndex('test_index')
+    expect(builder.toSql()).toBe('select `foo` from `users` ignore index (test_index)')
+  })
+
+  test('testUseIndexSqlite', () => {
+    const builder = getSQLiteBuilder()
+    builder.select('foo').from('users').useIndex('test_index')
+    expect(builder.toSql()).toBe('select "foo" from "users"')
+  })
+
+  test('testForceIndexSqlite', () => {
+    const builder = getSQLiteBuilder()
+    builder.select('foo').from('users').forceIndex('test_index')
+    expect(builder.toSql()).toBe('select "foo" from "users" indexed by test_index')
+  })
+
+  test('testIgnoreIndexSqlite', () => {
+    const builder = getSQLiteBuilder()
+    builder.select('foo').from('users').ignoreIndex('test_index')
+    expect(builder.toSql()).toBe('select "foo" from "users"')
+  })
+
+  test('testUseIndexSqlServer', () => {
+    const builder = getSqlServerBuilder()
+    builder.select('foo').from('users').useIndex('test_index')
+    expect(builder.toSql()).toBe('select [foo] from [users]')
+  })
+
+  test('testForceIndexSqlServer', () => {
+    const builder = getSqlServerBuilder()
+    builder.select('foo').from('users').forceIndex('test_index')
+    expect(builder.toSql()).toBe('select [foo] from [users] with (index([test_index]))')
+  })
+
+  test('testIgnoreIndexSqlServer', () => {
+    const builder = getSqlServerBuilder()
+    builder.select('foo').from('users').ignoreIndex('test_index')
+    expect(builder.toSql()).toBe('select [foo] from [users]')
+  })
+
+  test('testClone', () => {
+    const builder = getBuilder()
+    builder.select('*').from('users')
+    const cloned = builder.clone().where('email', 'foo')
+
+    expect(cloned).not.toBe(builder)
+    expect(builder.toSql()).toBe('select * from "users"')
+    expect(cloned.toSql()).toBe('select * from "users" where "email" = ?')
+  })
+
+  test('testCloneWithout', () => {
+    const builder = getBuilder()
+    builder.select('*').from('users').where('email', 'foo').orderBy('email')
+    const cloned = builder.cloneWithout(['orders'])
+
+    expect(builder.toSql()).toBe('select * from "users" where "email" = ? order by "email" asc')
+    expect(cloned.toSql()).toBe('select * from "users" where "email" = ?')
+  })
+
+  test('testCloneWithoutBindings', () => {
+    const builder = getBuilder()
+    builder.select('*').from('users').where('email', 'foo').orderBy('email')
+    const cloned = builder.cloneWithout(['wheres']).cloneWithoutBindings(['where'])
+
+    expect(builder.toSql()).toBe('select * from "users" where "email" = ? order by "email" asc')
+    expect(builder.getBindings()).toEqual(['foo'])
+
+    expect(cloned.toSql()).toBe('select * from "users" order by "email" asc')
+    expect(cloned.getBindings()).toEqual([])
+  })
+
+  test('testWhereVectorSimilarToOnPostgres', () => {
+    const builder = getPostgresBuilder()
+    builder
+      .select('*')
+      .from('documents')
+      .whereVectorSimilarTo('embedding', [1, 2, 3], 0.4)
+      .limit(10)
+
+    expect(builder.toSql()).toBe(
+      'select * from "documents" where ("embedding" <=> ?) <= ? order by ("embedding" <=> ?) asc limit 10'
+    )
+    expect(builder.getBindings()).toEqual(['[1,2,3]', 0.6, '[1,2,3]'])
+  })
+
+  test('testWhereVectorSimilarToOnMariaDb', () => {
+    const builder = getMariaDbBuilder()
+    builder
+      .select('*')
+      .from('documents')
+      .whereVectorSimilarTo('embedding', [1, 2, 3], 0.4)
+      .limit(10)
+
+    expect(builder.toSql()).toBe(
+      'select * from `documents` where vec_distance_cosine(`embedding`, vec_fromtext(?)) <= ? order by vec_distance_cosine(`embedding`, vec_fromtext(?)) asc limit 10'
+    )
+    expect(builder.getBindings()).toEqual(['[1,2,3]', 0.6, '[1,2,3]'])
+  })
+
+  test('testWhereVectorSimilarToThrowsOnUnsupportedGrammar', () => {
+    const builder = getMySqlBuilder()
+
+    expect(() => {
+      builder.select('*').from('documents').whereVectorSimilarTo('embedding', [1, 2, 3])
+    }).toThrow('RuntimeException: Vector distance queries are only supported by Postgres and MariaDB.')
+  })
+
+  test('testWhereVectorDistanceLessThanOnPostgres', () => {
+    const builder = getPostgresBuilder()
+    builder.select('*').from('documents').whereVectorDistanceLessThan('embedding', [1, 2, 3], 0.5)
+
+    expect(builder.toSql()).toBe('select * from "documents" where ("embedding" <=> ?) <= ?')
+    expect(builder.getBindings()).toEqual(['[1,2,3]', 0.5])
+  })
+
+  test('testWhereVectorDistanceLessThanOnMariaDb', () => {
+    const builder = getMariaDbBuilder()
+    builder.select('*').from('documents').whereVectorDistanceLessThan('embedding', [1, 2, 3], 0.5)
+
+    expect(builder.toSql()).toBe(
+      'select * from `documents` where vec_distance_cosine(`embedding`, vec_fromtext(?)) <= ?'
+    )
+    expect(builder.getBindings()).toEqual(['[1,2,3]', 0.5])
+  })
+
+  test('testOrderByVectorDistanceOnMariaDb', () => {
+    const builder = getMariaDbBuilder()
+    builder.select('*').from('documents').orderByVectorDistance('embedding', [1, 2, 3])
+
+    expect(builder.toSql()).toBe(
+      'select * from `documents` order by vec_distance_cosine(`embedding`, vec_fromtext(?)) asc'
+    )
+    expect(builder.getBindings()).toEqual(['[1,2,3]'])
+  })
+
+  test('testSelectVectorDistanceOnMariaDb', () => {
+    const builder = getMariaDbBuilder()
+    builder.from('documents').selectVectorDistance('embedding', [1, 2, 3])
+
+    expect(builder.toSql()).toBe(
+      'select vec_distance_cosine(`embedding`, vec_fromtext(?)) as `embedding_distance` from `documents`'
+    )
+    expect(builder.getBindings()).toEqual(['[1,2,3]'])
+  })
+
+  test('testToRawSql', () => {
+    const builder = getBuilder()
+    const connection = builder.getConnection()
+    const grammar = builder.getGrammar()
+
+    jest.spyOn(connection, 'prepareBindings').mockImplementation((bindings) => bindings)
+    jest.spyOn(grammar, 'substituteBindingsIntoRawSql').mockReturnValue(
+      'select * from "users" where "email" = \'foo\''
+    )
+
+    builder.select('*').from('users').where('email', 'foo')
+
+    expect(builder.toRawSql()).toBe('select * from "users" where "email" = \'foo\'')
+    expect(connection.prepareBindings).toHaveBeenCalledWith(['foo'])
+    expect(grammar.substituteBindingsIntoRawSql).toHaveBeenCalledWith(
+      'select * from "users" where "email" = ?',
+      ['foo']
+    )
   })
 })

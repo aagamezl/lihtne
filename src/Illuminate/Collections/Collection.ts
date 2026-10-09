@@ -4,7 +4,7 @@ import type { Dictionary } from './types'
 
 import { mixing } from '../Support'
 import { Arr } from './Arr'
-import { EnumeratesValues } from './EnumeratesValues'
+import { EnumeratesValues } from './Traits/EnumeratesValues'
 
 const EMPTY_GLUE = ''
 
@@ -115,6 +115,35 @@ export class Collection<
     // }
 
     return this.items
+  }
+
+  /**
+   * Reverse items order.
+   *
+   * @return static
+   */
+  public reverse (): Collection<TKey, TValue> {
+    return this.newInstance(Array.isArray(this.items) ? this.items.reverse(true) : Object.values(this.items).reverse(true))
+  }
+
+  /**
+   * Count the number of items in the collection.
+   *
+   * @return int<0, max>
+   */
+  public count (): number {
+    return Object.keys(this.items).length
+  }
+
+  /**
+   * Slice the underlying collection array.
+   *
+   * @param  int  $offset
+   * @param  int|null  $length
+   * @return static
+   */
+  public slice (offset: number, length: number | undefined): Collection<TKey, TValue> {
+    return this.newInstance(Array.isArray(this.items) ? this.items.slice(offset, length) : Object.values(this.items).slice(offset, length, true))
   }
 
   /**

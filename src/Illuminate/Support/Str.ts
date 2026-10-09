@@ -21,6 +21,40 @@ export class Str {
   }
 
   /**
+   * Determine if a given string contains a given substring.
+   *
+   * @param  string  $haystack
+   * @param  string|iterable<string>  $needles
+   * @param  bool  $ignoreCase
+   * @return ($needles is array{} ? false : ($haystack is non-empty-string ? bool : false))
+   */
+  public static contains (haystack: string, needles: string | string[], ignoreCase = false): boolean {
+    if (haystack === undefined) {
+      return false
+    }
+
+    if (ignoreCase) {
+      haystack = haystack.toLowerCase()
+    }
+
+    if (!Array.isArray(needles)) {
+      needles = [needles]
+    }
+
+    for (let needle of needles) {
+      if (ignoreCase) {
+        needle = needle.toLowerCase()
+      }
+
+      if (needle !== '' && haystack.includes(needle)) {
+        return true
+      }
+    }
+
+    return false
+  }
+
+  /**
    * Return the remainder of a string after the first occurrence of a given value.
    *
    * @param  string  $subject
