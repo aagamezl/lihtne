@@ -284,8 +284,8 @@ export class BuildsQueries extends Conditionable {
   //   )
   // }
 
-  protected paginator (
-    items: SupportCollection<PropertyKey, unknown>,
+  protected paginator <TValue>(
+    items: SupportCollection<PropertyKey, TValue>,
     total: number,
     perPage: number,
     currentPage: number,

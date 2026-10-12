@@ -1,6 +1,7 @@
 import { isPlainObject } from 'es-toolkit'
 
 import type { Bindings, BindingValues, Builder } from '../Builder'
+import type { Expression } from '../Expression'
 import type { IndexHint } from '../IndexHint'
 
 import { Arr, Collection } from '../../../Collections'
@@ -175,7 +176,7 @@ export class SQLiteGrammar extends Grammar {
     * @param  array  $update
     * @return string
     */
-  public override compileUpsert (query: Builder, values: unknown[], uniqueBy: string | string[], update: unknown[]): string {
+  public override compileUpsert (query: Builder, values: unknown[], uniqueBy: string | string[], update: Array<string | Expression> | Record<string, string | Expression>): string {
     let sql = this.compileInsert(query, values)
 
     sql += ' on conflict (' + this.columnize(uniqueBy) + ') do update set '

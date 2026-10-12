@@ -168,7 +168,7 @@ export type GroupLimit = {
   column: string
 }
 
-export type JoinType = 'inner' | 'left' | 'right' | 'cross'
+export type JoinType = 'inner' | 'left' | 'right' | 'cross' | 'straight_join'
 
 export type QueryCallback = (query: Builder) => unknown
 type JoinCallback = (join: JoinClause) => unknown
@@ -213,7 +213,7 @@ export class Builder extends mixing().useTrait([
   public connection: Connection
 
   // An aggregate function and column to be run.
-  public aggregateProperty: Agregate | undefined = undefined
+  public aggregateProperty: Agregate | undefined
 
   /**
    * The database query post processor instance.
@@ -265,7 +265,7 @@ export class Builder extends mixing().useTrait([
    *
    * @var int|null
    */
-  public limitProperty: number | undefined = undefined
+  public limitProperty: number | undefined
 
   /**
    * The where constraints for the query.
@@ -447,7 +447,7 @@ export class Builder extends mixing().useTrait([
    * @return int
    */
   public insertGetId (
-    values: BindingValues,
+    values: Record<string, unknown>,
     sequence: string | undefined = undefined
   ): number {
     this.applyBeforeQueryCallbacks()
@@ -468,7 +468,7 @@ export class Builder extends mixing().useTrait([
   //  *
   //  * @throws \BadMethodCallException
   //  */
-  public __call (method: string, parameters: unknown[]): unknown {
+  public __call (method: string, parameters: Array<string | number | Expression>): unknown {
     if (this.hasMacro(method)) {
       return this.macroCall(method, parameters)
     }
@@ -671,16 +671,18 @@ export class Builder extends mixing().useTrait([
    *
    * @throws \LogicException
    */
-  public updateFrom (values: Record<string, unknown>): number {
+  public updateFrom (values: Record<string, unknown>): Promise<number> {
     if (!Reflect.has(this.grammar, 'compileUpdateFrom')) {
       throw new Error('LogicException: This database engine does not support the updateFrom method.')
     }
 
     this.applyBeforeQueryCallbacks()
 
+    // @ts-expect-error - compileUpdateFrom is not defined in the grammar
     const sql = this.grammar.compileUpdateFrom(this, values)
 
     return this.connection.update(sql, this.cleanBindings(
+      // @ts-expect-error - prepareBindingsForUpdateFrom is not defined in the grammar
       this.grammar.prepareBindingsForUpdateFrom(this.bindings, values)
     ))
   }
@@ -690,10 +692,10 @@ export class Builder extends mixing().useTrait([
    *
    * @return bool
    */
-  public async updateOrInsert (attributes: Record<string, unknown>, values: BindingValues | (() => BindingValues) = []): Promise<boolean> {
+  public async updateOrInsert (attributes: Record<string, unknown>, values: BindingValues | ((exists: boolean) => BindingValues) = []): Promise<boolean> {
     const exists = await this.where(attributes).exists()
 
-    if (values instanceof Function) {
+    if (typeof values === 'function') {
       values = await values(exists)
     }
 
@@ -714,7 +716,7 @@ export class Builder extends mixing().useTrait([
    * @param  mixed  $id
    * @return int
    */
-  public delete (id?: unknown): number {
+  public delete (id?: string | number | Expression): Promise<number> {
     // If an ID is passed to the method, we will set the where clause to check the
     // ID to let developers to simply and quickly remove a single row from this
     // database without manually specifying the "where" clauses on the query.
@@ -749,7 +751,7 @@ export class Builder extends mixing().useTrait([
    * @return $this
    */
   protected addArrayOfWheres (
-    column: Record<string, unknown>,
+    column: object,
     boolean: WhereBoolean,
     method: 'where' | 'whereColumn' = 'where'
   ): this {
@@ -846,8 +848,8 @@ export class Builder extends mixing().useTrait([
    */
   public having (
     column: Expression | QueryCallback | string,
-    operator: unknown = undefined,
-    value: unknown = undefined,
+    operator: Date | string | number | undefined = undefined,
+    value: Date | string | number | Expression | undefined = undefined,
     boolean: BooleanOperator = 'and'
   ): this {
     let type: HavingClauseType = 'Basic'
@@ -925,8 +927,8 @@ export class Builder extends mixing().useTrait([
    */
   public orHaving (
     column: Expression | string,
-    operator: unknown = undefined,
-    value: unknown = undefined
+    operator: Date | string | number | undefined = undefined,
+    value: Date | string | number | Expression | undefined = undefined
   ): this {
     ;[value, operator] = this.prepareValueAndOperator(
       value,
@@ -947,11 +949,11 @@ export class Builder extends mixing().useTrait([
    * @throws \InvalidArgumentException
    */
   public incrementEach (
-    columns: Record<string, number | string>,
+    columns: Record<string, number | string | Expression>,
     extra: Record<string, unknown> = {}
-  ): number {
+  ): Promise<number> {
     for (const [column, amount] of Object.entries(columns)) {
-      if (!isNumeric(amount)) {
+      if (!isNumeric(amount as PropertyKey)) {
         throw new Error(
           `InvalidArgumentException: Non-numeric value passed as increment amount for column: '${column}'.`
         )
@@ -1110,7 +1112,7 @@ export class Builder extends mixing().useTrait([
    * @param  array  $parameters
    * @return $this
    */
-  public dynamicWhere (method: string, parameters: unknown[]): this {
+  public dynamicWhere (method: string, parameters: Array<string | number | Expression>): this {
     const finder = method.substring(5)
 
     const segments = finder.split(/(And|Or)(?=[A-Z])/)
@@ -1153,7 +1155,7 @@ export class Builder extends mixing().useTrait([
   protected addDynamic (
     segment: string,
     connector: string,
-    parameters: unknown[],
+    parameters: Array<string | number | Expression>,
     index: number
   ): void {
     // Once we have parsed out the columns and formatted the boolean operators we
@@ -1161,7 +1163,7 @@ export class Builder extends mixing().useTrait([
     // clause on the query. Then we'll increment the parameter index values.
     const bool = connector.toLowerCase()
 
-    this.where(snakeCase(segment), '=', parameters[index], bool)
+    this.where(snakeCase(segment), '=', parameters[index], bool as WhereBoolean)
   }
 
   /**
@@ -1208,7 +1210,7 @@ export class Builder extends mixing().useTrait([
     first: string | Expression,
     operator: string | undefined = undefined,
     second: string | Expression | undefined = undefined,
-    type: 'inner' | 'left' | 'right' = 'inner',
+    type: JoinType = 'inner',
     where: boolean = false
   ): this {
     const [subQuery, bindings] = this.createSub(query)
@@ -1272,7 +1274,7 @@ export class Builder extends mixing().useTrait([
    * @return TValue|null
    */
   public async first (
-    columns: string | Expression | string[] = ['*']
+    columns: string | Expression | Array<string | Expression> = ['*']
   ): Promise<Record<string, unknown> | undefined> {
     const result = await this.limit(1).get(columns)
 
@@ -1289,7 +1291,7 @@ export class Builder extends mixing().useTrait([
   public async pluck (
     column: string | Expression,
     key: string | undefined = undefined
-  ): Collection<unknown> {
+  ): Promise<Collection<PropertyKey, unknown>> {
     // First, we will need to select the results of the query accounting for the
     // given columns / key. Once we have the results, we will be able to take
     // the results and get the exact data that was requested for the query.
@@ -1325,7 +1327,7 @@ export class Builder extends mixing().useTrait([
    * @return string|null
    */
   protected stripTableForPluck (
-    column: string | Expression
+    column: string | Expression | undefined
   ): string | undefined {
     if (isNil(column)) {
       return column
@@ -1351,7 +1353,7 @@ export class Builder extends mixing().useTrait([
    */
   protected pluckFromObjectColumn (
     queryResult: Record<string, unknown>[],
-    column: string | Expression,
+    column: string | undefined = undefined,
     key: string | undefined = undefined
   ): Collection<string | number, unknown> {
     const columnName = String(column)
@@ -1381,7 +1383,7 @@ export class Builder extends mixing().useTrait([
   ): Promise<unknown | undefined> {
     const result = await this.selectRaw(expression, bindings).first()
 
-    return !Array.isArray(result) ? Object.values(result)[0] : undefined
+    return !Array.isArray(result) ? Object.values(result as Record<string, unknown>)[0] : undefined
   }
 
   /**
@@ -1395,7 +1397,7 @@ export class Builder extends mixing().useTrait([
   ): Promise<unknown | undefined> {
     const result = await this.first([column])
 
-    return !Array.isArray(result) ? Object.values(result)[0] : undefined
+    return !Array.isArray(result) ? Object.values(result as Record<string, unknown>)[0] : undefined
   }
 
   /**
@@ -1423,19 +1425,19 @@ export class Builder extends mixing().useTrait([
    * @return \Illuminate\Support\Collection
    */
   protected pluckFromArrayColumn (
-    queryResult: unknown[][],
-    column: string | Expression,
+    queryResult: Record<string, unknown>[],
+    column: string | undefined = undefined,
     key: string | null = null
   ): Collection<string | number, unknown> {
     const results: unknown[] = []
 
     if (isNil(key)) {
       for (const row of queryResult) {
-        results.push(row[column])
+        results.push(row[column as string])
       }
     } else {
       for (const row of queryResult) {
-        results[row[key]] = row[column]
+        results[row[key] as number] = row[column as string]
       }
     }
 
@@ -1452,7 +1454,7 @@ export class Builder extends mixing().useTrait([
   public find (
     id: number | string,
     columns: string | Expression | string[] = ['*']
-  ): Record<string, unknown> | null {
+  ): Promise<Record<string, unknown> | undefined> {
     return this.where('id', '=', id).first(columns)
   }
 
@@ -1483,7 +1485,7 @@ export class Builder extends mixing().useTrait([
       return data
     }
 
-    return callback()
+    return callback!()
   }
 
   /**
@@ -1625,8 +1627,8 @@ export class Builder extends mixing().useTrait([
     table: string,
     first: string | Expression,
     operator: string,
-    second: string | Expression,
-    type: 'inner' | 'left' = 'inner'
+    second: string | Expression | undefined = undefined,
+    type: JoinType = 'inner'
   ): this {
     return this.join(table, first, operator, second, type, true)
   }
@@ -1679,8 +1681,8 @@ export class Builder extends mixing().useTrait([
   public upsert (
     values: unknown[],
     uniqueBy: string | string[],
-    update?: unknown[]
-  ): Promise<number> {
+    update?: Array<string | Expression> | Record<string, string | Expression>
+  ): number | boolean | Promise<number | boolean> {
     if (uniqueBy.length === 0 || uniqueBy === '') {
       throw new Error('InvalidArgumentException: The unique columns must not be empty.')
     }
@@ -1700,9 +1702,9 @@ export class Builder extends mixing().useTrait([
 
       //   values[key] = value
       // }
-      for (const [key, value] of typedEntries(values)) {
+      for (const [key, value] of typedEntries(values as Record<number, Record<string, unknown>>)) {
         const sortedKeys = Object.keys(value).sort()
-        const sortedValue = {}
+        const sortedValue: Record<string, unknown> = {}
 
         for (const key of sortedKeys) {
           sortedValue[key] = value[key]
@@ -1713,16 +1715,18 @@ export class Builder extends mixing().useTrait([
     }
 
     if (update === undefined) {
-      update = Object.keys(head(values))
+      update = Object.keys(head(values) as Record<string, unknown>)
     }
 
     this.applyBeforeQueryCallbacks()
 
     const bindings = this.cleanBindings([
       ...Arr.flatten(values, 1),
-      ...(new Collection(update))
-        .reject((value: unknown, key: number) => typeof key === 'number')
-        .all()
+      ...(new Collection(update)
+      // @ts-expect-error - value is not used
+
+        .reject((value: string | Expression, key: PropertyKey) => typeof key === 'number')
+        .all() as unknown[])
     ])
 
     return this.connection.affectingStatement(
@@ -1762,7 +1766,7 @@ export class Builder extends mixing().useTrait([
    * @return \Illuminate\Contracts\Database\Query\Expression
    */
   public raw (value: string | number | Expression): Expression {
-    return this.connection.raw(value)
+    return this.connection.raw(value as string | number)
   }
 
   /**
@@ -2335,15 +2339,15 @@ export class Builder extends mixing().useTrait([
   public async exists (): Promise<boolean> {
     this.applyBeforeQueryCallbacks()
 
-    const results = await this.connection.select(
-      this.grammar.compileExists(this),
+    const results = await this.connection.select<{ exists: boolean }>(
+    this.grammar.compileExists(this),
       this.getBindings()
     )
 
     // If the results have rows, we will get the row and see if the exists column is a
     // boolean true. If there are no results for this query we will return false as
     // there are no rows for this query at all, and we can return that info here.
-    if (results.length > 0) {
+    if (Object.keys(results).length > 0) {
       const result = results[0]
 
       return Boolean(result.exists)
@@ -2358,7 +2362,7 @@ export class Builder extends mixing().useTrait([
    * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
    * @return mixed
    */
-  public async min (column: Expression | string): Promise<number> {
+  public async min (column: Expression | string): Promise<unknown> {
     return this.aggregate('min', [column])
   }
 
@@ -2368,7 +2372,7 @@ export class Builder extends mixing().useTrait([
    * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
    * @return mixed
    */
-  public async max (column: Expression | string): Promise<number> {
+  public async max (column: Expression | string): Promise<unknown> {
     return this.aggregate('max', [column])
   }
 
@@ -2390,7 +2394,7 @@ export class Builder extends mixing().useTrait([
    * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
    * @return mixed
    */
-  public async avg (column: Expression | string): Promise<number> {
+  public async avg (column: Expression | string): Promise<unknown> {
     return this.aggregate('avg', [column])
   }
 
@@ -2400,7 +2404,7 @@ export class Builder extends mixing().useTrait([
    * @param  \Illuminate\Contracts\Database\Query\Expression|string  $column
    * @return mixed
    */
-  public async average (column: Expression | string): Promise<number> {
+  public async average (column: Expression | string): Promise<unknown> {
     return this.avg(column)
   }
 
@@ -2420,7 +2424,7 @@ export class Builder extends mixing().useTrait([
    *
    * @return mixed
    */
-  public async existsOr (callback: () => Promise<unknown>): Promise<boolean> {
+  public async existsOr (callback: () => Promise<unknown>): Promise<unknown> {
     const exists = await this.exists()
 
     if (exists) {
@@ -2437,7 +2441,7 @@ export class Builder extends mixing().useTrait([
    */
   public async doesntExistOr (
     callback: () => Promise<unknown>
-  ): Promise<boolean> {
+  ): Promise<unknown> {
     const doesntExist = await this.doesntExist()
 
     if (doesntExist) {
@@ -2841,7 +2845,7 @@ export class Builder extends mixing().useTrait([
    * @return $this
    */
   public fromRaw (expression: string | Expression, bindings: BindingValues = []) {
-    this.fromProperty = new Expression(expression)
+    this.fromProperty = new Expression(expression as string | number)
 
     this.addBinding(bindings, 'from')
 
@@ -3226,7 +3230,7 @@ export class Builder extends mixing().useTrait([
    * @return \Illuminate\Pagination\LengthAwarePaginator
    */
   public async paginate (
-    perPage: number | ((total: number) => number) = 15,
+    perPage: number | ((...args: PropertyKey[]) => number) = 15,
     columns: string[] = ['*'],
     pageName: string = 'page',
     page: number | undefined = undefined,
@@ -3238,7 +3242,9 @@ export class Builder extends mixing().useTrait([
 
     perPage = getValue(perPage, total)
 
-    const results = total ? await this.forPage(page, perPage).get(columns) : new Collection()
+    const results = total
+      ? await this.forPage(page, perPage).get(columns)
+      : new Collection<PropertyKey, Record<string, unknown>>()
 
     return this.paginator(results, total, perPage, page, {
       path: Paginator.resolveCurrentPath(),
@@ -3299,12 +3305,12 @@ export class Builder extends mixing().useTrait([
    * @param  array  $bindings
    * @return $this
    */
-  public mergeWheres (wheres: WhereClause[], bindings: Record<number, unknown> | unknown[]): this {
+  public mergeWheres (wheres: WhereClause[], bindings: BindingValues): this {
     this.wheres = [...this.wheres, ...wheres]
 
     this.bindings.where = [
       ...this.bindings.where,
-      ...Object.values(bindings as Record<number, unknown>)
+      ...Object.values(bindings)
     ]
 
     return this
@@ -3321,9 +3327,9 @@ export class Builder extends mixing().useTrait([
    */
   public where (
     column: Expression | Scalar | Array<Expression | Scalar> | QueryCallback | Record<string, unknown>,
-    operator: string | number | undefined = undefined,
-    value: string | number | Expression | undefined = undefined,
-    boolean: WhereBoolean | string = BOOLEAN_OPERATORS.and
+    operator: Date | string | number | undefined = undefined,
+    value: Date | string | number | Expression | undefined = undefined,
+    boolean: WhereBoolean = BOOLEAN_OPERATORS.and
   ): this {
     if (column instanceof ConditionExpression) {
       const type = 'Expression'
@@ -3708,13 +3714,13 @@ export class Builder extends mixing().useTrait([
    */
   public whereJsonLength (
     column: Expression | string,
-    operator: string | number | undefined = undefined,
-    value: unknown = undefined,
+    operator: Date | string | number | undefined = undefined,
+    value: Date | string | number | Expression | undefined = undefined,
     boolean: WhereBoolean = BOOLEAN_OPERATORS.and
   ): this {
     ;[value, operator] = this.prepareValueAndOperator(
-      value as string | number | Expression | undefined,
-      operator as string | undefined,
+      value,
+      operator,
       arguments.length === 2
     )
 
@@ -3747,8 +3753,8 @@ export class Builder extends mixing().useTrait([
    */
   public orWhereJsonLength (
     column: Expression | string,
-    operator: string | number | undefined = undefined,
-    value: unknown = undefined
+    operator: Date | string | number | undefined = undefined,
+    value: Date | string | number | Expression | undefined = undefined
   ): this {
     // [value, operator] = this.prepareValueAndOperator(
     //   value as string | number | Expression | undefined,
@@ -3772,11 +3778,12 @@ export class Builder extends mixing().useTrait([
    * @throws \InvalidArgumentException
    */
   public prepareValueAndOperator (
-    value: string | number | Expression | undefined,
-    operator: string | undefined,
+    value: Date | string | number | Expression | undefined,
+    operator: Date | string | number | undefined = undefined,
     useDefault: boolean = false
-  ): [string | number | Expression | undefined, string | undefined] {
+  ): [Date | string | number | Expression | undefined, Date | string | number | undefined] {
     if (useDefault) {
+      // return [operator as string | number | Expression | undefined, '=']
       return [operator, '=']
     }
 
@@ -3787,7 +3794,10 @@ export class Builder extends mixing().useTrait([
       throw new Error('Illegal operator and value combination.')
     }
 
-    return [value, operator]
+    return [
+      value,
+      operator
+    ]
   }
 
   /**
@@ -3825,7 +3835,7 @@ export class Builder extends mixing().useTrait([
    */
   protected invalidOperatorAndValue (
     operator: string,
-    value: string | number | Expression | undefined
+    value: unknown
   ): boolean {
     return (
       isNil(value) &&
@@ -3847,7 +3857,7 @@ export class Builder extends mixing().useTrait([
   protected addDateBasedWhere (
     type: WhereClauseType,
     column: Expression | string,
-    operator: string | undefined,
+    operator: Date | string | number | undefined,
     value: string | number | Expression | undefined,
     boolean: BooleanOperator = 'and'
   ): this {
@@ -3921,7 +3931,7 @@ export class Builder extends mixing().useTrait([
     //     ...(query.bindings[type] ?? [])
     //   ]
     // }
-    for (const [key, value] of Object.entries(query.bindings)) {
+    for (const [key, value] of Object.entries(query.bindings) as Array<[keyof Bindings, BindingValues]>) {
       this.bindings[key] = this.bindings[key].concat(value)
     }
 
@@ -4002,10 +4012,10 @@ export class Builder extends mixing().useTrait([
   /**
    * Get the query builder instances that are used in the union of the query.
    */
-  protected getUnionBuilders (): Collection<PropertyKey, Builder> {
+  protected getUnionBuilders (): Collection<PropertyKey, Builder | undefined> {
     return this.unions.length > 0
-      ? (new Collection<PropertyKey, Builder>(this.unions)).pluck('query')
-      : new Collection<PropertyKey, Builder>()
+      ? (new Collection<PropertyKey, Union>(this.unions)).pluck<Builder>('query')
+      : new Collection<PropertyKey, Builder | undefined>()
   }
 
   /**
@@ -4101,10 +4111,10 @@ export class Builder extends mixing().useTrait([
     if (results.length === 0) {
       return 0
     } else if (results[0] instanceof Object) {
-      return parseInt(String(results[0].aggregate), 10)
+      return parseInt(String(results[0]!.aggregate), 10)
     }
 
-    return parseInt(String(changeKeyCase(results[0].aggregate)), 10)
+    return parseInt(String(changeKeyCase(results[0]!.aggregate as Record<string, unknown>)), 10)
   }
 
   /**
@@ -4115,7 +4125,7 @@ export class Builder extends mixing().useTrait([
    */
   protected async runPaginationCountQuery (
     columns: string[] = ['*']
-  ): Promise<Array<string | number | Expression>> {
+  ): Promise<Array<{ aggregate: unknown }>> {
     if (this.groups.length > 0 || this.havings.length > 0) {
       const clone = this.cloneForPaginationCount()
 
@@ -4133,7 +4143,7 @@ export class Builder extends mixing().useTrait([
         .setAggregate('count', this.withoutSelectAliases(columns))
         .get()
 
-      return result.all() as Array<string | number | Expression>
+      return result.all() as unknown as Array<{ aggregate: unknown }>
     }
 
     const without = this.unions
@@ -4145,7 +4155,7 @@ export class Builder extends mixing().useTrait([
       .setAggregate('count', this.withoutSelectAliases(columns))
       .get()
 
-    return result.all() as Array<string | number | Expression>
+    return result.all() as unknown as Array<{ aggregate: unknown }>
   }
 
   /**
@@ -4187,7 +4197,7 @@ export class Builder extends mixing().useTrait([
    *
    * @return int<0, max>
    */
-  public update (values: Record<string, unknown>): Promise<number> {
+  public update (values: BindingValues | Record<string, unknown>): Promise<number> {
     this.applyBeforeQueryCallbacks()
 
     const compiledValues = (new Collection(values)).map((value: unknown) => {
@@ -4208,7 +4218,7 @@ export class Builder extends mixing().useTrait([
 
     const sql = this.grammar.compileUpdate(
       this,
-      compiledValues.map((value: { value: Expression }) => value.value).all()
+      compiledValues.map((value) => value.value).all() as unknown as Record<string, unknown>
     )
 
     return this.connection.update(
@@ -4216,7 +4226,7 @@ export class Builder extends mixing().useTrait([
       this.cleanBindings(
         this.grammar.prepareBindingsForUpdate(
           this.bindings,
-          compiledValues.map((value) => value.bindings).all()
+          compiledValues.map((value) => value.bindings).all() as unknown as BindingValues
         )
       )
     )
@@ -4229,22 +4239,23 @@ export class Builder extends mixing().useTrait([
    * @return list<mixed>
    */
   public cleanBindings (
-    bindings: BindingValues,
+    bindings: unknown[] | Record<string, unknown>,
     includeExpressions = false
   ): BindingValues {
-    const cleaned = new Collection(bindings)
+    const cleaned = new Collection<PropertyKey, unknown>(bindings)
+
       .reject(
-        (binding: BindingValue) =>
+        (binding: unknown) =>
           binding instanceof Expression && !includeExpressions
       )
-      .map((binding: BindingValue) => {
+      .map((binding: unknown): BindingValue => {
         if (binding instanceof Expression) {
           return this.castBinding(
             binding.getValue(this.grammar)
           )
         }
 
-        return this.castBinding(binding)
+        return this.castBinding(binding as BindingValue)
       })
       .values()
       .all()
@@ -4263,8 +4274,8 @@ export class Builder extends mixing().useTrait([
    */
   public whereMonth (
     column: Expression | string,
-    operator: string | undefined = undefined,
-    value: string | number | Expression | undefined = undefined,
+    operator: Date | string | number | undefined = undefined,
+    value: Date | string | number | Expression | undefined = undefined,
     boolean: BooleanOperator = BOOLEAN_OPERATORS.and
   ): this {
     ;[value, operator] = this.prepareValueAndOperator(
@@ -4305,8 +4316,8 @@ export class Builder extends mixing().useTrait([
    */
   public whereYear (
     column: Expression | string,
-    operator: string | undefined = undefined,
-    value: string | number | Expression | undefined = undefined,
+    operator: Date | string | number | undefined = undefined,
+    value: Date | string | number | Expression | undefined = undefined,
     boolean: BooleanOperator = BOOLEAN_OPERATORS.and
   ): this {
     ;[value, operator] = this.prepareValueAndOperator(
@@ -4342,8 +4353,8 @@ export class Builder extends mixing().useTrait([
    */
   public orWhereDate (
     column: Expression | string,
-    operator: string | undefined = undefined,
-    value: string | number | Expression | undefined = undefined
+    operator: Date | string | number | undefined = undefined,
+    value: Date | string | number | Expression | undefined = undefined
   ): this {
     ;[value, operator] = this.prepareValueAndOperator(
       value,
@@ -4365,8 +4376,8 @@ export class Builder extends mixing().useTrait([
    */
   public whereTime (
     column: Expression | string,
-    operator: string | undefined = undefined,
-    value: string | number | Expression | undefined = undefined,
+    operator: Date | string | number | undefined = undefined,
+    value: Date | string | number | Expression | undefined = undefined,
     boolean: BooleanOperator = BOOLEAN_OPERATORS.and
   ): this {
     ;[value, operator] = this.prepareValueAndOperator(
@@ -4401,8 +4412,8 @@ export class Builder extends mixing().useTrait([
    */
   public orWhereTime (
     column: Expression | string,
-    operator: string | undefined = undefined,
-    value: string | number | Expression | undefined = undefined
+    operator: Date | string | number | undefined = undefined,
+    value: Date | string | number | Expression | undefined = undefined
   ): this {
     ;[value, operator] = this.prepareValueAndOperator(
       value,
@@ -4423,8 +4434,8 @@ export class Builder extends mixing().useTrait([
    */
   public orWhereDay (
     column: Expression | string,
-    operator: string | undefined = undefined,
-    value: string | number | Expression | undefined = undefined
+    operator: Date | string | number | undefined = undefined,
+    value: Date | string | number | Expression | undefined = undefined
   ): this {
     ;[value, operator] = this.prepareValueAndOperator(
       value,
@@ -4445,8 +4456,8 @@ export class Builder extends mixing().useTrait([
    */
   public orWhereMonth (
     column: Expression | string,
-    operator: string | undefined = undefined,
-    value: string | number | Expression | undefined = undefined
+    operator: Date | string | number | undefined = undefined,
+    value: Date | string | number | Expression | undefined = undefined
   ): this {
     ;[value, operator] = this.prepareValueAndOperator(
       value,
@@ -4467,8 +4478,8 @@ export class Builder extends mixing().useTrait([
    */
   public orWhereYear (
     column: Expression | string,
-    operator: string | undefined = undefined,
-    value: string | number | Expression | undefined = undefined
+    operator: Date | string | number | undefined = undefined,
+    value: Date | string | number | Expression | undefined = undefined
   ): this {
     ;[value, operator] = this.prepareValueAndOperator(
       value,
@@ -4490,8 +4501,8 @@ export class Builder extends mixing().useTrait([
    */
   public whereDay (
     column: Expression | string,
-    operator: string | undefined = undefined,
-    value: string | number | Expression | undefined = undefined,
+    operator: Date | string | number | undefined = undefined,
+    value: Date | string | number | Expression | undefined = undefined,
     boolean: BooleanOperator = BOOLEAN_OPERATORS.and
   ): this {
     ;[value, operator] = this.prepareValueAndOperator(
@@ -4532,8 +4543,8 @@ export class Builder extends mixing().useTrait([
    */
   public whereDate (
     column: Expression | string,
-    operator: string | undefined = undefined,
-    value: string | number | Expression | undefined = undefined,
+    operator: Date | string | number | undefined = undefined,
+    value: Date | string | number | Expression | undefined = undefined,
     boolean: BooleanOperator = BOOLEAN_OPERATORS.and
   ): this {
     ;[value, operator] = this.prepareValueAndOperator(
@@ -4903,8 +4914,8 @@ export class Builder extends mixing().useTrait([
    */
   public whereAll (
     columns: Expression | string | Array<Expression | string>,
-    operator: string | undefined = undefined,
-    value: string | number | Expression | undefined = undefined,
+    operator: Date | string | number | undefined = undefined,
+    value: Date | string | number | Expression | undefined = undefined,
     boolean: BooleanOperator = BOOLEAN_OPERATORS.and
   ): this {
     ;[value, operator] = this.prepareValueAndOperator(
@@ -4951,8 +4962,8 @@ export class Builder extends mixing().useTrait([
    */
   public whereAny (
     columns: Expression | string | Array<Expression | string>,
-    operator: string | undefined = undefined,
-    value: string | number | Expression | undefined = undefined,
+    operator: Date | string | number | undefined = undefined,
+    value: Date | string | number | Expression | undefined = undefined,
     boolean: WhereBoolean = BOOLEAN_OPERATORS.and
   ): this {
     ;[value, operator] = this.prepareValueAndOperator(
@@ -5100,8 +5111,8 @@ export class Builder extends mixing().useTrait([
    */
   public orWhere (
     column: Expression | string | Array<Expression | string> | QueryCallback,
-    operator?: string | undefined,
-    value?: string | number | Expression | undefined
+    operator?: Date | string | number | undefined,
+    value?: Date | string | number | Expression | undefined
   ): this {
     ;[value, operator] = this.prepareValueAndOperator(
       value,
@@ -5133,9 +5144,11 @@ export class Builder extends mixing().useTrait([
    * @return mixed
    */
   protected flattenValue (
-    value: string | number | Expression | undefined
+    value: unknown
   ): string | number | Expression | undefined {
-    return Array.isArray(value) ? head(Arr.flatten(value)) : value
+    return (
+      Array.isArray(value) ? head(Arr.flatten(value)) : value
+    ) as string | number | Expression | undefined
   }
 
   /**
@@ -5149,7 +5162,7 @@ export class Builder extends mixing().useTrait([
    */
   protected whereSub (
     column: Expression | string,
-    operator: string | undefined,
+    operator: Date | string | number | undefined,
     callback: QueryCallback | Builder | EloquentBuilder | Relation,
     boolean: WhereBoolean | string = BOOLEAN_OPERATORS.and
   ): this {
@@ -5261,7 +5274,7 @@ export class Builder extends mixing().useTrait([
    */
   public async aggregate (
     fn: string,
-    columns: string[] = ['*']
+    columns: Array<string | Expression> = ['*']
   ): Promise<unknown> {
     // const NO_CLAUSES_TO_PRESERVE: string[] = []
     // const COLUMNS_CLAUSE_TO_PRESERVE = ['columns']
@@ -5292,16 +5305,22 @@ export class Builder extends mixing().useTrait([
 
     const results = await this.cloneWithout(
       this.unions.length > 0 || this.havings.length > 0 ? [] : ['columns']
-    )
-      .cloneWithoutBindings(
-        this.unions.length > 0 || this.havings.length > 0 ? [] : ['select']
-      )
-      .setAggregate(fn, columns)
+    ).cloneWithoutBindings(
+      this.unions.length > 0 || this.havings.length > 0 ? [] : ['select']
+    ).setAggregate(fn, columns)
       .get(columns)
 
     if (!results.isEmpty()) {
-      return changeKeyCase(results.first()).aggregate
+      const row = results.first<{ aggregate: unknown }>()
+
+      if (row !== undefined) {
+        return changeKeyCase(row).aggregate
+      }
+
+      return undefined
     }
+
+    return undefined
   }
 
   protected isRecord (value: unknown): value is Record<string, unknown> {
@@ -5335,7 +5354,7 @@ export class Builder extends mixing().useTrait([
    *
    * @return bool
    */
-  public insert (values: Array<Record<string, unknown>> | Record<string, unknown>): boolean {
+  public insert (values: unknown[] | Record<string, unknown>): boolean | Promise<boolean> {
     // Since every insert gets treated like a batch insert, we will make sure the
     // bindings are structured in a way that is convenient when building these
     // inserts statements by verifying these elements are actually an array.
@@ -5350,15 +5369,15 @@ export class Builder extends mixing().useTrait([
       // Here, we will sort the insert keys for every record so that each insert is
       // in the same order for the record. We need to make sure this is the case
       // so there are not any errors or problems when inserting these records.
-      for (const [key, value] of typedEntries(values)) {
+      for (const [key, value] of typedEntries(values as Record<number, Record<string, unknown>>)) {
         const sortedKeys = Object.keys(value).sort()
-        const sortedValue = {}
+        const sortedValue: Record<string, unknown> = {}
 
         for (const key of sortedKeys) {
           sortedValue[key] = value[key]
         }
 
-        values[key] = sortedValue
+        ;(values as Record<number, Record<string, unknown>>)[key] = sortedValue
       }
     }
 
@@ -5368,7 +5387,7 @@ export class Builder extends mixing().useTrait([
     // the results. We will need to also flatten these bindings before running
     // the query so they are all in one huge, flattened array for execution.
     return this.connection.insert(
-      this.grammar.compileInsert(this, values),
+      this.grammar.compileInsert(this, values as unknown[]),
       this.cleanBindings(Arr.flatten(values, 1))
     )
   }
@@ -5378,7 +5397,7 @@ export class Builder extends mixing().useTrait([
    *
    * @return int<0, max>
    */
-  public insertOrIgnore (values: unknown[]): number {
+  public insertOrIgnore (values: unknown[]): number | Promise<number> {
     if (values.length === 0) {
       return 0
     }
@@ -5386,9 +5405,9 @@ export class Builder extends mixing().useTrait([
     if (!Array.isArray(values[0])) {
       values = [values]
     } else {
-      for (const [key, value] of values.entries()) {
+      for (const [key, value] of (values as Array<Record<string, unknown>>).entries()) {
         const sortedKeys = Object.keys(value).sort()
-        const sortedValue = {}
+        const sortedValue: Record<string, unknown> = {}
 
         for (const key of sortedKeys) {
           sortedValue[key] = value[key]
@@ -5417,7 +5436,7 @@ export class Builder extends mixing().useTrait([
     values: unknown[],
     returning: string[] = ['*'],
     uniqueBy?: string | string[] | undefined
-  ): Promise<Collection> {
+  ): Promise<Collection<PropertyKey, unknown>> {
     if (Array.isArray(values) && values.length === 0) {
       return new Collection()
     }
@@ -5437,9 +5456,9 @@ export class Builder extends mixing().useTrait([
     if (!Array.isArray(values[0]) && !isPlainObject(values[0])) {
       values = [values]
     } else {
-      for (const [key, value] of values.entries()) {
+      for (const [key, value] of (values as Array<Record<string, unknown>>).entries()) {
         const sortedKeys = Object.keys(value).sort()
-        const sortedValue = {}
+        const sortedValue: Record<string, unknown> = {}
 
         for (const key of sortedKeys) {
           sortedValue[key] = value[key]
@@ -5463,7 +5482,7 @@ export class Builder extends mixing().useTrait([
       this.cleanBindings(Arr.flatten(values, 1))
     )
 
-    const result = new Collection<unknown, unknown>(rows)
+    const result = new Collection<PropertyKey, unknown>(rows)
 
     this.connection.recordsHaveBeenModified(result.isNotEmpty())
 
@@ -5479,7 +5498,7 @@ export class Builder extends mixing().useTrait([
   public insertUsing (
     columns: string[],
     query: QueryCallback | Builder | EloquentBuilder
-  ): boolean {
+  ): Promise<number> {
     this.applyBeforeQueryCallbacks()
 
     const [sql, bindings] = this.createSub(query)
@@ -5499,7 +5518,7 @@ export class Builder extends mixing().useTrait([
   public insertOrIgnoreUsing (
     columns: string[] | Record<string, unknown>,
     query: QueryCallback | Builder | EloquentBuilder | string
-  ): number {
+  ): Promise<number> {
     this.applyBeforeQueryCallbacks()
 
     const [sql, bindings] = this.createSub(query)

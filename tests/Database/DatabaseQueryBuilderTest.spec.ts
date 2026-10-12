@@ -4671,12 +4671,12 @@ describe('Database Query Builder', () => {
     expect(result).toBe(1)
   })
 
-  test('testInsertGetIdWithEmptyValues', async () => {
+  test.only('testInsertGetIdWithEmptyValues', async () => {
     let builder = getMySqlBuilder()
     let processor = builder.getProcessor()
     jest.spyOn(processor, 'processInsertGetId').mockResolvedValue(1)
 
-    let result = await builder.from('users').insertGetId([])
+    let result = await builder.from('users').insertGetId({})
     expect(processor.processInsertGetId).toHaveBeenCalledWith(builder, 'insert into `users` () values ()', [], undefined)
     expect(result).toBe(1)
 
@@ -4684,7 +4684,7 @@ describe('Database Query Builder', () => {
     processor = builder.getProcessor()
     jest.spyOn(processor, 'processInsertGetId').mockResolvedValue(1)
 
-    result = await builder.from('users').insertGetId([])
+    result = await builder.from('users').insertGetId({})
     expect(processor.processInsertGetId).toHaveBeenCalledWith(builder, 'insert into "users" default values returning "id"', [], undefined)
     expect(result).toBe(1)
 
@@ -4692,7 +4692,7 @@ describe('Database Query Builder', () => {
     processor = builder.getProcessor()
     jest.spyOn(processor, 'processInsertGetId').mockResolvedValue(1)
 
-    result = await builder.from('users').insertGetId([])
+    result = await builder.from('users').insertGetId({})
     expect(processor.processInsertGetId).toHaveBeenCalledWith(builder, 'insert into "users" default values', [], undefined)
     expect(result).toBe(1)
 
@@ -4700,7 +4700,7 @@ describe('Database Query Builder', () => {
     processor = builder.getProcessor()
     jest.spyOn(processor, 'processInsertGetId').mockResolvedValue(1)
 
-    result = await builder.from('users').insertGetId([])
+    result = await builder.from('users').insertGetId({})
     expect(processor.processInsertGetId).toHaveBeenCalledWith(builder, 'insert into [users] default values', [], undefined)
     expect(result).toBe(1)
   })

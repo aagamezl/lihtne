@@ -7,16 +7,13 @@ const isMacro = (value: unknown): value is (...args: unknown[]) => unknown => {
   return typeof value === 'function'
 }
 
-/**
- * @mixin \Illuminate\Database\Query\Builder
- */
-// Merges query-builder members onto this class. The interface adds no fields of its own.
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging
-export interface Builder extends QueryBuilder {}
-
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Builder implements BuilderContract {
-  query: QueryBuilder
+  /**
+     * The base query builder instance.
+     *
+     * @var \Illuminate\Database\Query\Builder
+     */
+  protected query: QueryBuilder
 
   protected passthru: string[] = [
     'aggregate',

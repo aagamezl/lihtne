@@ -99,12 +99,36 @@ export function tap<TValue> (
   return value
 }
 
-export const changeKeyCase = (
+type ChangeRecordKeyCase<
+  TValue extends Record<string, unknown>,
+  TCase extends ChangeCase
+> = {
+  [K in keyof TValue as K extends string
+    ? TCase extends 'CASE_LOWER'
+      ? Lowercase<K>
+      : Uppercase<K>
+    : K]: TValue[K]
+}
+
+export function changeKeyCase<TValue extends Record<string, unknown>> (
+  value: TValue,
+  changeCase?: 'CASE_LOWER'
+): ChangeRecordKeyCase<TValue, 'CASE_LOWER'>
+export function changeKeyCase<TValue extends Record<string, unknown>> (
+  value: TValue,
+  changeCase: 'CASE_UPPER'
+): ChangeRecordKeyCase<TValue, 'CASE_UPPER'>
+export function changeKeyCase<TValue extends Record<string, unknown>> (
+  value: TValue,
+  changeCase: ChangeCase
+): Record<string, unknown>
+export function changeKeyCase (
   value: Record<string, unknown>,
   changeCase: ChangeCase = 'CASE_LOWER'
-): Record<string, unknown> => {
+): Record<string, unknown> {
   const casefunction =
     changeCase === 'CASE_LOWER' ? 'toLowerCase' : 'toUpperCase'
+
   return Object.fromEntries(
     Object.entries(value).map(([key, value]) => [key[casefunction](), value])
   )

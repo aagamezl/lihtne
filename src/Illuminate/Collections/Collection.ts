@@ -180,11 +180,16 @@ export class Collection<
    * Mirrors `Collection::first()`, which delegates straight to
    * `Arr::first()` over the collection's underlying items.
    */
+  public first<TRow extends TValue>(): TRow | undefined
   public first<TDefault = undefined>(
     callback?: (value: TValue, key: TKey) => boolean,
     defaultValue?: TDefault | (() => TDefault)
-  ): TValue | TDefault | undefined {
-    return Arr.first<TValue, TKey, TDefault>(this.items, callback, defaultValue)
+  ): TValue | TDefault | undefined
+  public first (
+    callback?: (value: TValue, key: TKey) => boolean,
+    defaultValue?: unknown
+  ): unknown {
+    return Arr.first<TValue, TKey, unknown>(this.items, callback, defaultValue)
   }
 
   /**

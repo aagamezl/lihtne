@@ -1,6 +1,6 @@
 import { isPlainObject } from '@devnetic/utils'
 
-import type { Bindings, BindingValues, Builder, WhereClause } from '../Builder'
+import type { Bindings, BindingValue, BindingValues, Builder, WhereClause } from '../Builder'
 import type { Expression } from '../Expression'
 import type { IndexHint } from '../IndexHint'
 import type { JoinLateralClause } from '../JoinLateralClause'
@@ -47,7 +47,14 @@ export class MySqlGrammar extends Grammar {
    * @param  array  $update
    * @return string
    */
-  public override compileUpsert (query: Builder, values: unknown[], uniqueBy: string | string[], update: unknown[]): string {
+  public override compileUpsert (
+    query: Builder,
+    values: unknown[],
+    // @ts-expect-error - uniqueBy is not used
+
+    uniqueBy: string | string[],
+    update: Array<string | Expression> | Record<string, string | Expression>
+  ): string {
     const useUpsertAlias = query.getConnection().getConfig('use_upsert_alias')
 
     let sql = this.compileInsert(query, values)
@@ -58,7 +65,7 @@ export class MySqlGrammar extends Grammar {
 
     sql += ' on duplicate key update '
 
-    const columns = (new Collection(update)).map((value: unknown, key: string | Expression) => {
+    const columns = new Collection<string, string | Expression>(update).map((value, key) => {
       if (!isNumeric(key)) {
         return this.wrap(key) + ' = ' + this.parameter(value)
       }
@@ -92,8 +99,11 @@ export class MySqlGrammar extends Grammar {
    * @param  array  $values
    * @return string
    */
-  public override compileInsert (query: Builder, values: unknown[]): string {
-    if (values.length === 0) {
+  public override compileInsert (
+    query: Builder,
+    values: Record<string, unknown> | unknown[]
+  ): string {
+    if (Object.keys(values).length === 0) {
       values = [[]]
     }
 
@@ -146,10 +156,12 @@ export class MySqlGrammar extends Grammar {
    * @return string
    */
   protected override compileUpdateColumns (
+    // @ts-expect-error - values is not used
+
     query: Builder,
     values: Record<string, unknown>
   ): string {
-    return new Collection(values)
+    return new Collection<string, unknown>(values)
       .map((value, key) => {
         if (this.isJsonSelector(String(key))) {
           return this.compileJsonUpdateColumn(String(key), value)
@@ -194,12 +206,9 @@ export class MySqlGrammar extends Grammar {
     bindings: Bindings,
     values: BindingValues
   ): BindingValues {
-    const newValues = (new Collection(values))
-      .reject((
-        value: unknown,
-        column: string | Expression
-      ): boolean => this.isJsonSelector(column) && typeof value === 'boolean')
-      .map((value: unknown) => (Array.isArray(value) || isPlainObject(value)) ? JSON.stringify(value) : value)
+    const newValues = new Collection<string, BindingValue>(values)
+      .reject((value, column) => this.isJsonSelector(column) && typeof value === 'boolean')
+      .map((value) => (Array.isArray(value) || isPlainObject(value)) ? JSON.stringify(value) : value)
       .all()
 
     return super.prepareBindingsForUpdate(bindings, newValues)

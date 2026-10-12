@@ -142,7 +142,7 @@ export const head = (value: unknown[] | Record<string, unknown>): unknown => {
  * @param  {Array}  array
  * @return {*}
  */
-export const last = (array: unknown[]): unknown => {
+export const last = <TValue>(array: readonly TValue[]): TValue | undefined => {
   return end(array)
 }
 
@@ -152,6 +152,6 @@ export const last = (array: unknown[]): unknown => {
  * @param  {any}  array
  * @return {any}
  */
-export const end = (array: unknown[]): unknown => {
+export const end = <TValue>(array: readonly TValue[]): TValue | undefined => {
   return array[array.length - 1]
 }

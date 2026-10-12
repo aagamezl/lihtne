@@ -3,6 +3,7 @@ import { isPlainObject, isTruthy } from '@devnetic/utils'
 import type {
   Agregate,
   Bindings,
+  BindingValue,
   BindingValues,
   Builder,
   Having,
@@ -412,7 +413,7 @@ export class Grammar
     query: Builder,
     // @ts-expect-error expected error; columns is not used in this method
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    columns: string[],
+    columns: string[] | Record<string, unknown>,
     // @ts-expect-error expected error; sql is not used in this method
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     sql: string
@@ -628,9 +629,6 @@ export class Grammar
 
     for (const { name, property } of this.selectComponents) {
       if (this.isExecutable(query, property)) {
-        // const method = `compile${pascalCase(name)}`
-
-        // sql[name] = this[method](query, query[property as keyof Builder])
         sql[name] = this.compilers[name](query)
       }
     }
@@ -1053,36 +1051,31 @@ export class Grammar
    * @param  array  $values
    * @return string
    */
-  public compileInsert (query: Builder, values: unknown[]): string {
+  public compileInsert (
+    query: Builder,
+    values: Record<string, unknown> | unknown[]
+  ): string {
     // Essentially we will force every insert to be treated as a batch insert which
     // simply makes creating the SQL easier for us since we can utilize the same
     // basic routine regardless of an amount of records given to us to insert.
     const table = this.wrapTable(query.fromProperty)
 
-    if (values.length === 0) {
+    if (Object.keys(values).length === 0) {
       return `insert into ${table} default values`
     }
 
-    // if (!Array.isArray(values) && !Array.isArray(values[0])) {
-    //   values = [values]
-    // }
-
-    // const recordKeys = Object.keys(values[0] as Record<string, unknown>)
-    // const columns = this.columnize(recordKeys)
-
-    if (!Array.isArray(values) && !isPlainObject(values[0])) {
+    if (!Array.isArray(values) && !isPlainObject(values['0'])) {
       values = [values]
     }
 
-    const columns = this.columnize(Object.keys(values[0]))
-    // const columns = this.columnize(Object.keys(reset(values)))
+    const firstRow = Array.isArray(values) ? values[0] : values['0']
+    const columns = this.columnize(Object.keys(firstRow ?? {}))
 
     // We need to build a list of parameter place-holders of values that are bound
     // to the query. Each insert should have the exact same number of parameter
     // bindings so we will loop through the record and parameterize them all.
     const parameters = new Collection(values)
       .map((record: unknown) => {
-        // return '(' + this.parameterize(recordKeys.map((key) => record[key])) + ')'
         return '(' + this.parameterize(record) + ')'
       })
       .implode(', ')
@@ -1113,7 +1106,7 @@ export class Grammar
     uniqueBy: string | string[],
     // @ts-expect-error expected error; update is not used in this method
     // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base compileUpsert signature
-    update: unknown[]
+    update: Array<string | Expression> | Record<string, string | Expression>
   ): string {
     throw new Error('RuntimeException: This database engine does not support upserts.')
   }
@@ -1197,7 +1190,15 @@ export class Grammar
   // @ts-expect-error expected error; query is not used in this method
 
   protected whereExists (query: Builder, where: WhereClause): string {
-    return 'exists (' + this.compileSelect(where.query) + ')'
+    const nested = where.query
+
+    if (nested === undefined) {
+      throw new Error(
+        'RuntimeException: Exists where clause is missing its query.'
+      )
+    }
+
+    return 'exists (' + this.compileSelect(nested) + ')'
   }
 
   /**
@@ -1210,7 +1211,15 @@ export class Grammar
   // @ts-expect-error expected error; query is not used in this method
 
   protected whereNotExists (query: Builder, where: WhereClause): string {
-    return 'not exists (' + this.compileSelect(where.query) + ')'
+    const nested = where.query
+
+    if (nested === undefined) {
+      throw new Error(
+        'RuntimeException: Not exists where clause is missing its query.'
+      )
+    }
+
+    return 'not exists (' + this.compileSelect(nested) + ')'
   }
 
   /**
@@ -1766,7 +1775,7 @@ export class Grammar
    */
   public prepareBindingsForUpdate (
     bindings: Bindings,
-    values: BindingValues
+    values: BindingValues | Record<string, BindingValue>
   ): BindingValues {
     const cleanBindings = Arr.except(bindings, ['select', 'join'])
 
@@ -1834,7 +1843,7 @@ export class Grammar
    */
   public compileInsertGetId (
     query: Builder,
-    values: BindingValues,
+    values: Record<string, unknown>,
     // @ts-expect-error expected error; sequence is not used in this method
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     sequence: string | undefined = undefined
@@ -1896,6 +1905,8 @@ export class Grammar
    * @return string
    */
   protected compileUpdateWithoutJoins (
+    // @ts-expect-error expected error; query is not used in this method
+
     query: Builder,
     table: string,
     columns: string,
@@ -1912,10 +1923,12 @@ export class Grammar
    * @return string
    */
   protected compileUpdateColumns (
+    // @ts-expect-error expected error; query is not used in this method
+
     query: Builder,
     values: Record<string, unknown>
   ): string {
-    return new Collection(values)
+    return new Collection<string, unknown>(values)
       .map((value, key) => this.wrap(key) + ' = ' + this.parameter(value))
       .implode(', ')
   }
@@ -1929,6 +1942,8 @@ export class Grammar
    * @return string
    */
   protected compileDeleteWithoutJoins (
+    // @ts-expect-error expected error; query is not used in this method
+
     query: Builder,
     table: string,
     where: string
@@ -1989,17 +2004,6 @@ export class Grammar
    * @return string
    */
   protected compileHavingExpression (having: Having): string {
-    // const column = having.column
-
-    // if (
-    //   typeof column === 'object' &&
-    //   column !== null &&
-    //   typeof column.getValue === 'function'
-    // ) {
-    //   return String(column.getValue(this))
-    // }
-
-    // return typeof column === 'string' ? column : ''
     return String((having.column as Expression).getValue(this))
   }
 
@@ -2027,7 +2031,7 @@ export class Grammar
     sql: string,
     bindings: BindingValues
   ): string {
-    const escaped = bindings.map((value) => {
+    const escaped = bindings.map((value: BindingValue) => {
       if (value instanceof Expression) {
         return String(this.getValue(value))
       }

@@ -310,7 +310,7 @@ export class PostgresGrammar extends Grammar {
    */
   public override compileInsertGetId (
     query: Builder,
-    values: BindingValues,
+    values: Record<string, unknown>,
     sequence: string | undefined = undefined
   ): string {
     return this.compileInsert(query, values) + ' returning ' + this.wrap(sequence ?? 'id')
@@ -325,7 +325,7 @@ export class PostgresGrammar extends Grammar {
    * @param  array  $update
    * @return string
    */
-  public override compileUpsert (query: Builder, values: unknown[], uniqueBy: string | string[], update: unknown[]): string {
+  public override compileUpsert (query: Builder, values: unknown[], uniqueBy: string | string[], update: Array<string | Expression> | Record<string, string | Expression>): string {
     let sql = this.compileInsert(query, values)
 
     sql += ' on conflict (' + this.columnize(uniqueBy) + ') do update set '

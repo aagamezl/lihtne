@@ -9,6 +9,10 @@ import {
 
 const DOT_SEPARATOR = '.'
 
+type FlatValues<TValue> = [TValue] extends [readonly unknown[]]
+  ? never
+  : readonly TValue[]
+
 /**
  * TypeScript port of `Illuminate\Support\Arr`.
  *
@@ -31,7 +35,8 @@ export class Arr {
    */
   public static except<TValue, TKeys extends PropertyKey>(
     array: TValue,
-    keys: TKeys[]
+    // keys: TKeys[]
+    keys: Array<TKeys> | string | number
   ): TValue {
     const copy = this.duplicate(array)
 
@@ -188,7 +193,7 @@ export class Arr {
    * @param  string|array  $keys
    * @return bool
    */
-  public static has (array: unknown, keys: string[]): boolean {
+  public static has (array: unknown, keys: string | string[]): boolean {
     keys = Array.isArray(keys) ? keys : [keys]
 
     if (!array || keys.length === 0) {
@@ -290,8 +295,20 @@ export class Arr {
     return value.constructor === Object
   }
 
+  static flatten<TValue>(
+    array: Record<PropertyKey, readonly TValue[]>,
+    depth?: number
+  ): TValue[]
+  static flatten<TValue>(
+    array: FlatValues<TValue>,
+    depth?: number
+  ): TValue[]
   static flatten (
-    array: Iterable<unknown>,
+    array: Iterable<unknown> | Record<PropertyKey, unknown>,
+    depth?: number
+  ): unknown[]
+  static flatten (
+    array: Iterable<unknown> | Record<PropertyKey, unknown>,
     depth: number = Infinity
   ): unknown[] {
     // const result: unknown[] = []

@@ -246,7 +246,7 @@ export class SqlServerGrammar extends Grammar {
     query: Builder,
     values: unknown[],
     uniqueBy: string | string[],
-    update: unknown[]
+    update: Array<string | Expression> | Record<string, string | Expression>
   ): string {
     const columns = this.columnize(Object.keys(values[0]))
 

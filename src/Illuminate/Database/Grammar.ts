@@ -1,4 +1,5 @@
 import type { Connection } from './Connection'
+import type { BindingValue } from './Query'
 
 import { Collection } from '../Collections/Collection'
 import { Expression } from './Query/Expression'
@@ -24,14 +25,20 @@ export abstract class Grammar {
    * @return string
    */
   public escape (
-    value: string | number | boolean | Date | null,
+    value: string | number | boolean | BindingValue,
     binary: boolean = false
   ): string {
     if (value instanceof Date) {
       return this.connection.escape(value.toISOString(), binary)
     }
 
-    return this.connection.escape(value, binary)
+    if (typeof value !== 'object') {
+      return this.connection.escape(value, binary)
+    }
+
+    throw new Error(
+      'RuntimeException: The database connection does not support escaping this value.'
+    )
   }
 
   /**
@@ -164,9 +171,13 @@ export abstract class Grammar {
    * @param  array<mixed>  $values
    * @return string
    */
-  public parameterize (values: unknown[]): string {
+  public parameterize (values: unknown): string {
     // return values.map((value) => this.parameter(value)).join(', ')
-    return (Array.isArray(values) ? values : Object.values(values))
+    const list = Array.isArray(values)
+      ? values
+      : Object.values(values ?? {})
+
+    return list
       .map((value) => {
         return this.parameter(value)
       })

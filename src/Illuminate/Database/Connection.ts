@@ -4,7 +4,7 @@ import { isNil } from 'es-toolkit'
 import type { Dispatcher } from '../Contracts'
 import type { Driver } from './Drivers/Driver'
 import type { Grammar } from './Grammar'
-import type { BindingValues } from './Query/Builder'
+import type { BindingValue, BindingValues } from './Query/Builder'
 import type { Grammar as SchemaGrammar } from './Schema/Grammars'
 import type { Statement } from './Statements'
 
@@ -14,6 +14,7 @@ import { QueryExecuted, StatementPrepared } from './Events'
 import { Expression } from './Query/Expression'
 import { Grammar as QueryGrammar } from './Query/Grammars/Grammar'
 import { Processor } from './Query/Processors/Processor'
+import { Builder as SchemaBuilder } from './Schema/Builder'
 // import { type BindingValues, Processor, Grammar as QueryGrammar } from './Query/index-backup'
 
 export type QueryLogEntry = {
@@ -137,7 +138,7 @@ export class Connection extends DetectsLostConnections {
    * @param  string  $tablePrefix
    * @param  array  $config
    */
-  constructor (
+  constructor(
     driver: Driver,
     database: string = '',
     tablePrefix: string = '',
@@ -173,8 +174,8 @@ export class Connection extends DetectsLostConnections {
    *
    * @throws \RuntimeException
    */
-  public escape (
-    value: string | number | boolean | undefined | null,
+  public escape(
+    value: string | number | boolean | null,
     binary: boolean = false
   ): string {
     if (isNil(value) === true) {
@@ -212,7 +213,7 @@ export class Connection extends DetectsLostConnections {
    * @param  literal-string|int|float  $value
    * @return \Illuminate\Contracts\Database\Query\Expression
    */
-  public raw (value: string | number): Expression {
+  public raw(value: string | number): Expression {
     return new Expression(value)
   }
 
@@ -222,7 +223,7 @@ export class Connection extends DetectsLostConnections {
    * @param  bool  $value
    * @return void
    */
-  public recordsHaveBeenModified (value: boolean = true) {
+  public recordsHaveBeenModified(value: boolean = true) {
     if (!this.recordsModified) {
       this.recordsModified = value
     }
@@ -235,7 +236,7 @@ export class Connection extends DetectsLostConnections {
    * @param  array  $bindings
    * @return bool
    */
-  public async insert (query: string, bindings: BindingValues = []): Promise<boolean> {
+  public async insert(query: string, bindings: BindingValues = []): Promise<boolean> {
     return this.statement(query, bindings)
   }
 
@@ -246,8 +247,17 @@ export class Connection extends DetectsLostConnections {
    * @param  array  $bindings
    * @return int
    */
-  public delete (query: string, bindings: BindingValues = []): Promise<number> {
+  public delete(query: string, bindings: BindingValues = []): Promise<number> {
     return this.affectingStatement(query, bindings)
+  }
+
+  /**
+   * Get the schema grammar used by the connection.
+   *
+   * @return \Illuminate\Database\Schema\Grammars\Grammar
+   */
+  public getSchemaGrammar(): SchemaGrammar | undefined {
+    return this.schemaGrammar;
   }
 
   /**
@@ -257,7 +267,7 @@ export class Connection extends DetectsLostConnections {
    * @param  array  $bindings
    * @return int
    */
-  public affectingStatement (
+  public affectingStatement(
     query: string,
     bindings: BindingValues = []
   ): Promise<number> {
@@ -292,7 +302,7 @@ export class Connection extends DetectsLostConnections {
    * @param  array  $bindings
    * @return bool
    */
-  public async statement (
+  public async statement(
     query: string,
     bindings: BindingValues = []
   ): Promise<boolean> {
@@ -323,7 +333,7 @@ export class Connection extends DetectsLostConnections {
    * @param  string  value
    * @return {string}
    */
-  protected escapeString (value: string): string {
+  protected escapeString(value: string): string {
     return this.quote(value)
   }
 
@@ -332,7 +342,7 @@ export class Connection extends DetectsLostConnections {
    * @param {string} value
    * @returns {string}
    */
-  protected quote (value: string): string {
+  protected quote(value: string): string {
     // Escape special characters within the input string
     const escapedString = value.replace(/'/g, "''")
 
@@ -345,7 +355,7 @@ export class Connection extends DetectsLostConnections {
    * @param  bool  $value
    * @return string
    */
-  protected escapeBool (value: boolean): string {
+  protected escapeBool(value: boolean): string {
     return value ? '1' : '0'
   }
 
@@ -359,7 +369,7 @@ export class Connection extends DetectsLostConnections {
    */
   // @ts-expect-error - expected error, value is not used in this method
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  protected escapeBinary (value: string | number | boolean): string {
+  protected escapeBinary(value: string | number | boolean | BindingValue): string {
     throw new Error(
       'RuntimeException: The database connection does not support escaping binary values.'
     )
@@ -372,11 +382,11 @@ export class Connection extends DetectsLostConnections {
    * @param  array  $bindings
    * @return array
    */
-  async select (
+  async select<TResult extends Record<string, unknown> = Record<string, unknown>>(
     query: string,
     bindings: BindingValues
-  ): Promise<Record<string, unknown>[]> {
-    return await this.run(query, bindings, (
+  ): Promise<TResult[] | TResult> {
+    return await this.run<TResult[]>(query, bindings, (
       query: string,
       bindings: BindingValues
     ) => {
@@ -396,7 +406,11 @@ export class Connection extends DetectsLostConnections {
 
       statement.execute()
 
-      return statement.fetchAll()
+      const rows = statement.fetchAll()
+
+      this.narrowRows<TResult>(rows)
+
+      return rows
     })
   }
 
@@ -408,7 +422,7 @@ export class Connection extends DetectsLostConnections {
    */
   // The exception is part of the override signature; the base connection reports no unique violations.
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  protected isUniqueConstraintError (_exception: Error) {
+  protected isUniqueConstraintError(_exception: Error) {
     return false
   }
 
@@ -425,7 +439,7 @@ export class Connection extends DetectsLostConnections {
   protected async run<TValue>(
     query: string,
     bindings: BindingValues,
-    callback: QueryCallback
+    callback: QueryCallback<TValue>
   ): Promise<TValue> {
     for (const beforeExecutingCallback of this.beforeExecutingCallbacks) {
       await beforeExecutingCallback(query, bindings, this)
@@ -435,7 +449,7 @@ export class Connection extends DetectsLostConnections {
 
     const start = Date.now()
 
-    let result: TValue
+    let result: Promise<TValue>
 
     // Here we will run this query. If an exception occurs we'll determine if it was
     // caused by a connection that has been lost. If that is the cause, we'll try
@@ -460,7 +474,7 @@ export class Connection extends DetectsLostConnections {
    * @param  float  $start
    * @return float
    */
-  protected getElapsedTime (start: number): number {
+  protected getElapsedTime(start: number): number {
     return Number(Math.round((Date.now() - start) * 1000).toPrecision(2))
   }
 
@@ -475,12 +489,12 @@ export class Connection extends DetectsLostConnections {
    *
    * @throws \Illuminate\Database\QueryException
    */
-  protected handleQueryException (
+  protected handleQueryException<TValue>(
     e: Error,
     query: string,
     bindings: BindingValues,
-    callback: QueryCallback
-  ) {
+    callback: QueryCallback<TValue>
+  ): Promise<TValue> {
     if (this.transactions >= 1) {
       throw e
     }
@@ -493,7 +507,7 @@ export class Connection extends DetectsLostConnections {
    *
    * @return string|null
    */
-  public getName (): string {
+  public getName(): string {
     const name = this.getConfig('name')
 
     return typeof name === 'string' ? name : ''
@@ -505,7 +519,7 @@ export class Connection extends DetectsLostConnections {
    * @param  [string]  option
    * @return unknown
    */
-  public getConfig (option?: string) {
+  public getConfig(option?: string) {
     return Arr.get(this.config, option)
   }
 
@@ -517,7 +531,7 @@ export class Connection extends DetectsLostConnections {
    * @param  float|null  time
    * @return void
    */
-  public logQuery (query: string, bindings: BindingValues, time: number) {
+  public logQuery(query: string, bindings: BindingValues, time: number) {
     this.totalQueryDurationProperty += time ?? 0.0
 
     this.event(new QueryExecuted(query, bindings, time, this))
@@ -540,7 +554,7 @@ export class Connection extends DetectsLostConnections {
    *
    * @throws \Illuminate\Database\LostConnectionException
    */
-  reconnect () {
+  reconnect() {
     if (typeof this.reconnector === 'function') {
       return this.reconnector(this)
     }
@@ -583,7 +597,7 @@ export class Connection extends DetectsLostConnections {
    * @param  array  $bindings
    * @return int
    */
-  public update (query: string, bindings: BindingValues = []): Promise<number> {
+  public update(query: string, bindings: BindingValues = []): Promise<number> {
     return this.affectingStatement(query, bindings)
   }
 
@@ -633,7 +647,7 @@ export class Connection extends DetectsLostConnections {
    *
    * @return void
    */
-  reconnectIfMissingConnection () {
+  reconnectIfMissingConnection() {
     if (isNil(this.driver)) {
       this.reconnect()
     }
@@ -645,7 +659,7 @@ export class Connection extends DetectsLostConnections {
    * @param  array  bindings
    * @return array
    */
-  public prepareBindings (bindings: BindingValues) {
+  public prepareBindings(bindings: BindingValues) {
     const grammar = this.getQueryGrammar()
 
     for (const [key, value] of bindings.entries()) {
@@ -667,7 +681,7 @@ export class Connection extends DetectsLostConnections {
    *
    * @return {Driver}
    */
-  getDriver (): Driver {
+  getDriver(): Driver {
     if (typeof this.driver === 'function') {
       return this.driver()
     }
@@ -682,7 +696,7 @@ export class Connection extends DetectsLostConnections {
    * @param  array  bindings
    * @return void
    */
-  public bindValues (statement: Statement, bindings: BindingValues) {
+  public bindValues(statement: Statement, bindings: BindingValues) {
     for (const [key, value] of Object.entries(bindings)) {
       statement.bindValue(
         typeof key === 'string' ? key : Number(key) + 1,
@@ -698,7 +712,7 @@ export class Connection extends DetectsLostConnections {
    * @param  array  $bindings
    * @return array
    */
-  public selectFromWriteConnection (
+  public selectFromWriteConnection(
     query: string,
     bindings: BindingValues = []
   ): Promise<Record<string, unknown>[]> {
@@ -711,7 +725,7 @@ export class Connection extends DetectsLostConnections {
    * @param  mixed  event
    * @return void
    */
-  protected event (event: string | object) {
+  protected event(event: string | object) {
     this.events?.dispatch(event)
   }
 
@@ -721,18 +735,26 @@ export class Connection extends DetectsLostConnections {
    * @param  \PDOStatement  statement
    * @return \PDOStatement
    */
-  protected prepared (statement: Statement): Statement {
+  protected prepared(statement: Statement): Statement {
     this.event(new StatementPrepared(this, statement))
 
     return statement
   }
 
   /**
+   * Relate fetched rows to the row shape requested by `select()`.
+   */
+  protected narrowRows<TRow extends Record<string, unknown>>(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- assertion parameter is type-only
+    _rows: Record<string, unknown>[]
+  ): asserts _rows is TRow[] {}
+
+  /**
    * Determine if the connection is in a "dry run".
    *
    * @return bool
    */
-  pretending () {
+  pretending() {
     return this.pretendingProperty === true
   }
 
@@ -741,7 +763,7 @@ export class Connection extends DetectsLostConnections {
    *
    * @return string
    */
-  public getTablePrefix (): string {
+  public getTablePrefix(): string {
     return this.tablePrefix
   }
 
@@ -750,7 +772,7 @@ export class Connection extends DetectsLostConnections {
    *
    * @return \Illuminate\Database\Schema\Builder
    */
-  public getSchemaBuilder (): SchemaBuilder {
+  public getSchemaBuilder(): SchemaBuilder {
     if (this.schemaGrammar === undefined) {
       this.useDefaultSchemaGrammar()
     }
@@ -763,7 +785,7 @@ export class Connection extends DetectsLostConnections {
    *
    * @return void
    */
-  public useDefaultSchemaGrammar () {
+  public useDefaultSchemaGrammar() {
     this.schemaGrammar = this.getDefaultSchemaGrammar()
   }
 
@@ -772,14 +794,16 @@ export class Connection extends DetectsLostConnections {
  *
  * @return \Illuminate\Database\Schema\Grammars\Grammar|null
  */
-  protected getDefaultSchemaGrammar () { }
+  protected getDefaultSchemaGrammar(): SchemaGrammar | undefined {
+    return undefined
+  }
 
   /**
    * Get the query grammar used by the connection.
    *
    * @return \Illuminate\Database\Query\Grammars\Grammar
    */
-  public getQueryGrammar (): Grammar {
+  public getQueryGrammar(): Grammar {
     if (this.queryGrammar === undefined) {
       throw new Error('Query grammar has not been set.')
     }
@@ -792,7 +816,7 @@ export class Connection extends DetectsLostConnections {
    *
    * @return \Illuminate\Database\Query\Processors\Processor
    */
-  public getPostProcessor () {
+  public getPostProcessor() {
     return this.postProcessor
   }
 
@@ -801,7 +825,7 @@ export class Connection extends DetectsLostConnections {
    *
    * @return string
    */
-  public getDatabaseName () {
+  public getDatabaseName() {
     return this.database
   }
 
@@ -810,7 +834,7 @@ export class Connection extends DetectsLostConnections {
    *
    * @return void
    */
-  public useDefaultQueryGrammar () {
+  public useDefaultQueryGrammar() {
     this.queryGrammar = this.getDefaultQueryGrammar()
   }
 
@@ -819,7 +843,7 @@ export class Connection extends DetectsLostConnections {
    *
    * @return \Illuminate\Database\Query\Grammars\Grammar
    */
-  protected getDefaultQueryGrammar () {
+  protected getDefaultQueryGrammar() {
     return new QueryGrammar(this)
   }
 
@@ -828,7 +852,7 @@ export class Connection extends DetectsLostConnections {
    *
    * @return void
    */
-  public useDefaultPostProcessor () {
+  public useDefaultPostProcessor() {
     this.postProcessor = this.getDefaultPostProcessor()
   }
 
@@ -837,7 +861,7 @@ export class Connection extends DetectsLostConnections {
    *
    * @return \Illuminate\Database\Query\Processors\Processor
    */
-  protected getDefaultPostProcessor () {
+  protected getDefaultPostProcessor() {
     return new Processor()
   }
 }
