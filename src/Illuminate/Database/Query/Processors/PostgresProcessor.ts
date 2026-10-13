@@ -1,5 +1,3 @@
-import { isObject } from '@devnetic/utils'
-
 import type { BindingValues, Builder } from '../Builder'
 
 import { isNumeric } from '../../../Support/helpers'
@@ -20,16 +18,18 @@ export class PostgresProcessor extends Processor {
     sql: string,
     values: BindingValues,
     sequence: string | undefined = undefined
-  ): number {
+  ): Promise<string | number> {
     const connection = query.getConnection()
 
     connection.recordsHaveBeenModified()
 
-    const result = (await connection.selectFromWriteConnection(sql, values))[0]
-
+    const results = await connection.selectFromWriteConnection<Record<string, string | number>>(sql, values)
     const sequenceValue = sequence ?? 'id'
+    const id = results[0]?.[sequenceValue]
 
-    const id = isObject(result) ? result?.[sequenceValue] : result?.[sequenceValue]
+    if (typeof id !== 'string' && typeof id !== 'number') {
+      throw new Error(`RuntimeException: Unable to find sequence [${sequenceValue}] in inserted row.`)
+    }
 
     return isNumeric(id) ? Number(id) : id
   }

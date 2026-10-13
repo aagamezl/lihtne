@@ -1,13 +1,22 @@
 import { isPlainObject } from 'es-toolkit'
 
-import type { Bindings, BindingValues, Builder } from '../Builder'
+import type { Bindings, BindingValue, BindingValues, Builder, WhereClause } from '../Builder'
 import type { Expression } from '../Expression'
 import type { IndexHint } from '../IndexHint'
 
 import { Arr, Collection } from '../../../Collections'
 import { last } from '../../../Collections/helpers'
-import { isNumeric, Str } from '../../../Support'
+import { isNumeric, Str, typedEntries } from '../../../Support'
 import { Grammar } from './Grammar'
+
+type Splittable = {
+  split (separator: string | RegExp): string[]
+}
+
+function withSplit (value: Expression | string): Splittable
+function withSplit (value: Expression | string): Expression | string | Splittable {
+  return value
+}
 
 export class SQLiteGrammar extends Grammar {
   /**
@@ -68,7 +77,9 @@ export class SQLiteGrammar extends Grammar {
    * @return string
    */
   protected override whereNullSafeEquals (
-    _query: Builder,
+    // @ts-expect-error expected error; query is not used in this method
+
+    query: Builder,
     where: WhereClause
   ): string {
     return this.wrap(where.column ?? '') + ' is ' + this.parameter(where.value)
@@ -176,12 +187,17 @@ export class SQLiteGrammar extends Grammar {
     * @param  array  $update
     * @return string
     */
-  public override compileUpsert (query: Builder, values: unknown[], uniqueBy: string | string[], update: Array<string | Expression> | Record<string, string | Expression>): string {
+  public override compileUpsert (
+    query: Builder,
+    values: unknown[],
+    uniqueBy: string[],
+    update: Array<string | Expression> | Record<string, string | Expression>
+  ): string {
     let sql = this.compileInsert(query, values)
 
     sql += ' on conflict (' + this.columnize(uniqueBy) + ') do update set '
 
-    const columns = (new Collection(update)).map((value: unknown, key: PropertyKey) => {
+    const columns = (new Collection<string, string | Expression>(update)).map((value, key) => {
       return isNumeric(key)
         ? this.wrap(value) + ' = ' + this.wrapValue('excluded') + '.' + this.wrap(value)
         : this.wrap(key) + ' = ' + this.parameter(value)
@@ -217,10 +233,10 @@ export class SQLiteGrammar extends Grammar {
    * @param  array  $values
    * @return string
    */
-  protected compileUpdateWithJoinsOrLimit (query: Builder, values: unknown[]): string {
+  protected compileUpdateWithJoinsOrLimit (query: Builder, values: Record<string, unknown>): string {
     const table = this.wrapTable(query.fromProperty)
     const columns = this.compileUpdateColumns(query, values)
-    const alias = query.fromProperty.split(' as ').pop() ?? ''
+    const alias = withSplit(query.fromProperty).split(' as ').pop() ?? ''
     const selectSql = this.compileSelect(query.select(`${alias}.rowid`))
 
     return `update ${table} set ${columns} where ${this.wrap('rowid')} in (${selectSql})`
@@ -233,15 +249,18 @@ export class SQLiteGrammar extends Grammar {
    * @param  array  $values
    * @return string
    */
+  protected override compileUpdateColumns (
+    // @ts-expect-error - query is not used
 
-  // @ts-expect-error expected error; query is not used in this method
-  protected override compileUpdateColumns (query: Builder, values: unknown[]): string {
+    query: Builder,
+    values: Record<string, unknown>
+  ): string {
     const jsonGroups = this.groupJsonColumnsForUpdate(values)
 
-    return (new Collection(values))
-      .reject((value: unknown, key: PropertyKey) => this.isJsonSelector(key))
+    return (new Collection<string, unknown>(values))
+      .reject((_: unknown, key: string) => this.isJsonSelector(key))
       .merge(jsonGroups)
-      .map((value: unknown, key: PropertyKey) => {
+      .map((value: unknown, key: string) => {
         const column = last(key.split('.'))
 
         value = Object.hasOwn(jsonGroups, String(key))
@@ -275,7 +294,7 @@ export class SQLiteGrammar extends Grammar {
     query: Builder,
     values: Record<string, unknown>
   ): string {
-    if (query.joins.length > 0 || query.limitProperty > 0) {
+    if (query.joins.length > 0 || (query.limitProperty ?? 0) > 0) {
       return this.compileUpdateWithJoinsOrLimit(query, values)
     }
 
@@ -289,13 +308,16 @@ export class SQLiteGrammar extends Grammar {
    * @param  array  $values
    * @return array
    */
-  public override prepareBindingsForUpdate (bindings: Bindings, values: BindingValues): BindingValues {
+  public override prepareBindingsForUpdate (
+    bindings: Bindings,
+    values: BindingValues | Record<string, BindingValue>
+  ): BindingValues {
     const groups = this.groupJsonColumnsForUpdate(values)
 
-    const preparedValues = (new Collection(values))
-      .reject((value: unknown, key: PropertyKey) => this.isJsonSelector(String(key)))
+    const preparedValues = (new Collection<string, BindingValue>(values))
+      .reject((_: unknown, key: string) => this.isJsonSelector(key))
       .merge(groups)
-      .map((value: unknown) => (Array.isArray(value) || isPlainObject(value)) ? JSON.stringify(value) : value)
+      .map((value): BindingValue => (Array.isArray(value) || isPlainObject(value)) ? JSON.stringify(value) : value)
       .all()
 
     const cleanBindings = Arr.except(bindings, 'select')
@@ -334,7 +356,7 @@ export class SQLiteGrammar extends Grammar {
   }
 
   public override compileDelete (query: Builder): string {
-    if (query.joins.length > 0 || query.limitProperty > 0) {
+    if (query.joins.length > 0 || (query.limitProperty ?? 0) > 0) {
       return this.compileDeleteWithJoinsOrLimit(query)
     }
 
@@ -349,7 +371,7 @@ export class SQLiteGrammar extends Grammar {
    */
   protected compileDeleteWithJoinsOrLimit (query: Builder): string {
     const table = this.wrapTable(query.fromProperty)
-    const alias = last(query.fromProperty.split(' as ') ?? '')
+    const alias = last(withSplit(query.fromProperty).split(' as ') ?? '')
     const selectSql = this.compileSelect(query.select(`${alias}.rowid`))
 
     return `delete from ${table} where ${this.wrap('rowid')} in (${selectSql})`
@@ -361,10 +383,12 @@ export class SQLiteGrammar extends Grammar {
    * @param  array  $values
    * @return array
    */
-  protected groupJsonColumnsForUpdate (values: unknown[] | Record<string, unknown>): Record<string, unknown> {
-    const groups: Record<string, unknown> = {}
+  protected groupJsonColumnsForUpdate<TValue> (
+    values: readonly TValue[] | Record<string, TValue>
+  ): Record<string, TValue> {
+    const groups: Record<string, TValue> = {}
 
-    for (const [key, value] of Object.entries(values as Record<string, unknown>)) {
+    for (const [key, value] of typedEntries(values)) {
       if (!this.isJsonSelector(key)) {
         continue
       }

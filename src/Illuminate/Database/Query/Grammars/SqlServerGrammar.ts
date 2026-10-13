@@ -1,13 +1,13 @@
 import { cloneDeep } from 'es-toolkit'
 
-import type { Bindings, BindingValues, Builder, Having, WhereClause } from '../Builder'
-import type { Expression } from '../Expression'
+import type { Bindings, BindingValue, BindingValues, Builder, Having, WhereClause } from '../Builder'
 import type { IndexHint } from '../IndexHint'
 import type { JoinLateralClause } from '../JoinLateralClause'
 
 import { Arr, Collection } from '../../../Collections'
 import { Str } from '../../../Support'
 import { getValue, isNumeric } from '../../../Support/helpers'
+import { Expression } from '../Expression'
 import { Grammar, type SelectComponents } from './Grammar'
 
 export class SqlServerGrammar extends Grammar {
@@ -149,11 +149,7 @@ export class SqlServerGrammar extends Grammar {
    * @return string
    */
   public override compileJoinLateral (
-    // @ts-expect-error expected error; join is not used in this method
-
     join: JoinLateralClause,
-    // @ts-expect-error expected error; expression is not used in this method
-
     expression: string
   ): string {
     const type = join.type === 'left' ? 'outer' : 'cross'
@@ -244,8 +240,8 @@ export class SqlServerGrammar extends Grammar {
     */
   public override compileUpsert (
     query: Builder,
-    values: unknown[],
-    uniqueBy: string | string[],
+    values: [Record<string, unknown>, ...Array<Record<string, unknown>>],
+    uniqueBy: string[],
     update: Array<string | Expression> | Record<string, string | Expression>
   ): string {
     const columns = this.columnize(Object.keys(values[0]))
@@ -265,9 +261,9 @@ export class SqlServerGrammar extends Grammar {
     sql += 'on ' + on + ' '
 
     if (update) {
-      const updateColumns = (new Collection(update as unknown[])).map((value: unknown, key: PropertyKey) => {
+      const updateColumns = (new Collection<string, string | Expression>(update)).map((value, key) => {
         return isNumeric(key)
-          ? this.wrap(value) + ' = ' + this.wrap('lihtne_source.' + value)
+          ? this.wrap(value) + ' = ' + this.wrap('lihtne_source.' + (value instanceof Expression ? value.getValue(this) : value))
           : this.wrap(key) + ' = ' + this.parameter(value)
       }).implode(', ')
 
@@ -342,7 +338,7 @@ export class SqlServerGrammar extends Grammar {
    *
    * @return string
    */
-  public getDateFormat (): string {
+  public override getDateFormat (): string {
     return 'Y-m-d H:i:s.v'
   }
 
@@ -488,11 +484,15 @@ export class SqlServerGrammar extends Grammar {
    * @param  array  $values
    * @return array
    */
-  public override prepareBindingsForUpdate (bindings: Bindings, values: BindingValues): BindingValues {
+  public override prepareBindingsForUpdate (
+    bindings: Bindings,
+    values: BindingValues | Record<string, BindingValue>
+  ): BindingValues {
     const cleanBindings = Arr.except(bindings, 'select')
 
     const flattenedValues = Arr.flatten(
       (Array.isArray(values) ? values : Object.values(values)).map((value) =>
+        // resolveBinding(value))
         getValue(value))
     )
 
@@ -546,7 +546,8 @@ export class SqlServerGrammar extends Grammar {
    * @return string
    */
   protected compileHavingBitwise (having: Having): string {
-    const column = this.wrap(having.column ?? '')
+    const source = having.column
+    const column = this.wrap(typeof source === 'string' || source instanceof Expression ? source : '')
 
     const parameter = this.parameter(having.value)
 

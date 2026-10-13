@@ -1,9 +1,15 @@
 import { isPlainObject } from 'es-toolkit'
 
-import type { ArrayableInput } from '../types'
-
+import { typedEntries } from '../../Support'
 import { Collection } from '../Collection'
-export class EnumeratesValues<TKey extends PropertyKey, TValue> {
+
+export abstract class EnumeratesValues<TValue> {
+  /**
+   * Rows owned by the class that uses this trait.
+   * `Collection` declares the field; these methods only read it.
+   */
+  protected items!: TValue[] | Record<string, TValue>
+
   /**
    * The methods that can be proxied.
    */
@@ -72,15 +78,6 @@ export class EnumeratesValues<TKey extends PropertyKey, TValue> {
   }
 
   /**
-   * Narrow a runtime object key (always a `string`, per `Object.entries()`)
-   * back to the caller's declared key type. See the matching helper on
-   * `Arr` for why this cast — the one in this file — is unavoidable.
-   */
-  private static toKey<TKey extends PropertyKey> (key: string): TKey {
-    return key as unknown as TKey
-  }
-
-  /**
    * Determine if the given value is callable, but not a string.
    *
    * @param  mixed  $value
@@ -98,11 +95,11 @@ export class EnumeratesValues<TKey extends PropertyKey, TValue> {
    * @param  callable(TValue, TKey): mixed  $callback
    * @return $this
    */
-  public each (callback: (value: TValue, key: TKey) => unknown): this {
-    const items = (this as { items?: Iterable<unknown> }).items ?? []
+  public each (callback: (value: TValue, key: PropertyKey) => unknown): this {
+    const items = this.items ?? []
 
     if (Array.isArray(items)) {
-      for (const [key, item] of items.entries()) {
+      for (const [key, item] of typedEntries<TValue>(items)) {
         if (callback(item, key) === false) {
           break
         }
@@ -111,7 +108,7 @@ export class EnumeratesValues<TKey extends PropertyKey, TValue> {
       return this
     }
 
-    for (const [key, item] of Object.entries(Object(items))) {
+    for (const [key, item] of typedEntries<TValue>(items)) {
       if (callback(item, key) === false) {
         break
       }
@@ -121,36 +118,13 @@ export class EnumeratesValues<TKey extends PropertyKey, TValue> {
   }
 
   /**
-   * Narrow helper used only to keep `getArrayableItems()` readable:
-   * reports whether a value is one of PHP's "scalar" types (or null),
-   * i.e. not an array/object/Arrayable that `Arr.from()` should handle.
-   */
-  private isScalarLike (
-    value: ArrayableInput<TValue> | TValue
-  ): value is TValue | null | undefined {
-    if (value === null || value === undefined) {
-      return true
-    }
-
-    if (isArrayable<TValue>(value)) {
-      return false
-    }
-
-    const scalarType = typeof value
-
-    return (
-      scalarType === 'string' ||
-      scalarType === 'number' ||
-      scalarType === 'boolean'
-    )
-  }
-
-  /**
      * Get the collection of items as a plain array.
      *
      * @return array<TKey, mixed>
      */
   public toArray (): Array<TValue> {
+    // return withMap(this).map((value: TValue) => value).all()
+    // @ts-expect-error - `map` is not defined on the `EnumeratesValues` class
     return this.map((value: TValue) => value).all()
   }
 }

@@ -1,6 +1,8 @@
 import type { Collection } from '../Collections/Collection'
 
 export abstract class AbstractPaginator<TKey extends PropertyKey = PropertyKey, TValue = unknown> {
+  [key: string]: unknown
+
   /**
    * The current page resolver callback.
    *
@@ -22,7 +24,7 @@ export abstract class AbstractPaginator<TKey extends PropertyKey = PropertyKey, 
    *
    * @var \Illuminate\Support\Collection<TKey, TValue>
    */
-  protected items: Collection<TKey, TValue> | TValue[] | undefined
+  protected items!: Collection<TKey, TValue>
 
   /**
    * The number of items to be shown per page.

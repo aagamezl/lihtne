@@ -3,16 +3,28 @@ import type { Arrayable } from '../Collections/types'
 import { Collection } from '../Collections/Collection'
 import { AbstractPaginator } from './AbstractPaginator'
 
+function arrayableItems<TValue> (
+  items: Arrayable<TValue> | Iterable<TValue>
+): TValue[] | Record<string, TValue>
+function arrayableItems<TValue> (
+  items: Arrayable<TValue> | Iterable<TValue>
+): Arrayable<TValue> | Iterable<TValue> | TValue[] | Record<string, TValue> {
+  return items
+}
+
 /**
  * Minimal port of Laravel's AbstractPaginator static helpers.
  */
-export class Paginator extends AbstractPaginator {
+export class Paginator<
+  TKey extends PropertyKey = PropertyKey,
+  TValue = unknown
+> extends AbstractPaginator<TKey, TValue> {
   /**
  * Indicates if there are more items in the data source.
  *
  * @var bool
  */
-  protected hasMore: boolean
+  protected hasMore: boolean = false
 
   /**
  * Create a new paginator instance.
@@ -22,7 +34,12 @@ export class Paginator extends AbstractPaginator {
  * @param  int|null  currentPage
  * @param  array  options  (path, query, fragment, pageName)
  */
-  public constructor (items: Collection<TKey, TValue> | Arrayable<TKey, TValue> | iterable<TKey, TValue>, perPage: number, currentPage: number | undefined = undefined, options: Record<string, unknown> = {}) {
+  public constructor (
+    items: Collection<TKey, TValue> | Arrayable<TValue> | Iterable<TValue>,
+    perPage: number,
+    currentPage: number | undefined = undefined,
+    options: Record<string, unknown> = {}
+  ) {
     super()
 
     this.options = options
@@ -56,10 +73,10 @@ export class Paginator extends AbstractPaginator {
 * @param  Collection<TKey, TValue>|Arrayable<TKey, TValue>|iterable<TKey, TValue>|null  $items
 * @return void
 */
-  protected setItems (items: Collection<PropertyKey, unknown>): void {
-    this.items = items instanceof Collection ? items : new Collection(items)
+  protected setItems (items: Collection<TKey, TValue> | Arrayable<TValue> | Iterable<TValue>): void {
+    this.items = items instanceof Collection ? items : new Collection<TKey, TValue>(arrayableItems(items))
 
-    this.hasMore = this.items.count() > this.perPage
+    this.hasMore = this.items.count() > (this.perPage ?? 0)
 
     this.items = this.items.slice(0, this.perPage)
   }

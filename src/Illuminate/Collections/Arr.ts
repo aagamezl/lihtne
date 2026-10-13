@@ -35,8 +35,7 @@ export class Arr {
    */
   public static except<TValue, TKeys extends PropertyKey>(
     array: TValue,
-    // keys: TKeys[]
-    keys: Array<TKeys> | string | number
+    keys: Array<TKeys> | TKeys
   ): TValue {
     const copy = this.duplicate(array)
 
@@ -55,36 +54,46 @@ export class Arr {
    * @param  mixed  $value
    * @return array
    */
-  public static set<TValue>(
-    array: TValue,
-    key: string | number | null,
+  public static set (
+    array: Dictionary<unknown>,
+    key: string,
     value: unknown,
+    separator?: string
+  ): Dictionary<unknown>
+  public static set<TValue> (
+    array: Dictionary<unknown>,
+    key: undefined,
+    value: TValue,
+    separator?: string
+  ): TValue
+  public static set (
+    array: Dictionary<unknown>,
+    key?: string,
+    value?: unknown,
     separator: string = DOT_SEPARATOR
-  ): TValue {
-    let current = array
+  ): unknown {
+    let current: Dictionary<unknown> = array
 
     if (key === undefined) {
-      array = value
-
-      return array
+      return value
     }
 
     const keys = key.split(separator)
 
     for (let i = 0; i < keys.length - 1; i++) {
-      const key = keys[i]
+      const segment = Arr.pathSegment(keys[i])
 
       // If the key doesn't exist at this depth, we will just create an empty array
       // to hold the next value, allowing us to create the arrays to hold final
       // values at the correct depth. Then we'll keep digging into the array.
-      if (current[key] === undefined || typeof current[key] !== 'object') {
-        current[key] = {}
+      if (current[segment] === undefined || typeof current[segment] !== 'object') {
+        current[segment] = {}
       }
 
-      current = current[key]
+      current = Arr.asRecord(current[segment])
     }
 
-    current[keys.pop()] = value
+    current[Arr.pathSegment(keys.pop())] = value
 
     return current
   }
@@ -168,19 +177,20 @@ export class Arr {
    * mutating the input. PHP arrays are copy-on-write; class instances stay
    * shared because `unset` only removes keys, it does not clone values.
    */
-  public static duplicate<TValue>(value: TValue): TValue {
+  public static duplicate<TValue>(value: TValue): TValue
+  public static duplicate (value: unknown): unknown {
     if (Array.isArray(value)) {
-      return value.map((item) => this.duplicate(item)) as TValue
+      return value.map((item) => this.duplicate(item))
     }
 
-    if (isPlainObject(value)) {
+    if (this.isPlainRecord(value)) {
       const copy: Dictionary<unknown> = {}
 
       for (const [key, item] of Object.entries(value)) {
         copy[key] = this.duplicate(item)
       }
 
-      return copy as TValue
+      return copy
     }
 
     return value
@@ -201,14 +211,18 @@ export class Arr {
     }
 
     for (const key of keys) {
-      let subKeyArray = array
+      let subKeyArray: unknown = array
 
       if (this.exists(array, key)) {
         continue
       }
 
       for (const segment of key.split('.')) {
-        if (this.accessible(subKeyArray) && this.exists(subKeyArray, segment)) {
+        if (
+          this.accessible(subKeyArray) &&
+          this.exists(subKeyArray, segment) &&
+          Arr.isRecord(subKeyArray)
+        ) {
           subKeyArray = subKeyArray[segment]
         } else {
           return false
@@ -274,27 +288,10 @@ export class Arr {
    * @param  int  $depth
    * @return array
    */
-  /**
-   * Plain `{}` dictionaries mirror PHP associative arrays for flattening.
-   */
-  private static shouldFlattenAsArray (
-    value: unknown
-  ): value is unknown[] | Dictionary<unknown> {
-    if (Array.isArray(value)) {
-      return true
-    }
-
-    if (value === null || typeof value !== 'object') {
-      return false
-    }
-
-    if (value instanceof Collection || value instanceof Date) {
-      return false
-    }
-
-    return value.constructor === Object
-  }
-
+  static flatten<TValue>(
+    array: Record<string, readonly TValue[]>,
+    depth?: number
+  ): TValue[]
   static flatten<TValue>(
     array: Record<PropertyKey, readonly TValue[]>,
     depth?: number
@@ -769,6 +766,32 @@ export class Arr {
     }
 
     return cursor as TValue
+  }
+
+  /**
+   * Plain objects and arrays are both string-indexable at runtime.
+   * `noUncheckedIndexedAccess` rejects indexing the `unknown[] | Dictionary`
+   * union, so callers narrow through this predicate before a bracket read.
+   */
+  private static isRecord (value: unknown): value is Dictionary<unknown> {
+    return typeof value === 'object' && value !== null
+  }
+
+  private static pathSegment (segment: string | undefined): string
+  private static pathSegment (segment: string | undefined): string | undefined {
+    return segment
+  }
+
+  private static asRecord (value: unknown): Dictionary<unknown>
+  private static asRecord (value: unknown): unknown {
+    return value
+  }
+
+  /**
+   * `isPlainObject` does not narrow, and `Object.entries` only accepts an object.
+   */
+  private static isPlainRecord (value: unknown): value is Dictionary<unknown> {
+    return isPlainObject(value)
   }
 
   /**

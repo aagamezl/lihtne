@@ -1,7 +1,5 @@
 import { isNil } from 'es-toolkit'
 
-import type { ArrayableInput } from './types'
-
 import { getValue, isObject, isSet } from '../Support'
 import { Arr } from './Arr'
 import { Collection } from './Collection'
@@ -16,7 +14,7 @@ import { Collection } from './Collection'
  * @return \Illuminate\Support\Collection<TKey, TValue>
  */
 export const collect = <TKey extends PropertyKey, TValue>(
-  value?: ArrayableInput<TValue> | undefined
+  value?: Array<TValue> | undefined
 ): Collection<TKey, TValue> => {
   return new Collection(value)
 }
@@ -29,11 +27,16 @@ export const collect = <TKey extends PropertyKey, TValue>(
  * @param  mixed  $default
  * @return mixed
  */
-export const dataGet = (
+export function dataGet<TValue = unknown> (
   target: unknown,
-  key?: string | Iterable<unknown> | number | null,
+  key?: string | Iterable<unknown> | number | undefined,
+  defaultValue?: TValue
+): TValue
+export function dataGet (
+  target: unknown,
+  key?: string | Iterable<unknown> | number | undefined,
   defaultValue?: unknown
-): unknown => {
+): unknown {
   if (isNil(key)) {
     return target
   }
@@ -142,7 +145,8 @@ export const head = (value: unknown[] | Record<string, unknown>): unknown => {
  * @param  {Array}  array
  * @return {*}
  */
-export const last = <TValue>(array: readonly TValue[]): TValue | undefined => {
+export function last<TValue> (array: readonly TValue[]): TValue
+export function last<TValue> (array: readonly TValue[]): TValue | undefined {
   return end(array)
 }
 

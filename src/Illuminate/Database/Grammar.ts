@@ -49,7 +49,7 @@ export abstract class Grammar {
    * @return string | number
    */
   public wrapTable (
-    table: string | Expression,
+    table: Expression | string,
     prefix: string | null = null
   ): string {
     if (this.isExpression(table)) {
@@ -91,7 +91,7 @@ export abstract class Grammar {
    * @param  \Illuminate\Contracts\Database\Query\Expression|string  $value
    * @return string
    */
-  public wrap (value: Expression | string): string {
+  public wrap <TValue extends Expression | string>(value: TValue): string {
     if (this.isExpression(value)) {
       return this.getValue(value)
     }

@@ -4,7 +4,7 @@ import { AbstractPaginator } from './AbstractPaginator'
 export class LengthAwarePaginator<
   TKey extends PropertyKey = PropertyKey,
   TValue = unknown
-> extends AbstractPaginator {
+> extends AbstractPaginator<TKey, TValue> {
   protected totalCount: number
 
   /**
@@ -52,8 +52,8 @@ export class LengthAwarePaginator<
  * @param  string  $pageName
  * @return int
  */
-  protected setCurrentPage (currentPage: number, pageName: string): number {
-    currentPage = currentPage ?? this.resolveCurrentPage(pageName)
+  protected setCurrentPage (currentPage: number | undefined, pageName: string): number {
+    currentPage = currentPage ?? LengthAwarePaginator.resolveCurrentPage(pageName)
 
     return this.isValidPageNumber(currentPage) ? Number(currentPage) : 1
   }

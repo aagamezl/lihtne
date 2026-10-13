@@ -1,7 +1,7 @@
 import { isNumeric, isTruthy } from '@devnetic/utils'
 import { isNil, isPlainObject } from 'es-toolkit'
 
-import type { BindingValues, Builder, Having, WhereClause } from '../Builder'
+import type { Bindings, BindingValue, BindingValues, Builder, Having, WhereClause, WhereClauseType } from '../Builder'
 import type { Expression } from '../Expression'
 import type { JoinClause } from '../JoinClause'
 import type { JoinLateralClause } from '../JoinLateralClause'
@@ -11,6 +11,28 @@ import { Collection } from '../../../Collections/Collection'
 import { last } from '../../../Collections/helpers'
 import { Str } from '../../../Support'
 import { Grammar } from './Grammar'
+
+type Splittable = {
+  split (separator: string | RegExp): string[]
+}
+
+function withSplit (value: Expression | string): Splittable
+function withSplit (value: Expression | string): Expression | string | Splittable {
+  return value
+}
+
+function whereMethod<TType extends WhereClauseType> (
+  type: TType
+): `where${Capitalize<TType>}`
+function whereMethod<TType extends WhereClauseType> (type: TType): string {
+  return `where${type.charAt(0).toUpperCase()}${type.slice(1)}`
+}
+
+declare global {
+  interface String {
+    replace (searchValue: string, replaceValue: string, subject: string): string
+  }
+}
 
 export class PostgresGrammar extends Grammar {
   /**
@@ -169,7 +191,7 @@ export class PostgresGrammar extends Grammar {
    * @return string
    */
   public override compileUpdate (query: Builder, values: Record<string, unknown>): string {
-    if (query.joins.length > 0 || query.limitProperty > 0) {
+    if (query.joins.length > 0 || (query.limitProperty ?? 0) > 0) {
       return this.compileUpdateWithJoinsOrLimit(query, values)
     }
 
@@ -188,7 +210,7 @@ export class PostgresGrammar extends Grammar {
 
     const columns = this.compileUpdateColumns(query, values)
 
-    const alias = last(query.fromProperty.split(/\s+as\s+/i))
+    const alias = last(withSplit(query.fromProperty).split(/\s+as\s+/i))
 
     const selectSql = this.compileSelect(query.select(`${alias}.ctid`))
 
@@ -202,7 +224,7 @@ export class PostgresGrammar extends Grammar {
    * @return string
    */
   public override compileDelete (query: Builder): string {
-    if (query.joins.length > 0 || query.limitProperty > 0) {
+    if (query.joins.length > 0 || (query.limitProperty ?? 0) > 0) {
       return this.compileDeleteWithJoinsOrLimit(query)
     }
 
@@ -218,7 +240,7 @@ export class PostgresGrammar extends Grammar {
   protected compileDeleteWithJoinsOrLimit (query: Builder): string {
     const table = this.wrapTable(query.fromProperty)
 
-    const alias = last(query.fromProperty.split(/\s+as\s+/i))
+    const alias = last(withSplit(query.fromProperty).split(/\s+as\s+/i))
 
     const selectSql = this.compileSelect(query.select(`${alias}.ctid`))
 
@@ -253,8 +275,13 @@ export class PostgresGrammar extends Grammar {
    * @param  array  $values
    * @return string
    */
-  protected override compileUpdateColumns (query: Builder, values: Record<string, unknown>): string {
-    return (new Collection(values)).map((value, key) => {
+  protected override compileUpdateColumns (
+    // @ts-expect-error - query is not used
+
+    query: Builder,
+    values: Record<string, unknown>
+  ): string {
+    return (new Collection<string, unknown>(values)).map((value, key) => {
       const column = last(key.split('.'))
 
       if (this.isJsonSelector(key)) {
@@ -325,12 +352,17 @@ export class PostgresGrammar extends Grammar {
    * @param  array  $update
    * @return string
    */
-  public override compileUpsert (query: Builder, values: unknown[], uniqueBy: string | string[], update: Array<string | Expression> | Record<string, string | Expression>): string {
+  public override compileUpsert (
+    query: Builder,
+    values: unknown[],
+    uniqueBy: string[],
+    update: Array<string | Expression> | Record<string, string | Expression>
+  ): string {
     let sql = this.compileInsert(query, values)
 
     sql += ' on conflict (' + this.columnize(uniqueBy) + ') do update set '
 
-    const columns = (new Collection(update)).map((value: unknown, key: PropertyKey) => {
+    const columns = (new Collection<string, string | Expression>(update)).map((value, key) => {
       return isNumeric(key)
         ? this.wrap(value) + ' = ' + this.wrapValue('excluded') + '.' + this.wrap(value)
         : this.wrap(key) + ' = ' + this.parameter(value)
@@ -434,7 +466,12 @@ export class PostgresGrammar extends Grammar {
    * @param  array  $where
    * @return string
    */
-  public override whereFulltext (_query: Builder, where: WhereClause): string {
+  public override whereFulltext (
+    // @ts-expect-error - query is not used
+
+    query: Builder,
+    where: WhereClause
+  ): string {
     let language = where.options?.language ?? 'english'
 
     if (!this.validFullTextLanguages().includes(language)) {
@@ -502,7 +539,12 @@ export class PostgresGrammar extends Grammar {
     return super.whereBasic(query, where)
   }
 
-  protected override whereBitwise (query: Builder, where: WhereClause): string {
+  protected override whereBitwise (
+    // @ts-expect-error - query is not used
+
+    query: Builder,
+    where: WhereClause
+  ): string {
     const value = this.parameter(where.value)
     const operator = where.operator?.replace('?', '??') ?? ''
 
@@ -595,7 +637,7 @@ export class PostgresGrammar extends Grammar {
         .map((join: JoinClause) => this.wrapTable(join.table))
         .all()
 
-      if (froms.length > 0) {
+      if (Array.isArray(froms) && froms.length > 0) {
         from = ' from ' + froms.join(', ')
       }
     }
@@ -605,9 +647,12 @@ export class PostgresGrammar extends Grammar {
     return String(`update ${table} set ${columns}${from} ${where}`).trim()
   }
 
-  public prepareBindingsForUpdateFrom (bindings: Bindings, values: Record<string, unknown>): BindingValues {
-    const preparedValues = (new Collection(values))
-      .map((value: unknown, column: string) => {
+  public prepareBindingsForUpdateFrom (
+    bindings: Bindings,
+    values: Record<string, BindingValue | BindingValue[]>
+  ): BindingValues {
+    const preparedValues = (new Collection<string, BindingValue | BindingValue[]>(values))
+      .map((value, column): BindingValue => {
         return Array.isArray(value) || (this.isJsonSelector(column) && !this.isExpression(value))
           ? JSON.stringify(value)
           : value
@@ -630,14 +675,19 @@ export class PostgresGrammar extends Grammar {
      * @param  array  $values
      * @return array
      */
-  public override prepareBindingsForUpdate (bindings: Bindings, values: BindingValues): BindingValues {
-    const preparedValues = (new Collection(values)).map((value: unknown, column: string) => {
-      return Array.isArray(value) ||
-        isPlainObject(value) ||
-        (this.isJsonSelector(column) && !this.isExpression(value))
-        ? JSON.stringify(value)
-        : value
-    }).all()
+  public override prepareBindingsForUpdate (
+    bindings: Bindings,
+    values: BindingValues | Record<string, BindingValue>
+  ): BindingValues {
+    const preparedValues = (new Collection<string, BindingValue>(values)).map(
+      (value, column): BindingValue => {
+        return Array.isArray(value) ||
+          isPlainObject(value) ||
+          (this.isJsonSelector(column) && !this.isExpression(value))
+          ? JSON.stringify(value)
+          : value
+      }
+    ).all()
 
     const cleanBindings = Arr.except(bindings, 'select')
 
@@ -665,7 +715,7 @@ export class PostgresGrammar extends Grammar {
     // everything has been built and then we will join it to the real wheres.
     for (const join of query.joins) {
       for (const where of join.wheres) {
-        const method = `where${where.type}`
+        const method = whereMethod(where.type)
 
         joinWheres.push(where.boolean + ' ' + this[method](query, where))
       }

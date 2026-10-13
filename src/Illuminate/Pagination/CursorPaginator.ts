@@ -36,7 +36,7 @@ export class CursorPaginator<
   }
 
   protected setItems (items: Collection<TKey, TValue> | TValue[] | undefined): void {
-    this.items = items instanceof Collection ? items : new Collection(items)
+    this.items = items instanceof Collection ? items : new Collection<TKey, TValue>(items)
 
     this.hasMore = this.items.count() > this.perPage
 

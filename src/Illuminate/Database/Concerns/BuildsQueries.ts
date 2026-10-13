@@ -132,7 +132,7 @@ export class BuildsQueries extends Conditionable {
     let countResults: number | undefined
 
     do {
-      const clone = cloneDeep<Builder>(this)
+      const clone = cloneDeep(this)
 
       if (skip && page > 1) {
         clone.offset(0)
@@ -171,7 +171,7 @@ export class BuildsQueries extends Conditionable {
 
       const items = results.all()
       const list = Array.isArray(items) ? items : Object.values(items)
-      lastId = dataGet(lastItem(list), alias) as number | null
+      lastId = dataGet<number | undefined>(lastItem(list), alias)
 
       if (lastId === undefined) {
         throw new Error(
@@ -249,48 +249,13 @@ export class BuildsQueries extends Conditionable {
     throw new Error(errorMessage)
   }
 
-  // /**
-  //  * Paginate the given query.
-  //  */
-  // public async paginate (
-  //   perPage: number = 15,
-  //   columns: string[] = ['*'],
-  //   pageName: string = 'page',
-  //   page: number | null = null,
-  //   total: number | (() => number) | null = null
-  // ): Promise<LengthAwarePaginator> {
-  //   const currentPage = page ?? Paginator.resolveCurrentPage(pageName)
-
-  //   const resolvedTotal =
-  //     total !== null && total !== undefined
-  //       ? typeof total === 'function'
-  //         ? total()
-  //         : total
-  //       : await this.getCountForPagination()
-
-  //   const results = resolvedTotal
-  //     ? await this.forPage(currentPage, perPage).get(columns)
-  //     : new SupportCollection([])
-
-  //   return this.paginator(
-  //     results,
-  //     resolvedTotal,
-  //     perPage,
-  //     currentPage,
-  //     {
-  //       path: Paginator.resolveCurrentPath(),
-  //       pageName
-  //     }
-  //   )
-  // }
-
   protected paginator <TValue>(
     items: SupportCollection<PropertyKey, TValue>,
     total: number,
     perPage: number,
     currentPage: number,
     options: { path?: string; pageName?: string }
-  ): LengthAwarePaginator {
+  ): LengthAwarePaginator<PropertyKey, TValue> {
     return new LengthAwarePaginator(items, total, perPage, currentPage, options)
   }
 
@@ -329,7 +294,7 @@ export class BuildsQueries extends Conditionable {
 
         if (previousColumn !== null) {
           originalColumn ??= this.getOriginalColumnNameForCursorPagination(
-            this as Builder,
+            this,
             previousColumn
           )
 
@@ -363,7 +328,7 @@ export class BuildsQueries extends Conditionable {
           const columnKey = String(order.column)
           const originalColumnForCompare =
             this.getOriginalColumnNameForCursorPagination(
-              this as Builder,
+              this,
               columnKey
             )
 
@@ -417,7 +382,7 @@ export class BuildsQueries extends Conditionable {
         })
       }
 
-      addCursorConditions(this as Builder, null, null, 0)
+      addCursorConditions(this, undefined, undefined, 0)
     }
 
     this.limit(perPage + 1)
@@ -432,7 +397,7 @@ export class BuildsQueries extends Conditionable {
   protected cursorPaginator (
     items: SupportCollection<PropertyKey, unknown>,
     perPage: number,
-    cursor: Cursor | null,
+    cursor: Cursor,
     options: {
       path?: string
       cursorName?: string

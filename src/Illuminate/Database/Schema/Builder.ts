@@ -1,5 +1,5 @@
-import type { Connection } from "../Connection";
-import type { Grammar } from "../Grammar";
+import type { Connection } from '../Connection'
+import type { Grammar } from '../Grammar'
 
 export class Builder {
   /**
@@ -7,17 +7,17 @@ export class Builder {
    *
    * @var \Illuminate\Database\Connection
    */
-  protected connection: Connection;
+  protected connection: Connection
 
   /**
    * The schema grammar instance.
    *
    * @var \Illuminate\Database\Schema\Grammars\Grammar
    */
-  protected grammar: Grammar | undefined;
+  protected grammar: Grammar | undefined
 
-  constructor(connection: Connection) {
-    this.connection = connection;
-    this.grammar = connection.getSchemaGrammar();
+  constructor (connection: Connection) {
+    this.connection = connection
+    this.grammar = connection.getSchemaGrammar()
   }
 }

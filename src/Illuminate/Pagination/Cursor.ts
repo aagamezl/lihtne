@@ -1,5 +1,11 @@
 import { Collection } from '../Collections/Collection'
 
+const isCursorPayload = (
+  value: unknown
+): value is Record<string, unknown> & { _pointsToNextItems: boolean } => {
+  return typeof value === 'object' && value !== null && '_pointsToNextItems' in value && typeof value._pointsToNextItems === 'boolean'
+}
+
 export class Cursor {
   protected parametersProperty: Record<string, unknown>
 
@@ -13,6 +19,14 @@ export class Cursor {
     this.pointsToNextItemsProperty = pointsToNextItems
   }
 
+  /**
+   * Get the given parameter from the cursor.
+   *
+   * @param  string  $parameterName
+   * @return string|null
+   *
+   * @throws \UnexpectedValueException
+   */
   public parameter (parameterName: string): unknown {
     if (!(parameterName in this.parametersProperty)) {
       throw new Error(
@@ -30,7 +44,7 @@ export class Cursor {
    * @return array
    */
   public parameters (parameterNames: string[]): unknown[] {
-    return (new Collection<string, unknown>(parameterNames))
+    return (new Collection<number, string>(parameterNames))
       .map((parameterName) => this.parameter(parameterName))
       .toArray()
   }
@@ -79,15 +93,14 @@ export class Cursor {
       'base64'
     ).toString('utf8')
 
-    const parameters = JSON.parse(json)
+    const parameters: unknown = JSON.parse(json)
 
-    if (!Array.isArray(parameters) || !('_pointsToNextItems' in parameters)) {
+    if (!isCursorPayload(parameters)) {
       return undefined
     }
 
-    const pointsToNextItems = parameters._pointsToNextItems
-    delete parameters._pointsToNextItems
+    const { _pointsToNextItems: pointsToNextItems, ...cursorParameters } = parameters
 
-    return new Cursor(parameters, pointsToNextItems)
+    return new Cursor(cursorParameters, pointsToNextItems)
   }
 }

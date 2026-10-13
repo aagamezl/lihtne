@@ -11,7 +11,7 @@ const EMPTY_GLUE = ''
 // Merges EnumeratesValues members onto this class. The interface adds no fields of its own.
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface Collection<TKey extends PropertyKey, TValue>
-  extends EnumeratesValues<TKey, TValue> { }
+  extends EnumeratesValues<TValue> { }
 
 /**
  * TypeScript port of `Illuminate\Support\Collection`.
@@ -38,12 +38,10 @@ export class Collection<
    */
 
   /**
- * Mirrors the underlying `$items` array every method in this trait
- * reads from. Stored as a `Dictionary` so both list-like (numeric) and
- * associative (string) keys behave the way PHP arrays do.
- */
-  protected items: TValue[] | Record<string, TValue>
-
+   * Mirrors the underlying `$items` array every method in this trait
+   * reads from. Stored as a `Dictionary` so both list-like (numeric) and
+   * associative (string) keys behave the way PHP arrays do.
+   */
   constructor (items: TValue[] | Record<string, TValue> = []) {
     super()
 
@@ -123,7 +121,11 @@ export class Collection<
    * @return static
    */
   public reverse (): Collection<TKey, TValue> {
-    return this.newInstance(Array.isArray(this.items) ? this.items.reverse(true) : Object.values(this.items).reverse(true))
+    return this.newInstance(
+      Array.isArray(this.items)
+        ? this.items.reverse()
+        : Object.values(this.items).reverse()
+    )
   }
 
   /**
@@ -143,7 +145,11 @@ export class Collection<
    * @return static
    */
   public slice (offset: number, length: number | undefined): Collection<TKey, TValue> {
-    return this.newInstance(Array.isArray(this.items) ? this.items.slice(offset, length) : Object.values(this.items).slice(offset, length, true))
+    return this.newInstance(
+      Array.isArray(this.items)
+        ? this.items.slice(offset, length)
+        : Object.values(this.items).slice(offset, length)
+    )
   }
 
   /**
@@ -154,8 +160,10 @@ export class Collection<
    * @param  \Illuminate\Contracts\Support\Arrayable<TKey, TMergeValue>|iterable<TKey, TMergeValue>  $items
    * @return static<TKey, TValue|TMergeValue>
    */
-  public merge (items: unknown[] | Record<string, unknown>): Collection<TKey, TValue | unknown> {
-    return this.newInstance(Object.assign({}, this.items, this.getArrayableItems(items)))
+  public merge (items: TValue[] | Record<string, TValue>): Collection<TKey, TValue | TValue> {
+    return this.newInstance(
+      Object.assign({}, this.items, this.getArrayableItems(items))
+    )
   }
 
   /**
@@ -210,7 +218,7 @@ export class Collection<
     }
 
     return this.newInstance(
-      Arr.filter(this.items, (value, key) => Boolean(callback(value, key)))
+      Arr.filter(this.items, (value, key: TKey) => Boolean(callback(value, key)))
     )
   }
 

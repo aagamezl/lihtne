@@ -58,8 +58,11 @@ export const getValue = <TValue>(
   return value instanceof Function ? value(...args) : value
 }
 
-export const typedEntries = <T extends object>(obj: T): [keyof T, T[keyof T]][] => {
-  return Object.entries(obj) as [keyof T, T[keyof T]][]
+export function typedEntries<TValue> (
+  obj: Record<string, TValue> | readonly TValue[]
+): [string, TValue][]
+export function typedEntries (obj: object): [string, unknown][] {
+  return Object.entries(obj)
 }
 
 /**
@@ -126,11 +129,11 @@ export function changeKeyCase (
   value: Record<string, unknown>,
   changeCase: ChangeCase = 'CASE_LOWER'
 ): Record<string, unknown> {
-  const casefunction =
-    changeCase === 'CASE_LOWER' ? 'toLowerCase' : 'toUpperCase'
-
   return Object.fromEntries(
-    Object.entries(value).map(([key, value]) => [key[casefunction](), value])
+    Object.entries(value).map(([key, value]) => [
+      key[changeCase === 'CASE_LOWER' ? 'toLowerCase' : 'toUpperCase'](),
+      value
+    ])
   )
 }
 

@@ -178,6 +178,16 @@ export class Builder implements BuilderContract {
   }
 
   /**
+   * Forwarded to the base query builder by the instance proxy.
+   */
+  declare getColumns: () => string[]
+
+  /**
+   * Forwarded to the base query builder by the instance proxy.
+   */
+  declare getGrammar: () => ReturnType<QueryBuilder['getGrammar']>
+
+  /**
    * Create a collection of models from plain arrays.
    *
    * @param  array  $items

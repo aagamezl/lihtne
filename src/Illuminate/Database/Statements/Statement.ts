@@ -2,8 +2,8 @@ import { uuid } from '@devnetic/utils'
 
 import type { BindingValue, BindingValues } from '../Query'
 
-export type Result = {
-  rows: Record<string, unknown>[]
+export type Result<TRow extends Record<string, unknown> = Record<string, unknown>> = {
+  rows: TRow[]
 }
 
 export type PreparedStatement = {
@@ -11,7 +11,7 @@ export type PreparedStatement = {
   text: string
 }
 
-export class Statement {
+export class Statement<TRow extends Record<string, unknown> = Record<string, unknown>> {
   protected bindings: Record<string, BindingValue> = {}
 
   protected statement?: PreparedStatement
@@ -20,7 +20,7 @@ export class Statement {
    * @protected
    * @type {any}
    */
-  protected result: Result = { rows: [] }
+  protected result: Result<TRow> = { rows: [] }
 
   /**
    *
@@ -38,7 +38,7 @@ export class Statement {
     }
   }
 
-  prepare (query: string): Statement {
+  prepare (query: string): this {
     this.statement = {
       // give the query a unique name
       name: `prepared-statement-${uuid()}`,
@@ -69,7 +69,7 @@ export class Statement {
     )
   }
 
-  public fetchAll (): Result['rows'] {
+  public fetchAll (): TRow[] {
     return this.result.rows
   }
 

@@ -1,7 +1,6 @@
 import { dateFormat } from '@devnetic/utils'
 import { cloneDeep, isNil, isPlainObject, snakeCase } from 'es-toolkit'
 
-import type { ConditionExpression as ConditionExpressionContract } from '../../Contracts/Database/Query/ConditionExpression'
 import type { CursorPaginator } from '../../Pagination/CursorPaginator'
 import type { Scalar } from '../../Support/types'
 import type { Connection } from '../Connection'
@@ -136,7 +135,7 @@ export type HavingClauseType =
 
 export type Having = {
   type: HavingClauseType
-  column?: string | Expression | ConditionExpressionContract | QueryCallback
+  column?: string | Expression | QueryCallback
   operator?: string
   value?: unknown
   boolean: string
@@ -177,6 +176,10 @@ type AfterQueryCallback = <TResult>(
 ) => TResult | null | undefined
 type SelectColumn =
   string | Expression | QueryCallback | Builder | EloquentBuilder | Relation
+
+type PaginationCountRow = { aggregate: unknown }
+
+type PaginationCountResults = [PaginationCountRow, ...PaginationCountRow[]]
 
 export type BooleanOperator = 'and' | 'or'
 
@@ -244,7 +247,7 @@ export class Builder extends mixing().useTrait([
    *
    * @var \Closure|\Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder<*>|\Illuminate\Contracts\Database\Query\Expression|string
    */
-  public fromProperty: string | Expression = ''
+  public fromProperty: Expression | string = ''
 
   /**
    * The callbacks that should be invoked before the query is executed.
@@ -449,7 +452,7 @@ export class Builder extends mixing().useTrait([
   public insertGetId (
     values: Record<string, unknown>,
     sequence: string | undefined = undefined
-  ): number {
+  ): Promise<string | number> {
     this.applyBeforeQueryCallbacks()
 
     const sql = this.grammar.compileInsertGetId(this, values, sequence)
@@ -1471,7 +1474,7 @@ export class Builder extends mixing().useTrait([
   public async findOr (
     id: number | string,
     columns: string | Expression | string[] = ['*'],
-    callback?: CallableFunction
+    callback: CallableFunction = () => Promise<PropertyKey | unknown | undefined>
   ): Promise<PropertyKey | unknown | undefined> {
     if (typeof columns === 'function') {
       callback = columns
@@ -1485,7 +1488,7 @@ export class Builder extends mixing().useTrait([
       return data
     }
 
-    return callback!()
+    return callback()
   }
 
   /**
@@ -1710,7 +1713,8 @@ export class Builder extends mixing().useTrait([
           sortedValue[key] = value[key]
         }
 
-        values[key] = sortedValue
+        // TODO: remove if possible the Number(key) cast
+        values[Number(key)] = sortedValue
       }
     }
 
@@ -2340,7 +2344,7 @@ export class Builder extends mixing().useTrait([
     this.applyBeforeQueryCallbacks()
 
     const results = await this.connection.select<{ exists: boolean }>(
-    this.grammar.compileExists(this),
+      this.grammar.compileExists(this),
       this.getBindings()
     )
 
@@ -2350,7 +2354,7 @@ export class Builder extends mixing().useTrait([
     if (Object.keys(results).length > 0) {
       const result = results[0]
 
-      return Boolean(result.exists)
+      return Boolean(result?.exists)
     }
 
     return false
@@ -2737,7 +2741,7 @@ export class Builder extends mixing().useTrait([
 
     if (value >= 0) {
       this[property] =
-        value !== undefined ? parseInt(value.toString()) : undefined
+        value !== undefined ? parseInt(String(value), 10) : undefined
     }
 
     return this
@@ -3235,7 +3239,7 @@ export class Builder extends mixing().useTrait([
     pageName: string = 'page',
     page: number | undefined = undefined,
     total: number | (() => number | Promise<number>) | undefined = undefined
-  ): Promise<LengthAwarePaginator> {
+  ): Promise<LengthAwarePaginator<PropertyKey, Record<string, unknown>>> {
     page = page ?? Paginator.resolveCurrentPage(pageName)
 
     total = await (getValue(total) ?? this.getCountForPagination())
@@ -4103,7 +4107,7 @@ export class Builder extends mixing().useTrait([
   public async getCountForPagination (
     columns: string[] = ['*']
   ): Promise<number> {
-    const results = await this.runPaginationCountQuery(columns)
+    const results: PaginationCountResults = await this.runPaginationCountQuery(columns)
 
     // Once we have run the pagination count query, we will get the resulting count and
     // take into account what type of query it was. When there is a group by we will
@@ -4111,10 +4115,13 @@ export class Builder extends mixing().useTrait([
     if (results.length === 0) {
       return 0
     } else if (results[0] instanceof Object) {
-      return parseInt(String(results[0]!.aggregate), 10)
+      return parseInt(String(results[0].aggregate), 10)
     }
 
-    return parseInt(String(changeKeyCase(results[0]!.aggregate as Record<string, unknown>)), 10)
+    const row: PaginationCountRow = results[0]
+
+    // TODO: improve the changeKeyCase return type inference
+    return parseInt(String(changeKeyCase(row).aggregate), 10)
   }
 
   /**
@@ -4125,12 +4132,12 @@ export class Builder extends mixing().useTrait([
    */
   protected async runPaginationCountQuery (
     columns: string[] = ['*']
-  ): Promise<Array<{ aggregate: unknown }>> {
+  ): Promise<PaginationCountResults> {
     if (this.groups.length > 0 || this.havings.length > 0) {
       const clone = this.cloneForPaginationCount()
 
       if (clone.columns === undefined && this.joins.length > 0) {
-        clone.select(`${this.from}.*`)
+        clone.select(`${this.fromProperty}.*`)
       }
 
       const result = await this.newQuery()
@@ -4143,7 +4150,8 @@ export class Builder extends mixing().useTrait([
         .setAggregate('count', this.withoutSelectAliases(columns))
         .get()
 
-      return result.all() as unknown as Array<{ aggregate: unknown }>
+      // TODO: remove the as cast
+      return result.all() as PaginationCountResults
     }
 
     const without = this.unions
@@ -4155,7 +4163,8 @@ export class Builder extends mixing().useTrait([
       .setAggregate('count', this.withoutSelectAliases(columns))
       .get()
 
-    return result.all() as unknown as Array<{ aggregate: unknown }>
+    // TODO: remove the unknown as cast
+    return result.all() as unknown as PaginationCountResults
   }
 
   /**
@@ -5377,7 +5386,8 @@ export class Builder extends mixing().useTrait([
           sortedValue[key] = value[key]
         }
 
-        ;(values as Record<number, Record<string, unknown>>)[key] = sortedValue
+        // TODO: remove the as cast
+        ;(values as Record<number, Record<string, unknown>>)[Number(key)] = sortedValue
       }
     }
 

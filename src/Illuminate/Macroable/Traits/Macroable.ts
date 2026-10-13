@@ -39,7 +39,7 @@ export class Macroable {
 
     if (typeof macro === 'function') {
       try {
-        const boundMacro = macro.bindTo(this)
+        const boundMacro = macro.bind(this)
 
         if (isNil(boundMacro)) {
           throw new Error('RuntimeException: Unable to bind macro to instance.')

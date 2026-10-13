@@ -10,10 +10,12 @@ export class Processor {
    * @param  array  $results
    * @return array
    */
-  public processSelect (
-    _query: Builder,
-    results: Record<string, unknown>[]
-  ): Record<string, unknown>[] {
+  public processSelect <TResult>(
+
+    // @ts-expect-error -- assertion parameter is type-only
+    query: Builder,
+    results: TResult
+  ): TResult {
     return results
   }
 
@@ -26,15 +28,15 @@ export class Processor {
  * @param  string|null  $sequence
  * @return int
  */
-  public processInsertGetId (
+  public async processInsertGetId (
     query: Builder,
     sql: string,
     values: BindingValues,
     sequence?: string
-  ): number {
+  ): Promise<string | number> {
     query.getConnection().insert(sql, values)
 
-    const id = query.getConnection().getDriver().lastInsertId(sequence)
+    const id = await query.getConnection().getDriver().lastInsertId(sequence)
 
     return isNumeric(id) ? Number(id) : id
   }
