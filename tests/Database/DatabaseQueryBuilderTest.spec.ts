@@ -4671,7 +4671,7 @@ describe('Database Query Builder', () => {
     expect(result).toBe(1)
   })
 
-  test.only('testInsertGetIdWithEmptyValues', async () => {
+  test('testInsertGetIdWithEmptyValues', async () => {
     let builder = getMySqlBuilder()
     let processor = builder.getProcessor()
     jest.spyOn(processor, 'processInsertGetId').mockResolvedValue(1)

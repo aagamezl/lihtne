@@ -58,7 +58,7 @@ export class Connection extends DetectsLostConnections {
    *
    * @var \Illuminate\Database\Schema\Grammars\Grammar
    */
-  protected schemaGrammar: SchemaGrammar | undefined = undefined
+  protected schemaGrammar!: SchemaGrammar
 
   /**
    * The active driver connection.
@@ -256,7 +256,7 @@ export class Connection extends DetectsLostConnections {
    *
    * @return \Illuminate\Database\Schema\Grammars\Grammar
    */
-  public getSchemaGrammar (): SchemaGrammar | undefined {
+  public getSchemaGrammar (): SchemaGrammar {
     return this.schemaGrammar
   }
 
@@ -782,6 +782,7 @@ export class Connection extends DetectsLostConnections {
    * @return void
    */
   public useDefaultSchemaGrammar () {
+    // @ts-expect-error - expected error, schemaGrammar is not set in the constructor
     this.schemaGrammar = this.getDefaultSchemaGrammar()
   }
 

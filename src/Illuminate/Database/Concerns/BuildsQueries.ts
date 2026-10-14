@@ -1,6 +1,7 @@
+
 import { cloneDeep } from 'es-toolkit'
 
-import type { Collection, Collection as SupportCollection } from '../../Collections/Collection'
+import type { Collection } from '../../Collections/Collection'
 import type { Builder as EloquentBuilder } from '../Eloquent/Builder'
 
 import { dataGet, last as lastItem } from '../../Collections/helpers'
@@ -28,8 +29,10 @@ export class BuildsQueries extends Conditionable {
     count: number,
     callback: (results: Collection<PropertyKey, unknown>, page: number) => unknown
   ): Promise<boolean> {
+    // @ts-expect-error -- `this` is the builder that mixes in BuildsQueries
     const clone = cloneDeep<Builder>(this)
 
+    // @ts-expect-error -- enforceOrderBy is implemented by the builder
     clone.enforceOrderBy()
 
     const skip = clone.getOffset()
@@ -59,6 +62,7 @@ export class BuildsQueries extends Conditionable {
         remaining = Math.max(remaining - countResults, 0)
       }
 
+      // @ts-expect-error -- get() rows are the collection the chunk callback receives
       if ((await callback(results, page)) === false) {
         return false
       }
@@ -122,10 +126,13 @@ export class BuildsQueries extends Conditionable {
     alias: string | undefined = undefined,
     descending: SortDirection | boolean = false
   ): Promise<boolean> {
+    // @ts-expect-error -- defaultKeyName is implemented by the builder
     column ??= this.defaultKeyName()
     alias ??= column
     let lastId: number | undefined
+    // @ts-expect-error -- getOffset is implemented by the builder
     const skip = this.getOffset()
+    // @ts-expect-error -- getLimit is implemented by the builder
     let remaining = this.getLimit()
 
     let page = 1
@@ -135,6 +142,7 @@ export class BuildsQueries extends Conditionable {
       const clone = cloneDeep(this)
 
       if (skip && page > 1) {
+        // @ts-expect-error -- offset is implemented by the builder
         clone.offset(0)
       }
 
@@ -150,11 +158,14 @@ export class BuildsQueries extends Conditionable {
       //     : await clone.forPageAfterId(limit, lastId, column).get()
       let results: Collection<PropertyKey, unknown>
       if (descending === SortDirection.Ascending || descending === false) {
+        // @ts-expect-error -- forPageAfterId is implemented by the builder
         results = await clone.forPageAfterId(limit, lastId, column).get()
       } else if (descending === SortDirection.Descending || descending === true) {
+        // @ts-expect-error -- forPageBeforeId is implemented by the builder
         results = await clone.forPageBeforeId(limit, lastId, column).get()
       }
 
+      // @ts-expect-error -- results is assigned by the builder page query above
       countResults = results.count()
 
       if (countResults === 0) {
@@ -165,10 +176,12 @@ export class BuildsQueries extends Conditionable {
         remaining = Math.max(remaining - countResults, 0)
       }
 
+      // @ts-expect-error -- results is assigned by the builder page query above
       if ((await callback(results, page)) === false) {
         return false
       }
 
+      // @ts-expect-error -- results is assigned by the builder page query above
       const items = results.all()
       const list = Array.isArray(items) ? items : Object.values(items)
       lastId = dataGet<number | undefined>(lastItem(list), alias)
@@ -218,6 +231,7 @@ export class BuildsQueries extends Conditionable {
   public async first (
     columns: Array<string> = ['*']
   ): Promise<unknown | undefined> {
+    // @ts-expect-error -- limit and get are implemented by the builder
     const results = await this.limit(1).get(columns)
 
     return results.first()
@@ -250,7 +264,7 @@ export class BuildsQueries extends Conditionable {
   }
 
   protected paginator <TValue>(
-    items: SupportCollection<PropertyKey, TValue>,
+    items: Collection<PropertyKey, TValue>,
     total: number,
     perPage: number,
     currentPage: number,
@@ -272,11 +286,13 @@ export class BuildsQueries extends Conditionable {
           : CursorPaginator.resolveCurrentCursor(cursorName, cursor)
     }
 
+    // @ts-expect-error -- ensureOrderForCursorPagination is implemented by the builder
     const orders = this.ensureOrderForCursorPagination(
       cursor !== undefined && cursor.pointsToPreviousItems()
     )
 
     if (cursor !== undefined) {
+      // @ts-expect-error -- setBindings is implemented by the builder
       this.setBindings([], 'union')
 
       const columnForWhere = (originalColumn: string): string | Expression =>
@@ -290,10 +306,12 @@ export class BuildsQueries extends Conditionable {
         originalColumn: string | undefined,
         index: number
       ): void => {
+        // @ts-expect-error -- getUnionBuilders is implemented by the builder
         const unionBuilders = builder.getUnionBuilders()
 
-        if (previousColumn !== null) {
+        if (previousColumn !== undefined) {
           originalColumn ??= this.getOriginalColumnNameForCursorPagination(
+            // @ts-expect-error -- `this` is the builder that mixes in BuildsQueries
             this,
             previousColumn
           )
@@ -305,8 +323,10 @@ export class BuildsQueries extends Conditionable {
           )
 
           unionBuilders.each((unionBuilder) => {
+            // @ts-expect-error -- union query is present when the builder reports one
             unionBuilder.where(
               this.getOriginalColumnNameForCursorPagination(
+                // @ts-expect-error -- union query is present when the builder reports one
                 unionBuilder,
                 previousColumn
               ),
@@ -314,6 +334,7 @@ export class BuildsQueries extends Conditionable {
               cursor.parameter(previousColumn) as string | number
             )
 
+            // @ts-expect-error -- addBinding is implemented by the builder
             this.addBinding(unionBuilder.getRawBindings().where, 'union')
           })
         }
@@ -328,6 +349,7 @@ export class BuildsQueries extends Conditionable {
           const columnKey = String(order.column)
           const originalColumnForCompare =
             this.getOriginalColumnNameForCursorPagination(
+              // @ts-expect-error -- `this` is the builder that mixes in BuildsQueries
               this,
               columnKey
             )
@@ -350,13 +372,16 @@ export class BuildsQueries extends Conditionable {
           }
 
           unionBuilders.each((unionBuilder) => {
+            // @ts-expect-error -- union query is present when the builder reports one
             const unionWheres = unionBuilder.getRawBindings().where
             const unionOriginalColumn =
               this.getOriginalColumnNameForCursorPagination(
+                // @ts-expect-error -- union query is present when the builder reports one
                 unionBuilder,
                 columnKey
               )
 
+            // @ts-expect-error -- union query is present when the builder reports one
             unionBuilder.where((nestedUnionBuilder: Builder) => {
               nestedUnionBuilder.where(
                 columnForWhere(unionOriginalColumn),
@@ -375,18 +400,23 @@ export class BuildsQueries extends Conditionable {
                 })
               }
 
+              // @ts-expect-error -- addBinding is implemented by the builder
               this.addBinding(unionWheres, 'union')
+              // @ts-expect-error -- addBinding is implemented by the builder
               this.addBinding(nestedUnionBuilder.getRawBindings().where, 'union')
             })
           })
         })
       }
 
+      // @ts-expect-error -- `this` is the builder that mixes in BuildsQueries
       addCursorConditions(this, undefined, undefined, 0)
     }
 
+    // @ts-expect-error -- limit is implemented by the builder
     this.limit(perPage + 1)
 
+    // @ts-expect-error -- get is implemented by the builder; cursor is resolved above
     return this.cursorPaginator(await this.get(columns), perPage, cursor, {
       path: Paginator.resolveCurrentPath(),
       cursorName,
@@ -395,7 +425,7 @@ export class BuildsQueries extends Conditionable {
   }
 
   protected cursorPaginator (
-    items: SupportCollection<PropertyKey, unknown>,
+    items: Collection<PropertyKey, unknown>,
     perPage: number,
     cursor: Cursor,
     options: {

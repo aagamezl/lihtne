@@ -35,19 +35,20 @@ export class Macroable {
       )
     }
 
-    let macro = (this.macros ?? {})[method]
+    const registered = (this.macros ?? {})[method]
+    let macro = registered
 
-    if (typeof macro === 'function') {
+    if (typeof registered === 'function') {
       try {
-        const boundMacro = macro.bind(this)
+        const boundMacro = registered.bind(this)
 
         if (isNil(boundMacro)) {
           throw new Error('RuntimeException: Unable to bind macro to instance.')
         }
 
         macro = boundMacro
-      } catch (error) {
-        macro = macro.bind(null)
+      } catch {
+        macro = registered.bind(null)
       }
     }
 

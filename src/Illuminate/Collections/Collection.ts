@@ -9,7 +9,8 @@ import { EnumeratesValues } from './Traits/EnumeratesValues'
 const EMPTY_GLUE = ''
 
 // Merges EnumeratesValues members onto this class. The interface adds no fields of its own.
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+// `TKey` is unused in this body; it must match the class type parameters for declaration merging.
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unused-vars
 export interface Collection<TKey extends PropertyKey, TValue>
   extends EnumeratesValues<TValue> { }
 
@@ -46,6 +47,8 @@ export class Collection<
     super()
 
     this.items = this.getArrayableItems(items)
+
+    // console.log('items: ', items, ' - this.items: ', this.items)
   }
 
   // constructor (items: ArrayableInput<TValue> = []) {
