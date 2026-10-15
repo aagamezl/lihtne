@@ -1,0 +1,276 @@
+import type { Connection } from './Connection'
+import type { BindingValue } from './Query'
+
+import { Collection } from '../Collections/Collection'
+import { Expression } from './Query/Expression'
+
+export abstract class Grammar {
+  //   use Macroable;
+
+  // The connection used for escaping values.
+  protected connection
+
+  /**
+   * Create a new grammar instance.
+   */
+  public constructor (connection: Connection) {
+    this.connection = connection
+  }
+
+  /**
+   * Escapes a value for safe SQL embedding.
+   *
+   * @param  string|float|int|bool|null  $value
+   * @param  bool  $binary
+   * @return string
+   */
+  public escape (
+    value: string | number | boolean | BindingValue,
+    binary: boolean = false
+  ): string {
+    if (value instanceof Date) {
+      return this.connection.escape(value.toISOString(), binary)
+    }
+
+    if (typeof value !== 'object') {
+      return this.connection.escape(value, binary)
+    }
+
+    throw new Error(
+      'RuntimeException: The database connection does not support escaping this value.'
+    )
+  }
+
+  /**
+   * Wrap a table in keyword identifiers.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression|string  table
+   * @param  string|null  prefix
+   * @return string | number
+   */
+  public wrapTable (
+    table: Expression | string,
+    prefix: string | null = null
+  ): string {
+    if (this.isExpression(table)) {
+      return this.getValue(table)
+    }
+
+    prefix ??= this.connection.getTablePrefix()
+
+    // If the table being wrapped has an alias we'll need to separate the pieces
+    // so we can prefix the table and then wrap each of the segments on their
+    // own and then join these both back together using the "as" connector.
+    if (/\s+as\s+/i.test(String(table))) {
+      return this.wrapAliasedTable(table, prefix)
+    }
+
+    // If the table being wrapped has a custom schema name specified, we need to
+    // prefix the last segment as the table name then wrap each segment alone
+    // and eventually join them both back together using the dot connector.
+    if (String(table).includes('.')) {
+      const tableString = String(table)
+      const lastDot = tableString.lastIndexOf('.')
+
+      table =
+        tableString.slice(0, lastDot + 1) +
+        prefix +
+        tableString.slice(lastDot + 1)
+
+      return new Collection(table.split('.'))
+        .map(this.wrapValue.bind(this))
+        .implode('.')
+    }
+
+    return this.wrapValue(prefix + table)
+  }
+
+  /**
+   * Wrap a value in keyword identifiers.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression|string  $value
+   * @return string
+   */
+  public wrap<TValue extends Expression | string> (value: TValue): string {
+    if (this.isExpression(value)) {
+      return this.getValue(value)
+    }
+
+    // If the value being wrapped has a column alias we will need to separate out
+    // the pieces so we can wrap each of the segments of the expression on its
+    // own, and then join these both back together using the "as" connector.
+    if (value.includes(' as ')) {
+      return this.wrapAliasedValue(value)
+    }
+
+    // If the given value is a JSON selector we will wrap it differently than a
+    // traditional value. We will need to split this path and wrap each part
+    // wrapped, etc. Otherwise, we will simply wrap the value as a string.
+    if (this.isJsonSelector(value)) {
+      return this.wrapJsonSelector(value)
+    }
+
+    return this.wrapSegments(value.split('.'))
+  }
+
+  /**
+   * Wrap a value that has an alias.
+   *
+   * @param  string  $value
+   * @return string
+   */
+  protected wrapAliasedValue (value: string): string {
+    const segments = value.split(/\s+as\s+/i)
+
+    return (
+      this.wrap(segments[0] ?? '') + ' as ' + this.wrapValue(segments[1] ?? '')
+    )
+  }
+
+  /**
+   * Wrap a table that has an alias.
+   *
+   * @param  string  $value
+   * @param  string|null  $prefix
+   * @return string
+   */
+  protected wrapAliasedTable (
+    value: string,
+    prefix: string | undefined = undefined
+  ): string {
+    const segments = value.split(/\s+as\s+/i)
+
+    prefix ??= this.connection.getTablePrefix()
+
+    return (
+      this.wrapTable(segments[0] ?? '', prefix) +
+      ' as ' +
+      this.wrapValue(prefix + (segments[1] ?? ''))
+    )
+  }
+
+  /**
+   * Wrap the given value segments.
+   *
+   * @param  list<string>  $segments
+   * @return string
+   */
+  protected wrapSegments (segments: string[]) {
+    return new Collection(segments)
+      .map((segment: string, key: PropertyKey) => {
+        return key === 0 && segments.length > 1
+          ? this.wrapTable(segment)
+          : this.wrapValue(segment)
+      })
+      .implode('.')
+  }
+
+  /**
+   * Create query parameter place-holders for an array.
+   *
+   * @param  array<mixed>  $values
+   * @return string
+   */
+  public parameterize (values: unknown): string {
+    // return values.map((value) => this.parameter(value)).join(', ')
+    const list = Array.isArray(values) ? values : Object.values(values ?? {})
+
+    return list
+      .map((value) => {
+        return this.parameter(value)
+      })
+      .join(', ')
+  }
+
+  /**
+   * Wrap a single string in keyword identifiers.
+   *
+   * @param  string  value
+   * @return string
+   */
+  protected wrapValue (value: string): string {
+    if (value !== '*') {
+      return '"' + value.replace('"', '""') + '"'
+    }
+
+    return value
+  }
+
+  /**
+   * Wrap the given JSON selector.
+   *
+   * @param  string  $value
+   * @return string
+   *
+   * @throws \RuntimeException
+   */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base wrapJsonSelector signature
+  protected wrapJsonSelector (_value: string): string {
+    throw new Error(
+      'RuntimeException: This database engine does not support JSON operations.'
+    )
+  }
+
+  /**
+   * Determine if the given string is a JSON selector.
+   *
+   * @param  string  $value
+   * @return bool
+   */
+  protected isJsonSelector (value: string): boolean {
+    return value.includes('->')
+  }
+
+  /**
+   * Convert an array of column names into a delimited string.
+   *
+   * @param  array<\Illuminate\Contracts\Database\Query\Expression|string>  $columns
+   * @return string
+   */
+  public columnize (columns: Array<Expression | string>): string {
+    return columns.map((column) => this.wrap(column)).join(', ')
+  }
+
+  /**
+   * Get the appropriate query parameter place-holder for a value.
+   *
+   * @param  mixed  $value
+   * @return string
+   */
+  public parameter (value: unknown) {
+    return this.isExpression(value) ? this.getValue(value) : '?'
+  }
+
+  /**
+   * Determine if the given value is a raw expression.
+   *
+   * @param  mixed  $value
+   * @return bool
+   */
+  public isExpression (value: unknown) {
+    return value instanceof Expression
+  }
+
+  /**
+   * Transforms expressions to their scalar types.
+   *
+   * @param {Expression | string | number} expression - The expression to transform.
+   * @returns {string | number} - The transformed value.
+   */
+  public getValue (expression: Expression | string | number): string {
+    if (this.isExpression(expression)) {
+      return this.getValue(expression.getValue(this))
+    }
+
+    return String(expression)
+  }
+
+  /**
+   * Get the format for database stored dates.
+   *
+   * @return string
+   */
+  public getDateFormat (): string {
+    return 'Y-m-d H:i:s'
+  }
+}

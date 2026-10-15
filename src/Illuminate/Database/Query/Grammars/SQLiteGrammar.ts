@@ -1,0 +1,590 @@
+import { isPlainObject } from 'es-toolkit'
+
+import type {
+  Bindings,
+  BindingValue,
+  BindingValues,
+  Builder,
+  WhereClause
+} from '../Builder'
+import type { Expression } from '../Expression'
+import type { IndexHint } from '../IndexHint'
+
+import { Arr, Collection } from '../../../Collections'
+import { last } from '../../../Collections/helpers'
+import { isNumeric, Str, typedEntries } from '../../../Support'
+import { Grammar } from './Grammar'
+
+type Splittable = {
+  split (separator: string | RegExp): string[]
+}
+
+function withSplit (value: Expression | string): Splittable
+function withSplit (
+  value: Expression | string
+): Expression | string | Splittable {
+  return value
+}
+
+export class SQLiteGrammar extends Grammar {
+  /**
+   * All of the available clause operators.
+   *
+   * @var string[]
+   */
+  protected override operators: string[] = [
+    '=',
+    '<',
+    '>',
+    '<=',
+    '>=',
+    '<>',
+    '!=',
+    'like',
+    'not like',
+    'ilike',
+    '&',
+    '|',
+    '<<',
+    '>>'
+  ]
+
+  /**
+   * Compile the lock into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  bool|string  $value
+   * @return string
+   */
+  protected override compileLock (
+    // @ts-expect-error expected error; query is not used in this method
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base compileLock signature
+    query: Builder,
+    // @ts-expect-error expected error; value is not used in this method
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base compileLock signature
+    value: boolean | string
+  ): string {
+    return ''
+  }
+
+  /**
+   * Wrap a union subquery in parentheses.
+   *
+   * @param  string  $sql
+   * @return string
+   */
+  protected override wrapUnion (sql: string): string {
+    return `select * from (${sql})`
+  }
+
+  /**
+   * Compile a "where null safe equals" clause.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $where
+   * @return string
+   */
+  protected override whereNullSafeEquals (
+    // @ts-expect-error expected error; query is not used in this method
+
+    query: Builder,
+    where: WhereClause
+  ): string {
+    return this.wrap(where.column ?? '') + ' is ' + this.parameter(where.value)
+  }
+
+  /**
+   * Compile a "where date" clause.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $where
+   * @return string
+   */
+  protected override whereDate (query: Builder, where: WhereClause): string {
+    return this.dateBasedWhere('%Y-%m-%d', query, where)
+  }
+
+  /**
+   * Compile a "where day" clause.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $where
+   * @return string
+   */
+  protected override whereDay (query: Builder, where: WhereClause): string {
+    return this.dateBasedWhere('%d', query, where)
+  }
+
+  /**
+   * Compile a "where month" clause.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $where
+   * @return string
+   */
+  protected override whereMonth (query: Builder, where: WhereClause): string {
+    return this.dateBasedWhere('%m', query, where)
+  }
+
+  /**
+   * Compile a "where year" clause.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $where
+   * @return string
+   */
+  protected override whereYear (query: Builder, where: WhereClause): string {
+    return this.dateBasedWhere('%Y', query, where)
+  }
+
+  /**
+   * Convert a LIKE pattern to a GLOB pattern using simple string replacement.
+   *
+   * @param  string  $value
+   * @param  bool  $caseSensitive
+   * @return string
+   */
+  public prepareWhereLikeBinding (
+    value: string,
+    caseSensitive: boolean
+  ): string {
+    if (!caseSensitive) {
+      return value
+    }
+
+    return value
+      .replaceAll('*', '[*]')
+      .replaceAll('?', '[?]')
+      .replaceAll('%', '*')
+      .replaceAll('_', '?')
+  }
+
+  /**
+   * Compile a "where like" clause.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $where
+   * @return string
+   */
+  protected override whereLike (query: Builder, where: WhereClause): string {
+    if (where.caseSensitive === false) {
+      return super.whereLike(query, where)
+    }
+    where.operator = where.not ? 'not glob' : 'glob'
+
+    return this.whereBasic(query, where)
+  }
+
+  /**
+   * Compile a "where time" clause.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $where
+   * @return string
+   */
+  protected override whereTime (query: Builder, where: WhereClause): string {
+    return this.dateBasedWhere('%H:%M:%S', query, where)
+  }
+
+  /**
+   * Compile an "upsert" statement into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $values
+   * @param  array  $uniqueBy
+   * @param  array  $update
+   * @return string
+   */
+  public override compileUpsert (
+    query: Builder,
+    values: unknown[],
+    uniqueBy: string[],
+    update: Array<string | Expression> | Record<string, string | Expression>
+  ): string {
+    let sql = this.compileInsert(query, values)
+
+    sql += ' on conflict (' + this.columnize(uniqueBy) + ') do update set '
+
+    const columns = new Collection<string, string | Expression>(update)
+      .map((value, key) => {
+        return isNumeric(key)
+          ? this.wrap(value) +
+              ' = ' +
+              this.wrapValue('excluded') +
+              '.' +
+              this.wrap(value)
+          : this.wrap(key) + ' = ' + this.parameter(value)
+      })
+      .implode(', ')
+
+    return sql + columns
+  }
+
+  /**
+   * Compile an insert ignore statement using a subquery into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $columns
+   * @param  string  $sql
+   * @return string
+   */
+  public override compileInsertOrIgnoreUsing (
+    query: Builder,
+    columns: string[],
+    sql: string
+  ): string {
+    return Str.replaceFirst(
+      'insert',
+      'insert or ignore',
+      this.compileInsertUsing(query, columns, sql)
+    )
+  }
+
+  /**
+   * Compile an update statement with joins or limit into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $values
+   * @return string
+   */
+  protected compileUpdateWithJoinsOrLimit (
+    query: Builder,
+    values: Record<string, unknown>
+  ): string {
+    const table = this.wrapTable(query.fromProperty)
+    const columns = this.compileUpdateColumns(query, values)
+    const alias = withSplit(query.fromProperty).split(' as ').pop() ?? ''
+    const selectSql = this.compileSelect(query.select(`${alias}.rowid`))
+
+    return `update ${table} set ${columns} where ${this.wrap('rowid')} in (${selectSql})`
+  }
+
+  /**
+   * Compile the columns for an update statement.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $values
+   * @return string
+   */
+  protected override compileUpdateColumns (
+    // @ts-expect-error - query is not used
+
+    query: Builder,
+    values: Record<string, unknown>
+  ): string {
+    const jsonGroups = this.groupJsonColumnsForUpdate(values)
+
+    return new Collection<string, unknown>(values)
+      .reject((_: unknown, key: string) => this.isJsonSelector(key))
+      .merge(jsonGroups)
+      .map((value: unknown, key: string) => {
+        const column = last(key.split('.'))
+
+        value = Object.hasOwn(jsonGroups, String(key))
+          ? this.compileJsonPatch(String(column), value)
+          : this.parameter(value)
+
+        return this.wrap(column) + ' = ' + value
+      })
+      .implode(', ')
+  }
+
+  /**
+   * Compile a "JSON" patch statement into SQL.
+   *
+   * @param  string  $column
+   * @param  mixed  $value
+   * @return string
+   */
+  protected compileJsonPatch (column: string, value: unknown): string {
+    return `json_patch(ifnull(${this.wrap(column)}, json('{}')), json(${this.parameter(value)}))`
+  }
+
+  /**
+   * Compile an update statement into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $values
+   * @return string
+   */
+  public override compileUpdate (
+    query: Builder,
+    values: Record<string, unknown>
+  ): string {
+    if (query.joins.length > 0 || (query.limitProperty ?? 0) > 0) {
+      return this.compileUpdateWithJoinsOrLimit(query, values)
+    }
+
+    return super.compileUpdate(query, values)
+  }
+
+  /**
+   * Prepare the bindings for an update statement.
+   *
+   * @param  array  $bindings
+   * @param  array  $values
+   * @return array
+   */
+  public override prepareBindingsForUpdate (
+    bindings: Bindings,
+    values: BindingValues | Record<string, BindingValue>
+  ): BindingValues {
+    const groups = this.groupJsonColumnsForUpdate(values)
+
+    const preparedValues = new Collection<string, BindingValue>(values)
+      .reject((_: unknown, key: string) => this.isJsonSelector(key))
+      .merge(groups)
+      .map((value): BindingValue =>
+        Array.isArray(value) || isPlainObject(value)
+          ? JSON.stringify(value)
+          : value)
+      .all()
+
+    const cleanBindings = Arr.except(bindings, 'select')
+
+    const updateBindings = Array.isArray(preparedValues)
+      ? preparedValues
+      : Object.values(preparedValues)
+
+    return [...updateBindings, ...Arr.flatten(cleanBindings)]
+  }
+
+  /**
+   * Compile a delete statement into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @return string
+   */
+  /**
+   * Compile a truncate table statement into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @return array
+   */
+  public override compileTruncate (
+    query: Builder
+  ): Record<string, BindingValues> {
+    let [schema, table] = query
+      .getConnection()
+      .getSchemaBuilder()
+      .parseSchemaAndTable(query.fromProperty)
+
+    schema = schema ? this.wrapValue(schema) + '.' : ''
+
+    return {
+      ['delete from ' + schema + 'sqlite_sequence where name = ?']: [
+        query.getConnection().getTablePrefix() + table
+      ],
+      ['delete from ' + this.wrapTable(query.fromProperty)]: []
+    }
+  }
+
+  public override compileDelete (query: Builder): string {
+    if (query.joins.length > 0 || (query.limitProperty ?? 0) > 0) {
+      return this.compileDeleteWithJoinsOrLimit(query)
+    }
+
+    return super.compileDelete(query)
+  }
+
+  /**
+   * Compile a delete statement with joins or limit into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @return string
+   */
+  protected compileDeleteWithJoinsOrLimit (query: Builder): string {
+    const table = this.wrapTable(query.fromProperty)
+    const alias = last(withSplit(query.fromProperty).split(' as ') ?? '')
+    const selectSql = this.compileSelect(query.select(`${alias}.rowid`))
+
+    return `delete from ${table} where ${this.wrap('rowid')} in (${selectSql})`
+  }
+
+  /**
+   * Group the nested JSON columns.
+   *
+   * @param  array  $values
+   * @return array
+   */
+  protected groupJsonColumnsForUpdate<TValue> (
+    values: readonly TValue[] | Record<string, TValue>
+  ): Record<string, TValue> {
+    const groups: Record<string, TValue> = {}
+
+    for (const [key, value] of typedEntries(values)) {
+      if (!this.isJsonSelector(key)) {
+        continue
+      }
+
+      const path = Str.after(key, '.').replaceAll('->', '.')
+
+      Arr.set(groups, path, value)
+    }
+
+    return groups
+  }
+
+  /**
+   * Compile an insert or ignore statement with a returning clause into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $values
+   * @param  array  $returning
+   * @param  array|null  $uniqueBy
+   * @return string
+   */
+  public override compileInsertOrIgnoreReturning (
+    query: Builder,
+    values: unknown[],
+    returning: string[],
+    uniqueBy?: string[] | undefined
+  ): string {
+    const insert = this.compileInsert(query, values)
+
+    if (uniqueBy === undefined) {
+      return `${insert} on conflict do nothing returning ${this.columnize(returning)}`
+    }
+
+    return `${insert} on conflict (${this.columnize(uniqueBy)}) do nothing returning ${this.columnize(returning)}`
+  }
+
+  /**
+   * Compile an insert ignore statement into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $values
+   * @return string
+   */
+  public override compileInsertOrIgnore (
+    query: Builder,
+    values: unknown[]
+  ): string {
+    return Str.replaceFirst(
+      'insert',
+      'insert or ignore',
+      this.compileInsert(query, values)
+    )
+  }
+
+  /**
+   * Compile a "JSON contains" statement into SQL.
+   *
+   * @param  string  $column
+   * @param  mixed  $value
+   * @return string
+   */
+  /**
+   * Compile the index hints for the query.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  \Illuminate\Database\Query\IndexHint  $indexHint
+   * @return string
+   *
+   * @throws \InvalidArgumentException
+   */
+  protected override compileIndexHint (
+    _query: Builder,
+    indexHint?: IndexHint
+  ): string {
+    if (indexHint === undefined || indexHint.type !== 'force') {
+      return ''
+    }
+
+    if (!/^[a-zA-Z0-9_$]+$/.test(indexHint.index)) {
+      throw new Error(
+        'InvalidArgumentException: Index name contains invalid characters.'
+      )
+    }
+
+    return 'indexed by ' + indexHint.index
+  }
+
+  /**
+   * Compile a "JSON length" statement into SQL.
+   *
+   * @param  string  $column
+   * @param  string  $operator
+   * @param  string  $value
+   * @return string
+   */
+  protected override compileJsonLength (
+    column: string,
+    operator: string,
+    value: string
+  ): string {
+    const [field, path] = this.wrapJsonFieldAndPath(column)
+
+    return `json_array_length(${field}${path}) ${operator} ${value}`
+  }
+
+  protected override compileJsonContains (
+    column: string,
+    value: string
+  ): string {
+    const [field, path] = this.wrapJsonFieldAndPath(column)
+
+    return (
+      'exists (select 1 from json_each(' +
+      field +
+      path +
+      ') where ' +
+      this.wrap('json_each.value') +
+      ' is ' +
+      value +
+      ')'
+    )
+  }
+
+  /**
+   * Prepare the binding for a "JSON contains" statement.
+   *
+   * @param  mixed  $binding
+   * @return mixed
+   */
+  public override prepareBindingForJsonContains (binding: unknown): unknown {
+    return binding
+  }
+
+  /**
+   * Compile a "JSON contains key" statement into SQL.
+   *
+   * @param  string  $column
+   * @return string
+   */
+  protected override compileJsonContainsKey (column: string): string {
+    const [field, path] = this.wrapJsonFieldAndPath(column)
+
+    return 'json_type(' + field + path + ') is not null'
+  }
+
+  /**
+   * Wrap the given JSON selector.
+   *
+   * @param  string  $value
+   * @return string
+   */
+  protected override wrapJsonSelector (value: string): string {
+    const [field, path] = this.wrapJsonFieldAndPath(value)
+
+    return `json_extract(${field}${path})`
+  }
+
+  /**
+   * Compile a date based where clause.
+   *
+   * @param  string  $type
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $where
+   * @return string
+   */
+  protected override dateBasedWhere (
+    type: string,
+    _query: Builder,
+    where: WhereClause
+  ): string {
+    const value = this.parameter(where.value)
+
+    return `strftime('${type}', ${this.wrap(where.column ?? '')}) ${where.operator} cast(${value} as text)`
+  }
+}
