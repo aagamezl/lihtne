@@ -10,12 +10,26 @@ export class Macroable {
   protected macros: Record<string, unknown> = {}
 
   /**
+   * Register a custom macro.
+   *
+   * @param  string  $name
+   * @param  object|callable  $macro
+   *
+   * @param-closure-this static  $macro
+   *
+   * @return void
+   */
+  public macro(name: string, macro: unknown): void {
+    this.macros[name] = macro;
+  }
+
+  /**
    * Checks if macro is registered.
    *
    * @param  string  $name
    * @return bool
    */
-  public hasMacro (name: string): boolean {
+  public hasMacro(name: string): boolean {
     return (this.macros ?? {})[name] !== undefined
   }
 
@@ -28,7 +42,8 @@ export class Macroable {
    *
    * @throws \BadMethodCallException
    */
-  public macroCall (method: string, parameters: unknown[]): unknown {
+  // public macroCall(method: string, parameters: unknown[]): unknown {
+  public __call(method: string, ...parameters: Array<unknown>): unknown {
     if (!this.hasMacro(method)) {
       throw new Error(
         `BadMethodCallException: Method ${this.constructor.name}::${method}() does not exist.`

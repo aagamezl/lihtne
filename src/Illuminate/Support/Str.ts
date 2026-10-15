@@ -59,6 +59,28 @@ export class Str {
   }
 
   /**
+   * Determine if a given string ends with a given substring.
+   *
+   * @param  string  $haystack
+   * @param  string|iterable<string>  $needles
+   * @return bool
+   */
+  public static endsWith (
+    haystack: string,
+    needles: string | readonly string[]
+  ): boolean {
+    const values = typeof needles === 'string' ? [needles] : needles
+
+    for (const needle of values) {
+      if (needle !== '' && haystack.endsWith(needle)) {
+        return true
+      }
+    }
+
+    return false
+  }
+
+  /**
    * Return the remainder of a string after the first occurrence of a given value.
    *
    * @param  string  $subject

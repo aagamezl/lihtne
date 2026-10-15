@@ -68,6 +68,29 @@ export function typedEntries (obj: object): [string, unknown][] {
 }
 
 /**
+ * Get a value from the array, and remove it.
+ *
+ * @param  {Record<string, unknown>}  array
+ * @param  {string}  key
+ * @param  {any}  [defaultValue=undefined]
+ * @return {any}
+ */
+export const pull = <
+  TRecord extends Record<string, unknown>,
+  TKey extends keyof TRecord & string
+>(
+  array: TRecord,
+  key: TKey,
+  defaultValue?: TRecord[TKey]
+): TRecord[TKey] | undefined => {
+  const value = array[key] ?? defaultValue
+
+  delete array[key]
+
+  return value
+}
+
+/**
  * Make a string's first character uppercase
  *
  * @param  {string}  value
