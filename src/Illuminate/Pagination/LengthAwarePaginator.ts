@@ -34,7 +34,10 @@ export class LengthAwarePaginator<
     this.lastPage = Math.max(Math.ceil(total / Math.max(this.perPage, 1)), 1)
     this.path = this.path !== '/' ? this.path.replace(/\/$/, '') : this.path
     this.currentPage = this.setCurrentPage(currentPage, this.pageName)
-    this.items = items instanceof Collection ? items : new Collection<TKey, TValue>(items ?? [])
+    this.items =
+      items instanceof Collection
+        ? items
+        : new Collection<TKey, TValue>(items ?? [])
   }
 
   public total (): number {
@@ -46,14 +49,18 @@ export class LengthAwarePaginator<
   }
 
   /**
- * Get the current page for the request.
- *
- * @param  int  $currentPage
- * @param  string  $pageName
- * @return int
- */
-  protected setCurrentPage (currentPage: number | undefined, pageName: string): number {
-    currentPage = currentPage ?? LengthAwarePaginator.resolveCurrentPage(pageName)
+   * Get the current page for the request.
+   *
+   * @param  int  $currentPage
+   * @param  string  $pageName
+   * @return int
+   */
+  protected setCurrentPage (
+    currentPage: number | undefined,
+    pageName: string
+  ): number {
+    currentPage =
+      currentPage ?? LengthAwarePaginator.resolveCurrentPage(pageName)
 
     return this.isValidPageNumber(currentPage) ? Number(currentPage) : 1
   }

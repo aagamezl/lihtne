@@ -9,10 +9,10 @@ const isMacro = (value: unknown): value is (...args: unknown[]) => unknown => {
 
 export class Builder implements BuilderContract {
   /**
-     * The base query builder instance.
-     *
-     * @var \Illuminate\Database\Query\Builder
-     */
+   * The base query builder instance.
+   *
+   * @var \Illuminate\Database\Query\Builder
+   */
   protected query: QueryBuilder
 
   protected passthru: string[] = [

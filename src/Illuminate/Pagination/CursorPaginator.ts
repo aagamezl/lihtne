@@ -1,7 +1,10 @@
 import type { Cursor } from './Cursor'
 
 import { Collection } from '../Collections/Collection'
-import { AbstractCursorPaginator, type Options } from './AbstractCursorPaginator'
+import {
+  AbstractCursorPaginator,
+  type Options
+} from './AbstractCursorPaginator'
 
 export class CursorPaginator<
   TKey extends PropertyKey = PropertyKey,
@@ -35,8 +38,11 @@ export class CursorPaginator<
     this.setItems(items)
   }
 
-  protected setItems (items: Collection<TKey, TValue> | TValue[] | undefined): void {
-    this.items = items instanceof Collection ? items : new Collection<TKey, TValue>(items)
+  protected setItems (
+    items: Collection<TKey, TValue> | TValue[] | undefined
+  ): void {
+    this.items =
+      items instanceof Collection ? items : new Collection<TKey, TValue>(items)
 
     this.hasMore = this.items.count() > this.perPage
 

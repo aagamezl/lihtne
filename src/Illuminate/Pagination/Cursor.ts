@@ -3,7 +3,12 @@ import { Collection } from '../Collections/Collection'
 const isCursorPayload = (
   value: unknown
 ): value is Record<string, unknown> & { _pointsToNextItems: boolean } => {
-  return typeof value === 'object' && value !== null && '_pointsToNextItems' in value && typeof value._pointsToNextItems === 'boolean'
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    '_pointsToNextItems' in value &&
+    typeof value._pointsToNextItems === 'boolean'
+  )
 }
 
 export class Cursor {
@@ -44,7 +49,7 @@ export class Cursor {
    * @return array
    */
   public parameters (parameterNames: string[]): unknown[] {
-    return (new Collection<number, string>(parameterNames))
+    return new Collection<number, string>(parameterNames)
       .map((parameterName) => this.parameter(parameterName))
       .toArray()
   }
@@ -83,7 +88,9 @@ export class Cursor {
    * @param  string|undefined  $encodedString
    * @return static|undefined
    */
-  public static fromEncoded (encodedString: string | undefined): Cursor | undefined {
+  public static fromEncoded (
+    encodedString: string | undefined
+  ): Cursor | undefined {
     if (typeof encodedString !== 'string') {
       return undefined
     }
@@ -99,7 +106,8 @@ export class Cursor {
       return undefined
     }
 
-    const { _pointsToNextItems: pointsToNextItems, ...cursorParameters } = parameters
+    const { _pointsToNextItems: pointsToNextItems, ...cursorParameters } =
+      parameters
 
     return new Cursor(cursorParameters, pointsToNextItems)
   }

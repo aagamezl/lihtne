@@ -1,4 +1,3 @@
-
 import { cloneDeep } from 'es-toolkit'
 
 import type { Collection } from '../../Collections/Collection'
@@ -27,7 +26,10 @@ export class BuildsQueries extends Conditionable {
    */
   public async chunk (
     count: number,
-    callback: (results: Collection<PropertyKey, unknown>, page: number) => unknown
+    callback: (
+      results: Collection<PropertyKey, unknown>,
+      page: number
+    ) => unknown
   ): Promise<boolean> {
     // @ts-expect-error -- `this` is the builder that mixes in BuildsQueries
     const clone = cloneDeep<Builder>(this)
@@ -84,11 +86,19 @@ export class BuildsQueries extends Conditionable {
    */
   public chunkById (
     count: number,
-    callback: (results: Collection<PropertyKey, unknown>, page: number) => unknown,
+    callback: (
+      results: Collection<PropertyKey, unknown>,
+      page: number
+    ) => unknown,
     column: string | null = null,
     alias: string | null = null
   ): Promise<boolean> {
-    return this.orderedChunkById(count, callback, column ?? undefined, alias ?? undefined)
+    return this.orderedChunkById(
+      count,
+      callback,
+      column ?? undefined,
+      alias ?? undefined
+    )
   }
 
   /**
@@ -96,7 +106,10 @@ export class BuildsQueries extends Conditionable {
    */
   public chunkByIdDesc (
     count: number,
-    callback: (results: Collection<PropertyKey, unknown>, page: number) => unknown,
+    callback: (
+      results: Collection<PropertyKey, unknown>,
+      page: number
+    ) => unknown,
     column: string | null = null,
     alias: string | null = null
   ): Promise<boolean> {
@@ -121,7 +134,10 @@ export class BuildsQueries extends Conditionable {
    */
   public async orderedChunkById (
     count: number,
-    callback: (results: Collection<PropertyKey, unknown>, page: number) => unknown,
+    callback: (
+      results: Collection<PropertyKey, unknown>,
+      page: number
+    ) => unknown,
     column: string | undefined = undefined,
     alias: string | undefined = undefined,
     descending: SortDirection | boolean = false
@@ -160,7 +176,10 @@ export class BuildsQueries extends Conditionable {
       if (descending === SortDirection.Ascending || descending === false) {
         // @ts-expect-error -- forPageAfterId is implemented by the builder
         results = await clone.forPageAfterId(limit, lastId, column).get()
-      } else if (descending === SortDirection.Descending || descending === true) {
+      } else if (
+        descending === SortDirection.Descending ||
+        descending === true
+      ) {
         // @ts-expect-error -- forPageBeforeId is implemented by the builder
         results = await clone.forPageBeforeId(limit, lastId, column).get()
       }
@@ -263,7 +282,7 @@ export class BuildsQueries extends Conditionable {
     throw new Error(errorMessage)
   }
 
-  protected paginator <TValue>(
+  protected paginator<TValue> (
     items: Collection<PropertyKey, TValue>,
     total: number,
     perPage: number,
@@ -403,7 +422,10 @@ export class BuildsQueries extends Conditionable {
               // @ts-expect-error -- addBinding is implemented by the builder
               this.addBinding(unionWheres, 'union')
               // @ts-expect-error -- addBinding is implemented by the builder
-              this.addBinding(nestedUnionBuilder.getRawBindings().where, 'union')
+              this.addBinding(
+                nestedUnionBuilder.getRawBindings().where,
+                'union'
+              )
             })
           })
         })
@@ -448,7 +470,10 @@ export class BuildsQueries extends Conditionable {
     builder: Builder | EloquentBuilder,
     parameter: string
   ): string {
-    const columns = builder instanceof Builder ? builder.getQuery().getColumns() : builder.getColumns()
+    const columns =
+      builder instanceof Builder
+        ? builder.getQuery().getColumns()
+        : builder.getColumns()
 
     if (columns !== undefined) {
       for (const column of columns) {
@@ -458,7 +483,10 @@ export class BuildsQueries extends Conditionable {
 
           const alias = column.slice(position + 4)
 
-          if (parameter === alias || builder.getGrammar().wrap(parameter) === alias) {
+          if (
+            parameter === alias ||
+            builder.getGrammar().wrap(parameter) === alias
+          ) {
             return original
           }
         }

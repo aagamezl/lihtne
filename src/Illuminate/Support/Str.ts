@@ -28,7 +28,11 @@ export class Str {
    * @param  bool  $ignoreCase
    * @return ($needles is array{} ? false : ($haystack is non-empty-string ? bool : false))
    */
-  public static contains (haystack: string, needles: string | string[], ignoreCase = false): boolean {
+  public static contains (
+    haystack: string,
+    needles: string | string[],
+    ignoreCase = false
+  ): boolean {
     if (haystack === undefined) {
       return false
     }
@@ -62,7 +66,9 @@ export class Str {
    * @return string
    */
   public static after (subject: string, search: string): string {
-    return search === '' ? subject : Array.from(subject.split(search)).reverse()[0] ?? ''
+    return search === ''
+      ? subject
+      : (Array.from(subject.split(search)).reverse()[0] ?? '')
   }
 
   /**

@@ -20,20 +20,20 @@ export class Paginator<
   TValue = unknown
 > extends AbstractPaginator<TKey, TValue> {
   /**
- * Indicates if there are more items in the data source.
- *
- * @var bool
- */
+   * Indicates if there are more items in the data source.
+   *
+   * @var bool
+   */
   protected hasMore: boolean = false
 
   /**
- * Create a new paginator instance.
- *
- * @param  Collection<TKey, TValue>|Arrayable<TKey, TValue>|iterable<TKey, TValue>  items
- * @param  int  perPage
- * @param  int|null  currentPage
- * @param  array  options  (path, query, fragment, pageName)
- */
+   * Create a new paginator instance.
+   *
+   * @param  Collection<TKey, TValue>|Arrayable<TKey, TValue>|iterable<TKey, TValue>  items
+   * @param  int  perPage
+   * @param  int|null  currentPage
+   * @param  array  options  (path, query, fragment, pageName)
+   */
   public constructor (
     items: Collection<TKey, TValue> | Arrayable<TValue> | Iterable<TValue>,
     perPage: number,
@@ -56,11 +56,11 @@ export class Paginator<
   }
 
   /**
- * Get the current page for the request.
- *
- * @param  int  $currentPage
- * @return int
- */
+   * Get the current page for the request.
+   *
+   * @param  int  $currentPage
+   * @return int
+   */
   protected setCurrentPage (currentPage: number | undefined): number {
     currentPage = currentPage ?? AbstractPaginator.resolveCurrentPage()
 
@@ -68,13 +68,18 @@ export class Paginator<
   }
 
   /**
-* Set the items for the paginator.
-*
-* @param  Collection<TKey, TValue>|Arrayable<TKey, TValue>|iterable<TKey, TValue>|null  $items
-* @return void
-*/
-  protected setItems (items: Collection<TKey, TValue> | Arrayable<TValue> | Iterable<TValue>): void {
-    this.items = items instanceof Collection ? items : new Collection<TKey, TValue>(arrayableItems(items))
+   * Set the items for the paginator.
+   *
+   * @param  Collection<TKey, TValue>|Arrayable<TKey, TValue>|iterable<TKey, TValue>|null  $items
+   * @return void
+   */
+  protected setItems (
+    items: Collection<TKey, TValue> | Arrayable<TValue> | Iterable<TValue>
+  ): void {
+    this.items =
+      items instanceof Collection
+        ? items
+        : new Collection<TKey, TValue>(arrayableItems(items))
 
     this.hasMore = this.items.count() > (this.perPage ?? 0)
 

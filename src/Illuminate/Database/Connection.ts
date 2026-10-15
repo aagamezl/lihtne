@@ -114,7 +114,7 @@ export class Connection extends DetectsLostConnections {
    *
    * @var (callable(\Illuminate\Database\Connection): mixed)
    */
-  protected reconnector: Reconnector = () => { }
+  protected reconnector: Reconnector = () => {}
 
   /**
    * Indicates whether queries are being logged.
@@ -236,7 +236,10 @@ export class Connection extends DetectsLostConnections {
    * @param  array  $bindings
    * @return bool
    */
-  public async insert (query: string, bindings: BindingValues = []): Promise<boolean> {
+  public async insert (
+    query: string,
+    bindings: BindingValues = []
+  ): Promise<boolean> {
     return this.statement(query, bindings)
   }
 
@@ -367,9 +370,12 @@ export class Connection extends DetectsLostConnections {
    *
    * @throws \RuntimeException
    */
-  // @ts-expect-error - expected error, value is not used in this method
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  protected escapeBinary (value: string | number | boolean | BindingValue): string {
+
+  protected escapeBinary (
+    // @ts-expect-error - expected error, value is not used in this method
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    value: string | number | boolean | BindingValue
+  ): string {
     throw new Error(
       'RuntimeException: The database connection does not support escaping binary values.'
     )
@@ -382,10 +388,9 @@ export class Connection extends DetectsLostConnections {
    * @param  array  $bindings
    * @return array
    */
-  async select<TResult extends Record<string, unknown> = Record<string, unknown>>(
-    query: string,
-    bindings: BindingValues
-  ): Promise<TResult[]> {
+  async select<
+    TResult extends Record<string, unknown> = Record<string, unknown>
+  > (query: string, bindings: BindingValues): Promise<TResult[]> {
     return await this.run<TResult[]>(query, bindings, (
       query: string,
       bindings: BindingValues
@@ -433,7 +438,7 @@ export class Connection extends DetectsLostConnections {
    *
    * @throws \Illuminate\Database\QueryException
    */
-  protected async run<TValue>(
+  protected async run<TValue> (
     query: string,
     bindings: BindingValues,
     callback: QueryCallback<TValue>
@@ -486,7 +491,7 @@ export class Connection extends DetectsLostConnections {
    *
    * @throws \Illuminate\Database\QueryException
    */
-  protected handleQueryException<TValue>(
+  protected handleQueryException<TValue> (
     e: Error,
     query: string,
     bindings: BindingValues,
@@ -572,7 +577,7 @@ export class Connection extends DetectsLostConnections {
    *
    * @throws \Illuminate\Database\QueryException
    */
-  protected tryAgainIfCausedByLostConnection<TValue>(
+  protected tryAgainIfCausedByLostConnection<TValue> (
     e: Error,
     query: string,
     bindings: BindingValues,
@@ -608,7 +613,7 @@ export class Connection extends DetectsLostConnections {
    *
    * @throws \Illuminate\Database\QueryException
    */
-  protected async runQueryCallback<TValue>(
+  protected async runQueryCallback<TValue> (
     query: string,
     bindings: BindingValues,
     callback: QueryCallback<TValue>
@@ -693,7 +698,7 @@ export class Connection extends DetectsLostConnections {
    * @param  array  bindings
    * @return void
    */
-  public bindValues<TRow extends Record<string, unknown>>(
+  public bindValues<TRow extends Record<string, unknown>> (
     statement: Statement<TRow>,
     bindings: BindingValues
   ) {
@@ -714,10 +719,7 @@ export class Connection extends DetectsLostConnections {
    */
   public selectFromWriteConnection<
     TResult extends Record<string, unknown> = Record<string, unknown>
-  > (
-    query: string,
-    bindings: BindingValues = []
-  ): Promise<TResult[]> {
+  > (query: string, bindings: BindingValues = []): Promise<TResult[]> {
     return this.select<TResult>(query, bindings)
   }
 
@@ -737,7 +739,7 @@ export class Connection extends DetectsLostConnections {
    * @param  \PDOStatement  statement
    * @return \PDOStatement
    */
-  protected prepared<TRow extends Record<string, unknown>>(
+  protected prepared<TRow extends Record<string, unknown>> (
     statement: Statement<TRow>
   ): Statement<TRow> {
     this.event(new StatementPrepared(this, statement))
@@ -787,10 +789,10 @@ export class Connection extends DetectsLostConnections {
   }
 
   /**
- * Get the default schema grammar instance.
- *
- * @return \Illuminate\Database\Schema\Grammars\Grammar|null
- */
+   * Get the default schema grammar instance.
+   *
+   * @return \Illuminate\Database\Schema\Grammars\Grammar|null
+   */
   protected getDefaultSchemaGrammar (): SchemaGrammar | undefined {
     return undefined
   }

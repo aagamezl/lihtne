@@ -1,6 +1,9 @@
 import type { Collection } from '../Collections/Collection'
 
-export abstract class AbstractPaginator<TKey extends PropertyKey = PropertyKey, TValue = unknown> {
+export abstract class AbstractPaginator<
+  TKey extends PropertyKey = PropertyKey,
+  TValue = unknown
+> {
   [key: string]: unknown
 
   /**
@@ -9,8 +12,7 @@ export abstract class AbstractPaginator<TKey extends PropertyKey = PropertyKey, 
    * @var \Closure
    */
   protected static currentPageResolverCallback:
-    | ((pageName: string) => number) |
-    undefined
+    ((pageName: string) => number) | undefined
 
   /**
    * The current path resolver callback.
@@ -111,11 +113,11 @@ export abstract class AbstractPaginator<TKey extends PropertyKey = PropertyKey, 
   }
 
   /**
- * Determine if the given value is a valid page number.
- *
- * @param  int  $page
- * @return bool
- */
+   * Determine if the given value is a valid page number.
+   *
+   * @param  int  $page
+   * @return bool
+   */
   protected isValidPageNumber (page: number): boolean {
     return page >= 1 && !Number.isNaN(page) && Number.isInteger(page)
   }

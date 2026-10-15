@@ -56,9 +56,7 @@ export abstract class EnumeratesValues<TValue> {
    * @param  mixed  $items
    * @return array<TKey, TValue>
    */
-  protected getArrayableItems (
-    items?: TValue[] | Record<string, TValue>
-  ) {
+  protected getArrayableItems (items?: TValue[] | Record<string, TValue>) {
     // return isPrimitive(items) || isEnum(items)
     //   ? Arr.wrap<TValue>(items as TValue)
     //   : Arr.from(items)
@@ -118,10 +116,10 @@ export abstract class EnumeratesValues<TValue> {
   }
 
   /**
-     * Get the collection of items as a plain array.
-     *
-     * @return array<TKey, mixed>
-     */
+   * Get the collection of items as a plain array.
+   *
+   * @return array<TKey, mixed>
+   */
   public toArray (): Array<TValue> {
     // return withMap(this).map((value: TValue) => value).all()
     // @ts-expect-error - `map` is not defined on the `EnumeratesValues` class

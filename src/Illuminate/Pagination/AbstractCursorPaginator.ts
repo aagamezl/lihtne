@@ -11,7 +11,10 @@ export type Options = {
   pageName?: string
 }
 
-export abstract class AbstractCursorPaginator<TKey extends PropertyKey = PropertyKey, TValue = unknown> {
+export abstract class AbstractCursorPaginator<
+  TKey extends PropertyKey = PropertyKey,
+  TValue = unknown
+> {
   [key: string]: unknown
 
   /**
@@ -83,15 +86,14 @@ export abstract class AbstractCursorPaginator<TKey extends PropertyKey = Propert
    * @var \Closure
    */
   protected static currentCursorResolverCallback:
-    | ((cursorName: string) => Cursor | undefined) |
-    undefined
+    ((cursorName: string) => Cursor | undefined) | undefined
 
   /**
- * Set the current cursor resolver callback.
- *
- * @param  \Closure  $resolver
- * @return void
- */
+   * Set the current cursor resolver callback.
+   *
+   * @param  \Closure  $resolver
+   * @return void
+   */
   public static currentCursorResolver (
     resolver: (cursorName: string) => Cursor | undefined
   ): void {
@@ -99,12 +101,12 @@ export abstract class AbstractCursorPaginator<TKey extends PropertyKey = Propert
   }
 
   /**
- * Resolve the current cursor or return the default value.
- *
- * @param  string  $cursorName
- * @param  \Illuminate\Pagination\Cursor|null  $default
- * @return \Illuminate\Pagination\Cursor|null
- */
+   * Resolve the current cursor or return the default value.
+   *
+   * @param  string  $cursorName
+   * @param  \Illuminate\Pagination\Cursor|null  $default
+   * @return \Illuminate\Pagination\Cursor|null
+   */
   public static resolveCurrentCursor (
     cursorName: string = 'cursor',
     defaultValue: Cursor | undefined = undefined

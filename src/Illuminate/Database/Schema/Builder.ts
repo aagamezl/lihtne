@@ -24,21 +24,23 @@ export class Builder {
   }
 
   /**
- * Parse the given database object reference and extract the schema and table.
- *
- * @param  string  $reference
- * @param  string|bool|null  $withDefaultSchema
- * @return array{string|null, string}
- *
- * @throws \InvalidArgumentException
- */
+   * Parse the given database object reference and extract the schema and table.
+   *
+   * @param  string  $reference
+   * @param  string|bool|null  $withDefaultSchema
+   * @return array{string|null, string}
+   *
+   * @throws \InvalidArgumentException
+   */
   public parseSchemaAndTable (
     reference: string | Expression,
     withDefaultSchema: string | boolean | undefined = undefined
   ): [string | undefined, string] {
-    const referenceName = String(reference instanceof Expression
-      ? reference.getValue(this.grammar) ?? ''
-      : reference)
+    const referenceName = String(
+      reference instanceof Expression
+        ? (reference.getValue(this.grammar) ?? '')
+        : reference
+    )
 
     const segments = referenceName.split('.')
     const [schemaSegment = '', tableSegment] = segments

@@ -10,9 +10,12 @@ const EMPTY_GLUE = ''
 
 // Merges EnumeratesValues members onto this class. The interface adds no fields of its own.
 // `TKey` is unused in this body; it must match the class type parameters for declaration merging.
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unused-vars
-export interface Collection<TKey extends PropertyKey, TValue>
-  extends EnumeratesValues<TValue> { }
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface Collection<
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- must match the class type parameters
+  TKey extends PropertyKey,
+  TValue
+> extends EnumeratesValues<TValue> {}
 
 /**
  * TypeScript port of `Illuminate\Support\Collection`.
@@ -29,7 +32,7 @@ export interface Collection<TKey extends PropertyKey, TValue>
 export class Collection<
   TKey extends PropertyKey,
   TValue
-// > extends EnumeratesValues<TKey, TValue> {
+  // > extends EnumeratesValues<TKey, TValue> {
 > extends mixing().useTrait([EnumeratesValues]) {
   /**
    * Create a new collection.
@@ -67,7 +70,7 @@ export class Collection<
    * always builds a plain `Collection` — faithful for this port's scope,
    * since no subclassing is exercised here.
    */
-  protected newInstance<TNewValue = TValue>(
+  protected newInstance<TNewValue = TValue> (
     items: TNewValue[] | Record<string, TNewValue> = []
   ): Collection<TKey, TNewValue> {
     return new Collection<TKey, TNewValue>(items)
@@ -89,16 +92,16 @@ export class Collection<
   }
 
   /**
- * Determine if the collection is not empty.
- *
- * @phpstan-assert-if-true TValue $this->first()
- * @phpstan-assert-if-true TValue $this->last()
- *
- * @phpstan-assert-if-false null $this->first()
- * @phpstan-assert-if-false null $this->last()
- *
- * @return bool
- */
+   * Determine if the collection is not empty.
+   *
+   * @phpstan-assert-if-true TValue $this->first()
+   * @phpstan-assert-if-true TValue $this->last()
+   *
+   * @phpstan-assert-if-false null $this->first()
+   * @phpstan-assert-if-false null $this->last()
+   *
+   * @return bool
+   */
   public isNotEmpty (): boolean {
     return !this.isEmpty()
   }
@@ -147,7 +150,10 @@ export class Collection<
    * @param  int|null  $length
    * @return static
    */
-  public slice (offset: number, length: number | undefined): Collection<TKey, TValue> {
+  public slice (
+    offset: number,
+    length: number | undefined
+  ): Collection<TKey, TValue> {
     return this.newInstance(
       Array.isArray(this.items)
         ? this.items.slice(offset, length)
@@ -163,7 +169,9 @@ export class Collection<
    * @param  \Illuminate\Contracts\Support\Arrayable<TKey, TMergeValue>|iterable<TKey, TMergeValue>  $items
    * @return static<TKey, TValue|TMergeValue>
    */
-  public merge (items: TValue[] | Record<string, TValue>): Collection<TKey, TValue | TValue> {
+  public merge (
+    items: TValue[] | Record<string, TValue>
+  ): Collection<TKey, TValue | TValue> {
     return this.newInstance(
       Object.assign({}, this.items, this.getArrayableItems(items))
     )
@@ -191,8 +199,8 @@ export class Collection<
    * Mirrors `Collection::first()`, which delegates straight to
    * `Arr::first()` over the collection's underlying items.
    */
-  public first<TRow extends TValue>(): TRow | undefined
-  public first<TDefault = undefined>(
+  public first<TRow extends TValue> (): TRow | undefined
+  public first<TDefault = undefined> (
     callback?: (value: TValue, key: TKey) => boolean,
     defaultValue?: TDefault | (() => TDefault)
   ): TValue | TDefault | undefined
@@ -221,7 +229,8 @@ export class Collection<
     }
 
     return this.newInstance(
-      Arr.filter(this.items, (value, key: TKey) => Boolean(callback(value, key)))
+      Arr.filter(this.items, (value, key: TKey) =>
+        Boolean(callback(value, key)))
     )
   }
 
@@ -230,9 +239,7 @@ export class Collection<
    */
   public reject (
     callback:
-      | ((value: TValue, key: TKey) => boolean | TValue) |
-      boolean |
-      TValue = true
+      ((value: TValue, key: TKey) => boolean | TValue) | boolean | TValue = true
   ): Collection<TKey, TValue> {
     if (typeof callback !== 'function') {
       return this.filter((value) => value !== callback)
@@ -309,7 +316,7 @@ export class Collection<
    *
    * Mirrors `Collection::map()`, which delegates to `Arr::map()`.
    */
-  map<TMapped>(
+  map<TMapped> (
     callback: (value: TValue, key: TKey) => TMapped
   ): Collection<TKey, TMapped> {
     const mapped = Arr.map<TKey, TValue, TMapped>(this.items, callback)
@@ -322,7 +329,7 @@ export class Collection<
    *
    * Mirrors `Collection::pluck()`, which delegates to `Arr::pluck()`.
    */
-  pluck<TPlucked>(
+  pluck<TPlucked> (
     value: string | string[] | ((item: TValue) => TPlucked),
     key?: string | string[] | ((item: TValue) => PropertyKey) | null
   ): Collection<PropertyKey, TPlucked | undefined> {

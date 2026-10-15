@@ -10,8 +10,7 @@ export class Processor {
    * @param  array  $results
    * @return array
    */
-  public processSelect <TResult>(
-
+  public processSelect<TResult> (
     // @ts-expect-error -- assertion parameter is type-only
     query: Builder,
     results: TResult
@@ -20,14 +19,14 @@ export class Processor {
   }
 
   /**
- * Process an  "insert get ID" query.
- *
- * @param  \Illuminate\Database\Query\Builder  $query
- * @param  string  $sql
- * @param  array  $values
- * @param  string|null  $sequence
- * @return int
- */
+   * Process an  "insert get ID" query.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  string  $sql
+   * @param  array  $values
+   * @param  string|null  $sequence
+   * @return int
+   */
   public async processInsertGetId (
     query: Builder,
     sql: string,

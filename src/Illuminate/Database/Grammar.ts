@@ -91,7 +91,7 @@ export abstract class Grammar {
    * @param  \Illuminate\Contracts\Database\Query\Expression|string  $value
    * @return string
    */
-  public wrap <TValue extends Expression | string>(value: TValue): string {
+  public wrap<TValue extends Expression | string> (value: TValue): string {
     if (this.isExpression(value)) {
       return this.getValue(value)
     }
@@ -173,9 +173,7 @@ export abstract class Grammar {
    */
   public parameterize (values: unknown): string {
     // return values.map((value) => this.parameter(value)).join(', ')
-    const list = Array.isArray(values)
-      ? values
-      : Object.values(values ?? {})
+    const list = Array.isArray(values) ? values : Object.values(values ?? {})
 
     return list
       .map((value) => {

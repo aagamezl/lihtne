@@ -1,6 +1,13 @@
 import { cloneDeep } from 'es-toolkit'
 
-import type { Bindings, BindingValue, BindingValues, Builder, Having, WhereClause } from '../Builder'
+import type {
+  Bindings,
+  BindingValue,
+  BindingValues,
+  Builder,
+  Having,
+  WhereClause
+} from '../Builder'
 import type { IndexHint } from '../IndexHint'
 import type { JoinLateralClause } from '../JoinLateralClause'
 
@@ -221,23 +228,34 @@ export class SqlServerGrammar extends Grammar {
    * @param  string  $where
    * @return string
    */
-  protected override compileUpdateWithoutJoins (query: Builder, table: string, columns: string, where: string): string {
+  protected override compileUpdateWithoutJoins (
+    query: Builder,
+    table: string,
+    columns: string,
+    where: string
+  ): string {
     const sql = super.compileUpdateWithoutJoins(query, table, columns, where)
 
-    return query.limitProperty && query.limitProperty > 0 && (query.offsetProperty ?? 0) <= 0
-      ? Str.replaceFirst('update', 'update top (' + query.limitProperty + ')', sql)
+    return query.limitProperty &&
+      query.limitProperty > 0 &&
+      (query.offsetProperty ?? 0) <= 0
+      ? Str.replaceFirst(
+        'update',
+        'update top (' + query.limitProperty + ')',
+        sql
+      )
       : sql
   }
 
   /**
-    * Compile an "upsert" statement into SQL.
-    *
-    * @param  \Illuminate\Database\Query\Builder  $query
-    * @param  array  $values
-    * @param  array  $uniqueBy
-    * @param  array  $update
-    * @return string
-    */
+   * Compile an "upsert" statement into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $values
+   * @param  array  $uniqueBy
+   * @param  array  $update
+   * @return string
+   */
   public override compileUpsert (
     query: Builder,
     values: [Record<string, unknown>, ...Array<Record<string, unknown>>],
@@ -248,29 +266,49 @@ export class SqlServerGrammar extends Grammar {
 
     let sql = 'merge ' + this.wrapTable(query.fromProperty) + ' '
 
-    const parameters = (new Collection(values))
+    const parameters = new Collection(values)
       .map((record: unknown) => '(' + this.parameterize(record) + ')')
       .implode(', ')
 
-    sql += 'using (values ' + parameters + ') ' + this.wrapTable('lihtne_source') + ' (' + columns + ') '
+    sql +=
+      'using (values ' +
+      parameters +
+      ') ' +
+      this.wrapTable('lihtne_source') +
+      ' (' +
+      columns +
+      ') '
 
-    const on = (new Collection(uniqueBy))
-      .map((column: string) => this.wrap('lihtne_source.' + column) + ' = ' + this.wrap(query.fromProperty + '.' + column))
+    const on = new Collection(uniqueBy)
+      .map(
+        (column: string) =>
+          this.wrap('lihtne_source.' + column) +
+          ' = ' +
+          this.wrap(query.fromProperty + '.' + column)
+      )
       .implode(' and ')
 
     sql += 'on ' + on + ' '
 
     if (update) {
-      const updateColumns = (new Collection<string, string | Expression>(update)).map((value, key) => {
-        return isNumeric(key)
-          ? this.wrap(value) + ' = ' + this.wrap('lihtne_source.' + (value instanceof Expression ? value.getValue(this) : value))
-          : this.wrap(key) + ' = ' + this.parameter(value)
-      }).implode(', ')
+      const updateColumns = new Collection<string, string | Expression>(update)
+        .map((value, key) => {
+          return isNumeric(key)
+            ? this.wrap(value) +
+                ' = ' +
+                this.wrap(
+                  'lihtne_source.' +
+                    (value instanceof Expression ? value.getValue(this) : value)
+                )
+            : this.wrap(key) + ' = ' + this.parameter(value)
+        })
+        .implode(', ')
 
       sql += 'when matched then update set ' + updateColumns + ' '
     }
 
-    sql += 'when not matched then insert (' + columns + ') values (' + columns + ');'
+    sql +=
+      'when not matched then insert (' + columns + ') values (' + columns + ');'
 
     return sql
   }
@@ -283,7 +321,11 @@ export class SqlServerGrammar extends Grammar {
    * @param  string  $value
    * @return string
    */
-  protected override compileJsonLength (column: string, operator: string, value: string): string {
+  protected override compileJsonLength (
+    column: string,
+    operator: string,
+    value: string
+  ): string {
     const [field, path] = this.wrapJsonFieldAndPath(column)
 
     return `(select count(*) from openjson(${field}${path})) ${operator} ${value}`
@@ -296,7 +338,10 @@ export class SqlServerGrammar extends Grammar {
    * @param  string  $orders
    * @return string
    */
-  protected override compileRowNumber (partition: string, orders: string): string {
+  protected override compileRowNumber (
+    partition: string,
+    orders: string
+  ): string {
     if (orders.length === 0) {
       orders = 'order by (select 0)'
     }
@@ -496,25 +541,32 @@ export class SqlServerGrammar extends Grammar {
         getValue(value))
     )
 
-    return [
-      ...flattenedValues,
-      ...Arr.flatten(cleanBindings)
-    ]
+    return [...flattenedValues, ...Arr.flatten(cleanBindings)]
   }
 
   /**
-    * Compile a delete statement without joins into SQL.
-    *
-    * @param  \Illuminate\Database\Query\Builder  $query
-    * @param  string  $table
-    * @param  string  $where
-    * @return string
-    */
-  protected override compileDeleteWithoutJoins (query: Builder, table: string, where: string): string {
+   * Compile a delete statement without joins into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  string  $table
+   * @param  string  $where
+   * @return string
+   */
+  protected override compileDeleteWithoutJoins (
+    query: Builder,
+    table: string,
+    where: string
+  ): string {
     const sql = super.compileDeleteWithoutJoins(query, table, where)
 
-    return query.limitProperty && query.limitProperty > 0 && (query.offsetProperty ?? 0) <= 0
-      ? Str.replaceFirst('delete', 'delete top (' + query.limitProperty + ')', sql)
+    return query.limitProperty &&
+      query.limitProperty > 0 &&
+      (query.offsetProperty ?? 0) <= 0
+      ? Str.replaceFirst(
+        'delete',
+        'delete top (' + query.limitProperty + ')',
+        sql
+      )
       : sql
   }
 
@@ -524,7 +576,10 @@ export class SqlServerGrammar extends Grammar {
    * @param  array  $having
    * @return string
    */
-  protected override whereBitwise (_query: Builder, where: WhereClause): string {
+  protected override whereBitwise (
+    _query: Builder,
+    where: WhereClause
+  ): string {
     const value = this.parameter(where.value)
     const operator = where.operator?.replace('?', '??') ?? ''
 
@@ -547,7 +602,9 @@ export class SqlServerGrammar extends Grammar {
    */
   protected compileHavingBitwise (having: Having): string {
     const source = having.column
-    const column = this.wrap(typeof source === 'string' || source instanceof Expression ? source : '')
+    const column = this.wrap(
+      typeof source === 'string' || source instanceof Expression ? source : ''
+    )
 
     const parameter = this.parameter(having.value)
 
@@ -565,7 +622,10 @@ export class SqlServerGrammar extends Grammar {
    */
   // @ts-expect-error expected error; query is not used in this method
 
-  protected override compileIndexHint (query: Builder, indexHint: IndexHint): string {
+  protected override compileIndexHint (
+    query: Builder,
+    indexHint: IndexHint
+  ): string {
     if (indexHint.type !== 'force') {
       return ''
     }
@@ -573,7 +633,9 @@ export class SqlServerGrammar extends Grammar {
     const index = indexHint.index
 
     if (!/^[a-zA-Z0-9_$]+$/.test(index)) {
-      throw new Error('InvalidArgumentException: Index name contains invalid characters.')
+      throw new Error(
+        'InvalidArgumentException: Index name contains invalid characters.'
+      )
     }
 
     return `with (index([${index}]))`
@@ -586,7 +648,10 @@ export class SqlServerGrammar extends Grammar {
    * @param  string  $value
    * @return string
    */
-  protected override compileJsonContains (column: string, value: string): string {
+  protected override compileJsonContains (
+    column: string,
+    value: string
+  ): string {
     const [field, path] = this.wrapJsonFieldAndPath(column)
 
     return value + ' in (select [value] from openjson(' + field + path + '))'
@@ -601,7 +666,12 @@ export class SqlServerGrammar extends Grammar {
    * @param  string  $where
    * @return string
    */
-  protected override compileUpdateWithJoins (query: Builder, table: string, columns: string, where: string): string {
+  protected override compileUpdateWithJoins (
+    query: Builder,
+    table: string,
+    columns: string,
+    where: string
+  ): string {
     const alias = table.split(' as ').pop() ?? ''
 
     const joins = this.compileJoins(query, query.joins)
@@ -635,11 +705,11 @@ export class SqlServerGrammar extends Grammar {
   }
 
   /**
-  * Prepare the binding for a "JSON contains" statement.
-  *
-  * @param  mixed  $binding
-  * @return string
-  */
+   * Prepare the binding for a "JSON contains" statement.
+   *
+   * @param  mixed  $binding
+   * @return string
+   */
   public override prepareBindingForJsonContains (binding: unknown): unknown {
     return typeof binding === 'boolean' ? JSON.stringify(binding) : binding
   }

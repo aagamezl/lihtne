@@ -23,12 +23,16 @@ export class PostgresProcessor extends Processor {
 
     connection.recordsHaveBeenModified()
 
-    const results = await connection.selectFromWriteConnection<Record<string, string | number>>(sql, values)
+    const results = await connection.selectFromWriteConnection<
+      Record<string, string | number>
+    >(sql, values)
     const sequenceValue = sequence ?? 'id'
     const id = results[0]?.[sequenceValue]
 
     if (typeof id !== 'string' && typeof id !== 'number') {
-      throw new Error(`RuntimeException: Unable to find sequence [${sequenceValue}] in inserted row.`)
+      throw new Error(
+        `RuntimeException: Unable to find sequence [${sequenceValue}] in inserted row.`
+      )
     }
 
     return isNumeric(id) ? Number(id) : id

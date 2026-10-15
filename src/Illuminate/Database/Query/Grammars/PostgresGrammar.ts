@@ -1,7 +1,15 @@
 import { isNumeric, isTruthy } from '@devnetic/utils'
 import { isNil, isPlainObject } from 'es-toolkit'
 
-import type { Bindings, BindingValue, BindingValues, Builder, Having, WhereClause, WhereClauseType } from '../Builder'
+import type {
+  Bindings,
+  BindingValue,
+  BindingValues,
+  Builder,
+  Having,
+  WhereClause,
+  WhereClauseType
+} from '../Builder'
 import type { Expression } from '../Expression'
 import type { JoinClause } from '../JoinClause'
 import type { JoinLateralClause } from '../JoinLateralClause'
@@ -17,7 +25,9 @@ type Splittable = {
 }
 
 function withSplit (value: Expression | string): Splittable
-function withSplit (value: Expression | string): Expression | string | Splittable {
+function withSplit (
+  value: Expression | string
+): Expression | string | Splittable {
   return value
 }
 
@@ -190,7 +200,10 @@ export class PostgresGrammar extends Grammar {
    * @param  array  $values
    * @return string
    */
-  public override compileUpdate (query: Builder, values: Record<string, unknown>): string {
+  public override compileUpdate (
+    query: Builder,
+    values: Record<string, unknown>
+  ): string {
     if (query.joins.length > 0 || (query.limitProperty ?? 0) > 0) {
       return this.compileUpdateWithJoinsOrLimit(query, values)
     }
@@ -205,7 +218,10 @@ export class PostgresGrammar extends Grammar {
    * @param  array  $values
    * @return string
    */
-  protected compileUpdateWithJoinsOrLimit (query: Builder, values: Record<string, unknown>): string {
+  protected compileUpdateWithJoinsOrLimit (
+    query: Builder,
+    values: Record<string, unknown>
+  ): string {
     const table = this.wrapTable(query.fromProperty)
 
     const columns = this.compileUpdateColumns(query, values)
@@ -254,7 +270,10 @@ export class PostgresGrammar extends Grammar {
    * @param  array  $bindings
    * @return string
    */
-  public override substituteBindingsIntoRawSql (sql: string, bindings: BindingValues): string {
+  public override substituteBindingsIntoRawSql (
+    sql: string,
+    bindings: BindingValues
+  ): string {
     let query = super.substituteBindingsIntoRawSql(sql, bindings)
 
     for (const operator of this.operators) {
@@ -281,15 +300,17 @@ export class PostgresGrammar extends Grammar {
     query: Builder,
     values: Record<string, unknown>
   ): string {
-    return (new Collection<string, unknown>(values)).map((value, key) => {
-      const column = last(key.split('.'))
+    return new Collection<string, unknown>(values)
+      .map((value, key) => {
+        const column = last(key.split('.'))
 
-      if (this.isJsonSelector(key)) {
-        return this.compileJsonUpdateColumn(column, value)
-      }
+        if (this.isJsonSelector(key)) {
+          return this.compileJsonUpdateColumn(column, value)
+        }
 
-      return this.wrap(column) + ' = ' + this.parameter(value)
-    }).implode(', ')
+        return this.wrap(column) + ' = ' + this.parameter(value)
+      })
+      .implode(', ')
   }
 
   /**
@@ -304,7 +325,8 @@ export class PostgresGrammar extends Grammar {
 
     const field = this.wrap(segments.shift() ?? '')
 
-    const path = "'{" + this.wrapJsonPathAttributes(segments, '"').join(',') + "}'"
+    const path =
+      "'{" + this.wrapJsonPathAttributes(segments, '"').join(',') + "}'"
 
     return `${field} = jsonb_set(${field}::jsonb, ${path}, ${this.parameter(value)})`
   }
@@ -340,7 +362,11 @@ export class PostgresGrammar extends Grammar {
     values: Record<string, unknown>,
     sequence: string | undefined = undefined
   ): string {
-    return this.compileInsert(query, values) + ' returning ' + this.wrap(sequence ?? 'id')
+    return (
+      this.compileInsert(query, values) +
+      ' returning ' +
+      this.wrap(sequence ?? 'id')
+    )
   }
 
   /**
@@ -362,11 +388,17 @@ export class PostgresGrammar extends Grammar {
 
     sql += ' on conflict (' + this.columnize(uniqueBy) + ') do update set '
 
-    const columns = (new Collection<string, string | Expression>(update)).map((value, key) => {
-      return isNumeric(key)
-        ? this.wrap(value) + ' = ' + this.wrapValue('excluded') + '.' + this.wrap(value)
-        : this.wrap(key) + ' = ' + this.parameter(value)
-    }).implode(', ')
+    const columns = new Collection<string, string | Expression>(update)
+      .map((value, key) => {
+        return isNumeric(key)
+          ? this.wrap(value) +
+              ' = ' +
+              this.wrapValue('excluded') +
+              '.' +
+              this.wrap(value)
+          : this.wrap(key) + ' = ' + this.parameter(value)
+      })
+      .implode(', ')
 
     return sql + columns
   }
@@ -619,7 +651,10 @@ export class PostgresGrammar extends Grammar {
    * @param  array  $values
    * @return string
    */
-  public compileUpdateFrom (query: Builder, values: Record<string, unknown>): string {
+  public compileUpdateFrom (
+    query: Builder,
+    values: Record<string, unknown>
+  ): string {
     const table = this.wrapTable(query.fromProperty)
 
     // Each one of the columns in the update statements needs to be wrapped in the
@@ -633,7 +668,7 @@ export class PostgresGrammar extends Grammar {
       // When using Postgres, updates with joins list the joined tables in the from
       // clause, which is different than other systems like MySQL. Here, we will
       // compile out the tables that are joined and add them to a from clause.
-      const froms = (new Collection(query.joins))
+      const froms = new Collection(query.joins)
         .map((join: JoinClause) => this.wrapTable(join.table))
         .all()
 
@@ -651,9 +686,13 @@ export class PostgresGrammar extends Grammar {
     bindings: Bindings,
     values: Record<string, BindingValue | BindingValue[]>
   ): BindingValues {
-    const preparedValues = (new Collection<string, BindingValue | BindingValue[]>(values))
+    const preparedValues = new Collection<
+      string,
+      BindingValue | BindingValue[]
+    >(values)
       .map((value, column): BindingValue => {
-        return Array.isArray(value) || (this.isJsonSelector(column) && !this.isExpression(value))
+        return Array.isArray(value) ||
+          (this.isJsonSelector(column) && !this.isExpression(value))
           ? JSON.stringify(value)
           : value
       })
@@ -662,32 +701,34 @@ export class PostgresGrammar extends Grammar {
     const bindingsWithoutWhere = Arr.except(bindings, ['select', 'where'])
 
     return [
-      ...(Array.isArray(preparedValues) ? preparedValues : Object.values(preparedValues)),
+      ...(Array.isArray(preparedValues)
+        ? preparedValues
+        : Object.values(preparedValues)),
       ...bindings.where,
       ...Arr.flatten(bindingsWithoutWhere)
     ]
   }
 
   /**
-     * Prepare the bindings for an update statement.
-     *
-     * @param  array  $bindings
-     * @param  array  $values
-     * @return array
-     */
+   * Prepare the bindings for an update statement.
+   *
+   * @param  array  $bindings
+   * @param  array  $values
+   * @return array
+   */
   public override prepareBindingsForUpdate (
     bindings: Bindings,
     values: BindingValues | Record<string, BindingValue>
   ): BindingValues {
-    const preparedValues = (new Collection<string, BindingValue>(values)).map(
-      (value, column): BindingValue => {
+    const preparedValues = new Collection<string, BindingValue>(values)
+      .map((value, column): BindingValue => {
         return Array.isArray(value) ||
           isPlainObject(value) ||
           (this.isJsonSelector(column) && !this.isExpression(value))
           ? JSON.stringify(value)
           : value
-      }
-    ).all()
+      })
+      .all()
 
     const cleanBindings = Arr.except(bindings, 'select')
 
@@ -695,10 +736,7 @@ export class PostgresGrammar extends Grammar {
       ? preparedValues
       : Object.values(preparedValues)
 
-    return [
-      ...updateBindings,
-      ...Arr.flatten(cleanBindings)
-    ]
+    return [...updateBindings, ...Arr.flatten(cleanBindings)]
   }
 
   /**
@@ -759,7 +797,9 @@ export class PostgresGrammar extends Grammar {
    * @param  string  $column
    * @return string
    */
-  public override compileVectorDistanceExpression (column: string | Expression): string {
+  public override compileVectorDistanceExpression (
+    column: string | Expression
+  ): string {
     return `(${this.wrap(column)} <=> ?)`
   }
 
@@ -772,7 +812,10 @@ export class PostgresGrammar extends Grammar {
     return true
   }
 
-  protected override compileJsonContains (column: string, value: string): string {
+  protected override compileJsonContains (
+    column: string,
+    value: string
+  ): string {
     const wrappedColumn = this.wrap(column).replaceAll('->>', '->')
 
     return '(' + wrappedColumn + ')::jsonb @> ' + value
@@ -897,7 +940,9 @@ export class PostgresGrammar extends Grammar {
     }
 
     const key = Str.beforeLast(attribute, matched)
-    const keys = [...matched.matchAll(/\[([^\]]+)\]/g)].map((match) => match[1] ?? '')
+    const keys = [...matched.matchAll(/\[([^\]]+)\]/g)].map(
+      (match) => match[1] ?? ''
+    )
 
     return [key, ...keys].filter((part) => part !== '')
   }

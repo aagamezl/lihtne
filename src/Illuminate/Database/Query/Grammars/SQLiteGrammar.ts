@@ -1,6 +1,12 @@
 import { isPlainObject } from 'es-toolkit'
 
-import type { Bindings, BindingValue, BindingValues, Builder, WhereClause } from '../Builder'
+import type {
+  Bindings,
+  BindingValue,
+  BindingValues,
+  Builder,
+  WhereClause
+} from '../Builder'
 import type { Expression } from '../Expression'
 import type { IndexHint } from '../IndexHint'
 
@@ -14,7 +20,9 @@ type Splittable = {
 }
 
 function withSplit (value: Expression | string): Splittable
-function withSplit (value: Expression | string): Expression | string | Splittable {
+function withSplit (
+  value: Expression | string
+): Expression | string | Splittable {
   return value
 }
 
@@ -179,14 +187,14 @@ export class SQLiteGrammar extends Grammar {
   }
 
   /**
-    * Compile an "upsert" statement into SQL.
-    *
-    * @param  \Illuminate\Database\Query\Builder  $query
-    * @param  array  $values
-    * @param  array  $uniqueBy
-    * @param  array  $update
-    * @return string
-    */
+   * Compile an "upsert" statement into SQL.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $values
+   * @param  array  $uniqueBy
+   * @param  array  $update
+   * @return string
+   */
   public override compileUpsert (
     query: Builder,
     values: unknown[],
@@ -197,11 +205,17 @@ export class SQLiteGrammar extends Grammar {
 
     sql += ' on conflict (' + this.columnize(uniqueBy) + ') do update set '
 
-    const columns = (new Collection<string, string | Expression>(update)).map((value, key) => {
-      return isNumeric(key)
-        ? this.wrap(value) + ' = ' + this.wrapValue('excluded') + '.' + this.wrap(value)
-        : this.wrap(key) + ' = ' + this.parameter(value)
-    }).implode(', ')
+    const columns = new Collection<string, string | Expression>(update)
+      .map((value, key) => {
+        return isNumeric(key)
+          ? this.wrap(value) +
+              ' = ' +
+              this.wrapValue('excluded') +
+              '.' +
+              this.wrap(value)
+          : this.wrap(key) + ' = ' + this.parameter(value)
+      })
+      .implode(', ')
 
     return sql + columns
   }
@@ -233,7 +247,10 @@ export class SQLiteGrammar extends Grammar {
    * @param  array  $values
    * @return string
    */
-  protected compileUpdateWithJoinsOrLimit (query: Builder, values: Record<string, unknown>): string {
+  protected compileUpdateWithJoinsOrLimit (
+    query: Builder,
+    values: Record<string, unknown>
+  ): string {
     const table = this.wrapTable(query.fromProperty)
     const columns = this.compileUpdateColumns(query, values)
     const alias = withSplit(query.fromProperty).split(' as ').pop() ?? ''
@@ -257,7 +274,7 @@ export class SQLiteGrammar extends Grammar {
   ): string {
     const jsonGroups = this.groupJsonColumnsForUpdate(values)
 
-    return (new Collection<string, unknown>(values))
+    return new Collection<string, unknown>(values)
       .reject((_: unknown, key: string) => this.isJsonSelector(key))
       .merge(jsonGroups)
       .map((value: unknown, key: string) => {
@@ -314,10 +331,13 @@ export class SQLiteGrammar extends Grammar {
   ): BindingValues {
     const groups = this.groupJsonColumnsForUpdate(values)
 
-    const preparedValues = (new Collection<string, BindingValue>(values))
+    const preparedValues = new Collection<string, BindingValue>(values)
       .reject((_: unknown, key: string) => this.isJsonSelector(key))
       .merge(groups)
-      .map((value): BindingValue => (Array.isArray(value) || isPlainObject(value)) ? JSON.stringify(value) : value)
+      .map((value): BindingValue =>
+        Array.isArray(value) || isPlainObject(value)
+          ? JSON.stringify(value)
+          : value)
       .all()
 
     const cleanBindings = Arr.except(bindings, 'select')
@@ -326,10 +346,7 @@ export class SQLiteGrammar extends Grammar {
       ? preparedValues
       : Object.values(preparedValues)
 
-    return [
-      ...updateBindings,
-      ...Arr.flatten(cleanBindings)
-    ]
+    return [...updateBindings, ...Arr.flatten(cleanBindings)]
   }
 
   /**
@@ -344,13 +361,20 @@ export class SQLiteGrammar extends Grammar {
    * @param  \Illuminate\Database\Query\Builder  $query
    * @return array
    */
-  public override compileTruncate (query: Builder): Record<string, BindingValues> {
-    let [schema, table] = query.getConnection().getSchemaBuilder().parseSchemaAndTable(query.fromProperty)
+  public override compileTruncate (
+    query: Builder
+  ): Record<string, BindingValues> {
+    let [schema, table] = query
+      .getConnection()
+      .getSchemaBuilder()
+      .parseSchemaAndTable(query.fromProperty)
 
     schema = schema ? this.wrapValue(schema) + '.' : ''
 
     return {
-      ['delete from ' + schema + 'sqlite_sequence where name = ?']: [query.getConnection().getTablePrefix() + table],
+      ['delete from ' + schema + 'sqlite_sequence where name = ?']: [
+        query.getConnection().getTablePrefix() + table
+      ],
       ['delete from ' + this.wrapTable(query.fromProperty)]: []
     }
   }
@@ -459,13 +483,18 @@ export class SQLiteGrammar extends Grammar {
    *
    * @throws \InvalidArgumentException
    */
-  protected override compileIndexHint (_query: Builder, indexHint?: IndexHint): string {
+  protected override compileIndexHint (
+    _query: Builder,
+    indexHint?: IndexHint
+  ): string {
     if (indexHint === undefined || indexHint.type !== 'force') {
       return ''
     }
 
     if (!/^[a-zA-Z0-9_$]+$/.test(indexHint.index)) {
-      throw new Error('InvalidArgumentException: Index name contains invalid characters.')
+      throw new Error(
+        'InvalidArgumentException: Index name contains invalid characters.'
+      )
     }
 
     return 'indexed by ' + indexHint.index
@@ -489,7 +518,10 @@ export class SQLiteGrammar extends Grammar {
     return `json_array_length(${field}${path}) ${operator} ${value}`
   }
 
-  protected override compileJsonContains (column: string, value: string): string {
+  protected override compileJsonContains (
+    column: string,
+    value: string
+  ): string {
     const [field, path] = this.wrapJsonFieldAndPath(column)
 
     return (

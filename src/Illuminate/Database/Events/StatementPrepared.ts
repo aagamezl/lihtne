@@ -1,7 +1,9 @@
 import type { Connection } from '../Connection'
 import type { Statement } from '../Statements'
 
-export class StatementPrepared<TRow extends Record<string, unknown> = Record<string, unknown>> {
+export class StatementPrepared<
+  TRow extends Record<string, unknown> = Record<string, unknown>
+> {
   /**
    * Create a new event instance.
    *

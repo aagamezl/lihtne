@@ -1,6 +1,12 @@
 import { isPlainObject } from '@devnetic/utils'
 
-import type { Bindings, BindingValue, BindingValues, Builder, WhereClause } from '../Builder'
+import type {
+  Bindings,
+  BindingValue,
+  BindingValues,
+  Builder,
+  WhereClause
+} from '../Builder'
 import type { Expression } from '../Expression'
 import type { IndexHint } from '../IndexHint'
 import type { JoinLateralClause } from '../JoinLateralClause'
@@ -65,15 +71,21 @@ export class MySqlGrammar extends Grammar {
 
     sql += ' on duplicate key update '
 
-    const columns = new Collection<string, string | Expression>(update).map((value, key) => {
-      if (!isNumeric(key)) {
-        return this.wrap(key) + ' = ' + this.parameter(value)
-      }
+    const columns = new Collection<string, string | Expression>(update)
+      .map((value, key) => {
+        if (!isNumeric(key)) {
+          return this.wrap(key) + ' = ' + this.parameter(value)
+        }
 
-      return useUpsertAlias
-        ? this.wrap(value) + ' = ' + this.wrap('lihtne_upsert_alias') + '.' + this.wrap(value)
-        : this.wrap(value) + ' = values(' + this.wrap(value) + ')'
-    }).implode(', ')
+        return useUpsertAlias
+          ? this.wrap(value) +
+              ' = ' +
+              this.wrap('lihtne_upsert_alias') +
+              '.' +
+              this.wrap(value)
+          : this.wrap(value) + ' = values(' + this.wrap(value) + ')'
+      })
+      .implode(', ')
 
     return sql + columns
   }
@@ -207,8 +219,14 @@ export class MySqlGrammar extends Grammar {
     values: BindingValues
   ): BindingValues {
     const newValues = new Collection<string, BindingValue>(values)
-      .reject((value, column) => this.isJsonSelector(column) && typeof value === 'boolean')
-      .map((value) => (Array.isArray(value) || isPlainObject(value)) ? JSON.stringify(value) : value)
+      .reject(
+        (value, column) =>
+          this.isJsonSelector(column) && typeof value === 'boolean'
+      )
+      .map((value) =>
+        Array.isArray(value) || isPlainObject(value)
+          ? JSON.stringify(value)
+          : value)
       .all()
 
     return super.prepareBindingsForUpdate(bindings, newValues)
@@ -222,7 +240,11 @@ export class MySqlGrammar extends Grammar {
    * @param  string  $where
    * @return string
    */
-  protected override compileDeleteWithoutJoins (query: Builder, table: string, where: string): string {
+  protected override compileDeleteWithoutJoins (
+    query: Builder,
+    table: string,
+    where: string
+  ): string {
     let sql = super.compileDeleteWithoutJoins(query, table, where)
 
     if (query.orders.length > 0) {
@@ -248,7 +270,11 @@ export class MySqlGrammar extends Grammar {
    * @param  string  $where
    * @return string
    */
-  protected override compileDeleteWithJoins (query: Builder, table: string, where: string): string {
+  protected override compileDeleteWithJoins (
+    query: Builder,
+    table: string,
+    where: string
+  ): string {
     let sql = super.compileDeleteWithJoins(query, table, where)
 
     if (query.orders.length > 0) {
@@ -271,7 +297,12 @@ export class MySqlGrammar extends Grammar {
    * @param  string  $where
    * @return string
    */
-  protected override compileUpdateWithoutJoins (query: Builder, table: string, columns: string, where: string): string {
+  protected override compileUpdateWithoutJoins (
+    query: Builder,
+    table: string,
+    columns: string,
+    where: string
+  ): string {
     let sql = super.compileUpdateWithoutJoins(query, table, columns, where)
 
     if (query.orders.length > 0) {
@@ -367,7 +398,7 @@ export class MySqlGrammar extends Grammar {
 
     const expanded =
       (where.options?.expanded ?? false) &&
-        (where.options?.mode ?? '') !== 'boolean'
+      (where.options?.mode ?? '') !== 'boolean'
         ? ' with query expansion'
         : ''
 
@@ -457,7 +488,10 @@ export class MySqlGrammar extends Grammar {
    *
    * @throws \InvalidArgumentException
    */
-  protected override compileIndexHint (_query: Builder, indexHint?: IndexHint): string {
+  protected override compileIndexHint (
+    _query: Builder,
+    indexHint?: IndexHint
+  ): string {
     if (indexHint === undefined) {
       return ''
     }
@@ -468,7 +502,9 @@ export class MySqlGrammar extends Grammar {
 
     for (const index of indexes) {
       if (!/^[a-zA-Z0-9_$]+$/.test(index)) {
-        throw new Error('InvalidArgumentException: Index name contains invalid characters.')
+        throw new Error(
+          'InvalidArgumentException: Index name contains invalid characters.'
+        )
       }
     }
 
@@ -482,7 +518,10 @@ export class MySqlGrammar extends Grammar {
     }
   }
 
-  protected override compileJsonContains (column: string, value: string): string {
+  protected override compileJsonContains (
+    column: string,
+    value: string
+  ): string {
     const [field, path] = this.wrapJsonFieldAndPath(column)
 
     return 'json_contains(' + field + ', ' + value + path + ')'
@@ -495,7 +534,10 @@ export class MySqlGrammar extends Grammar {
    * @param  string  $value
    * @return string
    */
-  protected override compileJsonOverlaps (column: string, value: string): string {
+  protected override compileJsonOverlaps (
+    column: string,
+    value: string
+  ): string {
     const [field, path] = this.wrapJsonFieldAndPath(column)
 
     return 'json_overlaps(' + field + ', ' + value + path + ')'

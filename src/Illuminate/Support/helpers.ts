@@ -18,7 +18,9 @@ export const isEmpty = (value: unknown): boolean => {
  * PHP array keys are integers for lists; `Object.entries()` only yields
  * strings. Match legacy `Arr::map()` by coercing numeric string keys.
  */
-export const iterationKey = <TKey extends PropertyKey>(key: PropertyKey): TKey => {
+export const iterationKey = <TKey extends PropertyKey>(
+  key: PropertyKey
+): TKey => {
   return (isNumeric(key) ? Number(key) : key) as TKey
 }
 
@@ -106,11 +108,13 @@ type ChangeRecordKeyCase<
   TValue extends Record<string, unknown>,
   TCase extends ChangeCase
 > = {
-  [K in keyof TValue as K extends string
+  [
+  K in keyof TValue as K extends string
     ? TCase extends 'CASE_LOWER'
       ? Lowercase<K>
       : Uppercase<K>
-    : K]: TValue[K]
+    : K
+  ]: TValue[K]
 }
 
 export function changeKeyCase<TValue extends Record<string, unknown>> (

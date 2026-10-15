@@ -69,12 +69,13 @@ export class CompilesJsonPaths {
 
     const separatorIndex = column.indexOf(JSON_FIELD_PATH_SEPARATOR)
 
-    const parts = separatorIndex === -1
-      ? [column]
-      : [
-        column.slice(0, separatorIndex),
-        column.slice(separatorIndex + JSON_FIELD_PATH_SEPARATOR.length)
-      ]
+    const parts =
+      separatorIndex === -1
+        ? [column]
+        : [
+          column.slice(0, separatorIndex),
+          column.slice(separatorIndex + JSON_FIELD_PATH_SEPARATOR.length)
+        ]
 
     // @ts-expect-error Property 'wrap' does not exist on type 'CompilesJsonPaths'.
     const field = this.wrap(parts[0] ?? '')

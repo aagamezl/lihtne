@@ -2,7 +2,9 @@ import { uuid } from '@devnetic/utils'
 
 import type { BindingValue, BindingValues } from '../Query'
 
-export type Result<TRow extends Record<string, unknown> = Record<string, unknown>> = {
+export type Result<
+  TRow extends Record<string, unknown> = Record<string, unknown>
+> = {
   rows: TRow[]
 }
 
@@ -11,7 +13,9 @@ export type PreparedStatement = {
   text: string
 }
 
-export class Statement<TRow extends Record<string, unknown> = Record<string, unknown>> {
+export class Statement<
+  TRow extends Record<string, unknown> = Record<string, unknown>
+> {
   protected bindings: Record<string, BindingValue> = {}
 
   protected statement?: PreparedStatement

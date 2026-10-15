@@ -30,18 +30,18 @@ import { JoinLateralClause } from '../JoinLateralClause'
 
 export type SelectComponentName =
 
-  | 'aggregate' |
-  'columns' |
-  'from' |
-  'indexHint' |
-  'joins' |
-  'wheres' |
-  'groups' |
-  'havings' |
-  'orders' |
-  'limit' |
-  'offset' |
-  'lock'
+    | 'aggregate' |
+    'columns' |
+    'from' |
+    'indexHint' |
+    'joins' |
+    'wheres' |
+    'groups' |
+    'havings' |
+    'orders' |
+    'limit' |
+    'offset' |
+    'lock'
 
 export type SelectComponent = {
   name: SelectComponentName
@@ -62,7 +62,7 @@ export type WhereCompilers = Record<
 
 // Trait methods are merged onto the class. `mixing().useTrait()` copies them onto the prototype at runtime.
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export interface Grammar extends BaseGrammar, CompilesJsonPaths { }
+export interface Grammar extends BaseGrammar, CompilesJsonPaths {}
 
 // Trait methods are merged onto the class. `mixing().useTrait()` copies them onto the prototype at runtime.
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -141,7 +141,8 @@ export class Grammar
       InRaw: (query, where) => this.whereInRaw(query, where),
       JsonBoolean: (query, where) => this.whereJsonBoolean(query, where),
       JsonContains: (query, where) => this.whereJsonContains(query, where),
-      JsonContainsKey: (query, where) => this.whereJsonContainsKey(query, where),
+      JsonContainsKey: (query, where) =>
+        this.whereJsonContainsKey(query, where),
       JsonLength: (query, where) => this.whereJsonLength(query, where),
       JsonOverlaps: (query, where) => this.whereJsonOverlaps(query, where),
       Like: (query, where) => this.whereLike(query, where),
@@ -964,10 +965,21 @@ export class Grammar
    * @param  string  $value
    * @return string
    */
-  // @ts-expect-error expected error; column is not used in this method
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  protected compileJsonLength (column: string, operator: string, value: string): string {
-    throw new Error('This database engine does not support JSON length operations.')
+
+  protected compileJsonLength (
+    // @ts-expect-error expected error; column, operator, and value are not used in this method
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    column: string,
+    // @ts-expect-error expected error; operator is not used in this method
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    operator: string,
+    // @ts-expect-error expected error; value is not used in this method
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    value: string
+  ): string {
+    throw new Error(
+      'This database engine does not support JSON length operations.'
+    )
   }
 
   /**
@@ -1108,7 +1120,9 @@ export class Grammar
     // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base compileUpsert signature
     update: Array<string | Expression> | Record<string, string | Expression>
   ): string {
-    throw new Error('RuntimeException: This database engine does not support upserts.')
+    throw new Error(
+      'RuntimeException: This database engine does not support upserts.'
+    )
   }
 
   /**
@@ -1784,11 +1798,7 @@ export class Grammar
         getValue(value))
     )
 
-    return [
-      ...bindings.join,
-      ...flattenedValues,
-      ...Arr.flatten(cleanBindings)
-    ]
+    return [...bindings.join, ...flattenedValues, ...Arr.flatten(cleanBindings)]
   }
 
   /**
@@ -1828,9 +1838,7 @@ export class Grammar
    * @return array
    */
   public prepareBindingsForDelete (bindings: Bindings): BindingValues {
-    return Arr.flatten(
-      Arr.except(bindings, 'select')
-    )
+    return Arr.flatten(Arr.except(bindings, 'select'))
   }
 
   /**
