@@ -1,12 +1,8 @@
-import Repository from '../../Config/Repository.js'
-import ConnectionFactory from '../../Database/Connectors/ConnectionFactory.js'
-import DatabaseManager from '../../Database/DatabaseManager.js'
+import { Repository } from '../../Config/Repository'
+import { ConnectionFactory } from '../../Database/Connectors/ConnectionFactory'
+import { DatabaseManager } from '../../Database/DatabaseManager'
 
-/**
- *
- * @returns {import('../../Database/Connection.js').default}
- */
-const DB = () => {
+export const DB = () => {
   // TODO: avoid the databaseManager variable instantiation
   const databaseManager = new DatabaseManager(
     new ConnectionFactory(),
@@ -15,5 +11,3 @@ const DB = () => {
 
   return databaseManager.connection()
 }
-
-export default DB

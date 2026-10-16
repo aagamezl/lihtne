@@ -19,8 +19,8 @@ export class Macroable {
    *
    * @return void
    */
-  public macro(name: string, macro: unknown): void {
-    this.macros[name] = macro;
+  public macro (name: string, macro: unknown): void {
+    this.macros[name] = macro
   }
 
   /**
@@ -29,7 +29,7 @@ export class Macroable {
    * @param  string  $name
    * @return bool
    */
-  public hasMacro(name: string): boolean {
+  public hasMacro (name: string): boolean {
     return (this.macros ?? {})[name] !== undefined
   }
 
@@ -43,10 +43,10 @@ export class Macroable {
    * @throws \BadMethodCallException
    */
   // public macroCall(method: string, parameters: unknown[]): unknown {
-  public __call(method: string, ...parameters: Array<unknown>): unknown {
+  public __call (method: string, ...parameters: Array<unknown>): unknown {
     if (!this.hasMacro(method)) {
       throw new Error(
-        `BadMethodCallException: Method ${this.constructor.name}::${method}() does not exist.`
+        `BadMethodCallException: Method ${this.constructor.name}.${method}() does not exist.`
       )
     }
 

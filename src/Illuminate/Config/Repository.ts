@@ -1,13 +1,12 @@
-import fs from 'node:fs'
-import { join } from 'path'
-
-import { isNumeric, isPlainObject } from '@devnetic/utils'
+import { isNumeric } from '@devnetic/utils'
 
 import type { LihtneConfig } from './types'
 
-import { Arr } from './../Collections/Arr'
+import { Collection } from '../Collections'
 import { Macroable } from '../Macroable/Traits/Macroable'
 import { instanceProxy } from '../Support'
+import { isPlainRecord } from '../Support/helpers'
+import { Arr } from './../Collections/Arr'
 
 export class Repository extends Macroable {
   /**
@@ -23,43 +22,64 @@ export class Repository extends Macroable {
   }
 
   /**
-   * The path to the configuration file.
-   *
-   * @var string
-   */
-  protected configFile: string = 'lihtne-config.json'
-
-  /**
    * Create a new configuration repository.
    *
    * @param  {Partial<LihtneConfig>}  items
    */
-  constructor(items: Partial<LihtneConfig> = {}) {
+  constructor (items: Partial<LihtneConfig> = {}) {
     super()
 
-    try {
-      const path = join(process.cwd(), this.configFile)
-
-      const config = JSON.parse(fs.readFileSync(path, { encoding: 'utf8' })) as LihtneConfig
-
-      // this.items = {
-      //   ...config,
-      //   ...items,
-      //   database: {
-      //     ...config.database,
-      //     ...items.database,
-      //     connections: {
-      //       ...config.database.connections,
-      //       ...items.database?.connections
-      //     }
-      //   }
-      // }
-      this.items = items
-    } catch (error) {
-      throw new Error(`Could not load ${this.configFile}`)
-    }
+    // this.items = {
+    //   ...config,
+    //   ...items,
+    //   database: {
+    //     ...config.database,
+    //     ...items.database,
+    //     connections: {
+    //       ...config.database.connections,
+    //       ...items.database?.connections
+    //     }
+    //   }
+    // }
+    this.items = items
 
     return instanceProxy(this)
+  }
+
+  /**
+   * Get the specified string configuration value.
+   *
+   * @param  string  $key
+   * @param  (\Closure():(string|null))|string|null  $default
+   * @return string
+   *
+   * @throws \InvalidArgumentException
+   */
+  public string (key: string, defaultValue?: unknown): string {
+    const value = this.get<string, unknown>(key, defaultValue)
+
+    if (typeof value !== 'string') {
+      throw new Error(`InvalidArgumentException: Configuration value for key [${key}] must be a string, ${typeof value} given.`)
+    }
+    return value
+  }
+
+  /**
+   * Get the specified integer configuration value.
+   *
+   * @param  string  $key
+   * @param  (\Closure():(int|null))|int|null  $default
+   * @return int
+   *
+   * @throws \InvalidArgumentException
+   */
+  public integer (key: string, defaultValue?: unknown): number {
+    const value = this.get<string, unknown>(key, defaultValue)
+
+    if (typeof value !== 'number') {
+      throw new Error(`InvalidArgumentException:Configuration value for key [${key}] must be an integer, ${typeof value} given.`)
+    }
+    return value
   }
 
   /**
@@ -67,7 +87,7 @@ export class Repository extends Macroable {
    *
    * @return {Array}
    */
-  all(): Partial<LihtneConfig> {
+  all (): Partial<LihtneConfig> {
     return this.items
   }
 
@@ -78,7 +98,9 @@ export class Repository extends Macroable {
    * @param  {unknown}  defaultValue
    * @return {unknown}
    */
-  get(key: Record<string, unknown> | string | number, defaultValue?: unknown): unknown {
+  get<TKey extends string | number, TValue = unknown>(key: TKey, defaultValue?: TValue): TValue
+  get<TKey extends Record<string, unknown> | readonly string[], TValue = unknown>(key: TKey, defaultValue?: TValue): Record<string, TValue>
+  get (key: Record<string, unknown> | readonly string[] | string | number, defaultValue?: unknown): unknown {
     if (Array.isArray(key) || typeof key === 'object') {
       return this.getMany(key)
     }
@@ -94,8 +116,9 @@ export class Repository extends Macroable {
    * @param  {string[]}  keys
    * @return {Record<string, unknown>}
    */
-  getMany(keys: string | number | Record<string, unknown>): Record<string, unknown> {
-    const config: Record<string, unknown> = {}
+  getMany<TValue = unknown>(keys: Record<string, unknown> | readonly string[]): Record<string, TValue>
+  getMany<TValue = unknown>(keys: object): Record<string, TValue> {
+    const config: Record<string, TValue> = {}
 
     for (const [index, value] of Object.entries(keys)) {
       const key = isNumeric(index) ? value : index
@@ -116,11 +139,11 @@ export class Repository extends Macroable {
    *
    * @throws \InvalidArgumentException
    */
-  float(key: string, defaultValue?: unknown): number {
-    const value = this.get(key, defaultValue);
+  float (key: string, defaultValue?: unknown): number {
+    const value = this.get(key, defaultValue)
 
     if (!Number.isFinite(value)) {
-      throw new Error(`Configuration value for key [${key}] must be a float, ${typeof value} given.`);
+      throw new Error(`Configuration value for key [${key}] must be a float, ${typeof value} given.`)
     }
 
     // TODO: This is a temporary solution to convert the value to a number.
@@ -129,12 +152,61 @@ export class Repository extends Macroable {
   }
 
   /**
+   * Get the specified boolean configuration value.
+   *
+   * @param  string  $key
+   * @param  (\Closure():(bool|null))|bool|null  $default
+   * @return bool
+   *
+   * @throws \InvalidArgumentException
+   */
+  public boolean (key: string, defaultValue?: unknown): boolean {
+    const value = this.get<string, unknown>(key, defaultValue)
+
+    if (typeof value !== 'boolean') {
+      throw new Error(`InvalidArgumentException: Configuration value for key [${key}] must be a boolean, ${typeof value} given.`)
+    }
+
+    return value
+  }
+
+  /**
+   * Get the specified array configuration value.
+   *
+   * @param  string  $key
+   * @param  (\Closure():(array<array-key, mixed>|null))|array<array-key, mixed>|null  $default
+   * @return array<array-key, mixed>
+   *
+   * @throws \InvalidArgumentException
+   */
+  public array (key: string, defaultValue?: unknown): unknown[] {
+    const value = this.get<string, unknown>(key, defaultValue)
+
+    if (!Array.isArray(value)) {
+      throw new Error(`InvalidArgumentException: Configuration value for key [${key}] must be an array, ${typeof value} given.`)
+    }
+
+    return value
+  }
+
+  /**
+   * Get the specified array configuration value as a collection.
+   *
+   * @param  string  $key
+   * @param  (\Closure():(array<array-key, mixed>|null))|array<array-key, mixed>|null  $default
+   * @return Collection<array-key, mixed>
+   */
+  public collection (key: string, defaultValue?: unknown): Collection<string, unknown> {
+    return new Collection(this.array(key, defaultValue))
+  }
+
+  /**
    * Determine if the given configuration value exists.
    *
    * @param  {string}  key
    * @return {boolean}
    */
-  has(key: string): boolean {
+  has (key: string): boolean {
     return Arr.has(this.items, key)
   }
 
@@ -144,7 +216,7 @@ export class Repository extends Macroable {
    * @param  {string}  key
    * @return {boolean}
    */
-  offsetExists(key: string): boolean {
+  offsetExists (key: string): boolean {
     return this.has(key)
   }
 
@@ -154,7 +226,7 @@ export class Repository extends Macroable {
    * @param  {string}  key
    * @return {*}
    */
-  offsetGet(key: string | number): unknown {
+  offsetGet (key: string | number): unknown {
     return this.get(key)
   }
 
@@ -165,7 +237,7 @@ export class Repository extends Macroable {
    * @param  {*}  value
    * @return {void}
    */
-  offsetSet(key: string | number, value: unknown): void {
+  offsetSet (key: string | number, value: unknown): void {
     this.set(key, value)
   }
 
@@ -175,7 +247,7 @@ export class Repository extends Macroable {
    * @param  {string}  key
    * @return {void}
    */
-  offsetUnset(key: string): void {
+  offsetUnset (key: string): void {
     this.set(key, undefined)
   }
 
@@ -186,12 +258,12 @@ export class Repository extends Macroable {
    * @param  {*}  value
    * @return {void}
    */
-  prepend(key: string, value: unknown): void {
-    const array = this.get(key, [])
+  prepend (key: string, value: unknown): void {
+    const array = this.get<string, unknown[]>(key, [])
 
     // if (typeof array === 'object') {
-      array.unshift(value)
-      // array[key] = value
+    array.unshift(value)
+    // array[key] = value
     // }
 
     this.set(key, array)
@@ -204,8 +276,8 @@ export class Repository extends Macroable {
    * @param  {*}  value
    * @return {void}
    */
-  push(key: string, value: unknown): void {
-    const array = this.get(key, [])
+  push (key: string, value: unknown): void {
+    const array = this.get<string, unknown[]>(key, [])
 
     if (Array.isArray(array)) {
       array.push(value)
@@ -221,8 +293,8 @@ export class Repository extends Macroable {
    * @param  {unknown}  value
    * @return {void}
    */
-  set(key: Record<string, unknown> | string | number, value?: unknown): void {
-    const keys = Array.isArray(key) || isPlainObject(key) ? key : { [key]: value }
+  set (key: Record<string, unknown> | string | number, value?: unknown): void {
+    const keys = Array.isArray(key) || isPlainRecord(key) ? key : { [key]: value }
 
     for (const [key, value] of Object.entries(keys)) {
       Arr.set(this.items, key, value)

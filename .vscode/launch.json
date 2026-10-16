@@ -28,29 +28,20 @@
         "<node_internals>/**"
       ]
     },
-    // {
-    //   "type": "node",
-    //   "request": "launch",
-    //   "name": "Launch TypeScript Program",
-    //   "skipFiles": [
-    //     "<node_internals>/**"
-    //   ],
-    //   "program": "${file}",
-    //   "preLaunchTask": "tsc: build - tsconfig.json",
-    //   "outFiles": [
-    //     "${file}"
-    //   ]
-    // }
     {
       "type": "node",
       "request": "launch",
       "name": "Launch TypeScript Program",
-      "runtimeExecutable": "tsx",
-      "preLaunchTask": "tsc: build - tsconfig.json",
-      "sourceMaps": true,
-      "smartStep": true,
       "program": "${file}",
+      "cwd": "${workspaceFolder}",
+      "runtimeArgs": [
+        "--import",
+        "tsx"
+      ],
       "console": "integratedTerminal",
+      "skipFiles": [
+        "<node_internals>/**"
+      ]
     },
     // Source - https://stackoverflow.com/a/72872275
     // Posted by Alberto S.

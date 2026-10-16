@@ -3,7 +3,7 @@
  */
 export interface DatabaseConnectionConfig {
   driver: string
-  host: string
+  host?: string
   database: string
   username: string
   password: string

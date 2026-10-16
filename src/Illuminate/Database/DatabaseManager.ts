@@ -1,12 +1,13 @@
 import { getValue, isNil } from '@devnetic/utils'
+import fs from 'node:fs'
+import { join } from 'node:path'
 
-import type Repository from '../Config/Repository'
-import type { DatabaseConnectionConfig } from '../Config/types'
+import type { Repository } from '../Config/Repository'
+import type { DatabaseConfig, DatabaseConnectionConfig } from '../Config/types'
 import type { Connection, Reconnector } from './Connection'
 import type { ConnectionFactory } from './Connectors/ConnectionFactory'
 
-import { Str } from './../Support'
-import ConfigurationUrlParser from './../Support/ConfigurationUrlParser'
+import { ConfigurationUrlParser } from './../Support/ConfigurationUrlParser'
 
 /**
  * @typedef {import('../Config/Repository.js').default} Repository
@@ -20,9 +21,13 @@ import ConfigurationUrlParser from './../Support/ConfigurationUrlParser'
  * @typedef {(connection: Connection) => void} Reconnector
  */
 
-export type DatabaseConfig = DatabaseConnectionConfig
+// export type { DatabaseConfig }
 
 export type ConnectionResolver = (config: DatabaseConfig, name: string) => Connection
+
+const isDatabaseConfig = (value: unknown): value is string | DatabaseConfig => {
+  return typeof value === 'string' || (typeof value === 'object' && value !== null)
+}
 
 /**
  * @mixin {Connection}
@@ -64,6 +69,13 @@ export class DatabaseManager {
   reconnector: Reconnector
 
   /**
+   * The path to the configuration file.
+   *
+   * @var string
+   */
+  protected configFile: string = 'lihtne-config.json'
+
+  /**
    * Create a new database manager instance.
    *
    * @param  {import('../Database/Connectors/ConnectionFactory.js').default}  factory
@@ -72,6 +84,12 @@ export class DatabaseManager {
   constructor (factory: ConnectionFactory, repository: Repository) {
     this.factory = factory
     this.repository = repository
+
+    const path = join(process.cwd(), this.configFile)
+
+    const config = JSON.parse(fs.readFileSync(path, { encoding: 'utf8' }))
+
+    this.repository.set('database', config.database)
 
     this.reconnector = (connection) => {
       this.reconnect(connection.getName())
@@ -85,28 +103,28 @@ export class DatabaseManager {
    * @param  {Array}  parameters
    * @return {*}
    */
-  call (method, ...parameters) {
+  protected call (method: string, ...parameters: unknown[]): unknown {
     return this.connection()[method](...parameters)
   }
 
   /**
- * Get the configuration for a connection.
- *
- * @param  {string}  name
- * @return {Record<string, any>}
- *
- * @throws {TypeError}
- */
-  configuration (name) {
+   * Get the configuration for a connection.
+   *
+   * @param  {string}  name
+   * @return {Record<string, any>}
+   *
+   * @throws {TypeError}
+   */
+  public configuration (name: string): DatabaseConfig {
     name = name ?? this.getDefaultConnection()
 
     // To get the database connection configuration, we will just pull each of the
     // connection configurations and get the configurations for the given name.
     // If the configuration doesn't exist, we'll throw an exception and bail.
-    const connections = this.repository.get('database.connections')
+    const connections = this.repository.get<string, Record<string, DatabaseConnectionConfig>>('database.connections')
     const config = getValue(connections, name)
 
-    if (isNil(config)) {
+    if (!isDatabaseConfig(config)) {
       throw new Error(`InvalidArgumentException: Database connection [${name}] not configured.`)
     }
 
@@ -117,10 +135,9 @@ export class DatabaseManager {
    * Prepare the database connection instance.
    *
    * @param  {Connection}  connection
-   * @param  {string}  type
    * @return {Connection}
    */
-  configure (connection, type) {
+  protected configure (connection: Connection): Connection {
     // connection = this.setNdoForType(connection, type).setReadWriteType(type)
 
     // First we'll set the fetch mode and a few other dependencies of the database
@@ -148,16 +165,16 @@ export class DatabaseManager {
    * @param  {string}  [name]
    * @return {Connection}
    */
-  connection (name = undefined) {
+  public connection (name?: string): Connection {
     name = name ?? this.getDefaultConnection()
 
-    const [database, type] = this.parseConnectionName(name)
+    const database = this.parseConnectionName(name)
 
     // If we haven't created this connection, we'll create it based on the config
     // provided in the application. Once we've created the connections we will
     // set the "fetch mode" for PDO which determines the query return types.
     if (this.connections[name] === undefined) {
-      this.connections[name] = this.configure(this.makeConnection(database), type)
+      this.connections[name] = this.configure(this.makeConnection(database))
 
       // TODO: Implement events
       // this.dispatchConnectionEstablishedEvent(this.connections[name])
@@ -172,7 +189,7 @@ export class DatabaseManager {
    * @param  {string|undefined}  name
    * @return {void}
    */
-  disconnect (name = undefined) {
+  public disconnect (name?: string): void {
     name = name ?? this.getDefaultConnection()
 
     if (this.connections[name]) {
@@ -185,7 +202,7 @@ export class DatabaseManager {
    *
    * @return {string}
    */
-  getDefaultConnection (): string {
+  public getDefaultConnection (): string {
     return this.repository.get('database.default')
   }
 
@@ -197,7 +214,7 @@ export class DatabaseManager {
    * @param  {string}  name
    * @return {Connection}
    */
-  makeConnection (name) {
+  protected makeConnection (name: string): Connection {
     const config = this.configuration(name)
 
     // First we will check by the connection name to see if an extension has been
@@ -212,7 +229,7 @@ export class DatabaseManager {
     // resolver for the drivers themselves which applies to all connections.
     const driver = config.driver
 
-    if (this.extensions[driver] !== undefined) {
+    if (driver !== undefined && this.extensions[driver] !== undefined) {
       return this.extensions[driver](config, name)
     }
 
@@ -226,12 +243,13 @@ export class DatabaseManager {
    * @param  {string}  name
    * @return {string[]}
    */
-  parseConnectionName (name) {
+  protected parseConnectionName (name?: string) {
     name = name ?? this.getDefaultConnection()
 
-    return Str.endsWith(name, ['::read', '::write'])
-      ? name.split('::', 2)
-      : [name, undefined]
+    // return Str.endsWith(name, ['::read', '::write'])
+    //   ? name.split('::', 2)
+    //   : [name, undefined]
+    return name
   }
 
   /**
@@ -240,7 +258,7 @@ export class DatabaseManager {
    * @param  {string|undefined}  name
    * @return {Connection}
    */
-  reconnect (name?: string = undefined) {
+  public reconnect (name?: string = undefined) {
     name = name ?? this.getDefaultConnection()
 
     this.disconnect(name)
@@ -258,7 +276,7 @@ export class DatabaseManager {
    * @param  {string}  name
    * @return {Connection}
    */
-  refreshDriversConnections (name) {
+  protected refreshDriversConnections (name: string): Connection {
     const [database, type] = this.parseConnectionName(name)
 
     const fresh = this.configure(this.makeConnection(database), type)
@@ -273,7 +291,7 @@ export class DatabaseManager {
    * @param  {Reconnector}  reconnector
    * @return {this}
    */
-  setReconnector (reconnector) {
+  public setReconnector (reconnector: Reconnector): this {
     this.reconnector = reconnector
 
     return this

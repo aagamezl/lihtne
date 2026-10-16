@@ -1,7 +1,8 @@
 import { describe, expect, test } from '@jest/globals'
 
-import { ConfigurationUrlParser } from '../../src/Illuminate/Support/ConfigurationUrlParser'
 import type { DatabaseConfig } from '../../src/Illuminate/Config/types'
+
+import { ConfigurationUrlParser } from '../../src/Illuminate/Support/ConfigurationUrlParser'
 
 interface DatabaseUrlCase {
   name: string

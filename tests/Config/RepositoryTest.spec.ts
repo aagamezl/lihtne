@@ -1,7 +1,5 @@
 import { beforeEach, describe, expect, test } from '@jest/globals'
 
-import type { LihtneConfig } from '../../src/Illuminate/Config/types'
-
 import { Collection } from '../../src/Illuminate/Collections/Collection'
 import { Repository } from '../../src/Illuminate/Config/Repository'
 
@@ -16,8 +14,6 @@ type ConfigValue =
 
 type Config = { [key: string]: ConfigValue }
 
-type ConfigKeys = string | string[] | Record<string, unknown>
-
 let repository: Repository
 let config: Config
 
@@ -26,7 +22,7 @@ beforeEach(() => {
     foo: 'bar',
     bar: 'baz',
     baz: 'bat',
-    'undefined': undefined,
+    undefined,
     null: null,
     boolean: true,
     integer: 1,
@@ -279,7 +275,7 @@ describe('Repository', () => {
   })
 
   test('testItThrowsAnExceptionWhenTryingToGetNonStringValueAsString', () => {
-    expect(() => repository.string('a')).toThrow(/^Configuration value for key \[a\] must be a string, (.*) given\./)
+    expect(() => repository.string('a')).toThrow(/^InvalidArgumentException: Configuration value for key \[a\] must be a string, (.*) given\./)
   })
 
   test('testItGetsAsArray', () => {

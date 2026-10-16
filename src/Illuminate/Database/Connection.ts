@@ -3,7 +3,6 @@ import { isNil } from 'es-toolkit'
 
 import type { Dispatcher } from '../Contracts'
 import type { Driver } from './Drivers/Driver'
-import type { Grammar } from './Grammar'
 import type { BindingValue, BindingValues } from './Query/Builder'
 import type { Grammar as SchemaGrammar } from './Schema/Grammars'
 import type { Statement } from './Statements'
@@ -11,6 +10,7 @@ import type { Statement } from './Statements'
 import { Arr } from '../Collections'
 import { DetectsLostConnections } from './DetectsLostConnections'
 import { QueryExecuted, StatementPrepared } from './Events'
+import { Builder as QueryBuilder } from './Query/Builder'
 import { Expression } from './Query/Expression'
 import { Grammar as QueryGrammar } from './Query/Grammars/Grammar'
 import { Processor } from './Query/Processors/Processor'
@@ -25,6 +25,7 @@ export type QueryLogEntry = {
 
 export type ConnectionConfig = Record<string, unknown>
 export type Reconnector = (connection: Connection) => unknown
+// export type DriverResolver = (connection: Driver, database: string, tablePrefix: string, config: ConnectionConfig) => Driver
 export type DriverResolver = () => Driver
 export type BeforeExecutingCallback = (
   query: string,
@@ -44,7 +45,7 @@ export class Connection extends DetectsLostConnections {
   protected database: string
 
   // The query post processor implementation.
-  protected postProcessor: Processor | undefined = undefined
+  protected postProcessor!: Processor
 
   /**
    * Indicates if changes have been made to the database.
@@ -66,7 +67,7 @@ export class Connection extends DetectsLostConnections {
    * @protected
    * @type {Driver}
    */
-  driver: Driver | DriverResolver
+  driver!: Driver | DriverResolver
 
   // The table prefix for the connection.
   protected tablePrefix = ''
@@ -114,7 +115,14 @@ export class Connection extends DetectsLostConnections {
    *
    * @var (callable(\Illuminate\Database\Connection): mixed)
    */
-  protected reconnector: Reconnector = () => {}
+  protected reconnector!: Reconnector
+
+  /**
+   * The connection resolvers.
+   *
+   * @var \Closure[]
+   */
+  protected static resolvers: Record<string, DriverResolver> = {}
 
   /**
    * Indicates whether queries are being logged.
@@ -230,6 +238,16 @@ export class Connection extends DetectsLostConnections {
   }
 
   /**
+   * Get the connection resolver for the given driver.
+   *
+   * @param  string  $driver
+   * @return \Closure|undefined
+   */
+  public static getResolver (driver: string): DriverResolver | undefined {
+    return this.resolvers[driver] ?? undefined
+  }
+
+  /**
    * Run an insert statement against the database.
    *
    * @param  string  $query
@@ -261,6 +279,27 @@ export class Connection extends DetectsLostConnections {
    */
   public getSchemaGrammar (): SchemaGrammar {
     return this.schemaGrammar
+  }
+
+  /**
+   * Get a new query builder instance.
+   *
+   * @return {QueryBuilder}
+   */
+  public query (): QueryBuilder {
+    return new QueryBuilder(this, this.getQueryGrammar(), this.getPostProcessor())
+  }
+
+  /**
+   * Set the reconnect instance on the connection.
+   *
+   * @param  (callable(\Illuminate\Database\Connection): mixed)  $reconnector
+   * @return $this
+   */
+  public setReconnector (reconnector: Reconnector): this {
+    this.reconnector = reconnector
+
+    return this
   }
 
   /**
@@ -390,7 +429,7 @@ export class Connection extends DetectsLostConnections {
    */
   async select<
     TResult extends Record<string, unknown> = Record<string, unknown>
-  > (query: string, bindings: BindingValues): Promise<TResult[]> {
+  >(query: string, bindings: BindingValues): Promise<TResult[]> {
     return await this.run<TResult[]>(query, bindings, (
       query: string,
       bindings: BindingValues
@@ -438,7 +477,7 @@ export class Connection extends DetectsLostConnections {
    *
    * @throws \Illuminate\Database\QueryException
    */
-  protected async run<TValue> (
+  protected async run<TValue>(
     query: string,
     bindings: BindingValues,
     callback: QueryCallback<TValue>
@@ -491,7 +530,7 @@ export class Connection extends DetectsLostConnections {
    *
    * @throws \Illuminate\Database\QueryException
    */
-  protected handleQueryException<TValue> (
+  protected handleQueryException<TValue>(
     e: Error,
     query: string,
     bindings: BindingValues,
@@ -577,7 +616,7 @@ export class Connection extends DetectsLostConnections {
    *
    * @throws \Illuminate\Database\QueryException
    */
-  protected tryAgainIfCausedByLostConnection<TValue> (
+  protected tryAgainIfCausedByLostConnection<TValue>(
     e: Error,
     query: string,
     bindings: BindingValues,
@@ -613,7 +652,7 @@ export class Connection extends DetectsLostConnections {
    *
    * @throws \Illuminate\Database\QueryException
    */
-  protected async runQueryCallback<TValue> (
+  protected async runQueryCallback<TValue>(
     query: string,
     bindings: BindingValues,
     callback: QueryCallback<TValue>
@@ -685,7 +724,9 @@ export class Connection extends DetectsLostConnections {
    */
   public getDriver (): Driver {
     if (typeof this.driver === 'function') {
-      return this.driver()
+      this.driver = this.driver()
+
+      return this.driver
     }
 
     return this.driver
@@ -698,7 +739,7 @@ export class Connection extends DetectsLostConnections {
    * @param  array  bindings
    * @return void
    */
-  public bindValues<TRow extends Record<string, unknown>> (
+  public bindValues<TRow extends Record<string, unknown>>(
     statement: Statement<TRow>,
     bindings: BindingValues
   ) {
@@ -719,7 +760,7 @@ export class Connection extends DetectsLostConnections {
    */
   public selectFromWriteConnection<
     TResult extends Record<string, unknown> = Record<string, unknown>
-  > (query: string, bindings: BindingValues = []): Promise<TResult[]> {
+  >(query: string, bindings: BindingValues = []): Promise<TResult[]> {
     return this.select<TResult>(query, bindings)
   }
 
@@ -739,7 +780,7 @@ export class Connection extends DetectsLostConnections {
    * @param  \PDOStatement  statement
    * @return \PDOStatement
    */
-  protected prepared<TRow extends Record<string, unknown>> (
+  protected prepared<TRow extends Record<string, unknown>>(
     statement: Statement<TRow>
   ): Statement<TRow> {
     this.event(new StatementPrepared(this, statement))
@@ -802,7 +843,7 @@ export class Connection extends DetectsLostConnections {
    *
    * @return \Illuminate\Database\Query\Grammars\Grammar
    */
-  public getQueryGrammar (): Grammar {
+  public getQueryGrammar (): QueryGrammar {
     if (this.queryGrammar === undefined) {
       throw new Error('Query grammar has not been set.')
     }
@@ -815,7 +856,7 @@ export class Connection extends DetectsLostConnections {
    *
    * @return \Illuminate\Database\Query\Processors\Processor
    */
-  public getPostProcessor () {
+  public getPostProcessor (): Processor {
     return this.postProcessor
   }
 

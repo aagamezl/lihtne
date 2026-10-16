@@ -1,19 +1,21 @@
 import { setValue } from '@devnetic/utils'
 
-import Arr from './../../Collections/Arr.js'
-import Connection from './../Connection.js'
-import MySqlConnection from './../MySqlConnection.js'
-import PostgresConnection from './../PostgresConnection.js'
-import SQLiteConnection from './../SQLiteConnection.js'
-import SqlServerConnection from './../SqlServerConnection.js'
-import {
-  MySqlConnector,
-  PostgresConnector,
-  SQLiteConnector,
-  SqlServerConnector
-} from './index.js'
+import type { DatabaseConfig } from '../../Config/types'
+import type { Driver } from '../Drivers'
+import type { Connector } from './Connector'
 
-/** @typedef {import('../Drivers/Driver.js').default} Driver */
+import { MariaDbConnection } from '../MariaDbConnection'
+import { PostgresConnection } from '../PostgresConnection'
+import { SQLiteConnection } from '../SQLiteConnection'
+import { SqlServerConnection } from '../SqlServerConnection'
+import { Arr } from './../../Collections/Arr'
+import { Connection } from './../Connection'
+import { MySqlConnection } from './../MySqlConnection'
+import { MariaDbConnector } from './MariaDbConnector'
+import { MySqlConnector } from './MySqlConnector'
+import { PostgresConnector } from './PostgresConnector'
+import { SQLiteConnector } from './SQLiteConnector'
+import { SqlServerConnector } from './SqlServerConnector'
 
 export class ConnectionFactory {
   /**
@@ -29,7 +31,7 @@ export class ConnectionFactory {
    *
    * @throws {Error}
    */
-  createConnection (driver, connection, database, prefix = '', config = {}) {
+  protected createConnection (driver: string, connection: Driver, database: string, prefix = '', config = {}) {
     const resolver = Connection.getResolver(driver)
 
     if (resolver) {
@@ -37,12 +39,18 @@ export class ConnectionFactory {
     }
 
     switch (driver) {
+      case 'mariadb':
+        return new MariaDbConnection(connection, database, prefix, config)
+
       case 'mysql':
         return new MySqlConnection(connection, database, prefix, config)
+
       case 'pgsql':
         return new PostgresConnection(connection, database, prefix, config)
+
       case 'sqlite':
         return new SQLiteConnection(connection, database, prefix, config)
+
       case 'sqlsrv':
         return new SqlServerConnection(connection, database, prefix, config)
     }
@@ -55,11 +63,11 @@ export class ConnectionFactory {
    *
    * @param  {object}  config
    *
-   * @return {import('../Connectors/Connector.js').default}
+   * @return {import('../Connectors/Connector').default}
    *
    * @throws {TypeError}
    */
-  createConnector (config) {
+  public createConnector (config: DatabaseConfig): Connector {
     if (!config.driver) {
       throw new Error('InvalidArgumentException: A driver must be specified.')
     }
@@ -67,10 +75,16 @@ export class ConnectionFactory {
     switch (config.driver) {
       case 'mysql':
         return new MySqlConnector()
+
+      case 'mariadb':
+        return new MariaDbConnector()
+
       case 'pgsql':
         return new PostgresConnector()
+
       case 'sqlite':
         return new SQLiteConnector()
+
       case 'sqlsrv':
         return new SqlServerConnector()
     }
@@ -84,7 +98,7 @@ export class ConnectionFactory {
    * @param  {Record<string, any>}  config
    * @return {Function}
    */
-  createDriverResolver (config) {
+  protected createDriverResolver (config: DatabaseConfig): () => Promise<unknown> {
     return Reflect.has(config, 'host')
       ? this.createResolverWithHosts(config)
       : this.createResolverWithoutHosts(config)
@@ -98,7 +112,7 @@ export class ConnectionFactory {
    *
    * @throws {DriverException}
    */
-  createResolverWithHosts (config) {
+  protected createResolverWithHosts (config: DatabaseConfig): () => Promise<unknown> {
     return () => {
       const hosts = this.parseHosts(config)
 
@@ -112,7 +126,7 @@ export class ConnectionFactory {
         }
       }
 
-      throw new Error('NDOException: Unable to create resolver with hosts.')
+      throw new Error('DriverException: Unable to create resolver with hosts.')
     }
   }
 
@@ -122,7 +136,7 @@ export class ConnectionFactory {
    * @param  {Record<string, any>}  config
    * @return {Function}
    */
-  createResolverWithoutHosts (config) {
+  protected createResolverWithoutHosts (config: DatabaseConfig): () => Promise<unknown> {
     return () => {
       return this.createConnector(config).connect(config)
     }
@@ -133,14 +147,12 @@ export class ConnectionFactory {
    *
    * @protected
    * @param  {Record<string, any>}  config
-   * @return {import('../Connection.js').default}
+   * @return {import('../Connection').default}
    */
-  createSingleConnection (config) {
+  protected createSingleConnection (config: DatabaseConfig): Connection {
     const resolver = this.createDriverResolver(config)
 
-    return this.createConnection(
-      config.driver, resolver, config.database, config.prefix, config
-    )
+    return this.createConnection(config.driver, resolver, config.database, config.prefix, config)
   }
 
   /**
@@ -148,9 +160,9 @@ export class ConnectionFactory {
    *
    * @param  {Record<string, any>}  config
    * @param  {string|undefined}  [name]
-   * @return {import('../Connection.js').default}
+   * @return {import('../Connection').default}
    */
-  make (config, name = undefined) {
+  public make (config: DatabaseConfig, name?: string) {
     config = this.parseConfig(config, name)
 
     return this.createSingleConnection(config)
@@ -163,7 +175,7 @@ export class ConnectionFactory {
    * @param  {string}  [name]
    * @return {Record<string, any>}
    */
-  parseConfig (config, name = undefined) {
+  protected parseConfig (config: DatabaseConfig, name?: string): DatabaseConfig {
     return setValue(setValue(config, 'prefix', ''), 'name', name)
   }
 
@@ -175,7 +187,7 @@ export class ConnectionFactory {
    *
    * @throws {Error}
    */
-  parseHosts (config) {
+  protected parseHosts (config: DatabaseConfig): string[] {
     const hosts = Arr.wrap(config.host)
 
     if (hosts.length === 0) {

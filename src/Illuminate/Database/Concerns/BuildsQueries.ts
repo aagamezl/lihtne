@@ -12,7 +12,7 @@ import {
   Paginator
 } from '../../Pagination'
 import { Str } from '../../Support/Str'
-import { Builder } from '../Query'
+import { Builder } from '../Query/Builder'
 import { SortDirection } from '../Query/Enums/SortDirection'
 import { Expression } from '../Query/Expression'
 

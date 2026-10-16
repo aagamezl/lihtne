@@ -51,7 +51,7 @@ export class Arr {
    * @param  mixed  $value
    * @return array
    */
-  public static set(
+  public static set (
     array: Dictionary<unknown>,
     key: string,
     value: unknown,
@@ -63,7 +63,7 @@ export class Arr {
     value: TValue,
     separator?: string
   ): TValue
-  public static set(
+  public static set (
     array: Dictionary<unknown>,
     key?: string,
     value?: unknown,
@@ -79,7 +79,7 @@ export class Arr {
 
     for (let i = 0; i < keys.length - 1; i++) {
       if (keys.length === 1) {
-        break;
+        break
       }
 
       const segment = Arr.pathSegment(keys[i])
@@ -183,7 +183,7 @@ export class Arr {
    * shared because `unset` only removes keys, it does not clone values.
    */
   public static duplicate<TValue>(value: TValue): TValue
-  public static duplicate(value: unknown): unknown {
+  public static duplicate (value: unknown): unknown {
     if (Array.isArray(value)) {
       return value.map((item) => this.duplicate(item))
     }
@@ -208,7 +208,7 @@ export class Arr {
    * @param  string|array  $keys
    * @return bool
    */
-  public static has(array: unknown, keys: string | string[]): boolean {
+  public static has (array: unknown, keys: string | string[]): boolean {
     keys = Array.isArray(keys) ? keys : [keys]
 
     if (!array || keys.length === 0) {
@@ -241,7 +241,7 @@ export class Arr {
   /**
    * Remove a key the way PHP `unset` does: drop the property, leave array holes.
    */
-  public static unset(
+  public static unset (
     target: unknown[] | Dictionary<unknown>,
     key: PropertyKey
   ): void {
@@ -252,6 +252,16 @@ export class Arr {
     }
 
     delete target[String(key)]
+  }
+
+  /**
+   * Shuffle the given array and return the result.
+   *
+   * @param  {Array}  array
+   * @return {Array}
+   */
+  public static shuffle<TValue>(array: TValue[]): TValue[] {
+    return array.sort((a: TValue, b: TValue) => a.localeCompare(b))
   }
 
   /**
@@ -302,11 +312,11 @@ export class Arr {
     depth?: number
   ): TValue[]
   static flatten<TValue>(array: FlatValues<TValue>, depth?: number): TValue[]
-  static flatten(
+  static flatten (
     array: Iterable<unknown> | Record<PropertyKey, unknown>,
     depth?: number
   ): unknown[]
-  static flatten(
+  static flatten (
     array: Iterable<unknown> | Record<PropertyKey, unknown>,
     depth: number = Infinity
   ): unknown[] {
@@ -364,7 +374,7 @@ export class Arr {
    * arrays and plain (non-null) objects as "accessible", mirroring how
    * PHP arrays serve as both lists and dictionaries.
    */
-  static accessible(value: unknown): value is unknown[] | Dictionary<unknown> {
+  static accessible (value: unknown): value is unknown[] | Dictionary<unknown> {
     if (Array.isArray(value)) {
       return true
     }
@@ -718,7 +728,7 @@ export class Arr {
   ): [
       string[] | ((item: TItem) => TValue),
       string[] | ((item: TItem) => PropertyKey) | null
-    ] {
+  ] {
     const explodedValue =
       typeof value === 'string' ? value.split(DOT_SEPARATOR) : value
 
@@ -787,24 +797,24 @@ export class Arr {
    * `noUncheckedIndexedAccess` rejects indexing the `unknown[] | Dictionary`
    * union, so callers narrow through this predicate before a bracket read.
    */
-  private static isRecord(value: unknown): value is Dictionary<unknown> {
+  private static isRecord (value: unknown): value is Dictionary<unknown> {
     return typeof value === 'object' && value !== null
   }
 
-  private static pathSegment(segment: string | undefined): string
-  private static pathSegment(segment: string | undefined): string | undefined {
+  private static pathSegment (segment: string | undefined): string
+  private static pathSegment (segment: string | undefined): string | undefined {
     return segment
   }
 
-  private static asRecord(value: unknown): Dictionary<unknown>
-  private static asRecord(value: unknown): unknown {
+  private static asRecord (value: unknown): Dictionary<unknown>
+  private static asRecord (value: unknown): unknown {
     return value
   }
 
   /**
    * `isPlainObject` does not narrow, and `Object.entries` only accepts an object.
    */
-  private static isPlainRecord(value: unknown): value is Dictionary<unknown> {
+  private static isPlainRecord (value: unknown): value is Dictionary<unknown> {
     return isPlainObject(value)
   }
 
@@ -813,7 +823,7 @@ export class Arr {
    * isset($target->{$segment})` branch — a plain-object property read
    * distinct from the array-accessible branch handled just above it.
    */
-  private static isPlainObjectWithProperty(
+  private static isPlainObjectWithProperty (
     value: unknown,
     property: string
   ): value is Dictionary<unknown> {
