@@ -64,7 +64,7 @@ export class Driver {
     // @ts-expect-error expected error; sequence is not used in this method
     // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base lastInsertId signature
     sequence: string | undefined = undefined
-  ): string | number {
+  ): string | number | Promise<string | number> {
     throw new Error(
       `RuntimeException: Implement 'lastInsertId' method on concrete class`
     )

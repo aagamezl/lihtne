@@ -58,7 +58,7 @@ export class MySqlConnection extends Connection {
 
       const result = await statement.execute(bindings)
 
-      this.lastInsertId = this.getDriver().lastInsertId(sequence)
+      this.lastInsertId = await this.getDriver().lastInsertId(sequence)
 
       return result
     })

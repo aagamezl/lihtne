@@ -26,7 +26,9 @@ export class PostgresProcessor extends Processor {
     const results = await connection.selectFromWriteConnection<
       Record<string, string | number>
     >(sql, values)
+
     const sequenceValue = sequence ?? 'id'
+
     const id = results[0]?.[sequenceValue]
 
     if (typeof id !== 'string' && typeof id !== 'number') {

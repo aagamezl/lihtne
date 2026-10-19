@@ -467,7 +467,13 @@ import perfectionistConfig from './eslint-config/perfectionist.js'
 import stylisticConfig from './eslint-config/stylistic.js'
 import typescriptConfig from './eslint-config/typescript.js'
 
-const IGNORED_PATHS = ['dist/**', 'node_modules/**', 'coverage/**']
+const IGNORED_PATHS = [
+  'dist/**',
+  'node_modules/**',
+  'coverage/**',
+  'bin/**',
+  'cli/**'
+]
 
 export default [
   {

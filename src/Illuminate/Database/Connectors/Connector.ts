@@ -1,9 +1,17 @@
 import type { DatabaseConfig } from '../../Config/types'
-import { objectDiffKey } from '../../Support'
-import { DetectsLostConnections } from '../DetectsLostConnections'
 import type { Driver, DriverOptions } from '../Drivers/Driver'
 
-export abstract class Connector extends DetectsLostConnections {
+import { objectDiffKey } from '../../Support'
+import { DetectsLostConnections } from '../DetectsLostConnections'
+
+export class Connector extends DetectsLostConnections {
+  /**
+   * The default PDO connection options.
+   *
+   * @var array
+   */
+  protected options: Record<string, unknown> = {}
+
   /**
    * Establish a database connection.
    *
@@ -12,7 +20,7 @@ export abstract class Connector extends DetectsLostConnections {
    */
   // @ts-expect-error - expected error, value is not used in this method
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  public connect(config: DatabaseConfig): Driver {
+  public connect (config: DatabaseConfig): Driver {
     throw new Error('ConcreteMethodException: Method connect must be implemented.')
   }
 
@@ -38,21 +46,31 @@ export abstract class Connector extends DetectsLostConnections {
    *
    * @throws {Error}
    */
-  protected createConnection(dsn: string, config: DatabaseConfig, options: DriverOptions): Driver {
+  protected createConnection (
+    dsn: string,
+
+    // @ts-expect-error - expected error, value is not used in this method
+    config: DatabaseConfig,
+    options: DriverOptions
+  ): Driver {
     try {
       return this.createDriverConnection(dsn, options)
     } catch (error) {
-      return this.tryAgainIfCausedByLostConnection(
-        error, dsn, options
-      )
+      return this.tryAgainIfCausedByLostConnection(error, dsn, options)
     }
   }
 
-  protected createDriverConnection(dsn: string, options: DriverOptions): Driver {
+  // @ts-expect-error - expected error, value is not used in this method
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  protected createDriverConnection (dsn: string, options: DriverOptions): Driver {
     throw new Error('ConcreteMethodException: Method createDriverConnection must be implemented.')
   }
 
-  protected tryAgainIfCausedByLostConnection(error: Error, dsn: string, options: DriverOptions): Driver {
+  protected tryAgainIfCausedByLostConnection (
+    error: Error,
+    dsn: string,
+    options: DriverOptions
+  ): Driver {
     if (this.causedByLostConnection(error)) {
       return this.createDriverConnection(dsn, options)
     }

@@ -1,0 +1,1638 @@
+#!/usr/bin/env bash
+# Project CLI for local development.
+# This file provides the db group: install, uninstall, and list database engines.
+
+set -uo pipefail
+
+WIDTH=68
+SECTION_OPEN=0
+BORDER=""
+DRY_RUN=0
+LAST_ERROR=""
+ROOT=""
+ENV_FILE=""
+COMPOSE_FILE=""
+SQLITE_FILE=""
+TMP_LIST=""
+COMPOSE_CMD_TEXT="docker compose"
+
+DEV_DB="lihtne"
+DEV_USER="lihtne"
+DEV_PASSWORD="lihtne"
+SQLSRV_PASSWORD="Lihtne_dev_1"
+
+NETWORKED="mysql mariadb pgsql sqlsrv"
+ALL_ENGINES="mysql mariadb pgsql sqlsrv sqlite"
+
+PIN_mysql=""
+PIN_mariadb=""
+PIN_pgsql=""
+PIN_sqlsrv=""
+RES_mysql=""
+RES_mariadb=""
+RES_pgsql=""
+RES_sqlsrv=""
+
+if [[ -t 1 && -z "${NO_COLOR:-}" && "${TERM:-}" != "dumb" ]]; then
+  C_RESET=$'\033[0m'
+  C_BOLD=$'\033[1m'
+  C_DIM=$'\033[2m'
+  C_RED=$'\033[31m'
+  C_GREEN=$'\033[32m'
+  C_YELLOW=$'\033[33m'
+  C_BLUE=$'\033[34m'
+  C_CYAN=$'\033[36m'
+else
+  C_RESET=""
+  C_BOLD=""
+  C_DIM=""
+  C_RED=""
+  C_GREEN=""
+  C_YELLOW=""
+  C_BLUE=""
+  C_CYAN=""
+fi
+
+# --- paths ---
+
+resolve_root() {
+  local source="${BASH_SOURCE[0]}"
+  local dir
+  while [[ -L "$source" ]]; do
+    dir="$(cd "$(dirname "$source")" && pwd)"
+    source="$(readlink "$source")"
+    if [[ "$source" != /* ]]; then
+      source="${dir}/${source}"
+    fi
+  done
+  ROOT="$(cd "$(dirname "$source")/.." && pwd)"
+  ENV_FILE="${ROOT}/docker/.env"
+  COMPOSE_FILE="${ROOT}/docker/docker-compose.yml"
+  SQLITE_FILE="${ROOT}/storage/databases/database.sqlite"
+}
+
+register_tmp() {
+  TMP_LIST="${TMP_LIST} $1"
+}
+
+cleanup() {
+  local file
+  for file in $TMP_LIST; do
+    rm -f "$file"
+  done
+}
+
+# --- UI ---
+
+repeat_char() {
+  local char="$1"
+  local count="$2"
+  local out=""
+  local i=0
+  while (( i < count )); do
+    out="${out}${char}"
+    i=$((i + 1))
+  done
+  printf '%s' "$out"
+}
+
+box_top() {
+  local title="$1"
+  local border="$2"
+  local max_title=$((WIDTH - 6))
+  local dashes
+
+  if (( max_title < 1 )); then
+    max_title=1
+  fi
+  if (( ${#title} > max_title )); then
+    if (( max_title == 1 )); then
+      title="…"
+    else
+      title="${title:0:$((max_title - 1))}…"
+    fi
+  fi
+  dashes=$((WIDTH - ${#title} - 5))
+  if (( dashes < 1 )); then
+    dashes=1
+  fi
+  printf '%s╭─ %s%s%s %s╮%s\n' \
+    "$border" "$C_BOLD" "$title" "$C_RESET$border" "$(repeat_char "─" "$dashes")" "$C_RESET"
+}
+
+box_bottom() {
+  local border="$1"
+  printf '%s╰%s╯%s\n' "$border" "$(repeat_char "─" $((WIDTH - 2)))" "$C_RESET"
+}
+
+box_row() {
+  local color="$1"
+  local text="$2"
+  local border="$3"
+  local max=$((WIDTH - 4))
+  local pad
+  local chunk
+  local room
+  local trimmed
+  local prefix=""
+
+  if [[ -z "$text" ]]; then
+    printf '%s│%s %*s %s│%s\n' "$border" "$C_RESET" "$((WIDTH - 4))" "" "$border" "$C_RESET"
+    return 0
+  fi
+
+  while [[ -n "$text" ]]; do
+    room=$((max - ${#prefix}))
+    if (( ${#text} <= room )); then
+      chunk="${prefix}${text}"
+      text=""
+    else
+      chunk="${text:0:room}"
+      if [[ "$chunk" == *" "* ]]; then
+        trimmed="${chunk% *}"
+        if [[ -n "$trimmed" ]]; then
+          chunk="$trimmed"
+        fi
+      elif [[ "$chunk" == */* && "$chunk" != */ ]]; then
+        trimmed="${chunk%/*}/"
+        if [[ -n "$trimmed" ]]; then
+          chunk="$trimmed"
+        fi
+      fi
+      text="${text:${#chunk}}"
+      text="${text# }"
+      chunk="${prefix}${chunk}"
+    fi
+    pad=$((max - ${#chunk}))
+    printf '%s│%s %s%s%s%*s %s│%s\n' \
+      "$border" "$C_RESET" "$color" "$chunk" "$C_RESET" "$pad" "" "$border" "$C_RESET"
+    prefix="  "
+  done
+}
+
+box_blank() {
+  box_row "" "" "$1"
+}
+
+box_lines() {
+  local color="$1"
+  local text="$2"
+  local border="$3"
+  local line
+
+  if [[ -z "$text" ]]; then
+    return 0
+  fi
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    if [[ -n "$line" ]]; then
+      line="  $line"
+    fi
+    box_row "$color" "$line" "$border"
+  done < <(printf '%s\n' "$text")
+}
+
+section_open() {
+  local title="$1"
+  local border="$2"
+  if (( SECTION_OPEN )); then
+    section_close
+  fi
+  BORDER="$border"
+  box_top "$title" "$border"
+  SECTION_OPEN=1
+}
+
+section_close() {
+  if (( SECTION_OPEN )); then
+    box_bottom "$BORDER"
+    SECTION_OPEN=0
+    printf '\n'
+  fi
+}
+
+finish() {
+  local code="$1"
+  local border="$2"
+  local title="$3"
+  shift 3
+  local line
+
+  section_close
+  section_open "$title" "$border"
+  if [[ $# -eq 0 ]]; then
+    box_blank "$border"
+  else
+    for line in "$@"; do
+      box_row "$border" "$line" "$border"
+    done
+  fi
+  section_close
+  exit "$code"
+}
+
+field_row() {
+  local color="$1"
+  local label="$2"
+  local value="$3"
+  box_row "$color" "$(printf '%-14s %s' "$label" "$value")" "$BORDER"
+}
+
+run_cmd() {
+  local label="$1"
+  shift
+  local output
+  local code
+
+  box_row "$C_CYAN" "› $label" "$BORDER"
+  output=$("$@" 2>&1)
+  code=$?
+  output="${output//$'\r'/$'\n'}"
+  box_lines "$C_DIM" "$output" "$BORDER"
+  return "$code"
+}
+
+banner_row() {
+  local color="$1"
+  local text="$2"
+  local max=$((WIDTH - 4))
+  local pad
+
+  if (( ${#text} > max )); then
+    text="${text:0:$((max - 1))}…"
+  fi
+  pad=$((max - ${#text}))
+  printf '%s┃%s %s%s%s%*s %s┃%s\n' \
+    "$C_CYAN" "$C_RESET" "$color" "$text" "$C_RESET" "$pad" "" "$C_CYAN" "$C_RESET"
+}
+
+banner() {
+  local subtitle="$1"
+  local dashes
+  dashes="$(repeat_char "━" $((WIDTH - 2)))"
+  printf '%s┏%s┓%s\n' "$C_CYAN" "$dashes" "$C_RESET"
+  banner_row "$C_BOLD" "lihtne"
+  banner_row "" "$subtitle"
+  printf '%s┗%s┛%s\n\n' "$C_CYAN" "$dashes" "$C_RESET"
+}
+
+choose_width() {
+  local longest=0
+  local title
+  local len
+  local needed
+  local cols
+
+  for title in "$@"; do
+    len=${#title}
+    if (( len > longest )); then
+      longest=$len
+    fi
+  done
+
+  needed=$((longest + 6))
+  if (( needed < 68 )); then
+    needed=68
+  fi
+
+  if [[ -t 1 ]]; then
+    exec 3>&1
+    cols=$(stty size <&3 2>/dev/null | awk '{print $2}')
+    exec 3>&-
+    if [[ ! "$cols" =~ ^[0-9]+$ ]] || (( cols < 2 )); then
+      cols=80
+    fi
+    cols=$((cols - 1))
+    if (( needed > cols )); then
+      needed=$cols
+    fi
+  elif (( needed > 68 )); then
+    needed=68
+  fi
+
+  WIDTH=$needed
+}
+
+# --- engines ---
+
+canonical_engine() {
+  local name
+  name="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+  case "$name" in
+    mysql|mariadb|pgsql|sqlsrv|sqlite|all)
+      printf '%s' "$name"
+      ;;
+    postgres|postgresql)
+      printf 'pgsql'
+      ;;
+    sqlserver|mssql)
+      printf 'sqlsrv'
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+engine_title() {
+  case "$1" in
+    mysql) printf 'MySQL' ;;
+    mariadb) printf 'MariaDB' ;;
+    pgsql) printf 'Postgres' ;;
+    sqlsrv) printf 'SQL Server' ;;
+    sqlite) printf 'SQLite' ;;
+    *) printf '%s' "$1" ;;
+  esac
+}
+
+engine_port() {
+  case "$1" in
+    mysql) printf '3306' ;;
+    mariadb) printf '3307' ;;
+    pgsql) printf '5432' ;;
+    sqlsrv) printf '1433' ;;
+    *) printf '' ;;
+  esac
+}
+
+engine_internal_port() {
+  case "$1" in
+    mysql|mariadb) printf '3306' ;;
+    pgsql) printf '5432' ;;
+    sqlsrv) printf '1433' ;;
+    *) printf '' ;;
+  esac
+}
+
+engine_user() {
+  case "$1" in
+    sqlsrv) printf 'sa' ;;
+    sqlite) printf '—' ;;
+    *) printf '%s' "$DEV_USER" ;;
+  esac
+}
+
+engine_password() {
+  case "$1" in
+    sqlsrv) printf '%s' "$SQLSRV_PASSWORD" ;;
+    sqlite) printf '—' ;;
+    *) printf '%s' "$DEV_PASSWORD" ;;
+  esac
+}
+
+pin_key() {
+  case "$1" in
+    mysql) printf 'MYSQL_VERSION' ;;
+    mariadb) printf 'MARIADB_VERSION' ;;
+    pgsql) printf 'POSTGRES_VERSION' ;;
+    sqlsrv) printf 'SQLSRV_VERSION' ;;
+  esac
+}
+
+image_template() {
+  case "$1" in
+    mysql) printf 'mysql:${MYSQL_VERSION}' ;;
+    mariadb) printf 'mariadb:${MARIADB_VERSION}' ;;
+    pgsql) printf 'postgres:${POSTGRES_VERSION}' ;;
+    sqlsrv) printf 'mcr.microsoft.com/mssql/server:${SQLSRV_VERSION}' ;;
+  esac
+}
+
+hub_repo() {
+  case "$1" in
+    mysql) printf 'mysql' ;;
+    mariadb) printf 'mariadb' ;;
+    pgsql) printf 'postgres' ;;
+  esac
+}
+
+data_path() {
+  case "$1" in
+    mysql|mariadb) printf '/var/lib/mysql' ;;
+    pgsql) printf '/var/lib/postgresql' ;;
+    sqlsrv) printf '/var/opt/mssql' ;;
+  esac
+}
+
+container_name() {
+  printf 'lihtne-%s' "$1"
+}
+
+volume_name() {
+  printf 'lihtne_%s-data' "$1"
+}
+
+pin_get() {
+  case "$1" in
+    mysql) printf '%s' "$PIN_mysql" ;;
+    mariadb) printf '%s' "$PIN_mariadb" ;;
+    pgsql) printf '%s' "$PIN_pgsql" ;;
+    sqlsrv) printf '%s' "$PIN_sqlsrv" ;;
+  esac
+}
+
+pin_set() {
+  case "$1" in
+    mysql) PIN_mysql="$2" ;;
+    mariadb) PIN_mariadb="$2" ;;
+    pgsql) PIN_pgsql="$2" ;;
+    sqlsrv) PIN_sqlsrv="$2" ;;
+  esac
+}
+
+res_get() {
+  case "$1" in
+    mysql) printf '%s' "$RES_mysql" ;;
+    mariadb) printf '%s' "$RES_mariadb" ;;
+    pgsql) printf '%s' "$RES_pgsql" ;;
+    sqlsrv) printf '%s' "$RES_sqlsrv" ;;
+  esac
+}
+
+res_set() {
+  case "$1" in
+    mysql) RES_mysql="$2" ;;
+    mariadb) RES_mariadb="$2" ;;
+    pgsql) RES_pgsql="$2" ;;
+    sqlsrv) RES_sqlsrv="$2" ;;
+  esac
+}
+
+load_pins() {
+  local line
+  PIN_mysql=""
+  PIN_mariadb=""
+  PIN_pgsql=""
+  PIN_sqlsrv=""
+  [[ -f "$ENV_FILE" ]] || return 0
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    case "$line" in
+      MYSQL_VERSION=*) PIN_mysql="${line#MYSQL_VERSION=}" ;;
+      MARIADB_VERSION=*) PIN_mariadb="${line#MARIADB_VERSION=}" ;;
+      POSTGRES_VERSION=*) PIN_pgsql="${line#POSTGRES_VERSION=}" ;;
+      SQLSRV_VERSION=*) PIN_sqlsrv="${line#SQLSRV_VERSION=}" ;;
+    esac
+  done < "$ENV_FILE"
+}
+
+any_pins() {
+  local engine
+  for engine in $NETWORKED; do
+    if [[ -n "$(pin_get "$engine")" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+selection_contains() {
+  local needle="$1"
+  local item
+  for item in $SELECTED; do
+    if [[ "$item" == "$needle" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+selection_has_network() {
+  local item
+  for item in $SELECTED; do
+    if [[ "$item" != "sqlite" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+join_words() {
+  local out=""
+  local word
+  for word in "$@"; do
+    if [[ -n "$out" ]]; then
+      out="${out}, ${word}"
+    else
+      out="$word"
+    fi
+  done
+  printf '%s' "$out"
+}
+
+# --- registries ---
+
+curl_http() {
+  local dest="$1"
+  shift
+  local attempt=0
+  local http=""
+
+  while (( attempt < 4 )); do
+    attempt=$((attempt + 1))
+    http="$(curl -sS -A lihtne --max-time 60 -o "$dest" -w '%{http_code}' "$@" || true)"
+    case "$http" in
+      200)
+        printf '%s' "$http"
+        return 0
+        ;;
+      429|500|502|503|504)
+        if (( attempt < 4 )); then
+          sleep "$attempt"
+          continue
+        fi
+        ;;
+    esac
+    break
+  done
+  printf '%s' "${http:-000}"
+  return 1
+}
+
+download_hub_tags() {
+  local repo="$1"
+  local dest="$2"
+  local url="https://hub.docker.com/v2/repositories/library/${repo}/tags?page_size=100"
+  local page=0
+  local body_file
+  local http
+  local next
+
+  : > "$dest"
+  while [[ -n "$url" ]]; do
+    page=$((page + 1))
+    if (( page > 50 )); then
+      LAST_ERROR="Stopped after 50 Docker Hub pages for library/${repo}."
+      return 1
+    fi
+    body_file="$(mktemp)"
+    register_tmp "$body_file"
+    if ! http="$(curl_http "$body_file" "$url")"; then
+      if jq -e '.message | type == "string"' >/dev/null < "$body_file"; then
+        local message
+        message="$(jq -r '.message' < "$body_file")"
+        if [[ "$message" == *"pagination offset"* ]]; then
+          break
+        fi
+        LAST_ERROR="$message"
+        return 1
+      fi
+      LAST_ERROR="Docker Hub returned HTTP ${http:-000} for library/${repo}."
+      return 1
+    fi
+    if ! jq -e 'type == "object"' >/dev/null < "$body_file"; then
+      LAST_ERROR="Docker Hub returned invalid JSON for library/${repo}."
+      return 1
+    fi
+    if jq -e '.message | type == "string"' >/dev/null < "$body_file"; then
+      LAST_ERROR="$(jq -r '.message' < "$body_file")"
+      return 1
+    fi
+    jq -r '(.results // [])[].name' < "$body_file" >> "$dest"
+    next="$(jq -r 'if .next == null then "" else .next end' < "$body_file")"
+    url="$next"
+  done
+}
+
+download_mcr_tags() {
+  local dest="$1"
+  local url="https://mcr.microsoft.com/v2/mssql/server/tags/list"
+  local page=0
+  local body_file
+  local headers
+  local http
+  local next
+  local link_line
+
+  : > "$dest"
+  while [[ -n "$url" ]]; do
+    page=$((page + 1))
+    if (( page > 20 )); then
+      LAST_ERROR="Stopped after 20 Microsoft Container Registry pages."
+      return 1
+    fi
+    body_file="$(mktemp)"
+    headers="$(mktemp)"
+    register_tmp "$body_file"
+    register_tmp "$headers"
+    if ! http="$(curl_http "$body_file" -D "$headers" "$url")"; then
+      LAST_ERROR="Microsoft Container Registry returned HTTP ${http:-000}."
+      return 1
+    fi
+    if ! jq -e 'type == "object"' >/dev/null < "$body_file"; then
+      LAST_ERROR="Microsoft Container Registry returned invalid JSON."
+      return 1
+    fi
+    jq -r '(.tags // [])[]' < "$body_file" >> "$dest"
+    link_line="$(grep -i '^link:' "$headers" || true)"
+    next=""
+    if [[ "$link_line" == *'rel="next"'* ]]; then
+      next="${link_line%%rel=\"next\"*}"
+      next="${next##*<}"
+      next="${next%%>*}"
+    fi
+    if [[ "$next" == /* ]]; then
+      next="https://mcr.microsoft.com${next}"
+    fi
+    url="$next"
+  done
+}
+
+highest_stable_tag() {
+  awk '
+    function cmp(a, b,    i, as, bs, na, av, bv) {
+      na = split(a, as, ".")
+      split(b, bs, ".")
+      for (i = 1; i <= 3; i++) {
+        av = (i in as) ? as[i] + 0 : 0
+        bv = (i in bs) ? bs[i] + 0 : 0
+        if (av > bv) return 1
+        if (av < bv) return -1
+      }
+      return 0
+    }
+    /^[0-9]+\.[0-9]+(\.[0-9]+)?$/ {
+      if (best == "" || cmp($0, best) > 0) best = $0
+    }
+    END { if (best != "") print best }
+  ' "$1"
+}
+
+tag_exists() {
+  local tag="$1"
+  local file="$2"
+  awk -v tag="$tag" '$0 == tag { found = 1 } END { exit found ? 0 : 1 }' "$file"
+}
+
+newest_sqlsrv_tag() {
+  sed -nE 's/^([0-9]{4})-CU([0-9]+)-ubuntu-([0-9]+)\.([0-9]+)$/\1 \2 \3 \4 &/p' "$1" \
+    | awk '{ printf "%04d %05d %04d %04d %s\n", $1, $2, $3, $4, $5 }' \
+    | sort -k1,1n -k2,2n -k3,3n -k4,4n \
+    | awk '{ tag = $5 } END { print tag }'
+}
+
+resolve_hub_engine() {
+  local engine="$1"
+  local repo
+  local tags
+  local best
+
+  repo="$(hub_repo "$engine")"
+  tags="$(mktemp)"
+  register_tmp "$tags"
+  box_row "$C_CYAN" "› Read Docker Hub tags for library/${repo}" "$BORDER"
+  if ! download_hub_tags "$repo" "$tags"; then
+    finish 2 "$C_RED" "Result" "✗ ${LAST_ERROR}"
+  fi
+  if [[ -n "$VERSION" ]]; then
+    if ! tag_exists "$VERSION" "$tags"; then
+      finish 2 "$C_RED" "Result" "✗ Tag '${VERSION}' was not found for ${engine}."
+    fi
+    res_set "$engine" "$VERSION"
+    field_row "$C_GREEN" "$engine" "$VERSION"
+    return 0
+  fi
+  best="$(highest_stable_tag "$tags")"
+  if [[ -z "$best" ]]; then
+    finish 2 "$C_RED" "Result" "✗ No stable version tag found for ${engine}."
+  fi
+  res_set "$engine" "$best"
+  field_row "$C_GREEN" "$engine" "$best"
+}
+
+resolve_sqlsrv() {
+  local tags
+  local best
+
+  tags="$(mktemp)"
+  register_tmp "$tags"
+  box_row "$C_CYAN" "› Read SQL Server tags from Microsoft Container Registry" "$BORDER"
+  if ! download_mcr_tags "$tags"; then
+    finish 2 "$C_RED" "Result" "✗ ${LAST_ERROR}"
+  fi
+  if [[ -n "$VERSION" ]]; then
+    if ! tag_exists "$VERSION" "$tags"; then
+      finish 2 "$C_RED" "Result" "✗ Tag '${VERSION}' was not found for sqlsrv."
+    fi
+    res_set "sqlsrv" "$VERSION"
+    field_row "$C_GREEN" "sqlsrv" "$VERSION"
+    return 0
+  fi
+  best="$(newest_sqlsrv_tag "$tags")"
+  if [[ -z "$best" ]]; then
+    finish 2 "$C_RED" "Result" "✗ No SQL Server cumulative update tag was found."
+  fi
+  res_set "sqlsrv" "$best"
+  field_row "$C_GREEN" "sqlsrv" "$best"
+}
+
+# --- compose ---
+
+write_env_file() {
+  local tmp
+  local engine
+  local value
+  tmp="$(mktemp)"
+  register_tmp "$tmp"
+  for engine in $NETWORKED; do
+    value="$(pin_get "$engine")"
+    if [[ -n "$value" ]]; then
+      printf '%s=%s\n' "$(pin_key "$engine")" "$value" >> "$tmp"
+    fi
+  done
+  mv "$tmp" "$ENV_FILE"
+}
+
+health_test() {
+  case "$1" in
+    mysql)
+      printf '%s' '["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-plihtne"]'
+      ;;
+    mariadb)
+      printf '%s' '["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]'
+      ;;
+    pgsql)
+      printf '%s' '["CMD-SHELL", "pg_isready -U lihtne -d lihtne"]'
+      ;;
+    sqlsrv)
+      printf '%s' '["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P Lihtne_dev_1 -C -Q '"'"'SELECT 1'"'"' >/dev/null 2>&1 || /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P Lihtne_dev_1 -Q '"'"'SELECT 1'"'"' >/dev/null 2>&1"]'
+      ;;
+  esac
+}
+
+write_service_env() {
+  case "$1" in
+    mysql)
+      printf '      MYSQL_ROOT_PASSWORD: %s\n' "$DEV_PASSWORD"
+      printf '      MYSQL_DATABASE: %s\n' "$DEV_DB"
+      printf '      MYSQL_USER: %s\n' "$DEV_USER"
+      printf '      MYSQL_PASSWORD: %s\n' "$DEV_PASSWORD"
+      ;;
+    mariadb)
+      printf '      MARIADB_ROOT_PASSWORD: %s\n' "$DEV_PASSWORD"
+      printf '      MARIADB_DATABASE: %s\n' "$DEV_DB"
+      printf '      MARIADB_USER: %s\n' "$DEV_USER"
+      printf '      MARIADB_PASSWORD: %s\n' "$DEV_PASSWORD"
+      ;;
+    pgsql)
+      printf '      POSTGRES_USER: %s\n' "$DEV_USER"
+      printf '      POSTGRES_PASSWORD: %s\n' "$DEV_PASSWORD"
+      printf '      POSTGRES_DB: %s\n' "$DEV_DB"
+      ;;
+    sqlsrv)
+      printf '      ACCEPT_EULA: "Y"\n'
+      printf '      MSSQL_SA_PASSWORD: "%s"\n' "$SQLSRV_PASSWORD"
+      printf '      MSSQL_PID: Developer\n'
+      ;;
+  esac
+}
+
+write_service() {
+  local engine="$1"
+  local start="20s"
+  if [[ "$engine" == "sqlsrv" ]]; then
+    start="40s"
+  fi
+  printf '  %s:\n' "$engine"
+  printf '    image: %s\n' "$(image_template "$engine")"
+  printf '    container_name: %s\n' "$(container_name "$engine")"
+  printf '    profiles: ["%s"]\n' "$engine"
+  printf '    restart: unless-stopped\n'
+  printf '    ports:\n'
+  printf '      - "%s:%s"\n' "$(engine_port "$engine")" "$(engine_internal_port "$engine")"
+  printf '    environment:\n'
+  write_service_env "$engine"
+  printf '    volumes:\n'
+  if [[ "$engine" == "pgsql" ]]; then
+    printf '      # Postgres 18 and newer keep data under this directory.\n'
+  fi
+  printf '      - %s-data:%s\n' "$engine" "$(data_path "$engine")"
+  printf '    healthcheck:\n'
+  printf '      test: %s\n' "$(health_test "$engine")"
+  printf '      interval: 10s\n'
+  printf '      timeout: 5s\n'
+  printf '      retries: 18\n'
+  printf '      start_period: %s\n' "$start"
+}
+
+write_compose_file() {
+  local tmp
+  local engine
+  tmp="$(mktemp)"
+  register_tmp "$tmp"
+  {
+    printf '%s\n' '# Generated by bin/lihtne. Do not edit.'
+    printf '%s\n' 'name: lihtne'
+    printf '%s\n' 'services:'
+    for engine in $NETWORKED; do
+      if [[ -n "$(pin_get "$engine")" ]]; then
+        write_service "$engine"
+      fi
+    done
+    printf '%s\n' 'volumes:'
+    for engine in $NETWORKED; do
+      if [[ -n "$(pin_get "$engine")" ]]; then
+        printf '  %s-data:\n' "$engine"
+      fi
+    done
+  } > "$tmp"
+  mv "$tmp" "$COMPOSE_FILE"
+}
+
+persist_generated_files() {
+  if (( DRY_RUN )); then
+    if any_pins; then
+      box_row "$C_YELLOW" "› dry run  write docker/.env" "$BORDER"
+      box_row "$C_YELLOW" "› dry run  write docker/docker-compose.yml" "$BORDER"
+    else
+      box_row "$C_YELLOW" "› dry run  delete docker/.env" "$BORDER"
+      box_row "$C_YELLOW" "› dry run  delete docker/docker-compose.yml" "$BORDER"
+    fi
+    return 0
+  fi
+
+  if any_pins; then
+    mkdir -p "${ROOT}/docker"
+    write_env_file
+    write_compose_file
+    box_row "$C_GREEN" "✓ Wrote docker/.env" "$BORDER"
+    box_row "$C_GREEN" "✓ Wrote docker/docker-compose.yml" "$BORDER"
+    return 0
+  fi
+
+  rm -f "$ENV_FILE" "$COMPOSE_FILE"
+  rmdir "${ROOT}/docker" 2>/dev/null || true
+  box_row "$C_GREEN" "✓ Removed generated Docker files" "$BORDER"
+}
+
+detect_compose() {
+  if docker compose version >/dev/null 2>&1; then
+    COMPOSE_CMD_TEXT="docker compose"
+    return 0
+  fi
+  if command -v docker-compose >/dev/null 2>&1 && docker-compose version >/dev/null 2>&1; then
+    COMPOSE_CMD_TEXT="docker-compose"
+    return 0
+  fi
+  return 1
+}
+
+compose() {
+  if [[ "$COMPOSE_CMD_TEXT" == "docker-compose" ]]; then
+    docker-compose \
+      --project-name lihtne \
+      --project-directory "${ROOT}/docker" \
+      --env-file "$ENV_FILE" \
+      -f "$COMPOSE_FILE" \
+      "$@"
+    return $?
+  fi
+  docker compose \
+    --project-name lihtne \
+    --project-directory "${ROOT}/docker" \
+    --env-file "$ENV_FILE" \
+    -f "$COMPOSE_FILE" \
+    "$@"
+}
+
+# --- docker state ---
+
+docker_daemon_up() {
+  docker info >/dev/null 2>&1
+}
+
+container_exists() {
+  docker inspect "$(container_name "$1")" >/dev/null 2>&1
+}
+
+container_state() {
+  local name
+  local status
+  local health
+  name="$(container_name "$1")"
+  if ! command -v docker >/dev/null 2>&1; then
+    printf 'docker is not installed'
+    return 0
+  fi
+  if ! docker_daemon_up; then
+    printf 'Docker is not running'
+    return 0
+  fi
+  if ! status="$(docker inspect -f '{{.State.Status}}' "$name" 2>/dev/null)"; then
+    printf 'absent'
+    return 0
+  fi
+  health="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$name" 2>/dev/null || true)"
+  if [[ -n "$health" ]]; then
+    printf '%s (%s)' "$status" "$health"
+  else
+    printf '%s' "$status"
+  fi
+}
+
+require_tool() {
+  local cmd="$1"
+  if ! command -v "$cmd" >/dev/null 2>&1; then
+    box_row "$C_RED" "✗ ${cmd} is not installed." "$BORDER"
+    return 1
+  fi
+  box_row "$C_GREEN" "✓ ${cmd}" "$BORDER"
+  return 0
+}
+
+require_docker() {
+  local ok=0
+  if ! command -v docker >/dev/null 2>&1; then
+    box_row "$C_RED" "✗ docker is not installed." "$BORDER"
+    return 1
+  fi
+  box_row "$C_GREEN" "✓ docker" "$BORDER"
+  if ! detect_compose; then
+    box_row "$C_RED" "✗ docker compose is not available." "$BORDER"
+    ok=1
+  else
+    box_row "$C_GREEN" "✓ ${COMPOSE_CMD_TEXT}" "$BORDER"
+  fi
+  if (( DRY_RUN == 0 )); then
+    if ! docker_daemon_up; then
+      box_row "$C_RED" "✗ Docker is not running." "$BORDER"
+      ok=1
+    else
+      box_row "$C_GREEN" "✓ Docker daemon is running" "$BORDER"
+    fi
+  fi
+  return "$ok"
+}
+
+# --- usage ---
+
+usage_root() {
+  section_open "Usage" "$C_YELLOW"
+  box_row "$C_BOLD" "lihtne <group> [command]" "$BORDER"
+  box_blank "$BORDER"
+  box_row "" "Groups" "$BORDER"
+  box_row "" "  db    Development databases" "$BORDER"
+  box_blank "$BORDER"
+  box_row "$C_DIM" "lihtne db --help" "$BORDER"
+  section_close
+}
+
+usage_db() {
+  section_open "Usage" "$C_YELLOW"
+  box_row "$C_BOLD" "lihtne db install [engine|all] [--version TAG] [--dry-run]" "$BORDER"
+  box_row "$C_BOLD" "lihtne db uninstall [engine|all] [--dry-run]" "$BORDER"
+  box_row "$C_BOLD" "lihtne db list" "$BORDER"
+  box_blank "$BORDER"
+  box_row "" "Engines" "$BORDER"
+  box_row "" "  mysql     port 3306" "$BORDER"
+  box_row "" "  mariadb   port 3307" "$BORDER"
+  box_row "" "  pgsql     port 5432. Aliases: postgres, postgresql" "$BORDER"
+  box_row "" "  sqlsrv    port 1433. Aliases: sqlserver, mssql" "$BORDER"
+  box_row "" "  sqlite    local file. No container and no --version" "$BORDER"
+  box_row "" "  all       every engine above" "$BORDER"
+  box_blank "$BORDER"
+  box_row "$C_DIM" "Omit --version to pin the newest stable tag." "$BORDER"
+  box_row "$C_DIM" "The latest tag is never used." "$BORDER"
+  box_row "$C_DIM" "--dry-run resolves versions and prints actions." "$BORDER"
+  section_close
+}
+
+open_banner() {
+  local subtitle="$1"
+  shift
+  choose_width "$@"
+  banner "$subtitle"
+}
+
+fail_usage() {
+  local usage="$1"
+  local message="$2"
+  if [[ "$usage" == "db" ]]; then
+    usage_db
+  else
+    usage_root
+  fi
+  finish 1 "$C_RED" "Result" "$message"
+}
+
+# --- commands ---
+
+parse_selection() {
+  local allow_version="$1"
+  shift
+  ENGINE=""
+  VERSION=""
+  DRY_RUN=0
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -h|--help)
+        return 2
+        ;;
+      --dry-run)
+        DRY_RUN=1
+        shift
+        ;;
+      --version)
+        if (( allow_version == 0 )); then
+          PARSE_ERROR="✗ This command does not take --version."
+          return 1
+        fi
+        if [[ $# -lt 2 || "$2" == -* || -z "$2" ]]; then
+          PARSE_ERROR="✗ --version needs a tag."
+          return 1
+        fi
+        VERSION="$2"
+        shift 2
+        ;;
+      --version=*)
+        if (( allow_version == 0 )); then
+          PARSE_ERROR="✗ This command does not take --version."
+          return 1
+        fi
+        VERSION="${1#--version=}"
+        if [[ -z "$VERSION" || "$VERSION" == -* ]]; then
+          PARSE_ERROR="✗ --version needs a tag."
+          return 1
+        fi
+        shift
+        ;;
+      -*)
+        PARSE_ERROR="✗ Unknown argument '$1'."
+        return 1
+        ;;
+      *)
+        if [[ -n "$ENGINE" ]]; then
+          PARSE_ERROR="✗ Unexpected argument '$1'."
+          return 1
+        fi
+        ENGINE="$1"
+        shift
+        ;;
+    esac
+  done
+
+  if [[ -z "$ENGINE" ]]; then
+    PARSE_ERROR="✗ Choose an engine or all."
+    return 1
+  fi
+  return 0
+}
+
+normalize_engine() {
+  local raw="$1"
+  if ! ENGINE="$(canonical_engine "$raw")"; then
+    PARSE_ERROR="✗ Unknown engine '${raw}'."
+    return 1
+  fi
+  if [[ "$ENGINE" == "all" ]]; then
+    SELECTED="$ALL_ENGINES"
+  else
+    SELECTED="$ENGINE"
+  fi
+  return 0
+}
+
+validate_version_request() {
+  if [[ -z "$VERSION" ]]; then
+    return 0
+  fi
+  if [[ "$VERSION" == *latest* ]]; then
+    PARSE_ERROR="✗ The latest tag is not used. Pass a version number."
+    return 1
+  fi
+  if [[ ! "$VERSION" =~ ^[A-Za-z0-9._-]+$ ]]; then
+    PARSE_ERROR="✗ Version tag contains unsupported characters."
+    return 1
+  fi
+  if [[ "$ENGINE" == "all" ]]; then
+    PARSE_ERROR="✗ --version applies to a single engine."
+    return 1
+  fi
+  if [[ "$ENGINE" == "sqlite" ]]; then
+    PARSE_ERROR="✗ sqlite has no image tag. Omit --version."
+    return 1
+  fi
+  return 0
+}
+
+show_parameters() {
+  local command_label="$1"
+  local version_label="newest stable tag"
+  section_open "1 · Parameters" "$C_BLUE"
+  field_row "" "Command" "$command_label"
+  field_row "" "Engines" "$(join_words $SELECTED)"
+  if [[ "$command_label" == "db install" ]]; then
+    if [[ -n "$VERSION" ]]; then
+      version_label="$VERSION"
+    elif [[ "$ENGINE" == "sqlite" ]]; then
+      version_label="local file"
+    fi
+    field_row "" "Version" "$version_label"
+  fi
+  if (( DRY_RUN )); then
+    field_row "$C_YELLOW" "Dry run" "yes"
+  else
+    field_row "" "Dry run" "no"
+  fi
+  section_close
+}
+
+engine_installed() {
+  case "$1" in
+    sqlite)
+      [[ -f "$SQLITE_FILE" ]]
+      ;;
+    *)
+      [[ -n "$(pin_get "$1")" ]]
+      ;;
+  esac
+}
+
+add_result() {
+  RESULT_LINES[${#RESULT_LINES[@]}]="$1"
+}
+
+record_install() {
+  local engine="$1"
+  local version="$2"
+  if [[ "$engine" == "sqlite" ]]; then
+    add_result "✓ Installed SQLite."
+    add_result "  File      ${SQLITE_FILE}"
+    return 0
+  fi
+  add_result "✓ Installed $(engine_title "$engine") ${version}."
+  add_result "  Host      127.0.0.1"
+  add_result "  Port      $(engine_port "$engine")"
+  add_result "  Database  ${DEV_DB}"
+  add_result "  User      $(engine_user "$engine")"
+  add_result "  Password  $(engine_password "$engine")"
+}
+
+install_sqlite() {
+  local relative="storage/databases/database.sqlite"
+  if [[ -f "$SQLITE_FILE" ]]; then
+    box_row "$C_GREEN" "✓ SQLite file already exists" "$BORDER"
+    box_row "" "  ${relative}" "$BORDER"
+    return 0
+  fi
+  if (( DRY_RUN )); then
+    box_row "$C_YELLOW" "› dry run  create ${relative}" "$BORDER"
+    return 0
+  fi
+  mkdir -p "$(dirname "$SQLITE_FILE")"
+  sqlite3 "$SQLITE_FILE" "PRAGMA user_version = 0;"
+  box_row "$C_GREEN" "✓ Created ${relative}" "$BORDER"
+}
+
+start_selected_containers() {
+  local engine
+  local label
+  local piece
+  local -a profiles
+  local -a services
+  profiles=()
+  services=()
+  for engine in $SELECTED; do
+    if [[ "$engine" == "sqlite" ]]; then
+      continue
+    fi
+    profiles[${#profiles[@]}]="--profile"
+    profiles[${#profiles[@]}]="$engine"
+    services[${#services[@]}]="$engine"
+  done
+  if [[ ${#services[@]} -eq 0 ]]; then
+    return 0
+  fi
+
+  label="${COMPOSE_CMD_TEXT} -f docker/docker-compose.yml --env-file docker/.env"
+  for piece in "${profiles[@]}"; do
+    label="${label} ${piece}"
+  done
+  label="${label} up -d --wait"
+  for piece in "${services[@]}"; do
+    label="${label} ${piece}"
+  done
+
+  if (( DRY_RUN )); then
+    box_row "$C_YELLOW" "› dry run  ${label}" "$BORDER"
+    return 0
+  fi
+
+  run_cmd "$label" compose "${profiles[@]}" up -d --wait "${services[@]}"
+}
+
+ensure_sqlsrv_database() {
+  local query="IF DB_ID(N'lihtne') IS NULL CREATE DATABASE lihtne"
+  if ! selection_contains "sqlsrv"; then
+    return 0
+  fi
+  if (( DRY_RUN )); then
+    box_row "$C_YELLOW" "› dry run  create database lihtne on sqlsrv" "$BORDER"
+    return 0
+  fi
+  run_cmd "create database lihtne" \
+    docker exec "$(container_name sqlsrv)" \
+    sh -c 'if [ -x /opt/mssql-tools18/bin/sqlcmd ]; then /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$1" -C -b -Q "$2"; else /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P "$1" -b -Q "$2"; fi' \
+    sh "$SQLSRV_PASSWORD" "$query"
+}
+
+apply_resolved_pins() {
+  local engine
+  for engine in $SELECTED; do
+    if [[ "$engine" == "sqlite" ]]; then
+      continue
+    fi
+    pin_set "$engine" "$(res_get "$engine")"
+  done
+}
+
+db_install() {
+  local status=0
+  local engine
+  local ok=0
+  local version_label
+  local first=1
+  PARSE_ERROR=""
+  RESULT_LINES=()
+  parse_selection 1 "$@"
+  status=$?
+  if [[ "$status" -ne 0 ]]; then
+    open_banner "Install, uninstall, and list development databases." \
+      "lihtne db install [engine|all] [--version TAG] [--dry-run]"
+    if [[ "$status" -eq 2 ]]; then
+      usage_db
+      exit 0
+    fi
+    fail_usage db "$PARSE_ERROR"
+  fi
+  if ! normalize_engine "$ENGINE"; then
+    open_banner "Install, uninstall, and list development databases." \
+      "lihtne db install [engine|all] [--version TAG] [--dry-run]" \
+      "$PARSE_ERROR"
+    fail_usage db "$PARSE_ERROR"
+  fi
+  if ! validate_version_request; then
+    open_banner "Install, uninstall, and list development databases." \
+      "lihtne db install [engine|all] [--version TAG] [--dry-run]" \
+      "$PARSE_ERROR"
+    fail_usage db "$PARSE_ERROR"
+  fi
+
+  open_banner "Install, uninstall, and list development databases." \
+    "lihtne db install [engine|all] [--version TAG] [--dry-run]" \
+    "Engines      $(join_words $SELECTED)"
+  show_parameters "db install"
+
+  section_open "2 · Preflight" "$C_BLUE"
+  ok=0
+  if selection_has_network; then
+    require_tool curl || ok=1
+    require_tool jq || ok=1
+    require_docker || ok=1
+  fi
+  if selection_contains "sqlite"; then
+    require_tool sqlite3 || ok=1
+  fi
+  if (( ok != 0 )); then
+    finish 1 "$C_RED" "Result" "✗ Install the missing tools and run this command again."
+  fi
+  if ! selection_has_network && ! selection_contains "sqlite"; then
+    box_row "$C_GREEN" "✓ Nothing to check" "$BORDER"
+  fi
+  section_close
+
+  load_pins
+
+  section_open "3 · Versions" "$C_CYAN"
+  for engine in $SELECTED; do
+    if [[ "$engine" == "sqlite" ]]; then
+      field_row "" "sqlite" "local file"
+      continue
+    fi
+    if [[ "$engine" == "sqlsrv" ]]; then
+      resolve_sqlsrv
+    else
+      resolve_hub_engine "$engine"
+    fi
+  done
+  section_close
+
+  section_open "4 · Install" "$C_CYAN"
+  if selection_has_network; then
+    apply_resolved_pins
+    persist_generated_files
+    if ! start_selected_containers; then
+      finish 3 "$C_RED" "Result" "✗ Docker did not start the selected engines."
+    fi
+    if ! ensure_sqlsrv_database; then
+      finish 3 "$C_RED" "Result" "✗ SQL Server is up, and creating the lihtne database failed."
+    fi
+  fi
+  if selection_contains "sqlite"; then
+    install_sqlite
+  fi
+  section_close
+
+  if (( DRY_RUN )); then
+    finish 0 "$C_YELLOW" "5 · Result" "✓ Dry run complete. Nothing was changed."
+  fi
+
+  for engine in $SELECTED; do
+    if (( first == 0 )); then
+      add_result ""
+    fi
+    first=0
+    if [[ "$engine" == "sqlite" ]]; then
+      record_install "sqlite" "file"
+      continue
+    fi
+    version_label="$(res_get "$engine")"
+    record_install "$engine" "$version_label"
+  done
+  finish 0 "$C_GREEN" "5 · Result" "${RESULT_LINES[@]}"
+}
+
+remove_one_container() {
+  local engine="$1"
+  local container
+  local volume
+  container="$(container_name "$engine")"
+  volume="$(volume_name "$engine")"
+  if (( DRY_RUN )); then
+    box_row "$C_YELLOW" "› dry run  docker rm -f ${container}" "$BORDER"
+    box_row "$C_YELLOW" "› dry run  docker volume rm ${volume}" "$BORDER"
+    return 0
+  fi
+  if container_exists "$engine"; then
+    run_cmd "docker rm -f ${container}" docker rm -f "$container" || return 1
+  else
+    box_row "$C_DIM" "· ${container} is absent" "$BORDER"
+  fi
+  if docker volume inspect "$volume" >/dev/null 2>&1; then
+    run_cmd "docker volume rm ${volume}" docker volume rm "$volume" || return 1
+  fi
+  return 0
+}
+
+down_project() {
+  if (( DRY_RUN )); then
+    box_row "$C_YELLOW" "› dry run  ${COMPOSE_CMD_TEXT} -f docker/docker-compose.yml down --volumes --remove-orphans" "$BORDER"
+    return 0
+  fi
+  if [[ ! -f "$COMPOSE_FILE" ]]; then
+    return 0
+  fi
+  run_cmd "${COMPOSE_CMD_TEXT} -f docker/docker-compose.yml down --volumes --remove-orphans" \
+    compose down --volumes --remove-orphans
+}
+
+uninstall_sqlite() {
+  local relative="storage/databases/database.sqlite"
+  if [[ ! -f "$SQLITE_FILE" ]]; then
+    box_row "$C_YELLOW" "· SQLite is not installed" "$BORDER"
+    return 0
+  fi
+  if (( DRY_RUN )); then
+    box_row "$C_YELLOW" "› dry run  delete ${relative}" "$BORDER"
+    return 0
+  fi
+  rm -f "$SQLITE_FILE"
+  rmdir "$(dirname "$SQLITE_FILE")" 2>/dev/null || true
+  box_row "$C_GREEN" "✓ Deleted ${relative}" "$BORDER"
+}
+
+network_selection_covers_all_pins() {
+  local engine
+  for engine in $NETWORKED; do
+    if [[ -z "$(pin_get "$engine")" ]]; then
+      continue
+    fi
+    if ! selection_contains "$engine"; then
+      return 1
+    fi
+  done
+  return 0
+}
+
+selected_network_installed() {
+  local engine
+  for engine in $SELECTED; do
+    if [[ "$engine" == "sqlite" ]]; then
+      continue
+    fi
+    if [[ -n "$(pin_get "$engine")" ]]; then
+      return 0
+    fi
+    if command -v docker >/dev/null 2>&1 && docker_daemon_up && container_exists "$engine"; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+db_uninstall() {
+  local status=0
+  local engine
+  local ok=0
+  local removed=0
+  PARSE_ERROR=""
+  parse_selection 0 "$@"
+  status=$?
+  if [[ "$status" -ne 0 ]]; then
+    open_banner "Install, uninstall, and list development databases." \
+      "lihtne db uninstall [engine|all] [--dry-run]"
+    if [[ "$status" -eq 2 ]]; then
+      usage_db
+      exit 0
+    fi
+    fail_usage db "$PARSE_ERROR"
+  fi
+  if ! normalize_engine "$ENGINE"; then
+    open_banner "Install, uninstall, and list development databases." \
+      "lihtne db uninstall [engine|all] [--dry-run]" \
+      "$PARSE_ERROR"
+    fail_usage db "$PARSE_ERROR"
+  fi
+
+  open_banner "Install, uninstall, and list development databases." \
+    "lihtne db uninstall [engine|all] [--dry-run]" \
+    "Engines      $(join_words $SELECTED)"
+  show_parameters "db uninstall"
+  load_pins
+
+  section_open "2 · Preflight" "$C_BLUE"
+  ok=0
+  if selection_has_network && selected_network_installed; then
+    require_docker || ok=1
+  elif selection_has_network; then
+    box_row "$C_GREEN" "✓ No networked engines from this selection are installed" "$BORDER"
+  else
+    box_row "$C_GREEN" "✓ No extra tools required" "$BORDER"
+  fi
+  if (( ok != 0 )); then
+    finish 1 "$C_RED" "Result" "✗ Install the missing tools and run this command again."
+  fi
+  section_close
+
+  section_open "3 · Uninstall" "$C_CYAN"
+  if selection_has_network && selected_network_installed; then
+    removed=1
+    if network_selection_covers_all_pins && [[ -f "$COMPOSE_FILE" ]]; then
+      down_project || finish 3 "$C_RED" "Result" "✗ Docker did not remove the engines."
+      for engine in $SELECTED; do
+        if [[ "$engine" != "sqlite" ]]; then
+          pin_set "$engine" ""
+        fi
+      done
+    else
+      for engine in $SELECTED; do
+        if [[ "$engine" == "sqlite" ]]; then
+          continue
+        fi
+        if [[ -z "$(pin_get "$engine")" ]] && { ! docker_daemon_up || ! container_exists "$engine"; }; then
+          box_row "$C_YELLOW" "· $(engine_title "$engine") is not installed" "$BORDER"
+          continue
+        fi
+        remove_one_container "$engine" || finish 3 "$C_RED" "Result" "✗ Docker did not remove ${engine}."
+        pin_set "$engine" ""
+      done
+    fi
+    persist_generated_files
+  elif selection_has_network; then
+    for engine in $SELECTED; do
+      if [[ "$engine" != "sqlite" ]]; then
+        box_row "$C_YELLOW" "· $(engine_title "$engine") is not installed" "$BORDER"
+      fi
+    done
+  fi
+  if selection_contains "sqlite"; then
+    if [[ -f "$SQLITE_FILE" ]]; then
+      removed=1
+    fi
+    uninstall_sqlite
+  fi
+  section_close
+
+  if (( DRY_RUN )); then
+    finish 0 "$C_YELLOW" "4 · Result" "✓ Dry run complete. Nothing was changed."
+  fi
+  if (( removed )); then
+    finish 0 "$C_GREEN" "4 · Result" "✓ Uninstalled the selected engines."
+  fi
+  finish 0 "$C_GREEN" "4 · Result" "✓ Nothing to uninstall."
+}
+
+db_list() {
+  local engine
+  local index=0
+  local installed=0
+  local missing=0
+  local version
+  local state
+  if [[ $# -gt 0 ]]; then
+    if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+      open_banner "Install, uninstall, and list development databases." \
+        "lihtne db list"
+      usage_db
+      exit 0
+    fi
+    open_banner "Install, uninstall, and list development databases." \
+      "lihtne db list"
+    fail_usage db "✗ list does not take arguments."
+  fi
+
+  open_banner "Install, uninstall, and list development databases." \
+    "lihtne db list"
+  load_pins
+
+  for engine in $ALL_ENGINES; do
+    index=$((index + 1))
+    section_open "${index} · $(engine_title "$engine")" "$C_BLUE"
+    if engine_installed "$engine"; then
+      installed=$((installed + 1))
+      field_row "$C_GREEN" "State" "installed"
+    else
+      missing=$((missing + 1))
+      field_row "$C_DIM" "State" "not installed"
+    fi
+    if [[ "$engine" == "sqlite" ]]; then
+      field_row "" "Version" "—"
+      if [[ -f "$SQLITE_FILE" ]]; then
+        field_row "" "File" "$SQLITE_FILE"
+      else
+        field_row "" "File" "—"
+      fi
+      field_row "" "Host" "—"
+      field_row "" "Port" "—"
+      field_row "" "Database" "database.sqlite"
+      field_row "" "User" "—"
+    else
+      version="$(pin_get "$engine")"
+      if [[ -z "$version" ]]; then
+        version="—"
+      fi
+      state="$(container_state "$engine")"
+      field_row "" "Version" "$version"
+      field_row "" "Container" "$state"
+      field_row "" "Host" "127.0.0.1"
+      field_row "" "Port" "$(engine_port "$engine")"
+      field_row "" "Database" "$DEV_DB"
+      field_row "" "User" "$(engine_user "$engine")"
+    fi
+    section_close
+  done
+
+  section_open "6 · Summary" "$C_CYAN"
+  field_row "" "Installed" "$installed"
+  field_row "" "Not installed" "$missing"
+  section_close
+}
+
+cmd_db() {
+  local action
+  if [[ $# -eq 0 || "$1" == "-h" || "$1" == "--help" ]]; then
+    open_banner "Install, uninstall, and list development databases." \
+      "lihtne db install [engine|all] [--version TAG] [--dry-run]" \
+      "lihtne db uninstall [engine|all] [--dry-run]" \
+      "lihtne db list"
+    usage_db
+    exit 0
+  fi
+  action="$1"
+  shift
+  case "$action" in
+    install) db_install "$@" ;;
+    uninstall) db_uninstall "$@" ;;
+    list) db_list "$@" ;;
+    *)
+      open_banner "Install, uninstall, and list development databases." \
+        "lihtne db install [engine|all] [--version TAG] [--dry-run]"
+      fail_usage db "✗ Unknown command '${action}'."
+      ;;
+  esac
+}
+
+main() {
+  resolve_root
+  if [[ $# -eq 0 || "$1" == "-h" || "$1" == "--help" ]]; then
+    open_banner "Development tasks for this repository." \
+      "lihtne <group> [command]" \
+      "lihtne db --help"
+    usage_root
+    exit 0
+  fi
+  case "$1" in
+    db)
+      shift
+      cmd_db "$@"
+      ;;
+    *)
+      open_banner "Development tasks for this repository." \
+        "lihtne <group> [command]"
+      fail_usage root "✗ Unknown group '$1'."
+      ;;
+  esac
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  trap cleanup EXIT
+  main "$@"
+fi

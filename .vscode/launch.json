@@ -5,30 +5,6 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Launch PHP Program",
-      "type": "php",
-      "request": "launch",
-      "program": "${file}",
-      "cwd": "${fileDirname}",
-      "port": 0,
-      "runtimeArgs": [
-        "-dxdebug.start_with_request=yes"
-      ],
-      "env": {
-        "XDEBUG_MODE": "debug,develop",
-        "XDEBUG_CONFIG": "client_port=${port}"
-      }
-    },
-    {
-      "type": "node",
-      "name": "Launch Program",
-      "program": "${file}",
-      "request": "launch",
-      "skipFiles": [
-        "<node_internals>/**"
-      ]
-    },
-    {
       "type": "node",
       "request": "launch",
       "name": "Launch TypeScript Program",
@@ -38,6 +14,7 @@
         "--import",
         "tsx"
       ],
+      "runtimeVersion": "22.22.0",
       "console": "integratedTerminal",
       "skipFiles": [
         "<node_internals>/**"
@@ -58,6 +35,7 @@
         "--coverage=false",
         "--no-cache"
       ],
+      "runtimeVersion": "22.22.0",
       "program": "${file}",
       "cwd": "${workspaceRoot}",
       "console": "integratedTerminal",
@@ -67,5 +45,30 @@
         "program": "${workspaceFolder}/node_modules/jest/bin/jest"
       }
     },
+    {
+      "name": "Launch JavaScript Program",
+      "program": "${file}",
+      "request": "launch",
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "type": "node",
+      "runtimeVersion": "22.22.0"
+    },
+    {
+      "name": "Launch PHP Program",
+      "type": "php",
+      "request": "launch",
+      "program": "${file}",
+      "cwd": "${fileDirname}",
+      "port": 0,
+      "runtimeArgs": [
+        "-dxdebug.start_with_request=yes"
+      ],
+      "env": {
+        "XDEBUG_MODE": "debug,develop",
+        "XDEBUG_CONFIG": "client_port=${port}"
+      }
+    }
   ]
 }

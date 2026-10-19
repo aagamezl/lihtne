@@ -33,7 +33,7 @@ export class Processor {
     values: BindingValues,
     sequence?: string
   ): Promise<string | number> {
-    query.getConnection().insert(sql, values)
+    await query.getConnection().insert(sql, values)
 
     const id = await query.getConnection().getDriver().lastInsertId(sequence)
 

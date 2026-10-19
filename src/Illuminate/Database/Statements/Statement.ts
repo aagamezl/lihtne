@@ -1,30 +1,54 @@
-import { uuid } from '@devnetic/utils'
-
+import type { DriverOptions } from '../Drivers/Driver'
 import type { BindingValue, BindingValues } from '../Query'
 
 export type Result<
   TRow extends Record<string, unknown> = Record<string, unknown>
 > = {
   rows: TRow[]
+  rowCount: number | undefined
 }
 
 export type PreparedStatement = {
   name: string
   text: string
+  values?: BindingValues
 }
 
-export class Statement<
+export abstract class Statement<
   TRow extends Record<string, unknown> = Record<string, unknown>
 > {
   protected bindings: Record<string, BindingValue> = {}
 
-  protected statement?: PreparedStatement
+  protected statement!: PreparedStatement
+
+  protected abstract client: unknown
+
+  protected dsn: string
+
+  protected options: DriverOptions
+
+  protected query: string
 
   /**
    * @protected
    * @type {any}
    */
-  protected result: Result<TRow> = { rows: [] }
+  protected result: Result<TRow> = { rows: [], rowCount: 0 }
+
+  /**
+   * Creates an instance of Statement.
+   * @param {string} dsn
+   * @param {Record<string, unknown>} options
+   * @param {string} query
+   * @memberof Statement
+   */
+  constructor (dsn: string, options: DriverOptions, query: string) {
+    this.dsn = dsn
+    this.options = options
+    this.query = query
+
+    this.prepare(query)
+  }
 
   /**
    *
@@ -42,44 +66,21 @@ export class Statement<
     }
   }
 
-  prepare (query: string): this {
-    this.statement = {
-      // give the query a unique name
-      name: `prepared-statement-${uuid()}`,
-      text: this.parameterize(query)
-    }
+  public abstract parameterize (query: string): string
 
-    this.bindings = {}
+  public abstract execute (values?: BindingValues): Promise<TRow[]>
 
-    return this
-  }
+  public abstract fetchAll (): TRow[]
 
-  parameterize (query: string): string {
-    const regex = /\?/gm
+  public abstract rowCount (): number
 
-    if (query.match(regex) === null) {
-      return query
-    }
+  public abstract close (): Promise<void>
 
-    let index = 0
-    return query.replace(regex, () => `$${++index}`)
-  }
-
-  // @ts-expect-error expected error; params is not used in this method
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base execute signature
-  public async execute (params?: BindingValues): Promise<boolean> {
-    throw new Error(
-      `RuntimeException: Implement execute method on concrete class.`
-    )
-  }
-
-  public fetchAll (): TRow[] {
-    return this.result.rows
-  }
-
-  public rowCount (): number {
-    throw new Error(
-      `RuntimeException: Implement rowCount method on concrete class.`
-    )
-  }
+  /**
+   * Prepares a statement for execution and returns a statement object
+   *
+   * @param {string} query
+   * @returns {Statement}
+   */
+  public abstract prepare (query: string): this
 }

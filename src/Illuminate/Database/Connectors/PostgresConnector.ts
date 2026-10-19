@@ -1,17 +1,24 @@
 import type { DatabaseConfig } from '../../Config/types'
 import type { Driver, DriverOptions } from '../Drivers/Driver'
 
+import { mixing } from '../../Support'
+import { ParsesSearchPath } from '../Concerns/ParsesSearchPath'
 import { PostgresDriver } from '../Drivers/PostgresDriver'
 import { Connector } from './Connector'
 
-export class PostgresConnector extends Connector {
+// Trait methods are merged onto the class. `mixing().useTrait()` copies them onto the prototype at runtime.
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface PostgresConnector extends Connector, ParsesSearchPath { }
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export class PostgresConnector extends mixing(Connector).useTrait([ParsesSearchPath]) {
   /**
    * Establish a database connection.
    *
    * @param  array  $config
    * @return \PDO
    */
-  public connect(config: DatabaseConfig): Driver {
+  public override connect (config: DatabaseConfig): Driver {
     // First we'll create the basic DSN and connection instance connecting to the
     // using the configuration option specified by the developer. We will also
     // set the default character set on the connections to UTF-8 by default.
@@ -32,6 +39,72 @@ export class PostgresConnector extends Connector {
   }
 
   /**
+   * Set the connection transaction isolation level.
+   *
+   * @param  \PDO  $connection
+   * @param  array  $config
+   * @return void
+   */
+  protected configureIsolationLevel (connection: Driver, config: DatabaseConfig) {
+    if (config.isolation_level !== undefined) {
+      connection.prepare(`set session characteristics as transaction isolation level ${config.isolation_level}`).execute()
+    }
+  }
+
+  /**
+   * Set the timezone on the connection.
+   *
+   * @param  \PDO  $connection
+   * @param  array  $config
+   * @return void
+   */
+  protected configureTimezone (connection: Driver, config: DatabaseConfig) {
+    if (config.timezone !== undefined) {
+      connection.prepare(`set time zone '${config.timezone}'`).execute()
+    }
+  }
+
+  /**
+   * Set the "search_path" on the database connection.
+   *
+   * @param  \PDO  $connection
+   * @param  array  $config
+   * @return void
+   */
+  protected configureSearchPath (connection: Driver, config: DatabaseConfig) {
+    if (config.search_path !== undefined || config.schema !== undefined) {
+      const searchPath = this.quoteSearchPath(
+        this.parseSearchPath(config.search_path ?? config.schema)
+      )
+
+      connection.prepare(`set search_path to ${searchPath}`).execute()
+    }
+  }
+
+  /**
+   * Format the search path for the DSN.
+   *
+   * @param  array  $searchPath
+   * @return string
+   */
+  protected quoteSearchPath (searchPath: string[]): string {
+    return searchPath.length === 1 ? `"${searchPath[0]}"` : `"${searchPath.join('", "')}"`
+  }
+
+  /**
+   * Configure the synchronous_commit setting.
+   *
+   * @param  \PDO  $connection
+   * @param  array  $config
+   * @return void
+   */
+  protected configureSynchronousCommit (connection: Driver, config: DatabaseConfig) {
+    if (config.synchronous_commit !== undefined) {
+      connection.prepare(`set synchronous_commit to '${config.synchronous_commit}'`).execute()
+    }
+  }
+
+  /**
    * Add the SSL options to the DSN.
    *
    * @protected
@@ -39,7 +112,7 @@ export class PostgresConnector extends Connector {
    * @param  {Record<string, unknown>}  config
    * @return {string}
    */
-  protected addSslOptions(dsn: string, config: DatabaseConfig): string {
+  protected addSslOptions (dsn: string, config: DatabaseConfig): string {
     for (const option of ['sslmode', 'sslcert', 'sslkey', 'sslrootcert']) {
       if (config[option] !== undefined) {
         dsn += `;${option}=${config[option]}`
@@ -56,7 +129,7 @@ export class PostgresConnector extends Connector {
    * @param  {Record<string, unknown>}  config
    * @return {string}
    */
-  protected getDsn(config: DatabaseConfig): string {
+  protected getDsn (config: DatabaseConfig): string {
     // First we will create the basic DSN setup as well as the port if it is in
     // in the configuration options. This will give us the basic DSN we will
     // need to establish the PDO connections and return them back for use.
@@ -99,7 +172,10 @@ export class PostgresConnector extends Connector {
    * @param  {Record<string, unknown>}  options
    * @return {object}
    */
-  protected override createDriverConnection(dsn: string, options: DriverOptions): Driver {
+  protected override createDriverConnection (
+    dsn: string,
+    options: DriverOptions
+  ): Driver {
     return new PostgresDriver(dsn, options)
   }
 }
