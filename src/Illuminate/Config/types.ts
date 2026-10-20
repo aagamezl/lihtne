@@ -1,12 +1,13 @@
 /**
  * One entry under `database.connections` in `lihtne-config.json`.
  */
-export interface DatabaseConnectionConfig {
+export interface DatabaseConfig {
   driver: string
   host?: string
   database: string
   username: string
   password: string
+  prefix?: string
   url?: string
   port?: number | string
   connect_via_database?: string
@@ -21,11 +22,10 @@ export interface DatabaseConnectionConfig {
 }
 
 /**
- * A connection config before URL parsing. Every field is optional because
- * the URL can supply the missing values, and query options add extra keys.
+ * A connection config. Every field is optional, so `{}` is a valid default.
  */
-export type DatabaseConfig = Partial<DatabaseConnectionConfig> &
-  Record<string, unknown>
+// export type DatabaseConfig = Partial<DatabaseConnectionConfig>
+// export type DatabaseConfig = DatabaseConnectionConfig
 
 /**
  * Shape of `lihtne-config.json`.
@@ -33,6 +33,6 @@ export type DatabaseConfig = Partial<DatabaseConnectionConfig> &
 export type LihtneConfig = {
   database: {
     default: string
-    connections: Record<string, DatabaseConnectionConfig>
+    connections: Record<string, DatabaseConfig>
   }
 }

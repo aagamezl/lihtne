@@ -1,9 +1,7 @@
 import { getValue, isNil } from '@devnetic/utils'
-import fs from 'node:fs'
-import { join } from 'node:path'
 
 import type { Repository } from '../Config/Repository'
-import type { DatabaseConfig, DatabaseConnectionConfig } from '../Config/types'
+import type { DatabaseConfig, LihtneConfig } from '../Config/types'
 import type { Connection, Reconnector } from './Connection'
 import type { ConnectionFactory } from './Connectors/ConnectionFactory'
 
@@ -25,9 +23,9 @@ import { ConfigurationUrlParser } from './../Support/ConfigurationUrlParser'
 
 export type ConnectionResolver = (config: DatabaseConfig, name: string) => Connection
 
-const isDatabaseConfig = (value: unknown): value is string | DatabaseConfig => {
-  return typeof value === 'string' || (typeof value === 'object' && value !== null)
-}
+// const isDatabaseConfig = (value: unknown): value is string | DatabaseConfig => {
+//   return typeof value === 'string' || (typeof value === 'object' && value !== null)
+// }
 
 /**
  * @mixin {Connection}
@@ -73,7 +71,7 @@ export class DatabaseManager {
    *
    * @var string
    */
-  protected configFile: string = 'lihtne-config.json'
+  protected configFile: string = 'lihtne.config.ts'
 
   /**
    * Create a new database manager instance.
@@ -81,13 +79,29 @@ export class DatabaseManager {
    * @param  {import('../Database/Connectors/ConnectionFactory.js').default}  factory
    * @param  {Repository}  repository
    */
-  constructor (factory: ConnectionFactory, repository: Repository) {
+  constructor (
+    factory: ConnectionFactory,
+    repository: Repository,
+    config: Partial<LihtneConfig> = {}
+  ) {
     this.factory = factory
     this.repository = repository
 
-    const path = join(process.cwd(), this.configFile)
+    // const config = JSON.parse(fs.readFileSync(path, { encoding: 'utf8' }))
+    // const path = join(process.cwd(), this.configFile)
 
-    const config = JSON.parse(fs.readFileSync(path, { encoding: 'utf8' }))
+    // const configContent = readFileSync(path, { encoding: 'utf8' })
+    // const context = { configContent }
+    // // const script = `
+    // //   const config = ${JSON.stringify(configContent)}
+    // //   module.exports = config
+    // // `
+    // const script = configContent
+    // const { default: config } = runInNewContext(script, context, {
+    //   filename: this.configFile,
+    //   lineOffset: -1,
+    //   displayErrors: true
+    // })
 
     this.repository.set('database', config.database)
 
@@ -121,12 +135,12 @@ export class DatabaseManager {
     // To get the database connection configuration, we will just pull each of the
     // connection configurations and get the configurations for the given name.
     // If the configuration doesn't exist, we'll throw an exception and bail.
-    const connections = this.repository.get<string, Record<string, DatabaseConnectionConfig>>('database.connections')
+    const connections = this.repository.get<string, Record<string, DatabaseConfig>>('database.connections')
     const config = getValue(connections, name)
 
-    if (!isDatabaseConfig(config)) {
-      throw new Error(`InvalidArgumentException: Database connection [${name}] not configured.`)
-    }
+    // if (!isDatabaseConfig(config)) {
+    //   throw new Error(`InvalidArgumentException: Database connection [${name}] not configured.`)
+    // }
 
     return (new ConfigurationUrlParser()).parseConfiguration(config)
   }

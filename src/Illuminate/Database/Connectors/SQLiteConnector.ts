@@ -1,1 +1,3 @@
-export class SQLiteConnector { }
+import { Connector } from './Connector'
+
+export class SQLiteConnector extends Connector { }

@@ -2,7 +2,8 @@ import { DB } from '../../../src/Illuminate/Support/Facades/DB'
 
 (async () => {
   try {
-    const userId = await DB().query().from('users').insertGetId({
+    const db = await DB()
+    const userId = await db.query().from('users').insertGetId({
       first_name: 'Robert',
       last_name: 'Doe',
       username: 'robert.doe',
@@ -12,7 +13,7 @@ import { DB } from '../../../src/Illuminate/Support/Facades/DB'
 
     console.log(`User id: ${userId}`)
 
-    const result = await DB().query().from('users').delete(userId)
+    const result = await db.query().from('users').delete(userId)
 
     console.log('result.rowCount: %o', result)
   } catch (error) {

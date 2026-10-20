@@ -60,7 +60,12 @@ describe('DatabaseManager', () => {
   })
 
   test('testParseConnectionNameRecognizesReadAndWriteTypes', () => {
-    const manager = new DatabaseManagerTestManager(factory, repository)
+    const manager = new DatabaseManagerTestManager(factory, repository, {
+      database: {
+        default: 'pgsql',
+        connections: {}
+      }
+    })
 
     // TODO: Review this test
     // expect(manager.parseConnectionNamePublic('pgsql::read')).toEqual(['pgsql', 'read'])
@@ -70,7 +75,7 @@ describe('DatabaseManager', () => {
   })
 
   test('testConfigureSetsTheReconnector', () => {
-    const manager = new DatabaseManagerTestManager(factory, repository)
+    const manager = new DatabaseManagerTestManager(factory, repository, {})
     const connection = new TestConnection(new Driver('cached', {}), 'database', '', { name: 'pgsql' })
 
     const configured = manager.configurePublic(connection)
@@ -80,7 +85,7 @@ describe('DatabaseManager', () => {
   })
 
   test('testRefreshDriversConnectionsReplacesTheDriver', () => {
-    const manager = new DatabaseManagerTestManager(factory, repository)
+    const manager = new DatabaseManagerTestManager(factory, repository, {})
     const connection = new TestConnection(new Driver('cached', {}), 'database', '', { name: 'pgsql' })
     const freshDriver = new Driver('fresh', {})
     const freshConnection = new TestConnection(new Driver('fresh', {}), 'database', '', { name: 'pgsql' })

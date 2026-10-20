@@ -1,7 +1,8 @@
+import type { DatabaseConfig } from '../Config/types'
 import type { Driver } from './Drivers/Driver'
 import type { BindingValues } from './Query/Builder'
 
-import { Connection, type ConnectionConfig } from './Connection'
+import { Connection, type DriverResolver } from './Connection'
 
 export class MySqlConnection extends Connection {
   /**
@@ -12,10 +13,10 @@ export class MySqlConnection extends Connection {
   protected lastInsertId: string | number | undefined
 
   constructor (
-    driver: Driver,
+    driver: Driver | DriverResolver,
     database: string = '',
     tablePrefix: string = '',
-    config: ConnectionConfig = {}
+    config: DatabaseConfig
   ) {
     super(driver, database, tablePrefix, config)
   }
@@ -56,11 +57,11 @@ export class MySqlConnection extends Connection {
 
       this.recordsHaveBeenModified()
 
-      const result = await statement.execute(bindings)
+      await statement.execute(bindings)
 
       this.lastInsertId = await this.getDriver().lastInsertId(sequence)
 
-      return result
+      return true
     })
   }
 }

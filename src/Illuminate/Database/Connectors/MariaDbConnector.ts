@@ -1,1 +1,3 @@
-export class MariaDbConnector { }
+import { Connector } from './Connector'
+
+export class MariaDbConnector extends Connector { }

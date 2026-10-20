@@ -11,7 +11,7 @@ export class PostgresConnection extends Connection {
   /**
    * {@inheritdoc}
    */
-  public getDriverTitle(): string {
+  public getDriverTitle (): string {
     return 'PostgreSQL'
   }
 
@@ -24,7 +24,7 @@ export class PostgresConnection extends Connection {
    * @param  array  $bindings
    * @return array
    */
-  public override prepareBindings(bindings: BindingValues): BindingValues {
+  public override prepareBindings (bindings: BindingValues): BindingValues {
     const grammar = this.getQueryGrammar()
 
     for (const [key, value] of bindings.entries()) {
@@ -42,7 +42,7 @@ export class PostgresConnection extends Connection {
    * @param  string  $value
    * @return string
    */
-  protected override escapeBinary($value: string): string {
+  protected override escapeBinary ($value: string): string {
     const hex = Buffer.from($value).toString('hex')
 
     return `'\\x${hex}'::bytea`
@@ -54,8 +54,8 @@ export class PostgresConnection extends Connection {
    * @param  bool  $value
    * @return string
    */
-  protected override escapeBool(value: boolean): string {
-    return value ? 'true' : 'false';
+  protected override escapeBool (value: boolean): string {
+    return value ? 'true' : 'false'
   }
 
   /**
@@ -64,7 +64,7 @@ export class PostgresConnection extends Connection {
    * @param  \Exception  $exception
    * @return bool
    */
-  protected override isUniqueConstraintError(exception: Error): boolean {
+  protected override isUniqueConstraintError (exception: Error): boolean {
     return exception.code === '23505'
   }
 
@@ -74,36 +74,35 @@ export class PostgresConnection extends Connection {
    * @param  Exception  $exception
    * @return array{index: string|null, columns: list<string>}
    */
-  protected override parseUniqueConstraintViolation(exception: Error): { index: string | null, columns: string[] } {
+  protected override parseUniqueConstraintViolation (exception: Error): { index: string | null, columns: string[] } {
     let index = null
     let columns: string[] = []
 
     const message = exception.message
-    let matches = new RegExp('#unique constraint "([^"]+)"#i').exec(message)
+    let matches = /unique constraint "([^"]+)"/i.exec(message)
 
     if (matches) {
-      index = matches[1];
+      index = matches[1]
     }
 
-    matches = new RegExp('#Key \\(([^)]+)\\)=#i').exec(message)
+    matches = /Key \(([^)]+)\)=/i.exec(message)
     if (matches) {
-      columns = matches[1].split(',').map(column => column.trim()) ?? [];
+      columns = matches[1].split(',').map((column) => column.trim()) ?? []
     }
 
     return { columns, index }
   }
 
-
   /**
    * Determine if the given database exception was caused by an invalid or out of range value.
    */
-  protected override isDataTypeError(exception: Error): boolean {
+  protected override isDataTypeError (exception: Error): boolean {
     return [
       '22001', // string_data_right_truncation
       '22003', // numeric_value_out_of_range
       '22007', // invalid_datetime_format
       '22008', // datetime_field_overflow
-      '22P02', // invalid_text_representation
+      '22P02' // invalid_text_representation
     ].includes(exception.code)
   }
 
@@ -121,7 +120,7 @@ export class PostgresConnection extends Connection {
    *
    * @return \Illuminate\Database\Query\Processors\PostgresProcessor
    */
-  protected override getDefaultPostProcessor(): Processor {
+  protected override getDefaultPostProcessor (): Processor {
     return new PostgresProcessor()
   }
 

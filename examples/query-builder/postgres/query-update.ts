@@ -2,13 +2,14 @@ import { DB } from '../../../src/Illuminate/Support/Facades/DB'
 
 (async () => {
   try {
-    const users = await DB()
+    const db = await DB()
+    const users = await db
       .query()
       .from('users')
       .where('email', 'astrid.larsen@example.com')
       .get()
 
-      const userId = users.first()?.['id']
+    const userId = users.first()?.id
 
     if (typeof userId !== 'string' && typeof userId !== 'number') {
       console.error('User not found')
@@ -18,7 +19,7 @@ import { DB } from '../../../src/Illuminate/Support/Facades/DB'
 
     console.log(`User id: ${userId}`)
 
-    const result = await DB().query().from('users')
+    const result = await db.query().from('users')
       .where('id', '=', userId)
       .update({ first_name: 'Louise' })
 

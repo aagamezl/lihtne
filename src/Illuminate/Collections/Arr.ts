@@ -257,11 +257,32 @@ export class Arr {
   /**
    * Shuffle the given array and return the result.
    *
+   * The copy is reordered with a Fisher-Yates shuffle, so every permutation
+   * is equally likely. The input array is left unchanged.
+   *
    * @param  {Array}  array
    * @return {Array}
    */
   public static shuffle<TValue>(array: TValue[]): TValue[] {
-    return array.sort((a: TValue, b: TValue) => a.localeCompare(b))
+    const shuffled = [...array]
+
+    // Fisher-Yates: walk from the end and swap each index with a random
+    // index in the still-unshuffled prefix, including itself.
+    for (let index = shuffled.length - 1; index > 0; index -= 1) {
+      const swapIndex = Math.floor(Math.random() * (index + 1))
+      const current = shuffled[index]
+      const swap = shuffled[swapIndex]
+
+      // Indexed access is `TValue | undefined` when a slot is missing.
+      if (current === undefined || swap === undefined) {
+        continue
+      }
+
+      shuffled[index] = swap
+      shuffled[swapIndex] = current
+    }
+
+    return shuffled
   }
 
   /**

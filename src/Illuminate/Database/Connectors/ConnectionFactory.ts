@@ -9,7 +9,7 @@ import { PostgresConnection } from '../PostgresConnection'
 import { SQLiteConnection } from '../SQLiteConnection'
 import { SqlServerConnection } from '../SqlServerConnection'
 import { Arr } from './../../Collections/Arr'
-import { Connection } from './../Connection'
+import { Connection, type DriverResolver } from './../Connection'
 import { MySqlConnection } from './../MySqlConnection'
 import { MariaDbConnector } from './MariaDbConnector'
 import { MySqlConnector } from './MySqlConnector'
@@ -31,7 +31,13 @@ export class ConnectionFactory {
    *
    * @throws {Error}
    */
-  protected createConnection (driver: string, connection: Driver, database: string, prefix = '', config = {}) {
+  protected createConnection (
+    driver: string,
+    connection: Driver | DriverResolver,
+    database: string,
+    prefix = '',
+    config: DatabaseConfig
+  ): Connection {
     const resolver = Connection.getResolver(driver)
 
     if (resolver) {
@@ -67,7 +73,10 @@ export class ConnectionFactory {
    *
    * @throws {TypeError}
    */
-  public createConnector (config: DatabaseConfig): Connector {
+  public createConnector (config: DatabaseConfig): Connector
+  public createConnector (
+    config: DatabaseConfig
+  ): Connector {
     if (!config.driver) {
       throw new Error('InvalidArgumentException: A driver must be specified.')
     }
@@ -98,7 +107,7 @@ export class ConnectionFactory {
    * @param  {Record<string, any>}  config
    * @return {Function}
    */
-  protected createDriverResolver (config: DatabaseConfig): () => Promise<unknown> {
+  protected createDriverResolver (config: DatabaseConfig): DriverResolver {
     return Reflect.has(config, 'host')
       ? this.createResolverWithHosts(config)
       : this.createResolverWithoutHosts(config)
@@ -112,7 +121,7 @@ export class ConnectionFactory {
    *
    * @throws {DriverException}
    */
-  protected createResolverWithHosts (config: DatabaseConfig): () => Promise<unknown> {
+  protected createResolverWithHosts (config: DatabaseConfig): DriverResolver {
     return () => {
       const hosts = this.parseHosts(config)
 
@@ -136,7 +145,7 @@ export class ConnectionFactory {
    * @param  {Record<string, any>}  config
    * @return {Function}
    */
-  protected createResolverWithoutHosts (config: DatabaseConfig): () => Promise<unknown> {
+  protected createResolverWithoutHosts (config: DatabaseConfig): DriverResolver {
     return () => {
       return this.createConnector(config).connect(config)
     }
@@ -175,7 +184,8 @@ export class ConnectionFactory {
    * @param  {string}  [name]
    * @return {Record<string, any>}
    */
-  protected parseConfig (config: DatabaseConfig, name?: string): DatabaseConfig {
+  protected parseConfig (config: DatabaseConfig, name?: string): DatabaseConfig
+  protected parseConfig (config: DatabaseConfig, name?: string): unknown {
     return setValue(setValue(config, 'prefix', ''), 'name', name)
   }
 

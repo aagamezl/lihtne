@@ -5,10 +5,11 @@ import { DB } from '../../../src/Illuminate/Support/Facades/DB'
     // console.log('SQL: %s', DB().query().from('users').where('firstname', 'John').toSql())
     // console.log('Bindings: %o', DB().query().from('users').where('firstname', 'John').getBindings())
 
-    let users = await DB().query().from('users').where('first_name', 'John').get()
+    const db = await DB()
+    let users = await db.query().from('users').where('first_name', 'John').get()
     console.log(JSON.stringify(users.all(), null, 2))
 
-    users = await DB().query().from('users').get()
+    users = await db.query().from('users').get()
 
     console.log(JSON.stringify(users.all(), null, 2))
   } catch (error) {

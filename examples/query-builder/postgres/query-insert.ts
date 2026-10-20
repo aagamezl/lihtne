@@ -2,7 +2,8 @@ import { DB } from '../../../src/Illuminate/Support/Facades/DB'
 
 (async () => {
   try {
-    let result = await DB().query().from('users').insert(
+    const db = await DB()
+    let result = await db.query().from('users').insert(
       {
         first_name: 'Michael',
         last_name: 'Doe',
@@ -14,7 +15,7 @@ import { DB } from '../../../src/Illuminate/Support/Facades/DB'
 
     console.log('result: %o', result)
 
-    result = await DB().query().from('users').insert([
+    result = await db.query().from('users').insert([
       {
         first_name: 'Helena',
         last_name: 'Doe',
@@ -33,7 +34,7 @@ import { DB } from '../../../src/Illuminate/Support/Facades/DB'
 
     console.log('result: %o', result)
 
-    const users = await DB().query().from('users').get()
+    const users = await db.query().from('users').get()
 
     console.log(JSON.stringify(users.all(), null, 2))
   } catch (error) {
