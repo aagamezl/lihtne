@@ -19,8 +19,6 @@ export abstract class Statement<
 > {
   protected bindings: Record<string, BindingValue> = {}
 
-  protected statement!: PreparedStatement
-
   protected abstract client: unknown
 
   protected dsn: string
@@ -34,6 +32,8 @@ export abstract class Statement<
    * @type {any}
    */
   protected result: Result<TRow> = { rows: [], rowCount: 0 }
+
+  protected statement!: PreparedStatement
 
   /**
    * Creates an instance of Statement.
@@ -66,15 +66,16 @@ export abstract class Statement<
     }
   }
 
-  public abstract parameterize (query: string): string
-
+  /**
+   * Executes the statement and returns the result.
+   * @param values {BindingValues}
+   * @returns {Promise<TRow[]>}
+   */
   public abstract execute (values?: BindingValues): Promise<TRow[]>
 
   public abstract fetchAll (): TRow[]
 
-  public abstract rowCount (): number
-
-  public abstract close (): Promise<void>
+  public abstract parameterize (query: string): string
 
   /**
    * Prepares a statement for execution and returns a statement object
@@ -83,4 +84,6 @@ export abstract class Statement<
    * @returns {Statement}
    */
   public abstract prepare (query: string): this
+
+  public abstract rowCount (): number
 }

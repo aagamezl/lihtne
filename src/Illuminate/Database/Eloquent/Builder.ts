@@ -9,11 +9,35 @@ const isMacro = (value: unknown): value is (...args: unknown[]) => unknown => {
 
 export class Builder implements BuilderContract {
   /**
-   * The base query builder instance.
+   * All of the globally registered builder macros.
    *
-   * @var \Illuminate\Database\Query\Builder
+   * @var array
    */
-  protected query: QueryBuilder
+  protected static macros: Record<string, (...args: unknown[]) => unknown> = {}
+
+  /**
+   * Forwarded to the base query builder by the instance proxy.
+   */
+  declare getColumns: () => string[]
+
+  /**
+   * Forwarded to the base query builder by the instance proxy.
+   */
+  declare getGrammar: () => ReturnType<QueryBuilder['getGrammar']>
+
+  /**
+   * All of the locally registered builder macros.
+   *
+   * @var array
+   */
+  protected localMacros: Record<string, (...args: unknown[]) => unknown> = {}
+
+  /**
+   * The model being queried.
+   *
+   * @var TModel
+   */
+  protected model: { hasNamedScope (scope: string): boolean } | undefined
 
   protected passthru: string[] = [
     'aggregate',
@@ -40,40 +64,16 @@ export class Builder implements BuilderContract {
   ]
 
   /**
-   * All of the globally registered builder macros.
+   * The base query builder instance.
    *
-   * @var array
+   * @var \Illuminate\Database\Query\Builder
    */
-  protected static macros: Record<string, (...args: unknown[]) => unknown> = {}
-
-  /**
-   * The model being queried.
-   *
-   * @var TModel
-   */
-  protected model: { hasNamedScope (scope: string): boolean } | undefined
-
-  /**
-   * All of the locally registered builder macros.
-   *
-   * @var array
-   */
-  protected localMacros: Record<string, (...args: unknown[]) => unknown> = {}
+  protected query: QueryBuilder
 
   constructor (query: QueryBuilder) {
     this.query = query
 
     return instanceProxy(this)
-  }
-
-  /**
-   * Checks if a macro is registered.
-   *
-   * @param  string  $name
-   * @return bool
-   */
-  public hasMacro (name: string): boolean {
-    return this.localMacros[name] !== undefined
   }
 
   /**
@@ -84,16 +84,6 @@ export class Builder implements BuilderContract {
    */
   public static hasGlobalMacro (name: string): boolean {
     return Builder.macros[name] !== undefined
-  }
-
-  /**
-   * Determine if the given model has a scope.
-   *
-   * @param  string  $scope
-   * @return bool
-   */
-  public hasNamedScope (scope: string): boolean {
-    return this.model?.hasNamedScope(scope) === true
   }
 
   __call (method: string, ...parameters: unknown[]) {
@@ -162,15 +152,17 @@ export class Builder implements BuilderContract {
     return this
   }
 
-  public newModelInstance (): {
-    newCollection: (items: unknown[]) => unknown
-    newFromBuilder: (item: unknown) => { preventsLazyLoading?: boolean }
-  } {
-    throw new Error('newModelInstance() is not implemented.')
-  }
-
-  toBase () {
-    return this.getQuery()
+  /**
+   * Create a collection of models from a raw query.
+   *
+   * @param  string  $query
+   * @param  array  $bindings
+   * @return \Illuminate\Database\Eloquent\Collection<int, TModel>
+   */
+  public fromQuery (query: string, bindings = []) {
+    // return this.hydrate(
+    this.query.getConnection().select(query, bindings)
+    // );
   }
 
   getQuery () {
@@ -178,14 +170,24 @@ export class Builder implements BuilderContract {
   }
 
   /**
-   * Forwarded to the base query builder by the instance proxy.
+   * Checks if a macro is registered.
+   *
+   * @param  string  $name
+   * @return bool
    */
-  declare getColumns: () => string[]
+  public hasMacro (name: string): boolean {
+    return this.localMacros[name] !== undefined
+  }
 
   /**
-   * Forwarded to the base query builder by the instance proxy.
+   * Determine if the given model has a scope.
+   *
+   * @param  string  $scope
+   * @return bool
    */
-  declare getGrammar: () => ReturnType<QueryBuilder['getGrammar']>
+  public hasNamedScope (scope: string): boolean {
+    return this.model?.hasNamedScope(scope) === true
+  }
 
   /**
    * Create a collection of models from plain arrays.
@@ -203,16 +205,14 @@ export class Builder implements BuilderContract {
     )
   }
 
-  /**
-   * Create a collection of models from a raw query.
-   *
-   * @param  string  $query
-   * @param  array  $bindings
-   * @return \Illuminate\Database\Eloquent\Collection<int, TModel>
-   */
-  public fromQuery (query: string, bindings = []) {
-    // return this.hydrate(
-    this.query.getConnection().select(query, bindings)
-    // );
+  public newModelInstance (): {
+    newCollection: (items: unknown[]) => unknown
+    newFromBuilder: (item: unknown) => { preventsLazyLoading?: boolean }
+  } {
+    throw new Error('newModelInstance() is not implemented.')
+  }
+
+  toBase () {
+    return this.getQuery()
   }
 }

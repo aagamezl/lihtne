@@ -24,6 +24,106 @@ type FlatValues<TValue> = [TValue] extends [readonly unknown[]]
  */
 export class Arr {
   /**
+   * Determine whether the given value is array accessible.
+   *
+   * PHP checks `is_array($value) || $value instanceof ArrayAccess`. There
+   * is no `ArrayAccess` equivalent in plain TypeScript/JS, so this treats
+   * arrays and plain (non-null) objects as "accessible", mirroring how
+   * PHP arrays serve as both lists and dictionaries.
+   */
+  static accessible (value: unknown): value is unknown[] | Dictionary<unknown> {
+    if (Array.isArray(value)) {
+      return true
+    }
+
+    if (value === null || value === undefined) {
+      return false
+    }
+
+    return typeof value === 'object'
+  }
+
+  /**
+   * Collapse an array of arrays into a single array.
+   *
+   * Mirrors `Arr::collapse()`: iterates the given iterable, and for every
+   * element that is itself an array, merges its values into the result.
+   * Non-array elements are silently dropped, exactly as in PHP (only
+   * `Collection` instances and arrays are collapsed; everything else is
+   * skipped).
+   */
+  static collapse<TValue>(array: Iterable<TValue[] | unknown>): TValue[] {
+    const results: TValue[] = []
+
+    for (const values of array) {
+      if (Arr.isValueArray<TValue>(values)) {
+        for (const value of values) {
+          results.push(value)
+        }
+      }
+    }
+
+    return results
+  }
+
+  /**
+   * Get an item from an array or object using "dot" notation.
+   *
+   * TypeScript port of the global `data_get()` helper, scoped to the
+   * subset `Arr::pluck()` needs: plain segment traversal through
+   * accessible values and objects. Wildcard (`*`) and `{first}`/`{last}`
+   * segments are intentionally out of scope here, since `pluck()` never
+   * produces them for this port's use cases.
+   */
+  static dataGet<TValue, TDefault = undefined>(
+    target: unknown,
+    segments: string[],
+    defaultValue?: TDefault | (() => TDefault)
+  ): TValue | TDefault | undefined {
+    let cursor: unknown = target
+
+    for (const segment of segments) {
+      if (Arr.accessible(cursor) && Arr.exists(cursor, segment)) {
+        cursor = Arr.readEntry<unknown>(cursor, segment)
+        continue
+      }
+
+      if (Arr.isPlainObjectWithProperty(cursor, segment)) {
+        cursor = cursor[segment]
+        continue
+      }
+
+      return resolveDefault(defaultValue)
+    }
+
+    return cursor as TValue
+  }
+
+  /**
+   * Copy arrays and plain objects so `except()` can drop keys without
+   * mutating the input. PHP arrays are copy-on-write; class instances stay
+   * shared because `unset` only removes keys, it does not clone values.
+   */
+  public static duplicate<TValue>(value: TValue): TValue
+  public static duplicate (value: unknown): unknown {
+    if (Array.isArray(value)) {
+      return value.map((item) => this.duplicate(item))
+    }
+
+    if (this.isPlainRecord(value)) {
+      const copy: Dictionary<unknown> = {}
+
+      for (const [key, item] of Object.entries(value)) {
+        copy[key] = this.duplicate(item)
+      }
+
+      return copy
+    }
+
+    return value
+  }
+
+  /**
    * Get all of the given array except for a specified array of keys.
    *
    * @param  array  $array
@@ -42,65 +142,197 @@ export class Arr {
   }
 
   /**
-   * Set an array item to a given value using "dot" notation.
+   * Determine if the given key exists in the provided array.
    *
-   * If no key is given to the method, the entire array will be replaced.
+   * Mirrors `Arr::exists()`. PHP normalizes float/null keys to strings
+   * before checking; TypeScript keys are already strings or numbers, so
+   * this checks own-property existence for objects and index bounds for
+   * arrays (an index within `[0, length)` counts as existing, matching
+   * PHP's `array_key_exists` for lists).
+   */
+  static exists<TValue, TKey extends PropertyKey>(
+    array: TValue,
+    key: TKey
+  ): boolean {
+    if (Array.isArray(array)) {
+      const index = Number(key)
+
+      if (Number.isInteger(index)) {
+        return index >= 0 && index < array.length
+      }
+
+      return false
+    }
+
+    return Object.prototype.hasOwnProperty.call(array, key)
+  }
+
+  /**
+   * Explode the "value" and "key" arguments passed to "pluck".
    *
-   * @param  array  $array
-   * @param  string|int|null  $key
-   * @param  mixed  $value
+   * Mirrors the protected `Arr::explodePluckParameters()`. String paths
+   * are split on `.` into segments; callbacks and already-exploded arrays
+   * pass through unchanged; `null` stays `null`.
+   */
+  static explodePluckParameters<TItem, TValue>(
+    value: string | string[] | ((item: TItem) => TValue),
+    key?: string | string[] | ((item: TItem) => PropertyKey) | null
+  ): [
+      string[] | ((item: TItem) => TValue),
+      string[] | ((item: TItem) => PropertyKey) | null
+  ] {
+    const explodedValue =
+      typeof value === 'string' ? value.split(DOT_SEPARATOR) : value
+
+    let explodedKey: string[] | ((item: TItem) => PropertyKey) | null
+
+    if (key === null || key === undefined) {
+      explodedKey = null
+    } else if (typeof key === 'function' || Array.isArray(key)) {
+      explodedKey = key
+    } else {
+      explodedKey = key.split(DOT_SEPARATOR)
+    }
+
+    return [explodedValue, explodedKey]
+  }
+
+  /**
+   * Run a map over each of the items in the array, preserving keys.
+   *
+   * Mirrors `Arr::map()`. The callback receives `(value, key)` for every
+   * entry and the result is rebuilt with the same keys, just like
+   * `array_combine(array_keys($array), array_map(...))` in PHP.
+   */
+  static filter<TKey extends PropertyKey, TValue>(
+    array: TValue[] | Record<string, TValue>,
+    callback?: (value: TValue, key: TKey) => boolean
+  ): TValue[] | Record<string, TValue> {
+    if (callback === undefined) {
+      if (Array.isArray(array)) {
+        return array.filter(Boolean)
+      }
+
+      return Object.fromEntries(
+        Object.entries(array).filter(([, value]) => Boolean(value))
+      )
+    }
+
+    if (Array.isArray(array)) {
+      return array.filter((value, index) => callback(value, index as TKey))
+    }
+
+    return Object.entries(array).reduce<Record<string, TValue>>((
+      acc,
+      [key, value]
+    ) => {
+      if (callback(value, iterationKey<TKey>(key))) {
+        acc[key] = value
+      }
+
+      return acc
+    }, {})
+  }
+
+  /**
+   * Return the first element in an iterable passing a given truth test.
+   *
+   * Mirrors `Arr::first()`. Without a callback, returns the first item
+   * (or `default` if empty). With a callback, returns the first item for
+   * which the callback returns `true` (or `default` if none match).
+   */
+  static first<TValue, TKey extends PropertyKey, TDefault = undefined>(
+    // array: ArrayableInput<TValue>,
+    array: TValue[] | Record<string, TValue>,
+    callback?: (value: TValue, key: TKey) => boolean,
+    defaultValue?: TDefault | (() => TDefault)
+  ): TValue | TDefault | undefined {
+    if (callback === undefined) {
+      if (array.length === 0) {
+        return getValue(defaultValue as TValue)
+      }
+
+      if (Array.isArray(array)) {
+        return array[0]
+      }
+
+      // for (const item of array) {
+      //   return item;
+      // }
+
+      return getValue(defaultValue as TValue)
+    }
+
+    array = this.from(array)
+
+    return (
+      Object.entries(array).find(([key, value]) => {
+        return callback(value, iterationKey<TKey>(key))
+      })?.[1] ?? getValue(defaultValue as TValue)
+    )
+  }
+
+  /**
+   * Flatten a multi-dimensional array into a single level.
+   *
+   * @param  iterable  $array
+   * @param  int  $depth
    * @return array
    */
-  public static set (
-    array: Dictionary<unknown>,
-    key: string,
-    value: unknown,
-    separator?: string
-  ): Dictionary<unknown>
-  public static set<TValue>(
-    array: Dictionary<unknown>,
-    key: undefined,
-    value: TValue,
-    separator?: string
-  ): TValue
-  public static set (
-    array: Dictionary<unknown>,
-    key?: string,
-    value?: unknown,
-    separator: string = DOT_SEPARATOR
-  ): unknown {
-    let current: Dictionary<unknown> = array
+  static flatten<TValue>(
+    array: Record<string, readonly TValue[]>,
+    depth?: number
+  ): TValue[]
+  static flatten<TValue>(
+    array: Record<PropertyKey, readonly TValue[]>,
+    depth?: number
+  ): TValue[]
+  static flatten<TValue>(array: FlatValues<TValue>, depth?: number): TValue[]
+  static flatten (
+    array: Iterable<unknown> | Record<PropertyKey, unknown>,
+    depth?: number
+  ): unknown[]
+  static flatten (
+    array: Iterable<unknown> | Record<PropertyKey, unknown>,
+    depth: number = Infinity
+  ): unknown[] {
+    // const result: unknown[] = []
 
-    if (key === undefined) {
-      return value
+    // for (let item of array) {
+    //   item = item instanceof Collection ? item.all() : item
+
+    //   if (!Arr.shouldFlattenAsArray(item)) {
+    //     result.push(item)
+    //   } else {
+    //     const nested = Array.isArray(item) ? item : Object.values(item)
+    //     const values = depth === 1 ? nested : Arr.flatten(nested, depth - 1)
+
+    //     for (const value of values) {
+    //       result.push(value)
+    //     }
+    //   }
+    // }
+
+    // return result
+    const result = []
+    const entries = Object.entries(array)
+
+    for (let [, item] of entries) {
+      item = item instanceof Collection ? item.all() : item
+
+      if (!Array.isArray(item) && !isPlainObject(item)) {
+        result.push(item)
+      } else {
+        const values =
+          depth === 1 ? Object.values(item) : this.flatten(item, depth - 1)
+
+        for (const value of values) {
+          result.push(value)
+        }
+      }
     }
 
-    const keys = key.split(separator)
-
-    for (let i = 0; i < keys.length - 1; i++) {
-      if (keys.length === 1) {
-        break
-      }
-
-      const segment = Arr.pathSegment(keys[i])
-      // const segment = Arr.pathSegment(key)
-
-      // If the key doesn't exist at this depth, we will just create an empty array
-      // to hold the next value, allowing us to create the arrays to hold final
-      // values at the correct depth. Then we'll keep digging into the array.
-      if (
-        current[segment] === undefined ||
-        typeof current[segment] !== 'object'
-      ) {
-        current[segment] = {}
-      }
-
-      current = Arr.asRecord(current[segment])
-    }
-
-    current[Arr.pathSegment(keys.pop())] = value
-
-    return current
+    return result
   }
 
   /**
@@ -175,334 +407,6 @@ export class Arr {
       this.unset(cursor, finalKey)
     }
     /* eslint-enable no-labels */
-  }
-
-  /**
-   * Copy arrays and plain objects so `except()` can drop keys without
-   * mutating the input. PHP arrays are copy-on-write; class instances stay
-   * shared because `unset` only removes keys, it does not clone values.
-   */
-  public static duplicate<TValue>(value: TValue): TValue
-  public static duplicate (value: unknown): unknown {
-    if (Array.isArray(value)) {
-      return value.map((item) => this.duplicate(item))
-    }
-
-    if (this.isPlainRecord(value)) {
-      const copy: Dictionary<unknown> = {}
-
-      for (const [key, item] of Object.entries(value)) {
-        copy[key] = this.duplicate(item)
-      }
-
-      return copy
-    }
-
-    return value
-  }
-
-  /**
-   * Check if an item or items exist in an array using "dot" notation.
-   *
-   * @param  \ArrayAccess|array  $array
-   * @param  string|array  $keys
-   * @return bool
-   */
-  public static has (array: unknown, keys: string | string[]): boolean {
-    keys = Array.isArray(keys) ? keys : [keys]
-
-    if (!array || keys.length === 0) {
-      return false
-    }
-
-    for (const key of keys) {
-      let subKeyArray: unknown = array
-
-      if (this.exists(array, key)) {
-        continue
-      }
-
-      for (const segment of key.split('.')) {
-        if (
-          this.accessible(subKeyArray) &&
-          this.exists(subKeyArray, segment) &&
-          Arr.isRecord(subKeyArray)
-        ) {
-          subKeyArray = subKeyArray[segment]
-        } else {
-          return false
-        }
-      }
-    }
-
-    return true
-  }
-
-  /**
-   * Remove a key the way PHP `unset` does: drop the property, leave array holes.
-   */
-  public static unset (
-    target: unknown[] | Dictionary<unknown>,
-    key: PropertyKey
-  ): void {
-    if (Array.isArray(target)) {
-      delete target[Number(key)]
-
-      return
-    }
-
-    delete target[String(key)]
-  }
-
-  /**
-   * Shuffle the given array and return the result.
-   *
-   * The copy is reordered with a Fisher-Yates shuffle, so every permutation
-   * is equally likely. The input array is left unchanged.
-   *
-   * @param  {Array}  array
-   * @return {Array}
-   */
-  public static shuffle<TValue>(array: TValue[]): TValue[] {
-    const shuffled = [...array]
-
-    // Fisher-Yates: walk from the end and swap each index with a random
-    // index in the still-unshuffled prefix, including itself.
-    for (let index = shuffled.length - 1; index > 0; index -= 1) {
-      const swapIndex = Math.floor(Math.random() * (index + 1))
-      const current = shuffled[index]
-      const swap = shuffled[swapIndex]
-
-      // Indexed access is `TValue | undefined` when a slot is missing.
-      if (current === undefined || swap === undefined) {
-        continue
-      }
-
-      shuffled[index] = swap
-      shuffled[swapIndex] = current
-    }
-
-    return shuffled
-  }
-
-  /**
-   * True when dictionary keys are dense `0..n-1`, like a PHP list array.
-   */
-  public static isList<TValue>(dictionary: Dictionary<TValue>): boolean {
-    const keys = Object.keys(dictionary)
-
-    for (let index = 0; index < keys.length; index += 1) {
-      if (keys[index] !== String(index)) {
-        return false
-      }
-    }
-
-    return true
-  }
-
-  /**
-   * Filter the array using the given callback.
-   *
-   * @template TKey of array-key
-   * @template TValue
-   *
-   * @param  array<TKey, TValue>  $array
-   * @param  callable(TValue, TKey): bool  $callback
-   * @return array<TKey, TValue>
-   */
-  public static where<TValue>(
-    array: Array<TValue>,
-    callback: (value: TValue, key: number) => boolean
-  ): TValue[] {
-    return array.filter((value, key) => callback(value, key))
-  }
-
-  /**
-   * Flatten a multi-dimensional array into a single level.
-   *
-   * @param  iterable  $array
-   * @param  int  $depth
-   * @return array
-   */
-  static flatten<TValue>(
-    array: Record<string, readonly TValue[]>,
-    depth?: number
-  ): TValue[]
-  static flatten<TValue>(
-    array: Record<PropertyKey, readonly TValue[]>,
-    depth?: number
-  ): TValue[]
-  static flatten<TValue>(array: FlatValues<TValue>, depth?: number): TValue[]
-  static flatten (
-    array: Iterable<unknown> | Record<PropertyKey, unknown>,
-    depth?: number
-  ): unknown[]
-  static flatten (
-    array: Iterable<unknown> | Record<PropertyKey, unknown>,
-    depth: number = Infinity
-  ): unknown[] {
-    // const result: unknown[] = []
-
-    // for (let item of array) {
-    //   item = item instanceof Collection ? item.all() : item
-
-    //   if (!Arr.shouldFlattenAsArray(item)) {
-    //     result.push(item)
-    //   } else {
-    //     const nested = Array.isArray(item) ? item : Object.values(item)
-    //     const values = depth === 1 ? nested : Arr.flatten(nested, depth - 1)
-
-    //     for (const value of values) {
-    //       result.push(value)
-    //     }
-    //   }
-    // }
-
-    // return result
-    const result = []
-    const entries = Object.entries(array)
-
-    for (let [, item] of entries) {
-      item = item instanceof Collection ? item.all() : item
-
-      if (!Array.isArray(item) && !isPlainObject(item)) {
-        result.push(item)
-      } else {
-        const values =
-          depth === 1 ? Object.values(item) : this.flatten(item, depth - 1)
-
-        for (const value of values) {
-          result.push(value)
-        }
-      }
-    }
-
-    return result
-  }
-
-  /**
-   * Ordered values for a list-shaped dictionary (same order as PHP `array_values`).
-   */
-  static listValues<TValue>(dictionary: Dictionary<TValue>): TValue[] {
-    return Object.values(dictionary)
-  }
-
-  /**
-   * Determine whether the given value is array accessible.
-   *
-   * PHP checks `is_array($value) || $value instanceof ArrayAccess`. There
-   * is no `ArrayAccess` equivalent in plain TypeScript/JS, so this treats
-   * arrays and plain (non-null) objects as "accessible", mirroring how
-   * PHP arrays serve as both lists and dictionaries.
-   */
-  static accessible (value: unknown): value is unknown[] | Dictionary<unknown> {
-    if (Array.isArray(value)) {
-      return true
-    }
-
-    if (value === null || value === undefined) {
-      return false
-    }
-
-    return typeof value === 'object'
-  }
-
-  /**
-   * Collapse an array of arrays into a single array.
-   *
-   * Mirrors `Arr::collapse()`: iterates the given iterable, and for every
-   * element that is itself an array, merges its values into the result.
-   * Non-array elements are silently dropped, exactly as in PHP (only
-   * `Collection` instances and arrays are collapsed; everything else is
-   * skipped).
-   */
-  static collapse<TValue>(array: Iterable<TValue[] | unknown>): TValue[] {
-    const results: TValue[] = []
-
-    for (const values of array) {
-      if (Arr.isValueArray<TValue>(values)) {
-        for (const value of values) {
-          results.push(value)
-        }
-      }
-    }
-
-    return results
-  }
-
-  /**
-   * Narrow helper for `collapse()`: an `Array.isArray` check that keeps
-   * the element type as `TValue[]` (instead of the generic `unknown[]`
-   * signature `Array.isArray` reports) without a cast at the call site.
-   */
-  private static isValueArray<TValue>(
-    value: TValue[] | unknown
-  ): value is TValue[] {
-    return Array.isArray(value)
-  }
-
-  /**
-   * Determine if the given key exists in the provided array.
-   *
-   * Mirrors `Arr::exists()`. PHP normalizes float/null keys to strings
-   * before checking; TypeScript keys are already strings or numbers, so
-   * this checks own-property existence for objects and index bounds for
-   * arrays (an index within `[0, length)` counts as existing, matching
-   * PHP's `array_key_exists` for lists).
-   */
-  static exists<TValue, TKey extends PropertyKey>(
-    array: TValue,
-    key: TKey
-  ): boolean {
-    if (Array.isArray(array)) {
-      const index = Number(key)
-
-      if (Number.isInteger(index)) {
-        return index >= 0 && index < array.length
-      }
-
-      return false
-    }
-
-    return Object.prototype.hasOwnProperty.call(array, key)
-  }
-
-  /**
-   * Return the first element in an iterable passing a given truth test.
-   *
-   * Mirrors `Arr::first()`. Without a callback, returns the first item
-   * (or `default` if empty). With a callback, returns the first item for
-   * which the callback returns `true` (or `default` if none match).
-   */
-  static first<TValue, TKey extends PropertyKey, TDefault = undefined>(
-    // array: ArrayableInput<TValue>,
-    array: TValue[] | Record<string, TValue>,
-    callback?: (value: TValue, key: TKey) => boolean,
-    defaultValue?: TDefault | (() => TDefault)
-  ): TValue | TDefault | undefined {
-    if (callback === undefined) {
-      if (array.length === 0) {
-        return getValue(defaultValue as TValue)
-      }
-
-      if (Array.isArray(array)) {
-        return array[0]
-      }
-
-      // for (const item of array) {
-      //   return item;
-      // }
-
-      return getValue(defaultValue as TValue)
-    }
-
-    array = this.from(array)
-
-    return (
-      Object.entries(array).find(([key, value]) => {
-        return callback(value, iterationKey<TKey>(key))
-      })?.[1] ?? getValue(defaultValue as TValue)
-    )
   }
 
   /**
@@ -592,60 +496,55 @@ export class Arr {
   }
 
   /**
-   * Run a map over each of the items in the array, preserving keys.
+   * Check if an item or items exist in an array using "dot" notation.
    *
-   * Mirrors `Arr::map()`. The callback receives `(value, key)` for every
-   * entry and the result is rebuilt with the same keys, just like
-   * `array_combine(array_keys($array), array_map(...))` in PHP.
+   * @param  \ArrayAccess|array  $array
+   * @param  string|array  $keys
+   * @return bool
    */
-  static filter<TKey extends PropertyKey, TValue>(
-    array: TValue[] | Record<string, TValue>,
-    callback?: (value: TValue, key: TKey) => boolean
-  ): TValue[] | Record<string, TValue> {
-    if (callback === undefined) {
-      if (Array.isArray(array)) {
-        return array.filter(Boolean)
-      }
+  public static has (array: unknown, keys: string | string[]): boolean {
+    keys = Array.isArray(keys) ? keys : [keys]
 
-      return Object.fromEntries(
-        Object.entries(array).filter(([, value]) => Boolean(value))
-      )
+    if (!array || keys.length === 0) {
+      return false
     }
 
-    if (Array.isArray(array)) {
-      return array.filter((value, index) => callback(value, index as TKey))
-    }
+    for (const key of keys) {
+      let subKeyArray: unknown = array
 
-    return Object.entries(array).reduce<Record<string, TValue>>((
-      acc,
-      [key, value]
-    ) => {
-      if (callback(value, iterationKey<TKey>(key))) {
-        acc[key] = value
+      if (this.exists(array, key)) {
+        continue
       }
 
-      return acc
-    }, {})
+      for (const segment of key.split('.')) {
+        if (
+          this.accessible(subKeyArray) &&
+          this.exists(subKeyArray, segment) &&
+          Arr.isRecord(subKeyArray)
+        ) {
+          subKeyArray = subKeyArray[segment]
+        } else {
+          return false
+        }
+      }
+    }
+
+    return true
   }
 
-  static map<TKey extends PropertyKey, TValue, TMapped>(
-    array: TValue[] | Record<string, TValue>,
-    callback: (value: TValue, key: TKey) => TMapped
-  ): TMapped[] | Record<string, TMapped> {
-    return Object.entries(array).reduce<
-      TMapped[] | Record<PropertyKey, TMapped>
-    >(
-      (acc, [key, value]) => {
-        if (Array.isArray(acc)) {
-          acc.push(callback(value, iterationKey<TKey>(key)))
-        } else {
-          acc[key] = callback(value, iterationKey<TKey>(key))
-        }
+  /**
+   * True when dictionary keys are dense `0..n-1`, like a PHP list array.
+   */
+  public static isList<TValue>(dictionary: Dictionary<TValue>): boolean {
+    const keys = Object.keys(dictionary)
 
-        return acc
-      },
-      Array.isArray(array) ? [] : {}
-    )
+    for (let index = 0; index < keys.length; index += 1) {
+      if (keys[index] !== String(index)) {
+        return false
+      }
+    }
+
+    return true
   }
 
   /**
@@ -685,6 +584,33 @@ export class Arr {
   }
 
   /**
+   * Ordered values for a list-shaped dictionary (same order as PHP `array_values`).
+   */
+  static listValues<TValue>(dictionary: Dictionary<TValue>): TValue[] {
+    return Object.values(dictionary)
+  }
+
+  static map<TKey extends PropertyKey, TValue, TMapped>(
+    array: TValue[] | Record<string, TValue>,
+    callback: (value: TValue, key: TKey) => TMapped
+  ): TMapped[] | Record<string, TMapped> {
+    return Object.entries(array).reduce<
+      TMapped[] | Record<PropertyKey, TMapped>
+    >(
+      (acc, [key, value]) => {
+        if (Array.isArray(acc)) {
+          acc.push(callback(value, iterationKey<TKey>(key)))
+        } else {
+          acc[key] = callback(value, iterationKey<TKey>(key))
+        }
+
+        return acc
+      },
+      Array.isArray(array) ? [] : {}
+    )
+  }
+
+  /**
    * Pluck an array of values from an array.
    *
    * Mirrors `Arr::pluck()`. For each item, extracts the value found at
@@ -720,50 +646,129 @@ export class Arr {
   }
 
   /**
-   * Resolve a single "value" or "key" pluck segment for one item: either
-   * calls the provided callback, or walks the exploded dot-path via
-   * `dataGet`. Extracted from `pluck()` to avoid an inline function-type
-   * cast at each call site.
+   * Set an array item to a given value using "dot" notation.
+   *
+   * If no key is given to the method, the entire array will be replaced.
+   *
+   * @param  array  $array
+   * @param  string|int|null  $key
+   * @param  mixed  $value
+   * @return array
    */
-  private static resolvePluckSegment<TItem, TResult>(
-    item: TItem,
-    path: string[] | ((item: TItem) => TResult)
-  ): TResult | undefined {
-    if (typeof path === 'function') {
-      return path(item)
+  public static set (
+    array: Dictionary<unknown>,
+    key: string,
+    value: unknown,
+    separator?: string
+  ): Dictionary<unknown>
+  public static set<TValue>(
+    array: Dictionary<unknown>,
+    key: undefined,
+    value: TValue,
+    separator?: string
+  ): TValue
+  public static set (
+    array: Dictionary<unknown>,
+    key?: string,
+    value?: unknown,
+    separator: string = DOT_SEPARATOR
+  ): unknown {
+    let current: Dictionary<unknown> = array
+
+    if (key === undefined) {
+      return value
     }
 
-    return Arr.dataGet<TResult>(item, path)
+    const keys = key.split(separator)
+
+    for (let i = 0; i < keys.length - 1; i++) {
+      if (keys.length === 1) {
+        break
+      }
+
+      const segment = Arr.pathSegment(keys[i])
+      // const segment = Arr.pathSegment(key)
+
+      // If the key doesn't exist at this depth, we will just create an empty array
+      // to hold the next value, allowing us to create the arrays to hold final
+      // values at the correct depth. Then we'll keep digging into the array.
+      if (
+        current[segment] === undefined ||
+        typeof current[segment] !== 'object'
+      ) {
+        current[segment] = {}
+      }
+
+      current = Arr.asRecord(current[segment])
+    }
+
+    current[Arr.pathSegment(keys.pop())] = value
+
+    return current
   }
 
   /**
-   * Explode the "value" and "key" arguments passed to "pluck".
+   * Shuffle the given array and return the result.
    *
-   * Mirrors the protected `Arr::explodePluckParameters()`. String paths
-   * are split on `.` into segments; callbacks and already-exploded arrays
-   * pass through unchanged; `null` stays `null`.
+   * The copy is reordered with a Fisher-Yates shuffle, so every permutation
+   * is equally likely. The input array is left unchanged.
+   *
+   * @param  {Array}  array
+   * @return {Array}
    */
-  static explodePluckParameters<TItem, TValue>(
-    value: string | string[] | ((item: TItem) => TValue),
-    key?: string | string[] | ((item: TItem) => PropertyKey) | null
-  ): [
-      string[] | ((item: TItem) => TValue),
-      string[] | ((item: TItem) => PropertyKey) | null
-  ] {
-    const explodedValue =
-      typeof value === 'string' ? value.split(DOT_SEPARATOR) : value
+  public static shuffle<TValue>(array: TValue[]): TValue[] {
+    const shuffled = [...array]
 
-    let explodedKey: string[] | ((item: TItem) => PropertyKey) | null
+    // Fisher-Yates: walk from the end and swap each index with a random
+    // index in the still-unshuffled prefix, including itself.
+    for (let index = shuffled.length - 1; index > 0; index -= 1) {
+      const swapIndex = Math.floor(Math.random() * (index + 1))
+      const current = shuffled[index]
+      const swap = shuffled[swapIndex]
 
-    if (key === null || key === undefined) {
-      explodedKey = null
-    } else if (typeof key === 'function' || Array.isArray(key)) {
-      explodedKey = key
-    } else {
-      explodedKey = key.split(DOT_SEPARATOR)
+      // Indexed access is `TValue | undefined` when a slot is missing.
+      if (current === undefined || swap === undefined) {
+        continue
+      }
+
+      shuffled[index] = swap
+      shuffled[swapIndex] = current
     }
 
-    return [explodedValue, explodedKey]
+    return shuffled
+  }
+
+  /**
+   * Remove a key the way PHP `unset` does: drop the property, leave array holes.
+   */
+  public static unset (
+    target: unknown[] | Dictionary<unknown>,
+    key: PropertyKey
+  ): void {
+    if (Array.isArray(target)) {
+      delete target[Number(key)]
+
+      return
+    }
+
+    delete target[String(key)]
+  }
+
+  /**
+   * Filter the array using the given callback.
+   *
+   * @template TKey of array-key
+   * @template TValue
+   *
+   * @param  array<TKey, TValue>  $array
+   * @param  callable(TValue, TKey): bool  $callback
+   * @return array<TKey, TValue>
+   */
+  public static where<TValue>(
+    array: Array<TValue>,
+    callback: (value: TValue, key: number) => boolean
+  ): TValue[] {
+    return array.filter((value, key) => callback(value, key))
   }
 
   /**
@@ -780,63 +785,9 @@ export class Arr {
     return Array.isArray(value) ? value : [value]
   }
 
-  /**
-   * Get an item from an array or object using "dot" notation.
-   *
-   * TypeScript port of the global `data_get()` helper, scoped to the
-   * subset `Arr::pluck()` needs: plain segment traversal through
-   * accessible values and objects. Wildcard (`*`) and `{first}`/`{last}`
-   * segments are intentionally out of scope here, since `pluck()` never
-   * produces them for this port's use cases.
-   */
-  static dataGet<TValue, TDefault = undefined>(
-    target: unknown,
-    segments: string[],
-    defaultValue?: TDefault | (() => TDefault)
-  ): TValue | TDefault | undefined {
-    let cursor: unknown = target
-
-    for (const segment of segments) {
-      if (Arr.accessible(cursor) && Arr.exists(cursor, segment)) {
-        cursor = Arr.readEntry<unknown>(cursor, segment)
-        continue
-      }
-
-      if (Arr.isPlainObjectWithProperty(cursor, segment)) {
-        cursor = cursor[segment]
-        continue
-      }
-
-      return resolveDefault(defaultValue)
-    }
-
-    return cursor as TValue
-  }
-
-  /**
-   * Plain objects and arrays are both string-indexable at runtime.
-   * `noUncheckedIndexedAccess` rejects indexing the `unknown[] | Dictionary`
-   * union, so callers narrow through this predicate before a bracket read.
-   */
-  private static isRecord (value: unknown): value is Dictionary<unknown> {
-    return typeof value === 'object' && value !== null
-  }
-
-  private static pathSegment (segment: string | undefined): string
-  private static pathSegment (segment: string | undefined): string | undefined {
-    return segment
-  }
-
   private static asRecord (value: unknown): Dictionary<unknown>
   private static asRecord (value: unknown): unknown {
     return value
-  }
-
-  /**
-   * `isPlainObject` does not narrow, and `Object.entries` only accepts an object.
-   */
-  private static isPlainRecord (value: unknown): value is Dictionary<unknown> {
-    return isPlainObject(value)
   }
 
   /**
@@ -849,6 +800,38 @@ export class Arr {
     property: string
   ): value is Dictionary<unknown> {
     return typeof value === 'object' && value !== null && property in value
+  }
+
+  /**
+   * `isPlainObject` does not narrow, and `Object.entries` only accepts an object.
+   */
+  private static isPlainRecord (value: unknown): value is Dictionary<unknown> {
+    return isPlainObject(value)
+  }
+
+  /**
+   * Plain objects and arrays are both string-indexable at runtime.
+   * `noUncheckedIndexedAccess` rejects indexing the `unknown[] | Dictionary`
+   * union, so callers narrow through this predicate before a bracket read.
+   */
+  private static isRecord (value: unknown): value is Dictionary<unknown> {
+    return typeof value === 'object' && value !== null
+  }
+
+  /**
+   * Narrow helper for `collapse()`: an `Array.isArray` check that keeps
+   * the element type as `TValue[]` (instead of the generic `unknown[]`
+   * signature `Array.isArray` reports) without a cast at the call site.
+   */
+  private static isValueArray<TValue>(
+    value: TValue[] | unknown
+  ): value is TValue[] {
+    return Array.isArray(value)
+  }
+
+  private static pathSegment (segment: string | undefined): string
+  private static pathSegment (segment: string | undefined): string | undefined {
+    return segment
   }
 
   /**
@@ -880,5 +863,22 @@ export class Arr {
     throw new Error(
       `Key "${stringKey}" does not exist; caller must check Arr.exists() first.`
     )
+  }
+
+  /**
+   * Resolve a single "value" or "key" pluck segment for one item: either
+   * calls the provided callback, or walks the exploded dot-path via
+   * `dataGet`. Extracted from `pluck()` to avoid an inline function-type
+   * cast at each call site.
+   */
+  private static resolvePluckSegment<TItem, TResult>(
+    item: TItem,
+    path: string[] | ((item: TItem) => TResult)
+  ): TResult | undefined {
+    if (typeof path === 'function') {
+      return path(item)
+    }
+
+    return Arr.dataGet<TResult>(item, path)
   }
 }

@@ -24,15 +24,6 @@ export class ConfigurationUrlParser {
   }
 
   /**
-   * Get all of the current drivers' aliases.
-   *
-   * @return array<string, string>
-   */
-  public static getDriverAliases (): Record<string, string> {
-    return ConfigurationUrlParser.driverAliases
-  }
-
-  /**
    * Add the given driver alias to the driver aliases array.
    *
    * @param  string  $alias
@@ -44,31 +35,12 @@ export class ConfigurationUrlParser {
   }
 
   /**
-   * Parse the database configuration, hydrating options using a database configuration URL if possible.
+   * Get all of the current drivers' aliases.
    *
-   * @param  {ParsableDatabaseConfig | string}  config
-   * @return {ParsableDatabaseConfig}
+   * @return array<string, string>
    */
-  parseConfiguration (config: string | DatabaseConfig): DatabaseConfig {
-    if (typeof config === 'string') {
-      config = { url: config }
-    }
-
-    const url = pull(config, 'url')
-
-    if (!url) {
-      return config
-    }
-
-    const rawComponents = this.parseUrl(url)
-
-    const decodedComponents = this.parseStringsToNativeTypes(rawComponents)
-
-    return {
-      ...config,
-      ...this.getPrimaryOptions(decodedComponents),
-      ...this.getQueryOptions(rawComponents)
-    }
+  public static getDriverAliases (): Record<string, string> {
+    return ConfigurationUrlParser.driverAliases
   }
 
   /**
@@ -148,6 +120,34 @@ export class ConfigurationUrlParser {
     }
 
     return query
+  }
+
+  /**
+   * Parse the database configuration, hydrating options using a database configuration URL if possible.
+   *
+   * @param  {ParsableDatabaseConfig | string}  config
+   * @return {ParsableDatabaseConfig}
+   */
+  parseConfiguration (config: string | DatabaseConfig): DatabaseConfig {
+    if (typeof config === 'string') {
+      config = { url: config }
+    }
+
+    const url = pull(config, 'url')
+
+    if (!url) {
+      return config
+    }
+
+    const rawComponents = this.parseUrl(url)
+
+    const decodedComponents = this.parseStringsToNativeTypes(rawComponents)
+
+    return {
+      ...config,
+      ...this.getPrimaryOptions(decodedComponents),
+      ...this.getQueryOptions(rawComponents)
+    }
   }
 
   /**

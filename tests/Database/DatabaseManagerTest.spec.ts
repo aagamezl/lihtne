@@ -9,10 +9,8 @@ import { DatabaseManager } from '../../src/Illuminate/Database/DatabaseManager'
 import { Driver } from '../../src/Illuminate/Database/Drivers/Driver'
 
 class TestConnection extends Connection {
-  setReconnector (reconnector: Reconnector): this {
-    this.reconnector = reconnector
-
-    return this
+  getReconnector (): Reconnector {
+    return this.reconnector
   }
 
   setDriver (driver: Driver): this {
@@ -21,24 +19,18 @@ class TestConnection extends Connection {
     return this
   }
 
-  getReconnector (): Reconnector {
-    return this.reconnector
+  setReconnector (reconnector: Reconnector): this {
+    this.reconnector = reconnector
+
+    return this
   }
 }
 
 class DatabaseManagerTestManager extends DatabaseManager {
   freshConnection: TestConnection | undefined
 
-  public parseConnectionNamePublic (name: string): string[] {
-    return this.parseConnectionName(name)
-  }
-
   public configurePublic (connection: Connection): Connection {
     return this.configure(connection)
-  }
-
-  setCachedConnection (name: string, connection: TestConnection): void {
-    this.connections[name] = connection
   }
 
   override makeConnection (name: string): TestConnection {
@@ -47,6 +39,14 @@ class DatabaseManagerTestManager extends DatabaseManager {
     }
 
     return this.freshConnection
+  }
+
+  public parseConnectionNamePublic (name: string): string[] {
+    return this.parseConnectionName(name)
+  }
+
+  setCachedConnection (name: string, connection: TestConnection): void {
+    this.connections[name] = connection
   }
 }
 
@@ -84,7 +84,7 @@ describe('DatabaseManager', () => {
     expect(connection.getReconnector()).toBe(manager.reconnector)
   })
 
-  test('testRefreshDriversConnectionsReplacesTheDriver', () => {
+  test('testRefreshDriversConnectionsReplacesTheDriver', async () => {
     const manager = new DatabaseManagerTestManager(factory, repository, {})
     const connection = new TestConnection(new Driver('cached', {}), 'database', '', { name: 'pgsql' })
     const freshDriver = new Driver('fresh', {})
@@ -94,10 +94,10 @@ describe('DatabaseManager', () => {
     manager.freshConnection = freshConnection
     manager.setCachedConnection('pgsql::read', connection)
 
-    const refreshed = manager.refreshDriversConnections('pgsql::read')
+    const refreshed = await manager.refreshDriversConnections('pgsql::read')
 
     expect(refreshed).toBe(connection)
-    expect(connection.getDriver()).toBe(freshDriver)
+    expect(await connection.getDriver()).toBe(freshDriver)
     expect(freshConnection.getReconnector()).toBe(manager.reconnector)
   })
 })

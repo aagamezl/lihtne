@@ -18,46 +18,12 @@ export abstract class AbstractCursorPaginator<
   [key: string]: unknown
 
   /**
-   * All of the items being paginated.
+   * The current cursor resolver callback.
    *
-   * @var \Illuminate\Support\Collection<TKey, TValue>
+   * @var \Closure
    */
-  protected items!: Collection<TKey, TValue>
-
-  /**
-   * The number of items to be shown per page.
-   *
-   * @var int
-   */
-  protected perPage!: number
-
-  /**
-   * The base path to assign to all URLs.
-   *
-   * @var string
-   */
-  protected path: string = '/'
-
-  /**
-   * The query parameters to add to all URLs.
-   *
-   * @var array
-   */
-  protected query: string[] | undefined
-
-  /**
-   * The URL fragment to add to all URLs.
-   *
-   * @var string|null
-   */
-  protected fragment: string | undefined
-
-  /**
-   * The cursor string variable used to store the page.
-   *
-   * @var string
-   */
-  protected cursorName: string = 'cursor'
+  protected static currentCursorResolverCallback:
+    ((cursorName: string) => Cursor | undefined) | undefined
 
   /**
    * The current cursor.
@@ -67,11 +33,25 @@ export abstract class AbstractCursorPaginator<
   protected cursor: Cursor | undefined
 
   /**
-   * The paginator parameters for the cursor.
+   * The cursor string variable used to store the page.
    *
-   * @var array
+   * @var string
    */
-  protected parameters: Record<string, unknown> = {}
+  protected cursorName: string = 'cursor'
+
+  /**
+   * The URL fragment to add to all URLs.
+   *
+   * @var string|null
+   */
+  protected fragment: string | undefined
+
+  /**
+   * All of the items being paginated.
+   *
+   * @var \Illuminate\Support\Collection<TKey, TValue>
+   */
+  protected items!: Collection<TKey, TValue>
 
   /**
    * The paginator options.
@@ -81,12 +61,32 @@ export abstract class AbstractCursorPaginator<
   protected options: Options = {}
 
   /**
-   * The current cursor resolver callback.
+   * The paginator parameters for the cursor.
    *
-   * @var \Closure
+   * @var array
    */
-  protected static currentCursorResolverCallback:
-    ((cursorName: string) => Cursor | undefined) | undefined
+  protected parameters: Record<string, unknown> = {}
+
+  /**
+   * The base path to assign to all URLs.
+   *
+   * @var string
+   */
+  protected path: string = '/'
+
+  /**
+   * The number of items to be shown per page.
+   *
+   * @var int
+   */
+  protected perPage!: number
+
+  /**
+   * The query parameters to add to all URLs.
+   *
+   * @var array
+   */
+  protected query: string[] | undefined
 
   /**
    * Set the current cursor resolver callback.

@@ -1,3 +1,4 @@
+// Finds the user with email astrid.larsen@example.com and sets first_name to Louise.
 import { DB } from '../../../src/Illuminate/Support/Facades/DB'
 
 (async () => {

@@ -18,90 +18,62 @@ export class PostgresConnector extends mixing(Connector).useTrait([ParsesSearchP
    * @param  array  $config
    * @return \PDO
    */
-  public override connect (config: DatabaseConfig): Driver {
+  public override async connect (config: DatabaseConfig): Promise<Driver> {
     // First we'll create the basic DSN and connection instance connecting to the
     // using the configuration option specified by the developer. We will also
     // set the default character set on the connections to UTF-8 by default.
-    const connection = this.createConnection(this.getDsn(config), config, this.getOptions(config))
+    const connection = this.createConnection(
+      this.getDsn(config),
+      config,
+      this.getOptions(config)
+    )
 
-    this.configureIsolationLevel(connection, config)
-
-    // Next, we will check to see if a timezone has been specified in this config
-    // and if it has we will issue a statement to modify the timezone with the
-    // database. Setting this DB timezone is an optional configuration item.
-    this.configureTimezone(connection, config)
-
-    this.configureSearchPath(connection, config)
-
-    this.configureSynchronousCommit(connection, config)
+    await this.configureIsolationLevel(connection, config)
+    await this.configureTimezone(connection, config)
+    await this.configureSearchPath(connection, config)
+    await this.configureSynchronousCommit(connection, config)
 
     return connection
   }
 
   /**
-   * Set the connection transaction isolation level.
+   * Add the keepalive options to the DSN.
    *
-   * @param  \PDO  $connection
+   * @param  string  $dsn
    * @param  array  $config
-   * @return void
-   */
-  protected configureIsolationLevel (connection: Driver, config: DatabaseConfig) {
-    if (config.isolation_level !== undefined) {
-      connection.prepare(`set session characteristics as transaction isolation level ${config.isolation_level}`).execute()
-    }
-  }
-
-  /**
-   * Set the timezone on the connection.
-   *
-   * @param  \PDO  $connection
-   * @param  array  $config
-   * @return void
-   */
-  protected configureTimezone (connection: Driver, config: DatabaseConfig) {
-    if (config.timezone !== undefined) {
-      connection.prepare(`set time zone '${config.timezone}'`).execute()
-    }
-  }
-
-  /**
-   * Set the "search_path" on the database connection.
-   *
-   * @param  \PDO  $connection
-   * @param  array  $config
-   * @return void
-   */
-  protected configureSearchPath (connection: Driver, config: DatabaseConfig) {
-    if (config.search_path !== undefined || config.schema !== undefined) {
-      const searchPath = this.quoteSearchPath(
-        this.parseSearchPath(config.search_path ?? config.schema)
-      )
-
-      connection.prepare(`set search_path to ${searchPath}`).execute()
-    }
-  }
-
-  /**
-   * Format the search path for the DSN.
-   *
-   * @param  array  $searchPath
    * @return string
    */
-  protected quoteSearchPath (searchPath: string[]): string {
-    return searchPath.length === 1 ? `"${searchPath[0]}"` : `"${searchPath.join('", "')}"`
+  protected addKeepaliveOptions (dsn: string, config: DatabaseConfig): string {
+    const options = ['keepalives', 'keepalives_idle', 'keepalives_interval', 'keepalives_count'] as const
+
+    for (const option of options) {
+      if (config[option] !== undefined) {
+        dsn = this.appendParameter(dsn, option, config[option])
+      }
+    }
+
+    return dsn
   }
 
   /**
-   * Configure the synchronous_commit setting.
+   * Add the server options to the DSN.
    *
-   * @param  \PDO  $connection
+   * @param  string  $dsn
    * @param  array  $config
-   * @return void
+   * @return string
    */
-  protected configureSynchronousCommit (connection: Driver, config: DatabaseConfig) {
-    if (config.synchronous_commit !== undefined) {
-      connection.prepare(`set synchronous_commit to '${config.synchronous_commit}'`).execute()
+  protected addServerOptions (dsn: string, config: DatabaseConfig): string {
+    if (config.server_options === undefined) {
+      return dsn
     }
+
+    const parts = Object.entries(config.server_options).map(([name, value]) => {
+      return `-c ${name}=${String(value).replace(/\\/g, '\\\\').replace(/ /g, '\\ ')}`
+    })
+
+    const options = parts.join(' ').replace(/\\/g, '\\\\').replace(/'/g, "\\'")
+
+    return this.appendParameter(dsn, 'options', options)
   }
 
   /**
@@ -113,13 +85,95 @@ export class PostgresConnector extends mixing(Connector).useTrait([ParsesSearchP
    * @return {string}
    */
   protected addSslOptions (dsn: string, config: DatabaseConfig): string {
+    const options = config as DatabaseConfig & Record<string, string | undefined>
+
     for (const option of ['sslmode', 'sslcert', 'sslkey', 'sslrootcert']) {
-      if (config[option] !== undefined) {
-        dsn += `;${option}=${config[option]}`
+      if (options[option] !== undefined) {
+        dsn = this.appendParameter(dsn, option, options[option])
       }
     }
 
     return dsn
+  }
+
+  protected appendParameter (dsn: string, name: string, value: string | number): string {
+    const separator = dsn.includes('?') ? '&' : '?'
+
+    return `${dsn}${separator}${encodeURIComponent(name)}=${encodeURIComponent(String(value))}`
+  }
+
+  /**
+   * Set the connection transaction isolation level.
+   *
+   * @param  \PDO  $connection
+   * @param  array  $config
+   * @return void
+   */
+  protected async configureIsolationLevel (connection: Driver, config: DatabaseConfig) {
+    if (config.isolation_level !== undefined) {
+      const statement = connection.prepare(`set session characteristics as transaction isolation level ${config.isolation_level}`)
+
+      await statement.execute()
+    }
+  }
+
+  /**
+   * Set the "search_path" on the database connection.
+   *
+   * @param  \PDO  $connection
+   * @param  array  $config
+   * @return void
+   */
+  protected async configureSearchPath (connection: Driver, config: DatabaseConfig): Promise<void> {
+    if (config.search_path !== undefined || config.schema !== undefined) {
+      const searchPath = this.quoteSearchPath(
+        this.parseSearchPath(config.search_path ?? config.schema)
+      )
+
+      await connection.prepare(`set search_path to ${searchPath}`).execute()
+    }
+  }
+
+  /**
+   * Configure the synchronous_commit setting.
+   *
+   * @param  \PDO  $connection
+   * @param  array  $config
+   * @return void
+   */
+  protected async configureSynchronousCommit (connection: Driver, config: DatabaseConfig): Promise<void> {
+    if (config.synchronous_commit !== undefined) {
+      const statement = connection.prepare(`set synchronous_commit to '${config.synchronous_commit}'`)
+
+      await statement.execute()
+    }
+  }
+
+  /**
+   * Set the timezone on the connection.
+   *
+   * @param  \PDO  $connection
+   * @param  array  $config
+   * @return void
+   */
+  protected async configureTimezone (connection: Driver, config: DatabaseConfig): Promise<void> {
+    if (config.timezone !== undefined) {
+      await connection.prepare(`set time zone '${config.timezone}'`).execute()
+    }
+  }
+
+  /**
+   * Create a new PDO connection instance.
+   *
+   * @param  {string}  dsn
+   * @param  {Record<string, unknown>}  options
+   * @return {object}
+   */
+  protected override createDriverConnection (
+    dsn: string,
+    options: DriverOptions
+  ): Driver {
+    return new PostgresDriver(dsn, options)
   }
 
   /**
@@ -142,40 +196,43 @@ export class PostgresConnector extends mixing(Connector).useTrait([ParsesSearchP
       connectViaPort,
       connect_via_database:
       connectViaDatabase,
-      database
+      database,
+      charset,
+      application_name
     } = config
 
-    // Sometimes - users may need to connect to a database that has a different
-    // name than the database used for "information_schema" queries. This is
-    // typically the case if using "pgbouncer" type software when pooling.
     database = connectViaDatabase ?? database ?? ''
     port = connectViaPort ?? port ?? undefined
 
-    let dsn = `pgsql://${username}:${password}@${host}`
+    let dsn = `pgsql://${encodeURIComponent(username)}:${encodeURIComponent(password)}@${host ?? ''}`
 
-    // If a port was specified, we will add it to this Postgres DSN connections
-    // format. Once we have done that we are ready to return this connection
-    // string back out for usage, as this has been fully constructed here.
-    if (port !== undefined && port !== null) {
+    if (port !== undefined) {
       dsn += `:${port}`
     }
 
-    dsn += `/${database}`
+    dsn += `/${encodeURIComponent(database)}`
 
-    return this.addSslOptions(dsn, config)
+    if (charset !== undefined) {
+      dsn = this.appendParameter(dsn, 'client_encoding', charset)
+    }
+
+    if (application_name !== undefined) {
+      dsn = this.appendParameter(dsn, 'application_name', application_name)
+    }
+
+    return this.addServerOptions(
+      this.addKeepaliveOptions(this.addSslOptions(dsn, config), config),
+      config
+    )
   }
 
   /**
-   * Create a new PDO connection instance.
+   * Format the search path for the DSN.
    *
-   * @param  {string}  dsn
-   * @param  {Record<string, unknown>}  options
-   * @return {object}
+   * @param  array  $searchPath
+   * @return string
    */
-  protected override createDriverConnection (
-    dsn: string,
-    options: DriverOptions
-  ): Driver {
-    return new PostgresDriver(dsn, options)
+  protected quoteSearchPath (searchPath: string[]): string {
+    return searchPath.length === 1 ? `"${searchPath[0]}"` : `"${searchPath.join('", "')}"`
   }
 }

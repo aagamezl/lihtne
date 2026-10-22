@@ -1,5 +1,18 @@
 export class Str {
   /**
+   * Return the remainder of a string after the first occurrence of a given value.
+   *
+   * @param  string  $subject
+   * @param  string  $search
+   * @return string
+   */
+  public static after (subject: string, search: string): string {
+    return search === ''
+      ? subject
+      : (Array.from(subject.split(search)).reverse()[0] ?? '')
+  }
+
+  /**
    * Get the portion of a string before the last occurrence of a given value.
    *
    * @param  string  $subject
@@ -18,6 +31,22 @@ export class Str {
     }
 
     return Str.substr(subject, 0, pos)
+  }
+
+  /**
+   * Get the portion of a string between two given values.
+   *
+   * @param  string  $subject
+   * @param  string  $from
+   * @param  string  $to
+   * @return string
+   */
+  public static between (subject: string, from: string, to: string): string {
+    if (from === '' || to === '') {
+      return subject
+    }
+
+    return this.beforeLast(this.after(subject, from), to)
   }
 
   /**
@@ -81,33 +110,39 @@ export class Str {
   }
 
   /**
-   * Return the remainder of a string after the first occurrence of a given value.
+   * Get a new stringable object from the given string.
    *
-   * @param  string  $subject
-   * @param  string  $search
-   * @return string
+   * @param  string  $string
+   * @return \Illuminate\Support\Stringable
    */
-  public static after (subject: string, search: string): string {
-    return search === ''
-      ? subject
-      : (Array.from(subject.split(search)).reverse()[0] ?? '')
+  public static of (string: string): string {
+    return String(string)
   }
 
   /**
-   * Returns the portion of the string specified by the start and length parameters.
+   * Replace a given value in the string sequentially with an array.
    *
-   * @param  string  $string
-   * @param  int  $start
-   * @param  int|null  $length
-   * @param  string  $encoding
+   * @param  string  $search
+   * @param  string[]  $replace
+   * @param  string  $subject
    * @return string
    */
-  public static substr (
-    string: string,
-    start: number,
-    length: number | undefined = undefined
+  public static replaceArray (
+    search: string,
+    replace: string[],
+    subject: string
   ): string {
-    return string.substring(start, length)
+    const segments = subject.split(search)
+    const replacements = replace.slice()
+
+    let result = segments.shift() ?? ''
+
+    for (const segment of segments) {
+      result +=
+        this.toStringOr(replacements.shift() ?? search, search) + segment
+    }
+
+    return result
   }
 
   /**
@@ -143,54 +178,20 @@ export class Str {
   }
 
   /**
-   * Replace a given value in the string sequentially with an array.
-   *
-   * @param  string  $search
-   * @param  string[]  $replace
-   * @param  string  $subject
-   * @return string
-   */
-  public static replaceArray (
-    search: string,
-    replace: string[],
-    subject: string
-  ): string {
-    const segments = subject.split(search)
-    const replacements = replace.slice()
-
-    let result = segments.shift() ?? ''
-
-    for (const segment of segments) {
-      result +=
-        this.toStringOr(replacements.shift() ?? search, search) + segment
-    }
-
-    return result
-  }
-
-  /**
-   * Convert the given value to a string or return the given fallback on failure.
-   *
-   * @param  mixed  $value
-   * @param  string  $fallback
-   * @return string
-   */
-  private static toStringOr (value: unknown, fallback: string): string {
-    try {
-      return String(value)
-    } catch (_) {
-      return fallback
-    }
-  }
-
-  /**
-   * Get a new stringable object from the given string.
+   * Returns the portion of the string specified by the start and length parameters.
    *
    * @param  string  $string
-   * @return \Illuminate\Support\Stringable
+   * @param  int  $start
+   * @param  int|null  $length
+   * @param  string  $encoding
+   * @return string
    */
-  public static of (string: string): string {
-    return String(string)
+  public static substr (
+    string: string,
+    start: number,
+    length: number | undefined = undefined
+  ): string {
+    return string.substring(start, length)
   }
 
   /**
@@ -213,5 +214,20 @@ export class Str {
     }
 
     return haystack.substring(offset).split(needle).length - 1
+  }
+
+  /**
+   * Convert the given value to a string or return the given fallback on failure.
+   *
+   * @param  mixed  $value
+   * @param  string  $fallback
+   * @return string
+   */
+  private static toStringOr (value: unknown, fallback: string): string {
+    try {
+      return String(value)
+    } catch (_) {
+      return fallback
+    }
   }
 }

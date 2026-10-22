@@ -1,9 +1,9 @@
 import type { Client } from 'pg'
 
 import crypto from 'node:crypto'
-import pg from 'pg'
 
 import type { DriverOptions } from '../Drivers/Driver'
+import type { PostgresDriver } from '../Drivers/PostgresDriver'
 import type { BindingValues } from '../Query/Builder'
 
 import { Statement } from './Statement'
@@ -13,39 +13,13 @@ export class PostgresStatement<
 > extends Statement<TRow> {
   protected override client!: Client
 
-  constructor (dsn: string, options: DriverOptions, query: string) {
+  constructor (
+    dsn: string,
+    options: DriverOptions,
+    query: string,
+    protected readonly driver: PostgresDriver
+  ) {
     super(dsn, options, query)
-
-    this.client = new pg.Client({
-      connectionString: this.dsn,
-      connectionTimeoutMillis: 2000
-    })
-  }
-
-  public override prepare (query: string): this {
-    this.statement = {
-      name: `prepared-statement-${crypto.randomUUID()}`,
-      text: this.parameterize(query)
-    }
-
-    this.bindings = {}
-
-    return this
-  }
-
-  public override parameterize (query: string): string {
-    const regex = /\?/gm
-
-    if (query.match(regex) === null) {
-      return query
-    }
-
-    let index = 0
-    return query.replace(regex, () => `$${++index}`)
-  }
-
-  public override fetchAll (): TRow[] {
-    return this.result.rows
   }
 
   /**
@@ -60,24 +34,42 @@ export class PostgresStatement<
       this.statement.values = values
     }
 
-    try {
-      await this.client.connect()
+    this.client = await this.driver.connection()
 
-      const result = await this.client.query<TRow>(this.statement)
+    const result = await this.client.query<TRow>(this.statement)
 
-      this.result = {
-        rows: result.rows,
-        rowCount: result.rowCount ?? 0
-      }
-
-      return this.result.rows
-    } finally {
-      await this.close()
+    this.result = {
+      rows: result.rows,
+      rowCount: result.rowCount ?? 0
     }
+
+    return this.result.rows
   }
 
-  public async close (): Promise<void> {
-    await this.client.end()
+  public override fetchAll (): TRow[] {
+    return this.result.rows
+  }
+
+  public override parameterize (query: string): string {
+    const regex = /\?/gm
+
+    if (query.match(regex) === null) {
+      return query
+    }
+
+    let index = 0
+    return query.replace(regex, () => `$${++index}`)
+  }
+
+  public override prepare (query: string): this {
+    this.statement = {
+      name: `prepared-statement-${crypto.randomUUID()}`,
+      text: this.parameterize(query)
+    }
+
+    this.bindings = {}
+
+    return this
   }
 
   public override rowCount (): number {

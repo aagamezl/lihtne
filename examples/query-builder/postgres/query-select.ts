@@ -1,3 +1,5 @@
+// Loads lihtne.config.ts through DB() and selects users, first by first_name
+// and then the whole table.
 import { DB } from '../../../src/Illuminate/Support/Facades/DB'
 
 (async () => {
@@ -14,5 +16,8 @@ import { DB } from '../../../src/Illuminate/Support/Facades/DB'
     console.log(JSON.stringify(users.all(), null, 2))
   } catch (error) {
     console.error(error)
+    process.exitCode = 1
+  } finally {
+    process.exit()
   }
 })()

@@ -47,48 +47,82 @@ export class Repository extends Macroable {
   }
 
   /**
-   * Get the specified string configuration value.
-   *
-   * @param  string  $key
-   * @param  (\Closure():(string|null))|string|null  $default
-   * @return string
-   *
-   * @throws \InvalidArgumentException
-   */
-  public string (key: string, defaultValue?: unknown): string {
-    const value = this.get<string, unknown>(key, defaultValue)
-
-    if (typeof value !== 'string') {
-      throw new Error(`InvalidArgumentException: Configuration value for key [${key}] must be a string, ${typeof value} given.`)
-    }
-    return value
-  }
-
-  /**
-   * Get the specified integer configuration value.
-   *
-   * @param  string  $key
-   * @param  (\Closure():(int|null))|int|null  $default
-   * @return int
-   *
-   * @throws \InvalidArgumentException
-   */
-  public integer (key: string, defaultValue?: unknown): number {
-    const value = this.get<string, unknown>(key, defaultValue)
-
-    if (typeof value !== 'number') {
-      throw new Error(`InvalidArgumentException:Configuration value for key [${key}] must be an integer, ${typeof value} given.`)
-    }
-    return value
-  }
-
-  /**
    * Get all of the configuration items for the application.
    *
    * @return {Array}
    */
   all (): Partial<LihtneConfig> {
     return this.items
+  }
+
+  /**
+   * Get the specified array configuration value.
+   *
+   * @param  string  $key
+   * @param  (\Closure():(array<array-key, mixed>|null))|array<array-key, mixed>|null  $default
+   * @return array<array-key, mixed>
+   *
+   * @throws \InvalidArgumentException
+   */
+  public array (key: string, defaultValue?: unknown): unknown[] {
+    const value = this.get<string, unknown>(key, defaultValue)
+
+    if (!Array.isArray(value)) {
+      throw new Error(`InvalidArgumentException: Configuration value for key [${key}] must be an array, ${typeof value} given.`)
+    }
+
+    return value
+  }
+
+  /**
+   * Get the specified boolean configuration value.
+   *
+   * @param  string  $key
+   * @param  (\Closure():(bool|null))|bool|null  $default
+   * @return bool
+   *
+   * @throws \InvalidArgumentException
+   */
+  public boolean (key: string, defaultValue?: unknown): boolean {
+    const value = this.get<string, unknown>(key, defaultValue)
+
+    if (typeof value !== 'boolean') {
+      throw new Error(`InvalidArgumentException: Configuration value for key [${key}] must be a boolean, ${typeof value} given.`)
+    }
+
+    return value
+  }
+
+  /**
+   * Get the specified array configuration value as a collection.
+   *
+   * @param  string  $key
+   * @param  (\Closure():(array<array-key, mixed>|null))|array<array-key, mixed>|null  $default
+   * @return Collection<array-key, mixed>
+   */
+  public collection (key: string, defaultValue?: unknown): Collection<string, unknown> {
+    return new Collection(this.array(key, defaultValue))
+  }
+
+  /**
+   * Get the specified float configuration value.
+   *
+   * @param  string  $key
+   * @param  (\Closure():(float|null))|float|null  $default
+   * @return float
+   *
+   * @throws \InvalidArgumentException
+   */
+  float (key: string, defaultValue?: unknown): number {
+    const value = this.get(key, defaultValue)
+
+    if (!Number.isFinite(value)) {
+      throw new Error(`Configuration value for key [${key}] must be a float, ${typeof value} given.`)
+    }
+
+    // TODO: This is a temporary solution to convert the value to a number.
+    // I need to find a better solution to handle this with a generic type.
+    return Number(value)
   }
 
   /**
@@ -131,76 +165,6 @@ export class Repository extends Macroable {
   }
 
   /**
-   * Get the specified float configuration value.
-   *
-   * @param  string  $key
-   * @param  (\Closure():(float|null))|float|null  $default
-   * @return float
-   *
-   * @throws \InvalidArgumentException
-   */
-  float (key: string, defaultValue?: unknown): number {
-    const value = this.get(key, defaultValue)
-
-    if (!Number.isFinite(value)) {
-      throw new Error(`Configuration value for key [${key}] must be a float, ${typeof value} given.`)
-    }
-
-    // TODO: This is a temporary solution to convert the value to a number.
-    // I need to find a better solution to handle this with a generic type.
-    return Number(value)
-  }
-
-  /**
-   * Get the specified boolean configuration value.
-   *
-   * @param  string  $key
-   * @param  (\Closure():(bool|null))|bool|null  $default
-   * @return bool
-   *
-   * @throws \InvalidArgumentException
-   */
-  public boolean (key: string, defaultValue?: unknown): boolean {
-    const value = this.get<string, unknown>(key, defaultValue)
-
-    if (typeof value !== 'boolean') {
-      throw new Error(`InvalidArgumentException: Configuration value for key [${key}] must be a boolean, ${typeof value} given.`)
-    }
-
-    return value
-  }
-
-  /**
-   * Get the specified array configuration value.
-   *
-   * @param  string  $key
-   * @param  (\Closure():(array<array-key, mixed>|null))|array<array-key, mixed>|null  $default
-   * @return array<array-key, mixed>
-   *
-   * @throws \InvalidArgumentException
-   */
-  public array (key: string, defaultValue?: unknown): unknown[] {
-    const value = this.get<string, unknown>(key, defaultValue)
-
-    if (!Array.isArray(value)) {
-      throw new Error(`InvalidArgumentException: Configuration value for key [${key}] must be an array, ${typeof value} given.`)
-    }
-
-    return value
-  }
-
-  /**
-   * Get the specified array configuration value as a collection.
-   *
-   * @param  string  $key
-   * @param  (\Closure():(array<array-key, mixed>|null))|array<array-key, mixed>|null  $default
-   * @return Collection<array-key, mixed>
-   */
-  public collection (key: string, defaultValue?: unknown): Collection<string, unknown> {
-    return new Collection(this.array(key, defaultValue))
-  }
-
-  /**
    * Determine if the given configuration value exists.
    *
    * @param  {string}  key
@@ -208,6 +172,24 @@ export class Repository extends Macroable {
    */
   has (key: string): boolean {
     return Arr.has(this.items, key)
+  }
+
+  /**
+   * Get the specified integer configuration value.
+   *
+   * @param  string  $key
+   * @param  (\Closure():(int|null))|int|null  $default
+   * @return int
+   *
+   * @throws \InvalidArgumentException
+   */
+  public integer (key: string, defaultValue?: unknown): number {
+    const value = this.get<string, unknown>(key, defaultValue)
+
+    if (typeof value !== 'number') {
+      throw new Error(`InvalidArgumentException:Configuration value for key [${key}] must be an integer, ${typeof value} given.`)
+    }
+    return value
   }
 
   /**
@@ -299,5 +281,23 @@ export class Repository extends Macroable {
     for (const [key, value] of Object.entries(keys)) {
       Arr.set(this.items, key, value)
     }
+  }
+
+  /**
+   * Get the specified string configuration value.
+   *
+   * @param  string  $key
+   * @param  (\Closure():(string|null))|string|null  $default
+   * @return string
+   *
+   * @throws \InvalidArgumentException
+   */
+  public string (key: string, defaultValue?: unknown): string {
+    const value = this.get<string, unknown>(key, defaultValue)
+
+    if (typeof value !== 'string') {
+      throw new Error(`InvalidArgumentException: Configuration value for key [${key}] must be a string, ${typeof value} given.`)
+    }
+    return value
   }
 }

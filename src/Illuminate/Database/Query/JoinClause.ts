@@ -16,6 +16,13 @@ type BuilderConstructor = new (
 
 export class JoinClause extends Builder {
   /**
+   * The table the join clause is joining to.
+   *
+   * @var \Illuminate\Contracts\Database\Query\Expression|string
+   */
+  public table: Expression | string
+
+  /**
    * The type of join being performed.
    *
    * @var string
@@ -23,11 +30,11 @@ export class JoinClause extends Builder {
   public type: string
 
   /**
-   * The table the join clause is joining to.
+   * The class name of the parent query builder.
    *
-   * @var \Illuminate\Contracts\Database\Query\Expression|string
+   * @var string
    */
-  public table: Expression | string
+  protected parentClass: BuilderConstructor
 
   /**
    * The connection of the parent query builder.
@@ -49,13 +56,6 @@ export class JoinClause extends Builder {
    * @var \Illuminate\Database\Query\Processors\Processor
    */
   protected parentProcessor: Processor
-
-  /**
-   * The class name of the parent query builder.
-   *
-   * @var string
-   */
-  protected parentClass: BuilderConstructor
 
   /**
    * Create a new join clause instance.
@@ -81,6 +81,15 @@ export class JoinClause extends Builder {
     this.parentGrammar = parentQuery.getGrammar()
     this.parentProcessor = parentQuery.getProcessor()
     this.parentConnection = parentQuery.getConnection()
+  }
+
+  /**
+   * Get a new instance of the join clause builder.
+   *
+   * @return \Illuminate\Database\Query\JoinClause
+   */
+  public override newQuery (): JoinClause {
+    return new JoinClause(this.newParentQuery(), this.type, this.table)
   }
 
   /**
@@ -130,15 +139,6 @@ export class JoinClause extends Builder {
     second: string | Expression | undefined = undefined
   ): this {
     return this.on(first, operator, second, 'or')
-  }
-
-  /**
-   * Get a new instance of the join clause builder.
-   *
-   * @return \Illuminate\Database\Query\JoinClause
-   */
-  public override newQuery (): JoinClause {
-    return new JoinClause(this.newParentQuery(), this.type, this.table)
   }
 
   /**

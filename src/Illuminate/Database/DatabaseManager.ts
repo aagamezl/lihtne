@@ -32,20 +32,6 @@ export type ConnectionResolver = (config: DatabaseConfig, name: string) => Conne
  */
 export class DatabaseManager {
   /**
-   * The application instance.
-   *
-   * @type {Repository}
-   */
-  protected repository: Repository
-
-  /**
-   * The active connection instances.
-   *
-   * @type {Record<string, Connection>}
-   */
-  protected connections: Record<string, Connection> = {}
-
-  /**
    * The custom connection resolvers.
    *
    * @type {Record<string, Function>}
@@ -72,6 +58,20 @@ export class DatabaseManager {
    * @var string
    */
   protected configFile: string = 'lihtne.config.ts'
+
+  /**
+   * The active connection instances.
+   *
+   * @type {Record<string, Connection>}
+   */
+  protected connections: Record<string, Connection> = {}
+
+  /**
+   * The application instance.
+   *
+   * @type {Repository}
+   */
+  protected repository: Repository
 
   /**
    * Create a new database manager instance.
@@ -106,19 +106,8 @@ export class DatabaseManager {
     this.repository.set('database', config.database)
 
     this.reconnector = (connection) => {
-      this.reconnect(connection.getName())
+      return this.reconnect(connection.getName())
     }
-  }
-
-  /**
-   * Dynamically pass methods to the default connection.
-   *
-   * @param  {string}  method
-   * @param  {Array}  parameters
-   * @return {*}
-   */
-  protected call (method: string, ...parameters: unknown[]): unknown {
-    return this.connection()[method](...parameters)
   }
 
   /**
@@ -143,34 +132,6 @@ export class DatabaseManager {
     // }
 
     return (new ConfigurationUrlParser()).parseConfiguration(config)
-  }
-
-  /**
-   * Prepare the database connection instance.
-   *
-   * @param  {Connection}  connection
-   * @return {Connection}
-   */
-  protected configure (connection: Connection): Connection {
-    // connection = this.setNdoForType(connection, type).setReadWriteType(type)
-
-    // First we'll set the fetch mode and a few other dependencies of the database
-    // connection. This method basically just configures and prepares it to get
-    // used by the application. Once we're finished we'll return it back out.
-    // if (this.repository.bound('events')) {
-    //   connection.setEventDispatcher(this.repository.events)
-    // }
-
-    // if (this.repository.bound('db.transactions')) {
-    //   connection.setTransactionManager(this.repository['db.transactions'])
-    // }
-
-    // Here we'll set a reconnector callback. This reconnector can be any callable
-    // so we will set a Closure to reconnect from this manager with the name of
-    // the connection, which will allow us to reconnect from the connections.
-    connection.setReconnector(this.reconnector)
-
-    return connection
   }
 
   /**
@@ -221,6 +182,75 @@ export class DatabaseManager {
   }
 
   /**
+   * Reconnect to the given database.
+   *
+   * @param  {string|undefined}  name
+   * @return {Connection}
+   */
+  public async reconnect (name?: string): Promise<Connection> {
+    name = name ?? this.getDefaultConnection()
+
+    this.disconnect(name)
+
+    if (isNil(this.connections[name])) {
+      return this.connection(name)
+    }
+
+    return await this.refreshDriversConnections(name)
+  }
+
+  /**
+   * Set the reconnect instance on the connection.
+   *
+   * @param  {Reconnector}  reconnector
+   * @return {this}
+   */
+  public setReconnector (reconnector: Reconnector): this {
+    this.reconnector = reconnector
+
+    return this
+  }
+
+  /**
+   * Dynamically pass methods to the default connection.
+   *
+   * @param  {string}  method
+   * @param  {Array}  parameters
+   * @return {*}
+   */
+  protected call (method: string, ...parameters: unknown[]): unknown {
+    return this.connection()[method](...parameters)
+  }
+
+  /**
+   * Prepare the database connection instance.
+   *
+   * @param  {Connection}  connection
+   * @return {Connection}
+   */
+  protected configure (connection: Connection): Connection {
+    // connection = this.setNdoForType(connection, type).setReadWriteType(type)
+
+    // First we'll set the fetch mode and a few other dependencies of the database
+    // connection. This method basically just configures and prepares it to get
+    // used by the application. Once we're finished we'll return it back out.
+    // if (this.repository.bound('events')) {
+    //   connection.setEventDispatcher(this.repository.events)
+    // }
+
+    // if (this.repository.bound('db.transactions')) {
+    //   connection.setTransactionManager(this.repository['db.transactions'])
+    // }
+
+    // Here we'll set a reconnector callback. This reconnector can be any callable
+    // so we will set a Closure to reconnect from this manager with the name of
+    // the connection, which will allow us to reconnect from the connections.
+    connection.setReconnector(this.reconnector)
+
+    return connection
+  }
+
+  /**
    * Make the database connection instance.
    *
    * @protected
@@ -267,47 +297,17 @@ export class DatabaseManager {
   }
 
   /**
-   * Reconnect to the given database.
-   *
-   * @param  {string|undefined}  name
-   * @return {Connection}
-   */
-  public reconnect (name?: string = undefined) {
-    name = name ?? this.getDefaultConnection()
-
-    this.disconnect(name)
-
-    if (isNil(this.connections[name])) {
-      return this.connection(name)
-    }
-
-    return this.refreshDriversConnections(name)
-  }
-
-  /**
    * Refresh the PDO connections on a given connection.
    *
    * @param  {string}  name
    * @return {Connection}
    */
-  protected refreshDriversConnections (name: string): Connection {
+  protected async refreshDriversConnections (name: string): Promise<Connection> {
     const [database, type] = this.parseConnectionName(name)
 
     const fresh = this.configure(this.makeConnection(database), type)
 
     return this.connections[name]
-      .setDriver(fresh.getDriver())
-  }
-
-  /**
-   * Set the reconnect instance on the connection.
-   *
-   * @param  {Reconnector}  reconnector
-   * @return {this}
-   */
-  public setReconnector (reconnector: Reconnector): this {
-    this.reconnector = reconnector
-
-    return this
+      .setDriver(await fresh.getDriver())
   }
 }

@@ -24,6 +24,24 @@ export class Builder {
   }
 
   /**
+   * Get the names of the current schemas for the connection.
+   *
+   * @return string[]|null
+   */
+  public getCurrentSchemaListing (): string[] | undefined {
+    return undefined
+  }
+
+  /**
+   * Get the default schema name for the connection.
+   *
+   * @return string|null
+   */
+  public getCurrentSchemaName (): string | undefined {
+    return this.getCurrentSchemaListing()?.[0] ?? undefined
+  }
+
+  /**
    * Parse the given database object reference and extract the schema and table.
    *
    * @param  string  $reference
@@ -64,23 +82,5 @@ export class Builder {
     }
 
     return [schema, table]
-  }
-
-  /**
-   * Get the default schema name for the connection.
-   *
-   * @return string|null
-   */
-  public getCurrentSchemaName (): string | undefined {
-    return this.getCurrentSchemaListing()?.[0] ?? undefined
-  }
-
-  /**
-   * Get the names of the current schemas for the connection.
-   *
-   * @return string[]|null
-   */
-  public getCurrentSchemaListing (): string[] | undefined {
-    return undefined
   }
 }

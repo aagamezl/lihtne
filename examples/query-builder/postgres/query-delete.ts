@@ -1,3 +1,4 @@
+// Inserts robert.doe and deletes that row by the id insertGetId returned.
 import { DB } from '../../../src/Illuminate/Support/Facades/DB'
 
 (async () => {

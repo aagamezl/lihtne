@@ -2,18 +2,18 @@ export type IndexHintType = 'use' | 'ignore' | 'force' | 'hint'
 
 export class IndexHint {
   /**
-   * The type of query hint.
-   *
-   * @var string
-   */
-  public type: IndexHintType
-
-  /**
    * The name of the index.
    *
    * @var string
    */
   public index: string
+
+  /**
+   * The type of query hint.
+   *
+   * @var string
+   */
+  public type: IndexHintType
 
   /**
    * Create a new index hint instance.

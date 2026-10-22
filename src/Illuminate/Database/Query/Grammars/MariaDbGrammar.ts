@@ -30,7 +30,7 @@ export class MariaDbGrammar extends MySqlGrammar {
    * @param  string  $value
    * @return string
    */
-  public compileJsonValueCast (value: string): string {
+  public override compileJsonValueCast (value: string): string {
     return `json_query(${value}, '$')`
   }
 
@@ -39,7 +39,7 @@ export class MariaDbGrammar extends MySqlGrammar {
    *
    * @return string
    */
-  public compileThreadCount (): string {
+  public override compileThreadCount (): string {
     return "select variable_value as `Value` from information_schema.global_status where variable_name = 'THREADS_CONNECTED'"
   }
 
@@ -69,7 +69,8 @@ export class MariaDbGrammar extends MySqlGrammar {
    * @return bool
    */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base useLegacyGroupLimit signature
-  public useLegacyGroupLimit (_query: Builder): boolean {
+  // @ts-expect-error -- required by the base useLegacyGroupLimit signature
+  public override async useLegacyGroupLimit (query: Builder): Promise<boolean> {
     return false
   }
 

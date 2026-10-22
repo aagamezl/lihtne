@@ -5,13 +5,15 @@ export type DriverOptions = Record<string, unknown>
 export type DriverType = 'mysql' | 'mariadb' | 'pgsql' | 'sqlsrv' | 'sqlite'
 
 export class Driver {
+  static ATTR_SERVER_VERSION: number = 4
+
+  protected driverTitle?: DriverType
+
   protected dsn: string
 
   protected options: DriverOptions = {}
 
-  protected driverTitle?: DriverType
-
-  static FETCH_OBJ: number = 5
+  protected serverVersion?: string
 
   /**
    * Creates an instance of Statement.
@@ -24,10 +26,6 @@ export class Driver {
     this.options = options
   }
 
-  public getDriverTitle (): DriverType | undefined {
-    return this.driverTitle
-  }
-
   /**
    *
    * @param {number} attribute
@@ -35,24 +33,14 @@ export class Driver {
    */
   // @ts-expect-error expected error; attribute is not used in this method
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base getAttribute signature
-  public getAttribute (attribute: string | number): unknown {
+  public async getAttribute (attribute: string | number): Promise<string> {
     throw new Error(
       `RuntimeException: Implement 'getAttribute' method on concrete class.`
     )
   }
 
-  /**
-   * Prepares a statement for execution and returns a statement object
-   * @param {string} query
-   * @returns {Statement}
-   * @throws {Error}
-   */
-  public prepare<
-    TRow extends Record<string, unknown> = Record<string, unknown>
-  > (query: string): Statement<TRow> {
-    throw new Error(
-      `RuntimeException: Implement 'prepare' method on concrete class for query: ${query}`
-    )
+  public getDriverTitle (): DriverType | undefined {
+    return this.driverTitle
   }
 
   /**
@@ -67,6 +55,20 @@ export class Driver {
   ): string | number | Promise<string | number> {
     throw new Error(
       `RuntimeException: Implement 'lastInsertId' method on concrete class`
+    )
+  }
+
+  /**
+   * Prepares a statement for execution and returns a statement object
+   * @param {string} query
+   * @returns {Statement}
+   * @throws {Error}
+   */
+  public prepare<
+    TRow extends Record<string, unknown> = Record<string, unknown>
+  > (query: string): Statement<TRow> {
+    throw new Error(
+      `RuntimeException: Implement 'prepare' method on concrete class for query: ${query}`
     )
   }
 }

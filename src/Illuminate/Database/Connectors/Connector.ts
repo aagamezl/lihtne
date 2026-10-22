@@ -20,7 +20,7 @@ export class Connector extends DetectsLostConnections {
    */
   // @ts-expect-error - expected error, value is not used in this method
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  public connect (config: DatabaseConfig): Driver {
+  public async connect (config: DatabaseConfig): Promise<Driver> {
     throw new Error('ConcreteMethodException: Method connect must be implemented.')
   }
 
@@ -48,7 +48,6 @@ export class Connector extends DetectsLostConnections {
    */
   protected createConnection (
     dsn: string,
-
     // @ts-expect-error - expected error, value is not used in this method
     config: DatabaseConfig,
     options: DriverOptions

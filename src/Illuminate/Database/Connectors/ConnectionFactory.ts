@@ -19,6 +19,56 @@ import { SqlServerConnector } from './SqlServerConnector'
 
 export class ConnectionFactory {
   /**
+   * Create a connector instance based on the configuration.
+   *
+   * @param  {object}  config
+   *
+   * @return {import('../Connectors/Connector').default}
+   *
+   * @throws {TypeError}
+   */
+  public createConnector (config: DatabaseConfig): Connector
+  public createConnector (
+    config: DatabaseConfig
+  ): Connector {
+    if (!config.driver) {
+      throw new Error('InvalidArgumentException: A driver must be specified.')
+    }
+
+    switch (config.driver) {
+      case 'mysql':
+        return new MySqlConnector()
+
+      case 'mariadb':
+        return new MariaDbConnector()
+
+      case 'pgsql':
+        return new PostgresConnector()
+
+      case 'sqlite':
+        return new SQLiteConnector()
+
+      case 'sqlsrv':
+        return new SqlServerConnector()
+    }
+
+    throw new Error(`InvalidArgumentException: Unsupported driver [${config.driver}].`)
+  }
+
+  /**
+   * Establish a PDO connection based on the configuration.
+   *
+   * @param  {Record<string, any>}  config
+   * @param  {string|undefined}  [name]
+   * @return {import('../Connection').default}
+   */
+  public make (config: DatabaseConfig, name?: string) {
+    config = this.parseConfig(config, name)
+
+    return this.createSingleConnection(config)
+  }
+
+  /**
    * Create a new connection instance.
    *
    * @protected
@@ -62,43 +112,6 @@ export class ConnectionFactory {
     }
 
     throw new Error(`InvalidArgumentException: Unsupported driver [${driver}].`)
-  }
-
-  /**
-   * Create a connector instance based on the configuration.
-   *
-   * @param  {object}  config
-   *
-   * @return {import('../Connectors/Connector').default}
-   *
-   * @throws {TypeError}
-   */
-  public createConnector (config: DatabaseConfig): Connector
-  public createConnector (
-    config: DatabaseConfig
-  ): Connector {
-    if (!config.driver) {
-      throw new Error('InvalidArgumentException: A driver must be specified.')
-    }
-
-    switch (config.driver) {
-      case 'mysql':
-        return new MySqlConnector()
-
-      case 'mariadb':
-        return new MariaDbConnector()
-
-      case 'pgsql':
-        return new PostgresConnector()
-
-      case 'sqlite':
-        return new SQLiteConnector()
-
-      case 'sqlsrv':
-        return new SqlServerConnector()
-    }
-
-    throw new Error(`InvalidArgumentException: Unsupported driver [${config.driver}].`)
   }
 
   /**
@@ -162,19 +175,6 @@ export class ConnectionFactory {
     const resolver = this.createDriverResolver(config)
 
     return this.createConnection(config.driver, resolver, config.database, config.prefix, config)
-  }
-
-  /**
-   * Establish a PDO connection based on the configuration.
-   *
-   * @param  {Record<string, any>}  config
-   * @param  {string|undefined}  [name]
-   * @return {import('../Connection').default}
-   */
-  public make (config: DatabaseConfig, name?: string) {
-    config = this.parseConfig(config, name)
-
-    return this.createSingleConnection(config)
   }
 
   /**

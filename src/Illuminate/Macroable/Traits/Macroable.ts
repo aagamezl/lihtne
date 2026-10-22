@@ -10,30 +10,6 @@ export class Macroable {
   protected macros: Record<string, unknown> = {}
 
   /**
-   * Register a custom macro.
-   *
-   * @param  string  $name
-   * @param  object|callable  $macro
-   *
-   * @param-closure-this static  $macro
-   *
-   * @return void
-   */
-  public macro (name: string, macro: unknown): void {
-    this.macros[name] = macro
-  }
-
-  /**
-   * Checks if macro is registered.
-   *
-   * @param  string  $name
-   * @return bool
-   */
-  public hasMacro (name: string): boolean {
-    return (this.macros ?? {})[name] !== undefined
-  }
-
-  /**
    * Dynamically handle calls to the class.
    *
    * @param  string  $method
@@ -68,5 +44,29 @@ export class Macroable {
     }
 
     return (macro as Macro)(...parameters)
+  }
+
+  /**
+   * Checks if macro is registered.
+   *
+   * @param  string  $name
+   * @return bool
+   */
+  public hasMacro (name: string): boolean {
+    return (this.macros ?? {})[name] !== undefined
+  }
+
+  /**
+   * Register a custom macro.
+   *
+   * @param  string  $name
+   * @param  object|callable  $macro
+   *
+   * @param-closure-this static  $macro
+   *
+   * @return void
+   */
+  public macro (name: string, macro: unknown): void {
+    this.macros[name] = macro
   }
 }

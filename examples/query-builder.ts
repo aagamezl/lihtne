@@ -1,3 +1,4 @@
+// Builds a query builder with no real driver and runs a select. It does not connect.
 import { Connection, Driver } from '../src/Illuminate/Database'
 import { Processor } from '../src/Illuminate/Database/Query'
 import { Builder } from '../src/Illuminate/Database/Query/Builder'

@@ -4,6 +4,12 @@
 export interface DatabaseConfig {
   driver: string
   host?: string
+  unix_socket?: string
+  charset?: string
+  collation?: string
+  modes?: string[]
+  strict?: boolean
+  version?: string
   database: string
   username: string
   password: string
@@ -19,6 +25,11 @@ export interface DatabaseConfig {
   server_options?: Record<string, string>
   options?: Record<string, unknown>
   synchronous_commit?: string
+  application_name?: string,
+  keepalives?: number | string
+  keepalives_idle?: number | string
+  keepalives_interval?: number | string
+  keepalives_count?: number | string
 }
 
 /**
