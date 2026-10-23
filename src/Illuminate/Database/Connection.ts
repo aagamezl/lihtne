@@ -528,6 +528,12 @@ export class Connection extends DetectsLostConnections {
     return new QueryBuilder(this, this.getQueryGrammar(), this.getPostProcessor())
   }
 
+  public async disconnect (): Promise<void> {
+    const driver = await this.getDriver()
+
+    await driver.disconnect()
+  }
+
   /**
    * Get a new raw query expression.
    *
@@ -601,8 +607,6 @@ export class Connection extends DetectsLostConnections {
       // row from the database table, and will either be an array or objects.
       const driver = await this.getDriver()
       const statement = this.prepared(
-        // this.connection, query
-
         driver.prepare<TResult>(query)
       )
 

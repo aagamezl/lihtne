@@ -231,6 +231,22 @@ export class MySqlGrammar extends Grammar {
   }
 
   /**
+   * Determine whether to use a legacy group limit clause for MySQL < 8.0.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @return bool
+   */
+  public async useLegacyGroupLimit (query: Builder): Promise<boolean> {
+    const version = await query.getConnection().getServerVersion()
+
+    // @ts-expect-error -- isMaria is not a property of the Connection interface, required by the base useLegacyGroupLimit signature
+
+    const isMaria = await query.getConnection().isMaria()
+
+    return !(isMaria) && versionCompare(version, '8.0.11', '<')
+  }
+
+  /**
    * Compile a "where fulltext" clause.
    *
    * @param  \Illuminate\Database\Query\Builder  $query
@@ -238,7 +254,7 @@ export class MySqlGrammar extends Grammar {
    * @return string
    */
   public override whereFulltext (
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base whereFulltext signature
+
     // @ts-expect-error -- required by the base whereFulltext signature
     query: Builder,
     where: WhereClause
@@ -342,22 +358,6 @@ export class MySqlGrammar extends Grammar {
   }
 
   /**
-   * Determine whether to use a legacy group limit clause for MySQL < 8.0.
-   *
-   * @param  \Illuminate\Database\Query\Builder  $query
-   * @return bool
-   */
-  public async useLegacyGroupLimit(query: Builder): Promise<boolean> {
-    const version = await query.getConnection().getServerVersion()
-
-    // @ts-expect-error -- isMaria is not a property of the Connection interface, required by the base useLegacyGroupLimit signature
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base useLegacyGroupLimit signature
-    const isMaria = await query.getConnection().isMaria()
-
-    return !(isMaria) && versionCompare(version, '8.0.11', '<')
-  }
-
-  /**
    * Compile a "JSON contains" statement into SQL.
    *
    * @param  string  $column
@@ -374,7 +374,7 @@ export class MySqlGrammar extends Grammar {
    * @throws \InvalidArgumentException
    */
   protected override compileIndexHint (
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base compileIndexHint signature
+
     // @ts-expect-error -- required by the base compileIndexHint signature
     query: Builder,
     indexHint?: IndexHint

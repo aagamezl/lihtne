@@ -6,23 +6,35 @@ import { MySqlStatement } from '../Statements/MySqlStatement'
 import { Driver, type DriverOptions } from './Driver'
 
 export class MySqlDriver extends Driver {
-  protected client?: Promise<Connection>
+  protected override client: Connection | undefined = undefined
 
   protected insertedId: string | number = 0
 
-  constructor (dsn: string, options: DriverOptions) {
+  constructor(dsn: string, options: DriverOptions) {
     super(dsn, options)
 
     this.driverTitle = 'mysql'
   }
 
-  public connection (): Promise<Connection> {
-    this.client ??= mysql.createConnection({
-      uri: this.dsn,
-      connectTimeout: 2000
-    })
+  public override async connect(): Promise<Connection> {
+    if (!this.client) {
+      this.client = await mysql.createConnection({
+        uri: this.dsn,
+        connectTimeout: 2000
+      })
+    }
 
     return this.client
+  }
+
+  public override async disconnect(): Promise<void> {
+    const client = this.client
+
+    this.client = undefined
+
+    if (client !== undefined) {
+      await (await client).end()
+    }
   }
 
   /**
@@ -31,7 +43,7 @@ export class MySqlDriver extends Driver {
    * `ATTR_SERVER_VERSION` is the string returned by `VERSION()`, the same
    * value PDO returns for `PDO::ATTR_SERVER_VERSION`.
    */
-  public override async getAttribute (
+  public override async getAttribute(
     attribute: string | number
   ): Promise<string> {
     if (attribute !== Driver.ATTR_SERVER_VERSION) {
@@ -43,18 +55,25 @@ export class MySqlDriver extends Driver {
     return this.serverVersion
   }
 
-  public override lastInsertId (): string | number {
+  public override lastInsertId(): string | number {
     return this.insertedId
+  }
+
+  /**
+   * Store the auto-increment id from the last insert result.
+   */
+  public setLastInsertId(id: string | number): void {
+    this.insertedId = id
   }
 
   public override prepare<
     TRow extends Record<string, unknown> = Record<string, unknown>
-  > (query: string): Statement<TRow> {
+  >(query: string): Statement<TRow> {
     return new MySqlStatement<TRow>(this.dsn, this.options, query, this)
   }
 
-  protected async fetchServerVersion (): Promise<string> {
-    const connection = await this.connection()
+  protected async fetchServerVersion(): Promise<string> {
+    const connection = await this.connect()
     const [rows] = await connection.query<Array<RowDataPacket & { version: string }>>(
       'SELECT VERSION() AS version'
     )

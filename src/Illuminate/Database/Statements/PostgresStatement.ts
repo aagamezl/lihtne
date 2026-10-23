@@ -34,7 +34,7 @@ export class PostgresStatement<
       this.statement.values = values
     }
 
-    this.client = await this.driver.connection()
+    this.client = await this.driver.connect()
 
     const result = await this.client.query<TRow>(this.statement)
 

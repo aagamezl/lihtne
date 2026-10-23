@@ -15,6 +15,12 @@ export class Driver {
 
   protected serverVersion?: string
 
+  protected client: unknown | undefined
+
+  public isConnected(): boolean {
+    return this.client !== undefined
+  }
+
   /**
    * Creates an instance of Statement.
    * @param {string} dsn
@@ -24,6 +30,25 @@ export class Driver {
   constructor (dsn: string, options: DriverOptions) {
     this.dsn = dsn
     this.options = options
+  }
+
+  /**
+   * Open a session with the database client.
+   *
+   * Concrete drivers call the client library's own method (`Client.connect`,
+   * `mysql.createConnection`, and so on) and return that client.
+   */
+  public async connect (): Promise<unknown> {
+    throw new Error(`RuntimeException: Implement 'connect' method on concrete class.`)
+  }
+
+  /**
+   * Close the session opened by connect().
+   *
+   * Concrete drivers call the client library's own method (`end`, and so on).
+   */
+  public async disconnect (): Promise<void> {
+    throw new Error(`RuntimeException: Implement 'disconnect' method on concrete class.`)
   }
 
   /**

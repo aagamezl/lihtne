@@ -17,7 +17,11 @@ import { DB } from '../../../src/Illuminate/Support/Facades/DB'
     const result = await db.query().from('users').delete(userId)
 
     console.log('result.rowCount: %o', result)
+
+    await db.disconnect()
   } catch (error) {
     console.error(error)
+
+    process.exit(1)
   }
 })()

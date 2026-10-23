@@ -68,8 +68,8 @@ export class MariaDbGrammar extends MySqlGrammar {
    * @param  \Illuminate\Database\Query\Builder  $query
    * @return bool
    */
+  // @ts-expect-error expected error; query is not used in this method
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base useLegacyGroupLimit signature
-  // @ts-expect-error -- required by the base useLegacyGroupLimit signature
   public override async useLegacyGroupLimit (query: Builder): Promise<boolean> {
     return false
   }

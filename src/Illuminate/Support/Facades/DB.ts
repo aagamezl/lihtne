@@ -60,7 +60,7 @@ const loadConfiguration = async (configFiles: string[]): Promise<LihtneConfig> =
   throw new Error(`InvalidArgumentException: Configuration file [${configFiles.join(', ')}] must export a database configuration.`)
 }
 
-export const DB = async () => {
+export const DB = async (driver?: string) => {
   const config = await loadConfiguration(CONFIG_FILES)
 
   // TODO: avoid the databaseManager variable instantiation several times; a
@@ -71,5 +71,5 @@ export const DB = async () => {
     config
   )
 
-  return databaseManager.connection()
+  return databaseManager.connection(driver)
 }

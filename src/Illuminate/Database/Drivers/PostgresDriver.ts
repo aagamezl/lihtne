@@ -6,7 +6,7 @@ import { PostgresStatement } from '../Statements/PostgresStatement'
 import { Driver, type DriverOptions } from './Driver'
 
 export class PostgresDriver extends Driver {
-  protected client?: Promise<Client>
+  protected override client: Client | undefined = undefined
 
   constructor (dsn: string, options: DriverOptions) {
     super(dsn, options)
@@ -14,10 +14,29 @@ export class PostgresDriver extends Driver {
     this.driverTitle = 'pgsql'
   }
 
-  public connection (): Promise<Client> {
-    this.client ??= this.open()
+  public override async connect (): Promise<Client> {
+    if (!this.client) {
+      this.client = new Client({
+        connectionString: this.dsn,
+        connectionTimeoutMillis: 2000
+      })
+
+      await this.client.connect()
+    }
 
     return this.client
+  }
+
+  public override async disconnect (): Promise<void> {
+    if (!this.isConnected()) {
+      return
+    }
+
+    if (this.client !== undefined) {
+      await this.client.end()
+    }
+
+    this.client = undefined
   }
 
   /**
@@ -53,7 +72,7 @@ export class PostgresDriver extends Driver {
   }
 
   protected async fetchServerVersion (): Promise<string> {
-    const client = await this.connection()
+    const client = await this.connect()
     const result = await client.query<{ server_version: string }>(
       "SELECT current_setting('server_version') AS server_version"
     )
@@ -66,15 +85,13 @@ export class PostgresDriver extends Driver {
     return version
   }
 
-  protected async open (): Promise<Client> {
+  protected openClient (): Promise<Client> {
     const client = new Client({
       connectionString: this.dsn,
       connectionTimeoutMillis: 2000
     })
 
-    await client.connect()
-
-    return client
+    return client.connect()
   }
 
   // public override async lastInsertId (

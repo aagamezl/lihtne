@@ -23,7 +23,7 @@ export class MySqlStatement<
   public override async execute (values?: BindingValues): Promise<TRow[]> {
     const bound = values ?? Object.values(this.bindings)
 
-    this.client = await this.driver.connection()
+    this.client = await this.driver.connect()
 
     const [result] = await this.client.query(this.statement.text, bound)
 
@@ -43,6 +43,10 @@ export class MySqlStatement<
     this.result = {
       rows: [],
       rowCount: header.affectedRows
+    }
+
+    if (header.insertId > 0) {
+      this.driver.setLastInsertId(header.insertId)
     }
 
     return []

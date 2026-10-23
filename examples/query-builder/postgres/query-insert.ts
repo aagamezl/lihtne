@@ -3,7 +3,7 @@ import { DB } from '../../../src/Illuminate/Support/Facades/DB'
 
 (async () => {
   try {
-    const db = await DB()
+    const db = await DB('pgsql')
     // let result = await db.query().from('users').insert(
     //   {
     //     first_name: 'Michael',
@@ -50,7 +50,11 @@ import { DB } from '../../../src/Illuminate/Support/Facades/DB'
     const users = await db.query().from('users').get()
 
     console.log(JSON.stringify(users.all(), null, 2))
+
+    await db.disconnect()
   } catch (error) {
     console.error(error)
+
+    process.exit(1)
   }
 })()

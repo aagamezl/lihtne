@@ -25,7 +25,11 @@ import { DB } from '../../../src/Illuminate/Support/Facades/DB'
       .update({ first_name: 'Louise' })
 
     console.log('result.rowCount: %o', result)
+
+    await db.disconnect()
   } catch (error) {
     console.error(error)
+
+    process.exit(1)
   }
 })()
