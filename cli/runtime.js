@@ -457,3 +457,20 @@ export async function requireDocker (dryRun) {
   }
   return ok
 }
+
+export async function armHost () {
+  if (process.platform === 'darwin') {
+    if (process.arch === 'arm64') {
+      return 'Apple Silicon'
+    }
+    const result = await run('sysctl', ['-n', 'hw.optional.arm64'])
+    if (result.ok && result.output.trim() === '1') {
+      return 'Apple Silicon'
+    }
+    return ''
+  }
+  if (process.arch === 'arm64' || process.arch === 'arm') {
+    return 'ARM'
+  }
+  return ''
+}

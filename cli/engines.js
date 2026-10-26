@@ -22,6 +22,13 @@ export const SQLSRV_PASSWORD = 'Lihtne_dev_1'
 export const NETWORKED = ['mysql', 'mariadb', 'pgsql', 'sqlsrv']
 export const ALL_ENGINES = [...NETWORKED, 'sqlite']
 
+export const ARM_INCOMPATIBLE = [
+  {
+    engine: 'sqlsrv',
+    reason: 'The SQL Server container image is built for x86-64 CPUs.'
+  }
+]
+
 const ALIASES = {
   mysql: 'mysql',
   mariadb: 'mariadb',
@@ -33,6 +40,10 @@ const ALIASES = {
   mssql: 'sqlsrv',
   sqlite: 'sqlite',
   all: 'all'
+}
+
+export function armIncompatible (engine) {
+  return ARM_INCOMPATIBLE.find((item) => item.engine === engine) ?? null
 }
 
 export function canonicalEngine (name) {

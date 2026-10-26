@@ -14,10 +14,10 @@ export class MariaDbGrammar extends MySqlGrammar {
    * @throws \RuntimeException
    */
   public override compileJoinLateral (
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base compileJoinLateral signature
-    _join: JoinLateralClause,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base compileJoinLateral signature
-    _expression: string
+    // @ts-expect-error expected error; join is required by the base compileJoinLateral signature
+    join: JoinLateralClause,
+    // @ts-expect-error expected error; expression is required by the base compileJoinLateral signature
+    expression: string
   ): string {
     throw new Error(
       'RuntimeException: This database engine does not support lateral joins.'

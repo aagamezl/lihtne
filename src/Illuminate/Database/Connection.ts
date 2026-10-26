@@ -260,6 +260,12 @@ export class Connection extends DetectsLostConnections {
     return this.affectingStatement(query, bindings)
   }
 
+  public async disconnect (): Promise<void> {
+    const driver = await this.getDriver()
+
+    await driver.disconnect()
+  }
+
   /**
    * Escape a value for safe SQL embedding.
    *
@@ -425,15 +431,6 @@ export class Connection extends DetectsLostConnections {
   }
 
   /**
-   * Get the table prefix for the connection.
-   *
-   * @return string
-   */
-  public getTablePrefix (): string {
-    return this.tablePrefix
-  }
-
-  /**
    * Escape a binary value for safe SQL embedding.
    *
    * @param  string  $value
@@ -441,6 +438,15 @@ export class Connection extends DetectsLostConnections {
    *
    * @throws \RuntimeException
    */
+
+  /**
+   * Get the table prefix for the connection.
+   *
+   * @return string
+   */
+  public getTablePrefix (): string {
+    return this.tablePrefix
+  }
 
   /**
    * Run an insert statement against the database.
@@ -455,6 +461,13 @@ export class Connection extends DetectsLostConnections {
   ): Promise<boolean> {
     return this.statement(query, bindings)
   }
+
+  /**
+   * Determine if the given database exception was caused by a unique constraint violation.
+   *
+   * @param  \Exception  $exception
+   * @return bool
+   */
 
   /**
    * Log a query in the connection's query log.
@@ -479,13 +492,6 @@ export class Connection extends DetectsLostConnections {
       this.queryLog.push({ query, bindings, time })
     }
   }
-
-  /**
-   * Determine if the given database exception was caused by a unique constraint violation.
-   *
-   * @param  \Exception  $exception
-   * @return bool
-   */
 
   /**
    * Prepare the query bindings for execution.
@@ -526,12 +532,6 @@ export class Connection extends DetectsLostConnections {
    */
   public query (): QueryBuilder {
     return new QueryBuilder(this, this.getQueryGrammar(), this.getPostProcessor())
-  }
-
-  public async disconnect (): Promise<void> {
-    const driver = await this.getDriver()
-
-    await driver.disconnect()
   }
 
   /**

@@ -2,6 +2,8 @@ import fs from 'node:fs'
 
 import {
   ALL_ENGINES,
+  ARM_INCOMPATIBLE,
+  armIncompatible,
   composeFile,
   DEV_DB,
   enginePassword,
@@ -25,6 +27,7 @@ import {
   removeContainer,
   requireDocker,
   requireTool,
+  armHost,
   startContainers,
   uninstallSqlite
 } from './runtime.js'
@@ -79,6 +82,7 @@ export function showDb () {
   boxRow('', '')
   boxRow('dim', 'Omit --version to pin the newest stable tag.')
   boxRow('dim', 'The latest tag is never used.')
+  boxRow('dim', armHelpLine())
   boxRow('dim', '--dry-run resolves versions and prints actions.')
   sectionClose()
 }
@@ -111,6 +115,26 @@ function showParameters (command, selected, engine, version, dryRun) {
   }
   fieldRow(dryRun ? 'yellow' : '', 'Dry run', dryRun ? 'yes' : 'no')
   sectionClose()
+}
+
+function armHelpLine () {
+  const names = ARM_INCOMPATIBLE.map((item) => engineTitle(item.engine))
+  return `${names.join(', ')} can't be installed on ARM or Apple Silicon.`
+}
+
+function armRefusalLines (host, denied) {
+  const lines = []
+  for (const [index, engine] of denied.entries()) {
+    if (index > 0) {
+      lines.push('')
+    }
+    const title = engineTitle(engine)
+    lines.push(`✗ ${title} installation stopped.`)
+    lines.push(`  This host is ${host}.`)
+    lines.push(`  ${armIncompatible(engine).reason}`)
+    lines.push(`  ${title} can't be installed on ARM and Apple Silicon.`)
+  }
+  return lines
 }
 
 function recordInstall (lines, engine, version) {
@@ -147,16 +171,36 @@ async function selectedNetworkInstalled (pins, selected) {
 }
 
 export async function install (engine, selected, version, dryRun) {
-  openInstallBanner(selected)
-  showParameters('db install', selected, engine, version, dryRun)
+  let engines = selected
+  openInstallBanner(engines)
+  showParameters('db install', engines, engine, version, dryRun)
+
+  const denied = []
+  let host = ''
+  if (engines.some((item) => armIncompatible(item))) {
+    host = await armHost()
+    if (host) {
+      denied.push(...engines.filter((item) => armIncompatible(item)))
+      engines = engines.filter((item) => !armIncompatible(item))
+      if (engines.length === 0) {
+        finish(1, 'red', 'Result', armRefusalLines(host, denied))
+      }
+    }
+  }
 
   sectionOpen('2 · Preflight', 'blue')
+  if (host && denied.length > 0) {
+    for (const line of armRefusalLines(host, denied)) {
+      boxRow('red', line)
+    }
+    boxRow('yellow', '· The other selected engines will still be installed.')
+  }
   let ok = true
-  const networked = selected.some((item) => item !== 'sqlite')
+  const networked = engines.some((item) => item !== 'sqlite')
   if (networked) {
     ok = (await requireDocker(dryRun)) && ok
   }
-  if (selected.includes('sqlite')) {
+  if (engines.includes('sqlite')) {
     ok = (await requireTool('sqlite3')) && ok
   }
   if (!ok) {
@@ -164,7 +208,7 @@ export async function install (engine, selected, version, dryRun) {
       '✗ Install the missing tools and run this command again.'
     ])
   }
-  if (!networked && !selected.includes('sqlite')) {
+  if (!networked && !engines.includes('sqlite')) {
     boxRow('green', '✓ Nothing to check')
   }
   sectionClose()
@@ -173,7 +217,7 @@ export async function install (engine, selected, version, dryRun) {
   const resolved = { mysql: '', mariadb: '', pgsql: '', sqlsrv: '' }
 
   sectionOpen('3 · Versions', 'cyan')
-  for (const item of selected) {
+  for (const item of engines) {
     if (item === 'sqlite') {
       fieldRow('', 'sqlite', 'local file')
       continue
@@ -188,24 +232,24 @@ export async function install (engine, selected, version, dryRun) {
 
   sectionOpen('4 · Install', 'cyan')
   if (networked) {
-    for (const item of selected) {
+    for (const item of engines) {
       if (item !== 'sqlite') {
         pins[item] = resolved[item]
       }
     }
     persistGeneratedFiles(pins, dryRun)
-    if (!(await startContainers(selected, dryRun))) {
+    if (!(await startContainers(engines, dryRun))) {
       finish(3, 'red', 'Result', [
         '✗ Docker did not start the selected engines.'
       ])
     }
-    if (!(await ensureSqlsrvDatabase(selected, dryRun))) {
+    if (!(await ensureSqlsrvDatabase(engines, dryRun))) {
       finish(3, 'red', 'Result', [
         '✗ SQL Server is up, and creating the lihtne database failed.'
       ])
     }
   }
-  if (selected.includes('sqlite')) {
+  if (engines.includes('sqlite')) {
     try {
       await installSqlite(dryRun)
     } catch (error) {
@@ -221,7 +265,7 @@ export async function install (engine, selected, version, dryRun) {
   }
 
   const lines = []
-  selected.forEach((item, index) => {
+  engines.forEach((item, index) => {
     if (index > 0) {
       lines.push('')
     }

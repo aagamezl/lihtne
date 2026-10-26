@@ -3,7 +3,7 @@ import { DB } from '../../../src/Illuminate/Support/Facades/DB'
 
 (async () => {
   try {
-    const db = await DB()
+    const db = await DB('pgsql')
     const users = await db
       .query()
       .from('users')

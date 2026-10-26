@@ -7,6 +7,8 @@ export type DriverType = 'mysql' | 'mariadb' | 'pgsql' | 'sqlsrv' | 'sqlite'
 export class Driver {
   static ATTR_SERVER_VERSION: number = 4
 
+  protected client: unknown | undefined
+
   protected driverTitle?: DriverType
 
   protected dsn: string
@@ -14,12 +16,6 @@ export class Driver {
   protected options: DriverOptions = {}
 
   protected serverVersion?: string
-
-  protected client: unknown | undefined
-
-  public isConnected(): boolean {
-    return this.client !== undefined
-  }
 
   /**
    * Creates an instance of Statement.
@@ -66,6 +62,10 @@ export class Driver {
 
   public getDriverTitle (): DriverType | undefined {
     return this.driverTitle
+  }
+
+  public isConnected (): boolean {
+    return this.client !== undefined
   }
 
   /**

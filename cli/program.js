@@ -21,7 +21,7 @@ async function engineName (engine) {
   }
   const answer = await ask([
     {
-      type: 'list',
+      type: 'select',
       name: 'engine',
       message: 'Database engine',
       choices: [

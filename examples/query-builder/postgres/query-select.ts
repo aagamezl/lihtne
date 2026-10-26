@@ -4,7 +4,6 @@ import { DB } from '../../../src/Illuminate/Support/Facades/DB'
 
 (async () => {
   try {
-
     const db = await DB('postgres')
 
     console.log('SQL: %s', db.query().from('users').where('firstname', 'John').toSql())
