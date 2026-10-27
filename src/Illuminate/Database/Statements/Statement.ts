@@ -1,22 +1,21 @@
 import type { DriverOptions } from '../Drivers/Driver'
 import type { BindingValue, BindingValues } from '../Query'
 
-export type Result<
-  TRow extends Record<string, unknown> = Record<string, unknown>
-> = {
-  rows: TRow[]
+export type Result = {
+  rows: unknown[]
   rowCount: number | undefined
 }
 
-export type PreparedStatement = {
-  name: string
-  text: string
-  values?: BindingValues
-}
+// export type PreparedStatement = {
+//   name: string
+//   text: string
+//   values?: BindingValues
+// }
 
-export abstract class Statement<
-  TRow extends Record<string, unknown> = Record<string, unknown>
-> {
+// export abstract class Statement<
+//   TRow extends Record<string, unknown> = Record<string, unknown>
+// > {
+export abstract class Statement {
   protected bindings: Record<string, BindingValue> = {}
 
   protected abstract client: unknown
@@ -31,9 +30,10 @@ export abstract class Statement<
    * @protected
    * @type {any}
    */
-  protected result: Result<TRow> = { rows: [], rowCount: 0 }
+  protected result: Result = { rows: [], rowCount: 0 }
 
-  protected statement!: PreparedStatement
+  // protected statement!: PreparedStatement
+  protected  abstract statement: unknown
 
   /**
    * Creates an instance of Statement.
@@ -69,11 +69,11 @@ export abstract class Statement<
   /**
    * Executes the statement and returns the result.
    * @param values {BindingValues}
-   * @returns {Promise<TRow[]>}
+   * @returns {Promise<unknown[]>}
    */
-  public abstract execute (values?: BindingValues): Promise<TRow[]>
+  public abstract execute (values?: BindingValues): Promise<unknown[]>
 
-  public abstract fetchAll (): TRow[]
+  public abstract fetchAll (): unknown[]
 
   public abstract parameterize (query: string): string
 
@@ -83,7 +83,7 @@ export abstract class Statement<
    * @param {string} query
    * @returns {Statement}
    */
-  public abstract prepare (query: string): this
+  public abstract prepare (query: string): Promise<this>
 
   public abstract rowCount (): number
 }

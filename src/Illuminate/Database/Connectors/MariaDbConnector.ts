@@ -1,6 +1,6 @@
 import type { Driver, DriverOptions } from '../../..'
 import type { DatabaseConfig } from '../../Config/types'
-import { MariaDBDriver } from '../Drivers/MariaDbDriver'
+import { MariaDbDriver } from '../Drivers/MariaDbDriver'
 
 import { MySqlConnector } from './MySqlConnector'
 

@@ -4,7 +4,7 @@ import { Driver, type DriverOptions } from './Driver'
 import { MariaDbStatement } from '../Statements/MariaDbStatement'
 import type { Statement } from '../Statements/Statement';
 
-export class MariaDBDriver extends Driver {
+export class MariaDbDriver extends Driver {
   protected override client: Connection | undefined = undefined
 
   constructor (dsn: string, options: DriverOptions) {
@@ -21,10 +21,13 @@ export class MariaDBDriver extends Driver {
     return this.client
   }
 
-  public override prepare<
-    TRow extends Record<string, unknown> = Record<string, unknown>
-  >(query: string): Statement<TRow> {
-    return new MariaDbStatement<TRow>(this.dsn, this.options, query, this)
+  // public override prepare<
+  //   TRow extends Record<string, unknown> = Record<string, unknown>
+  // >(query: string): Statement<TRow> {
+  //   return new MariaDbStatement<TRow>(this.dsn, this.options, query, this)
+  // }
+  public override prepare(query: string): Statement {
+    return new MariaDbStatement(this.dsn, this.options, query, this)
   }
 
   public override async disconnect (): Promise<void> {

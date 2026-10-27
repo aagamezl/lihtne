@@ -4,7 +4,7 @@ import { DB } from '../../../src/Illuminate/Support/Facades/DB'
 
 (async () => {
   try {
-    const db = await DB('postgres')
+    const db = await DB('pgsql')
 
     console.log('SQL: %s', db.query().from('users').where('firstname', 'John').toSql())
     console.log('Bindings: %o', db.query().from('users').where('firstname', 'John').getBindings())

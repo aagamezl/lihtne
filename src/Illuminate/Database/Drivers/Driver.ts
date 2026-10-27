@@ -89,9 +89,14 @@ export class Driver {
    * @returns {Statement}
    * @throws {Error}
    */
-  public prepare<
-    TRow extends Record<string, unknown> = Record<string, unknown>
-  > (query: string): Statement<TRow> {
+  // public prepare<
+  //   TRow extends Record<string, unknown> = Record<string, unknown>
+  // > (query: string): Statement<TRow> {
+  //   throw new Error(
+  //     `RuntimeException: Implement 'prepare' method on concrete class for query: ${query}`
+  //   )
+  // }
+  public prepare(query: string): Statement {
     throw new Error(
       `RuntimeException: Implement 'prepare' method on concrete class for query: ${query}`
     )

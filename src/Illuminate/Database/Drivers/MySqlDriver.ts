@@ -59,10 +59,13 @@ export class MySqlDriver extends Driver {
     return this.insertedId
   }
 
-  public override prepare<
-    TRow extends Record<string, unknown> = Record<string, unknown>
-  >(query: string): Statement<TRow> {
-    return new MySqlStatement<TRow>(this.dsn, this.options, query, this)
+  // public override prepare<
+  //   TRow extends Record<string, unknown> = Record<string, unknown>
+  // >(query: string): Statement<TRow> {
+  //   return new MySqlStatement<TRow>(this.dsn, this.options, query, this)
+  // }
+  public override prepare(query: string): Statement {
+    return new MySqlStatement(this.dsn, this.options, query, this)
   }
 
   /**
