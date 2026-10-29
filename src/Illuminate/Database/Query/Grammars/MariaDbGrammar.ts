@@ -15,8 +15,10 @@ export class MariaDbGrammar extends MySqlGrammar {
    */
   public override compileJoinLateral (
     // @ts-expect-error expected error; join is required by the base compileJoinLateral signature
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base compileJoinLateral signature
     join: JoinLateralClause,
     // @ts-expect-error expected error; expression is required by the base compileJoinLateral signature
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base compileJoinLateral signature
     expression: string
   ): string {
     throw new Error(

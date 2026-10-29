@@ -4,11 +4,10 @@ import type { Statement } from '../Statements/Statement'
 
 import { MySqlStatement } from '../Statements/MySqlStatement'
 import { Driver, type DriverOptions } from './Driver'
-
 export class MySqlDriver extends Driver {
   protected override client: Connection | undefined = undefined
 
-  protected insertedId: string | number = 0
+  protected insertedId: number = 0
 
   constructor (dsn: string, options: DriverOptions) {
     super(dsn, options)
@@ -64,14 +63,16 @@ export class MySqlDriver extends Driver {
   // >(query: string): Statement<TRow> {
   //   return new MySqlStatement<TRow>(this.dsn, this.options, query, this)
   // }
-  public override prepare(query: string): Statement {
+  public override prepare (query: string): Statement {
+    console.log('MySqlDriver.prepare: %s', query)
+
     return new MySqlStatement(this.dsn, this.options, query, this)
   }
 
   /**
    * Store the auto-increment id from the last insert result.
    */
-  public setLastInsertId (id: string | number): void {
+  public setLastInsertId (id: number): void {
     this.insertedId = id
   }
 

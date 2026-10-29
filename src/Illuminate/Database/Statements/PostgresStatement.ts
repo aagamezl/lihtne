@@ -8,23 +8,20 @@ import type { BindingValues } from '../Query/Builder'
 
 import { Statement } from './Statement'
 
-// export class PostgresStatement<
-//   TRow extends Record<string, unknown> = Record<string, unknown>
-// > extends Statement<TRow> {
-
 export type PreparedStatement = {
   name: string
   text: string
   values?: BindingValues
 }
+
 export class PostgresStatement extends Statement {
   protected override client!: Client
 
-  protected override statement!: PreparedStatement
-
   protected readonly driver: PostgresDriver
 
-  constructor(
+  protected override statement!: PreparedStatement
+
+  constructor (
     dsn: string,
     options: DriverOptions,
     query: string,
@@ -40,9 +37,16 @@ export class PostgresStatement extends Statement {
    * @param {unknown[]} values
    * @returns {Promise<any[]>}
    */
-  // public override async execute(values?: BindingValues): Promise<TRow[]> {
-  public override async execute(values?: BindingValues): Promise<unknown[]> {
+  public override async execute (values?: BindingValues): Promise<unknown[]> {
     values = values ?? Object.values(this.bindings)
+
+    if (this.client === undefined) {
+      this.client = await this.driver.connect()
+    }
+
+    if (this.statement === undefined) {
+      await this.prepare(this.query)
+    }
 
     if (Object.values(values).length > 0) {
       this.statement.values = values
@@ -50,7 +54,6 @@ export class PostgresStatement extends Statement {
 
     this.client = await this.driver.connect()
 
-    // const result = await this.client.query<TRow>(this.statement)
     const result = await this.client.query(this.statement)
 
     this.result = {
@@ -61,12 +64,11 @@ export class PostgresStatement extends Statement {
     return this.result.rows
   }
 
-  // public override fetchAll(): TRow[] {
-  public override fetchAll() {
+  public override fetchAll () {
     return this.result.rows
   }
 
-  public override parameterize(query: string): string {
+  public override parameterize (query: string): string {
     const regex = /\?/gm
 
     if (query.match(regex) === null) {
@@ -77,7 +79,7 @@ export class PostgresStatement extends Statement {
     return query.replace(regex, () => `$${++index}`)
   }
 
-  public override async prepare(query: string): Promise<this> {
+  public override async prepare (query: string): Promise<this> {
     this.statement = {
       name: `prepared-statement-${crypto.randomUUID()}`,
       text: this.parameterize(query)
@@ -88,7 +90,7 @@ export class PostgresStatement extends Statement {
     return this
   }
 
-  public override rowCount(): number {
+  public override rowCount (): number {
     return this.result.rowCount ?? 0
   }
 }

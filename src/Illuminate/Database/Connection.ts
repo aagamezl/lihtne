@@ -606,8 +606,8 @@ export class Connection extends DetectsLostConnections {
       // of the database result set. Each element in the array will be a single
       // row from the database table, and will either be an array or objects.
       const driver = await this.getDriver()
-      const statement = this.prepared(
-        driver.prepare<TResult>(query)
+      const statement = await this.prepared(
+        driver.prepare(query)
       )
 
       this.bindValues(statement, this.prepareBindings(bindings))
@@ -850,9 +850,9 @@ export class Connection extends DetectsLostConnections {
    * @param  \PDOStatement  statement
    * @return \PDOStatement
    */
-  protected prepared<TRow extends Record<string, unknown>>(
-    statement: Statement<TRow>
-  ): Statement<TRow> {
+  protected prepared (
+    statement: Statement
+  ): Statement {
     this.event(new StatementPrepared(this, statement))
 
     return statement

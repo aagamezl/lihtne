@@ -96,7 +96,7 @@ export class Driver {
   //     `RuntimeException: Implement 'prepare' method on concrete class for query: ${query}`
   //   )
   // }
-  public prepare(query: string): Statement {
+  public prepare (query: string): Statement {
     throw new Error(
       `RuntimeException: Implement 'prepare' method on concrete class for query: ${query}`
     )

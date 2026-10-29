@@ -1,4 +1,4 @@
-import type { DriverOptions } from '../Drivers/Driver'
+import type { Driver, DriverOptions } from '../Drivers/Driver'
 import type { BindingValue, BindingValues } from '../Query'
 
 export type Result = {
@@ -20,6 +20,8 @@ export abstract class Statement {
 
   protected abstract client: unknown
 
+  protected abstract readonly driver: Driver
+
   protected dsn: string
 
   protected options: DriverOptions
@@ -33,7 +35,7 @@ export abstract class Statement {
   protected result: Result = { rows: [], rowCount: 0 }
 
   // protected statement!: PreparedStatement
-  protected  abstract statement: unknown
+  protected abstract statement: unknown
 
   /**
    * Creates an instance of Statement.
@@ -42,12 +44,18 @@ export abstract class Statement {
    * @param {string} query
    * @memberof Statement
    */
-  constructor (dsn: string, options: DriverOptions, query: string) {
+  constructor (
+    dsn: string,
+    options: DriverOptions,
+    query: string
+    // driver: Driver
+  ) {
     this.dsn = dsn
     this.options = options
     this.query = query
+    // this.driver = driver
 
-    this.prepare(query)
+    // this.prepare(query)
   }
 
   /**
@@ -81,7 +89,7 @@ export abstract class Statement {
    * Prepares a statement for execution and returns a statement object
    *
    * @param {string} query
-   * @returns {Statement}
+   * @returns {Promise<Statement>}
    */
   public abstract prepare (query: string): Promise<this>
 

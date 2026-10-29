@@ -1,11 +1,14 @@
-import mariadb, { type Connection } from 'mariadb';
+import mariadb, { type Connection } from 'mariadb'
 
-import { Driver, type DriverOptions } from './Driver'
+import type { Statement } from '../Statements/Statement'
+
 import { MariaDbStatement } from '../Statements/MariaDbStatement'
-import type { Statement } from '../Statements/Statement';
+import { Driver, type DriverOptions } from './Driver'
 
 export class MariaDbDriver extends Driver {
   protected override client: Connection | undefined = undefined
+
+  protected insertedId: number = 0
 
   constructor (dsn: string, options: DriverOptions) {
     super(dsn, options)
@@ -21,15 +24,6 @@ export class MariaDbDriver extends Driver {
     return this.client
   }
 
-  // public override prepare<
-  //   TRow extends Record<string, unknown> = Record<string, unknown>
-  // >(query: string): Statement<TRow> {
-  //   return new MariaDbStatement<TRow>(this.dsn, this.options, query, this)
-  // }
-  public override prepare(query: string): Statement {
-    return new MariaDbStatement(this.dsn, this.options, query, this)
-  }
-
   public override async disconnect (): Promise<void> {
     const client = this.client
 
@@ -38,5 +32,16 @@ export class MariaDbDriver extends Driver {
     if (client !== undefined) {
       await (await client).end()
     }
+  }
+
+  public override prepare (query: string): Statement {
+    return new MariaDbStatement(this.dsn, this.options, query, this)
+  }
+
+  /**
+   * Store the auto-increment id from the last insert result.
+   */
+  public setLastInsertId (id: number): void {
+    this.insertedId = id
   }
 }

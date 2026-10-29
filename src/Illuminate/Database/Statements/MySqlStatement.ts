@@ -1,4 +1,4 @@
-import type { Connection, PreparedStatementInfo, QueryResult } from 'mysql2/promise'
+import type { Connection, PreparedStatementInfo } from 'mysql2/promise'
 
 import type { DriverOptions } from '../Drivers/Driver'
 import type { MySqlDriver } from '../Drivers/MySqlDriver'
@@ -6,15 +6,12 @@ import type { BindingValues } from '../Query/Builder'
 
 import { Statement } from './Statement'
 
-// export class MySqlStatement<
-//   TRow extends Record<string, unknown> = Record<string, unknown>
-// > extends Statement<TRow> {
-export class MySqlStatement extends Statement{
+export class MySqlStatement extends Statement {
   protected override client!: Connection
 
-  protected override statement!: PreparedStatementInfo
+  protected override readonly driver: MySqlDriver
 
-  protected readonly driver: MySqlDriver
+  protected override statement!: PreparedStatementInfo
 
   constructor (
     dsn: string,
@@ -27,23 +24,20 @@ export class MySqlStatement extends Statement{
     this.driver = driver
   }
 
-  // public override async execute (values?: BindingValues): Promise<TRow[]> {
   public override async execute (values?: BindingValues): Promise<unknown[]> {
     const bindings = values ?? Object.values(this.bindings)
 
-    this.client = await this.driver.connect()
+    if (this.client === undefined) {
+      this.client = await this.driver.connect()
+    }
+
+    if (this.statement === undefined) {
+      await this.prepare(this.query)
+    }
 
     const [result] = await this.statement.execute(bindings)
 
     if (Array.isArray(result)) {
-      // const rows = result as TRow[]
-
-      // this.result = {
-      //   rows,
-      //   rowCount: rows.length ?? 0
-      // }
-
-      // return rows
       this.result = {
         rows: result,
         rowCount: result.length ?? 0
@@ -51,8 +45,6 @@ export class MySqlStatement extends Statement{
 
       return this.result.rows
     }
-
-    // const header = result as ResultSetHeader
 
     this.result = {
       rows: [],
@@ -66,7 +58,6 @@ export class MySqlStatement extends Statement{
     return []
   }
 
-  // public override fetchAll (): TRow[] {
   public override fetchAll () {
     return this.result.rows
   }
@@ -76,11 +67,6 @@ export class MySqlStatement extends Statement{
   }
 
   public override async prepare (query: string): Promise<this> {
-    // this.statement = {
-    //   name: '',
-    //   text: this.parameterize(query)
-    // }
-
     this.statement = await this.client.prepare(this.parameterize(query))
 
     this.bindings = {}
