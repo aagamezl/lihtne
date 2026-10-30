@@ -25,7 +25,7 @@ export class MariaDbConnector extends MySqlConnector {
    * @param  array  $config
    * @return string
    */
-  protected getHostDsn (config: DatabaseConfig): string {
+  protected override getHostDsn (config: DatabaseConfig): string {
     const { username, password, host, port, database } = config
 
     return config.port !== undefined

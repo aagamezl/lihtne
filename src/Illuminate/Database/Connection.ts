@@ -237,8 +237,8 @@ export class Connection extends DetectsLostConnections {
    * @param  array  bindings
    * @return void
    */
-  public bindValues<TRow extends Record<string, unknown>>(
-    statement: Statement<TRow>,
+  public bindValues(
+    statement: Statement,
     bindings: BindingValues
   ) {
     for (const [key, value] of Object.entries(bindings)) {

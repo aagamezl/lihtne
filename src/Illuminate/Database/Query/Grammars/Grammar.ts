@@ -590,7 +590,6 @@ export class Grammar
    * @param  {number}  limit
    * @return {string}
    */
-  // @ts-expect-error expected error; query is not used in this method
 
   /**
    * Prepare the binding for a "JSON contains" statement.
@@ -609,7 +608,6 @@ export class Grammar
    * @param  int  $offset
    * @return string
    */
-  // @ts-expect-error expected error; query is not used in this method
 
   /**
    * Prepare the bindings for a delete statement.
@@ -1243,7 +1241,6 @@ export class Grammar
    * @param  array  $where
    * @return string
    */
-  // @ts-expect-error expected error; query is not used in this method
 
   /**
    * Compile the "order by" portions of the query.
@@ -1303,7 +1300,6 @@ export class Grammar
    * @param  array  $where
    * @return string
    */
-  // @ts-expect-error expected error; query is not used in this method
 
   /**
    * Compile a single union statement.
@@ -1317,7 +1313,6 @@ export class Grammar
     return conjunction + this.wrapUnion(union.query.toSql() ?? '')
   }
 
-  // @ts-expect-error expected error; query is not used in this method
 
   /**
    * Compile a union aggregate query into SQL.
@@ -1345,7 +1340,6 @@ export class Grammar
     )
   }
 
-  // @ts-expect-error expected error; query is not used in this method
 
   /**
    * Compile the "union" queries attached to the main query.
@@ -1388,7 +1382,6 @@ export class Grammar
    * @param  array  $where
    * @return string
    */
-  // @ts-expect-error expected error; query is not used in this method
 
   /**
    * Compile the columns for an update statement.
@@ -1417,7 +1410,6 @@ export class Grammar
    * @param  array  $where
    * @return string
    */
-  // @ts-expect-error expected error; query is not used in this method
 
   /**
    * Compile an update statement with joins into SQL.
@@ -1446,7 +1438,6 @@ export class Grammar
    * @param  array  $where
    * @return string
    */
-  // @ts-expect-error expected error; query is not used in this method
 
   /**
    * Compile an update statement without joins into SQL.
@@ -1475,7 +1466,6 @@ export class Grammar
    * @param  array  $where
    * @return string
    */
-  // @ts-expect-error expected error; query is not used in this method
 
   /**
    * Get an array of all the where clauses for the query.
@@ -1497,7 +1487,6 @@ export class Grammar
    * @param  array  $where
    * @return string
    */
-  // @ts-expect-error expected error; query is not used in this method
 
   /**
    * Concatenate an array of segments, removing empties.
@@ -1518,7 +1507,6 @@ export class Grammar
    * @param  array  $where
    * @return string
    */
-  // @ts-expect-error expected error; query is not used in this method
 
   /**
    * Concatenate the where clauses into a single string.
@@ -1540,7 +1528,6 @@ export class Grammar
    * @param  array  $where
    * @return string
    */
-  // @ts-expect-error expected error; query is not used in this method
 
   /**
    * Compile a date based where clause.
@@ -1577,7 +1564,6 @@ export class Grammar
    * @param  array  $where
    * @return string
    */
-  // @ts-expect-error expected error; query is not used in this method
 
   protected isExecutable (query: Builder, property: string): boolean {
     const subject = Reflect.get(query, property)
@@ -2066,7 +2052,6 @@ export class Grammar
    * @param  string  $table
    * @return string
    */
-  // @ts-expect-error expected error; query is not used in this method
 
   /**
    * Compile a "where year" clause.

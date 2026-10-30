@@ -65,10 +65,8 @@ export class PostgresDriver extends Driver {
  * @returns {PostgresStatement}
  * @throws {Error}
  */
-  public override prepare<
-    TRow extends Record<string, unknown> = Record<string, unknown>
-  >(query: string): Statement<TRow> {
-    return new PostgresStatement<TRow>(this.dsn, this.options, query, this)
+  public override prepare(query: string): Statement {
+    return new PostgresStatement(this.dsn, this.options, query, this)
   }
 
   protected async fetchServerVersion (): Promise<string> {

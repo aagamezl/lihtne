@@ -1,9 +1,10 @@
-import type { Connection, Prepare } from "mariadb";
+import type { Connection, Prepare } from 'mariadb'
 
-import type { DriverOptions } from "../Drivers/Driver";
-import { Statement } from "./Statement";
-import type { MariaDbDriver } from "../Drivers/MariaDbDriver";
-import type { BindingValues } from "../Query";
+import type { DriverOptions } from '../Drivers/Driver'
+import type { MariaDbDriver } from '../Drivers/MariaDbDriver'
+import type { BindingValues } from '../Query'
+
+import { Statement } from './Statement'
 
 // export class MariaDbStatement<
 //   TRow extends Record<string, unknown> = Record<string, unknown>
@@ -11,9 +12,9 @@ import type { BindingValues } from "../Query";
 export class MariaDbStatement extends Statement {
   protected override client!: Connection
 
-  protected override statement!: Prepare
-
   protected readonly driver: MariaDbDriver
+
+  protected override statement!: Prepare
 
   constructor (
     dsn: string,
@@ -24,18 +25,6 @@ export class MariaDbStatement extends Statement {
     super(dsn, options, query)
 
     this.driver = driver
-  }
-
-  public override async prepare (query: string): Promise<this> {
-    if (this.client === undefined) {
-      this.client = await this.driver.connect()
-    }
-
-    this.statement = await this.client.prepare(this.parameterize(query))
-
-    this.bindings = {}
-
-    return this
   }
 
   public override async execute (values?: BindingValues): Promise<unknown[]> {
@@ -72,12 +61,24 @@ export class MariaDbStatement extends Statement {
     return []
   }
 
-  public override fetchAll() {
+  public override fetchAll () {
     return this.result.rows
   }
 
   public override parameterize (query: string): string {
     return query
+  }
+
+  public override async prepare (query: string): Promise<this> {
+    if (this.client === undefined) {
+      this.client = await this.driver.connect()
+    }
+
+    this.statement = await this.client.prepare(this.parameterize(query))
+
+    this.bindings = {}
+
+    return this
   }
 
   public override rowCount (): number {

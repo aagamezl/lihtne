@@ -636,7 +636,6 @@ export class SqlServerGrammar extends Grammar {
    *
    * @throws \InvalidArgumentException
    */
-  // @ts-expect-error expected error; query is not used in this method
 
   /**
    * Compile a "where null safe equals" clause.

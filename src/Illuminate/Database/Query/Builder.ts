@@ -3645,7 +3645,6 @@ export class Builder extends mixing().useTrait([
     const bindings = this.cleanBindings([
       ...Arr.flatten(values, 1),
       ...(new Collection(update)
-      // @ts-expect-error - value is not used
 
         .reject(
           (value: string | Expression, key: PropertyKey) =>
