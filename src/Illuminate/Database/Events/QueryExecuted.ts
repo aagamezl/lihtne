@@ -3,25 +3,11 @@ import type { BindingValues } from '../Query'
 
 export class QueryExecuted {
   /**
-   * The SQL query that was executed.
-   *
-   * @var string
-   */
-  public sql: string
-
-  /**
    * The array of query bindings.
    *
    * @var array
    */
   public bindings: BindingValues
-
-  /**
-   * The number of milliseconds it took to execute the query.
-   *
-   * @var float
-   */
-  public time: number
 
   /**
    * The database connection instance.
@@ -36,6 +22,20 @@ export class QueryExecuted {
    * @var string
    */
   public connectionName: string
+
+  /**
+   * The SQL query that was executed.
+   *
+   * @var string
+   */
+  public sql: string
+
+  /**
+   * The number of milliseconds it took to execute the query.
+   *
+   * @var float
+   */
+  public time: number
 
   /**
    * Create a new event instance.

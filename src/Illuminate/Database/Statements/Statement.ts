@@ -1,30 +1,62 @@
-import { uuid } from '@devnetic/utils'
-
+import type { Driver, DriverOptions } from '../Drivers/Driver'
 import type { BindingValue, BindingValues } from '../Query'
 
-export type Result<
-  TRow extends Record<string, unknown> = Record<string, unknown>
-> = {
-  rows: TRow[]
+export type Result = {
+  rows: unknown[]
+  rowCount: number | undefined
 }
 
-export type PreparedStatement = {
-  name: string
-  text: string
-}
+// export type PreparedStatement = {
+//   name: string
+//   text: string
+//   values?: BindingValues
+// }
 
-export class Statement<
-  TRow extends Record<string, unknown> = Record<string, unknown>
-> {
+// export abstract class Statement<
+//   TRow extends Record<string, unknown> = Record<string, unknown>
+// > {
+export abstract class Statement {
   protected bindings: Record<string, BindingValue> = {}
 
-  protected statement?: PreparedStatement
+  protected abstract client: unknown
+
+  protected abstract readonly driver: Driver
+
+  protected dsn: string
+
+  protected options: DriverOptions
+
+  protected query: string
 
   /**
    * @protected
    * @type {any}
    */
-  protected result: Result<TRow> = { rows: [] }
+  protected result: Result = { rows: [], rowCount: 0 }
+
+  // protected statement!: PreparedStatement
+  protected abstract statement: unknown
+
+  /**
+   * Creates an instance of Statement.
+   * @param {string} dsn
+   * @param {Record<string, unknown>} options
+   * @param {string} query
+   * @memberof Statement
+   */
+  constructor (
+    dsn: string,
+    options: DriverOptions,
+    query: string
+    // driver: Driver
+  ) {
+    this.dsn = dsn
+    this.options = options
+    this.query = query
+    // this.driver = driver
+
+    // this.prepare(query)
+  }
 
   /**
    *
@@ -42,44 +74,24 @@ export class Statement<
     }
   }
 
-  prepare (query: string): this {
-    this.statement = {
-      // give the query a unique name
-      name: `prepared-statement-${uuid()}`,
-      text: this.parameterize(query)
-    }
+  /**
+   * Executes the statement and returns the result.
+   * @param values {BindingValues}
+   * @returns {Promise<unknown[]>}
+   */
+  public abstract execute (values?: BindingValues): Promise<unknown[]>
 
-    this.bindings = {}
+  public abstract fetchAll (): unknown[]
 
-    return this
-  }
+  public abstract parameterize (query: string): string
 
-  parameterize (query: string): string {
-    const regex = /\?/gm
+  /**
+   * Prepares a statement for execution and returns a statement object
+   *
+   * @param {string} query
+   * @returns {Promise<Statement>}
+   */
+  public abstract prepare (query: string): Promise<this>
 
-    if (query.match(regex) === null) {
-      return query
-    }
-
-    let index = 0
-    return query.replace(regex, () => `$${++index}`)
-  }
-
-  // @ts-expect-error expected error; params is not used in this method
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base execute signature
-  public async execute (params?: BindingValues): Promise<boolean> {
-    throw new Error(
-      `RuntimeException: Implement execute method on concrete class.`
-    )
-  }
-
-  public fetchAll (): TRow[] {
-    return this.result.rows
-  }
-
-  public rowCount (): number {
-    throw new Error(
-      `RuntimeException: Implement rowCount method on concrete class.`
-    )
-  }
+  public abstract rowCount (): number
 }

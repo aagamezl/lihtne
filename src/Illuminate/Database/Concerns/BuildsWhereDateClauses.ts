@@ -9,9 +9,9 @@ import type { Expression } from '../Query/Expression'
 import { Arr } from '../../Collections/Arr'
 
 export class BuildsWhereDateClauses {
-  declare wheres: WhereClause[]
-
   declare addBinding: (value: unknown, type?: keyof Bindings) => this
+
+  declare wheres: WhereClause[]
 
   declare protected addDateBasedWhere: (
     type: WhereClauseType,
@@ -22,13 +22,23 @@ export class BuildsWhereDateClauses {
   ) => this
 
   /**
-   * Add a where clause to determine if a "date" column is in the past to the query.
+   * Add an "or where date" clause to determine if a "date" column is after today.
    *
    * @param  array|string  $columns
    * @return $this
    */
-  public wherePast (columns: Array<string | Expression>) {
-    return this.wherePastOrFuture(columns, '<', 'and')
+  public orWhereAfterToday (columns: string | Array<string | Expression>) {
+    return this.whereTodayBeforeOrAfter(columns, '>', 'or')
+  }
+
+  /**
+   * Add an "or where date" clause to determine if a "date" column is before today.
+   *
+   * @param  array|string  $columns
+   * @return $this
+   */
+  public orWhereBeforeToday (columns: Array<string | Expression>) {
+    return this.whereTodayBeforeOrAfter(columns, '<', 'or')
   }
 
   /**
@@ -49,6 +59,150 @@ export class BuildsWhereDateClauses {
    */
   public orWhereNowOrFuture (columns: Array<string | Expression>) {
     return this.wherePastOrFuture(columns, '>=', 'or')
+  }
+
+  /**
+   * Add a where clause to determine if a "date" column is in the past or now to the query.
+   *
+   * @param  array|string  $columns
+   * @return $this
+   */
+  public orWhereNowOrPast (columns: Array<string | Expression>) {
+    return this.wherePastOrFuture(columns, '<=', 'or')
+  }
+
+  /**
+   * Add an "or where" clause to determine if a "date" column is in the past to the query.
+   *
+   * @param  array|string  $columns
+   * @return $this
+   */
+  public orWherePast (columns: Array<string | Expression>) {
+    return this.wherePastOrFuture(columns, '<', 'or')
+  }
+
+  /**
+   * Add an "or where date" clause to determine if a "date" column is today to the query.
+   *
+   * @param  array|string  $columns
+   * @return $this
+   */
+  public orWhereToday (columns: Array<string | Expression>) {
+    return this.whereToday(columns, 'or')
+  }
+
+  /**
+   * Add an "or where date" clause to determine if a "date" column is today or after to the query.
+   *
+   * @param  array|string  $columns
+   * @return $this
+   */
+  public orWhereTodayOrAfter (columns: string | Array<string | Expression>) {
+    return this.whereTodayBeforeOrAfter(columns, '>=', 'or')
+  }
+
+  /**
+   * Add an "or where date" clause to determine if a "date" column is today or before to the query.
+   *
+   * @param  array|string  $columns
+   * @return $this
+   */
+  public orWhereTodayOrBefore (columns: string | Array<string | Expression>) {
+    return this.whereTodayBeforeOrAfter(columns, '<=', 'or')
+  }
+
+  /**
+   * Add a "where date" clause to determine if a "date" column is after today.
+   *
+   * @param  array|string  $columns
+   * @return $this
+   */
+  public whereAfterToday (columns: Array<string | Expression>) {
+    return this.whereTodayBeforeOrAfter(columns, '>', 'and')
+  }
+
+  /**
+   * Add a "where date" clause to determine if a "date" column is before today.
+   *
+   * @param  array|string  $columns
+   * @return $this
+   */
+  public whereBeforeToday (columns: Array<string | Expression>) {
+    return this.whereTodayBeforeOrAfter(columns, '<', 'and')
+  }
+
+  /**
+   * Add a where clause to determine if a "date" column is in the future to the query.
+   *
+   * @param  array|string  $columns
+   * @return $this
+   */
+  public whereFuture (columns: Array<string | Expression>) {
+    return this.wherePastOrFuture(columns, '>', 'and')
+  }
+
+  /**
+   * Add a where clause to determine if a "date" column is in the future or now to the query.
+   *
+   * @param  array|string  $columns
+   * @return $this
+   */
+  public whereNowOrFuture (columns: Array<string | Expression>) {
+    return this.wherePastOrFuture(columns, '>=', 'and')
+  }
+
+  /**
+   * Add a where clause to determine if a "date" column is in the past or now to the query.
+   *
+   * @param  array|string  $columns
+   * @return $this
+   */
+  public whereNowOrPast (columns: Array<string | Expression>) {
+    return this.wherePastOrFuture(columns, '<=', 'and')
+  }
+
+  /**
+   * Add a where clause to determine if a "date" column is in the past to the query.
+   *
+   * @param  array|string  $columns
+   * @return $this
+   */
+  public wherePast (columns: Array<string | Expression>) {
+    return this.wherePastOrFuture(columns, '<', 'and')
+  }
+
+  /**
+   * Add a "where date" clause to determine if a "date" column is today to the query.
+   *
+   * @param  array|string  $columns
+   * @param  string  $boolean
+   * @return $this
+   */
+  public whereToday (
+    columns: Array<string | Expression>,
+    boolean: BooleanOperator = 'and'
+  ) {
+    return this.whereTodayBeforeOrAfter(columns, '=', boolean)
+  }
+
+  /**
+   * Add a "where date" clause to determine if a "date" column is today or after to the query.
+   *
+   * @param  array|string  $columns
+   * @return $this
+   */
+  public whereTodayOrAfter (columns: Array<string | Expression>) {
+    return this.whereTodayBeforeOrAfter(columns, '>=', 'and')
+  }
+
+  /**
+   * Add a "where date" clause to determine if a "date" column is today or before to the query.
+   *
+   * @param  array|string  $columns
+   * @return $this
+   */
+  public whereTodayOrBefore (columns: string | Array<string | Expression>) {
+    return this.whereTodayBeforeOrAfter(columns, '<=', 'and')
   }
 
   /**
@@ -73,160 +227,6 @@ export class BuildsWhereDateClauses {
     }
 
     return this
-  }
-
-  /**
-   * Add a where clause to determine if a "date" column is in the past or now to the query.
-   *
-   * @param  array|string  $columns
-   * @return $this
-   */
-  public whereNowOrPast (columns: Array<string | Expression>) {
-    return this.wherePastOrFuture(columns, '<=', 'and')
-  }
-
-  /**
-   * Add an "or where" clause to determine if a "date" column is in the past to the query.
-   *
-   * @param  array|string  $columns
-   * @return $this
-   */
-  public orWherePast (columns: Array<string | Expression>) {
-    return this.wherePastOrFuture(columns, '<', 'or')
-  }
-
-  /**
-   * Add a where clause to determine if a "date" column is in the past or now to the query.
-   *
-   * @param  array|string  $columns
-   * @return $this
-   */
-  public orWhereNowOrPast (columns: Array<string | Expression>) {
-    return this.wherePastOrFuture(columns, '<=', 'or')
-  }
-
-  /**
-   * Add a where clause to determine if a "date" column is in the future to the query.
-   *
-   * @param  array|string  $columns
-   * @return $this
-   */
-  public whereFuture (columns: Array<string | Expression>) {
-    return this.wherePastOrFuture(columns, '>', 'and')
-  }
-
-  /**
-   * Add a where clause to determine if a "date" column is in the future or now to the query.
-   *
-   * @param  array|string  $columns
-   * @return $this
-   */
-  public whereNowOrFuture (columns: Array<string | Expression>) {
-    return this.wherePastOrFuture(columns, '>=', 'and')
-  }
-
-  /**
-   * Add a "where date" clause to determine if a "date" column is today to the query.
-   *
-   * @param  array|string  $columns
-   * @param  string  $boolean
-   * @return $this
-   */
-  public whereToday (
-    columns: Array<string | Expression>,
-    boolean: BooleanOperator = 'and'
-  ) {
-    return this.whereTodayBeforeOrAfter(columns, '=', boolean)
-  }
-
-  /**
-   * Add a "where date" clause to determine if a "date" column is before today.
-   *
-   * @param  array|string  $columns
-   * @return $this
-   */
-  public whereBeforeToday (columns: Array<string | Expression>) {
-    return this.whereTodayBeforeOrAfter(columns, '<', 'and')
-  }
-
-  /**
-   * Add a "where date" clause to determine if a "date" column is today or before to the query.
-   *
-   * @param  array|string  $columns
-   * @return $this
-   */
-  public whereTodayOrBefore (columns: string | Array<string | Expression>) {
-    return this.whereTodayBeforeOrAfter(columns, '<=', 'and')
-  }
-
-  /**
-   * Add a "where date" clause to determine if a "date" column is after today.
-   *
-   * @param  array|string  $columns
-   * @return $this
-   */
-  public whereAfterToday (columns: Array<string | Expression>) {
-    return this.whereTodayBeforeOrAfter(columns, '>', 'and')
-  }
-
-  /**
-   * Add a "where date" clause to determine if a "date" column is today or after to the query.
-   *
-   * @param  array|string  $columns
-   * @return $this
-   */
-  public whereTodayOrAfter (columns: Array<string | Expression>) {
-    return this.whereTodayBeforeOrAfter(columns, '>=', 'and')
-  }
-
-  /**
-   * Add an "or where date" clause to determine if a "date" column is today to the query.
-   *
-   * @param  array|string  $columns
-   * @return $this
-   */
-  public orWhereToday (columns: Array<string | Expression>) {
-    return this.whereToday(columns, 'or')
-  }
-
-  /**
-   * Add an "or where date" clause to determine if a "date" column is before today.
-   *
-   * @param  array|string  $columns
-   * @return $this
-   */
-  public orWhereBeforeToday (columns: Array<string | Expression>) {
-    return this.whereTodayBeforeOrAfter(columns, '<', 'or')
-  }
-
-  /**
-   * Add an "or where date" clause to determine if a "date" column is today or before to the query.
-   *
-   * @param  array|string  $columns
-   * @return $this
-   */
-  public orWhereTodayOrBefore (columns: string | Array<string | Expression>) {
-    return this.whereTodayBeforeOrAfter(columns, '<=', 'or')
-  }
-
-  /**
-   * Add an "or where date" clause to determine if a "date" column is after today.
-   *
-   * @param  array|string  $columns
-   * @return $this
-   */
-  public orWhereAfterToday (columns: string | Array<string | Expression>) {
-    return this.whereTodayBeforeOrAfter(columns, '>', 'or')
-  }
-
-  /**
-   * Add an "or where date" clause to determine if a "date" column is today or after to the query.
-   *
-   * @param  array|string  $columns
-   * @return $this
-   */
-  public orWhereTodayOrAfter (columns: string | Array<string | Expression>) {
-    return this.whereTodayBeforeOrAfter(columns, '>=', 'or')
   }
 
   /**

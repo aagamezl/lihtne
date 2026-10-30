@@ -12,7 +12,7 @@ import {
   Paginator
 } from '../../Pagination'
 import { Str } from '../../Support/Str'
-import { Builder } from '../Query'
+import { Builder } from '../Query/Builder'
 import { SortDirection } from '../Query/Enums/SortDirection'
 import { Expression } from '../Query/Expression'
 
@@ -123,6 +123,47 @@ export class BuildsQueries extends Conditionable {
   }
 
   /**
+   * Execute the query and get the first result.
+   *
+   * @param  array|string  $columns
+   * @return TValue|undefined
+   */
+  public async first (
+    columns: Array<string> = ['*']
+  ): Promise<unknown | undefined> {
+    // @ts-expect-error -- limit and get are implemented by the builder
+    const results = await this.limit(1).get(columns)
+
+    return results.first()
+  }
+
+  /**
+   * Execute the query and get the first result or throw an exception.
+   *
+   * @param  array|string  $columns
+   * @param  string|null  $message
+   * @return TValue
+   *
+   * @throws \Illuminate\Database\RecordNotFoundException
+   */
+  public async firstOrFail (
+    $columns = ['*'],
+    message: string | undefined = undefined
+  ): Promise<unknown> {
+    const result = await this.first($columns)
+
+    if (result !== undefined) {
+      return result
+    }
+
+    const errorMessage = message
+      ? `RecordNotFoundException: ${message}`
+      : 'RecordNotFoundException: No record found for the given query.'
+
+    throw new Error(errorMessage)
+  }
+
+  /**
    * Chunk the results of a query by comparing IDs in a given order.
    *
    * @param  int  $count
@@ -218,18 +259,6 @@ export class BuildsQueries extends Conditionable {
   }
 
   /**
-   * Pass the query to a given callback and then return it.
-   *
-   * @param  callable($this): mixed  $callback
-   * @return $this
-   */
-  public tap (callback: (query: this) => void): this {
-    callback(this)
-
-    return this
-  }
-
-  /**
    * Pass the query to a given callback and return the result.
    *
    * @template TReturn
@@ -242,54 +271,65 @@ export class BuildsQueries extends Conditionable {
   }
 
   /**
-   * Execute the query and get the first result.
+   * Pass the query to a given callback and then return it.
    *
-   * @param  array|string  $columns
-   * @return TValue|undefined
+   * @param  callable($this): mixed  $callback
+   * @return $this
    */
-  public async first (
-    columns: Array<string> = ['*']
-  ): Promise<unknown | undefined> {
-    // @ts-expect-error -- limit and get are implemented by the builder
-    const results = await this.limit(1).get(columns)
+  public tap (callback: (query: this) => void): this {
+    callback(this)
 
-    return results.first()
+    return this
+  }
+
+  protected cursorPaginator (
+    items: Collection<PropertyKey, unknown>,
+    perPage: number,
+    cursor: Cursor,
+    options: {
+      path?: string
+      cursorName?: string
+      parameters?: string[]
+    }
+  ): CursorPaginator {
+    return new CursorPaginator(items, perPage, cursor, options)
   }
 
   /**
-   * Execute the query and get the first result or throw an exception.
+   * Get the original column name of the given column, without any aliasing.
    *
-   * @param  array|string  $columns
-   * @param  string|null  $message
-   * @return TValue
-   *
-   * @throws \Illuminate\Database\RecordNotFoundException
+   * @param  \Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder<*>  $builder
+   * @param  string  $parameter
+   * @return string
    */
-  public async firstOrFail (
-    $columns = ['*'],
-    message: string | undefined = undefined
-  ): Promise<unknown> {
-    const result = await this.first($columns)
+  protected getOriginalColumnNameForCursorPagination (
+    builder: Builder | EloquentBuilder,
+    parameter: string
+  ): string {
+    const columns =
+      builder instanceof Builder
+        ? builder.getQuery().getColumns()
+        : builder.getColumns()
 
-    if (result !== undefined) {
-      return result
+    if (columns !== undefined) {
+      for (const column of columns) {
+        const position = column.lastIndexOf(' as ')
+        if (position !== -1) {
+          const original = column.slice(0, position)
+
+          const alias = column.slice(position + 4)
+
+          if (
+            parameter === alias ||
+            builder.getGrammar().wrap(parameter) === alias
+          ) {
+            return original
+          }
+        }
+      }
     }
 
-    const errorMessage = message
-      ? `RecordNotFoundException: ${message}`
-      : 'RecordNotFoundException: No record found for the given query.'
-
-    throw new Error(errorMessage)
-  }
-
-  protected paginator<TValue> (
-    items: Collection<PropertyKey, TValue>,
-    total: number,
-    perPage: number,
-    currentPage: number,
-    options: { path?: string; pageName?: string }
-  ): LengthAwarePaginator<PropertyKey, TValue> {
-    return new LengthAwarePaginator(items, total, perPage, currentPage, options)
+    return parameter
   }
 
   protected async paginateUsingCursor (
@@ -446,53 +486,13 @@ export class BuildsQueries extends Conditionable {
     })
   }
 
-  protected cursorPaginator (
-    items: Collection<PropertyKey, unknown>,
+  protected paginator<TValue> (
+    items: Collection<PropertyKey, TValue>,
+    total: number,
     perPage: number,
-    cursor: Cursor,
-    options: {
-      path?: string
-      cursorName?: string
-      parameters?: string[]
-    }
-  ): CursorPaginator {
-    return new CursorPaginator(items, perPage, cursor, options)
-  }
-
-  /**
-   * Get the original column name of the given column, without any aliasing.
-   *
-   * @param  \Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder<*>  $builder
-   * @param  string  $parameter
-   * @return string
-   */
-  protected getOriginalColumnNameForCursorPagination (
-    builder: Builder | EloquentBuilder,
-    parameter: string
-  ): string {
-    const columns =
-      builder instanceof Builder
-        ? builder.getQuery().getColumns()
-        : builder.getColumns()
-
-    if (columns !== undefined) {
-      for (const column of columns) {
-        const position = column.lastIndexOf(' as ')
-        if (position !== -1) {
-          const original = column.slice(0, position)
-
-          const alias = column.slice(position + 4)
-
-          if (
-            parameter === alias ||
-            builder.getGrammar().wrap(parameter) === alias
-          ) {
-            return original
-          }
-        }
-      }
-    }
-
-    return parameter
+    currentPage: number,
+    options: { path?: string; pageName?: string }
+  ): LengthAwarePaginator<PropertyKey, TValue> {
+    return new LengthAwarePaginator(items, total, perPage, currentPage, options)
   }
 }

@@ -5,13 +5,17 @@ export type DriverOptions = Record<string, unknown>
 export type DriverType = 'mysql' | 'mariadb' | 'pgsql' | 'sqlsrv' | 'sqlite'
 
 export class Driver {
+  static ATTR_SERVER_VERSION: number = 4
+
+  protected client: unknown | undefined
+
+  protected driverTitle?: DriverType
+
   protected dsn: string
 
   protected options: DriverOptions = {}
 
-  protected driverTitle?: DriverType
-
-  static FETCH_OBJ: number = 5
+  protected serverVersion?: string
 
   /**
    * Creates an instance of Statement.
@@ -24,8 +28,23 @@ export class Driver {
     this.options = options
   }
 
-  public getDriverTitle (): DriverType | undefined {
-    return this.driverTitle
+  /**
+   * Open a session with the database client.
+   *
+   * Concrete drivers call the client library's own method (`Client.connect`,
+   * `mysql.createConnection`, and so on) and return that client.
+   */
+  public async connect (): Promise<unknown> {
+    throw new Error(`RuntimeException: Implement 'connect' method on concrete class.`)
+  }
+
+  /**
+   * Close the session opened by connect().
+   *
+   * Concrete drivers call the client library's own method (`end`, and so on).
+   */
+  public async disconnect (): Promise<void> {
+    throw new Error(`RuntimeException: Implement 'disconnect' method on concrete class.`)
   }
 
   /**
@@ -35,24 +54,18 @@ export class Driver {
    */
   // @ts-expect-error expected error; attribute is not used in this method
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base getAttribute signature
-  public getAttribute (attribute: string | number): unknown {
+  public async getAttribute (attribute: string | number): Promise<string> {
     throw new Error(
       `RuntimeException: Implement 'getAttribute' method on concrete class.`
     )
   }
 
-  /**
-   * Prepares a statement for execution and returns a statement object
-   * @param {string} query
-   * @returns {Statement}
-   * @throws {Error}
-   */
-  public prepare<
-    TRow extends Record<string, unknown> = Record<string, unknown>
-  > (query: string): Statement<TRow> {
-    throw new Error(
-      `RuntimeException: Implement 'prepare' method on concrete class for query: ${query}`
-    )
+  public getDriverTitle (): DriverType | undefined {
+    return this.driverTitle
+  }
+
+  public isConnected (): boolean {
+    return this.client !== undefined
   }
 
   /**
@@ -64,9 +77,28 @@ export class Driver {
     // @ts-expect-error expected error; sequence is not used in this method
     // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base lastInsertId signature
     sequence: string | undefined = undefined
-  ): string | number {
+  ): string | number | Promise<string | number> {
     throw new Error(
       `RuntimeException: Implement 'lastInsertId' method on concrete class`
+    )
+  }
+
+  /**
+   * Prepares a statement for execution and returns a statement object
+   * @param {string} query
+   * @returns {Statement}
+   * @throws {Error}
+   */
+  // public prepare<
+  //   TRow extends Record<string, unknown> = Record<string, unknown>
+  // > (query: string): Statement<TRow> {
+  //   throw new Error(
+  //     `RuntimeException: Implement 'prepare' method on concrete class for query: ${query}`
+  //   )
+  // }
+  public prepare (query: string): Statement {
+    throw new Error(
+      `RuntimeException: Implement 'prepare' method on concrete class for query: ${query}`
     )
   }
 }

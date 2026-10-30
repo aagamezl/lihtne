@@ -22,46 +22,11 @@ export abstract class AbstractPaginator<
   protected static currentPathResolverCallback: () => string
 
   /**
-   * All of the items being paginated.
-   *
-   * @var \Illuminate\Support\Collection<TKey, TValue>
-   */
-  protected items!: Collection<TKey, TValue>
-
-  /**
-   * The number of items to be shown per page.
-   *
-   * @var int
-   */
-  protected perPage: number | undefined
-
-  /**
-   * The paginator options.
-   *
-   * @var array
-   */
-  protected options: Record<string, unknown> = {}
-
-  /**
    * The current page being "viewed".
    *
    * @var int
    */
   protected currentPage: number | undefined
-
-  /**
-   * The base path to assign to all URLs.
-   *
-   * @var string
-   */
-  protected path = '/'
-
-  /**
-   * The query parameters to add to all URLs.
-   *
-   * @var array
-   */
-  protected query = []
 
   /**
    * The URL fragment to add to all URLs.
@@ -71,11 +36,62 @@ export abstract class AbstractPaginator<
   protected fragment: string | undefined
 
   /**
+   * All of the items being paginated.
+   *
+   * @var \Illuminate\Support\Collection<TKey, TValue>
+   */
+  protected items!: Collection<TKey, TValue>
+
+  /**
+   * The paginator options.
+   *
+   * @var array
+   */
+  protected options: Record<string, unknown> = {}
+
+  /**
    * The query string variable used to store the page.
    *
    * @var string
    */
   protected pageName = 'page'
+
+  /**
+   * The base path to assign to all URLs.
+   *
+   * @var string
+   */
+  protected path = '/'
+
+  /**
+   * The number of items to be shown per page.
+   *
+   * @var int
+   */
+  protected perPage: number | undefined
+
+  /**
+   * The query parameters to add to all URLs.
+   *
+   * @var array
+   */
+  protected query = []
+
+  public static currentPageResolver (
+    resolver: (pageName: string) => number
+  ): void {
+    this.currentPageResolverCallback = resolver
+  }
+
+  /**
+   * Set the current request path resolver callback.
+   *
+   * @param  \Closure  $resolver
+   * @return void
+   */
+  public static currentPathResolver (resolver: () => string): void {
+    this.currentPathResolverCallback = resolver
+  }
 
   public static resolveCurrentPage (
     pageName: string = 'page',
@@ -88,28 +104,12 @@ export abstract class AbstractPaginator<
     return defaultPage
   }
 
-  public static currentPageResolver (
-    resolver: (pageName: string) => number
-  ): void {
-    this.currentPageResolverCallback = resolver
-  }
-
   public static resolveCurrentPath (defaultPath: string = '/'): string {
     if (this.currentPathResolverCallback) {
       return this.currentPathResolverCallback()
     }
 
     return defaultPath
-  }
-
-  /**
-   * Set the current request path resolver callback.
-   *
-   * @param  \Closure  $resolver
-   * @return void
-   */
-  public static currentPathResolver (resolver: () => string): void {
-    this.currentPathResolverCallback = resolver
   }
 
   /**

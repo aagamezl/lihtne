@@ -40,15 +40,15 @@ export interface DateIntervalParts {
  * (e.g. "P1Y2M3DT4H5M6S") or from an object of component parts.
  */
 export class DateInterval {
-  y: number
-  m: number
   d: number
+  days: number | false
+  f: number
   h: number
   i: number
-  s: number
-  f: number
   invert: 0 | 1
-  days: number | false
+  m: number
+  s: number
+  y: number
 
   constructor (spec: string | DateIntervalParts = {}) {
     const parts = typeof spec === 'string' ? DateInterval.parseSpec(spec) : spec
@@ -62,36 +62,6 @@ export class DateInterval {
     this.f = 0
     this.invert = parts.invert ?? INVERT_FUTURE
     this.days = UNKNOWN_DAYS
-  }
-
-  private static parseSpec (spec: string): DateIntervalParts {
-    const match = ISO8601_DURATION_PATTERN.exec(spec)
-
-    if (match === null) {
-      throw new Error(`DateInterval: Unknown or bad format (${spec})`)
-    }
-
-    const [, years, months, days, hours, minutes, seconds] = match
-
-    if (
-      years === undefined &&
-      months === undefined &&
-      days === undefined &&
-      hours === undefined &&
-      minutes === undefined &&
-      seconds === undefined
-    ) {
-      throw new Error(`DateInterval: Unknown or bad format (${spec})`)
-    }
-
-    return {
-      years: years === undefined ? 0 : parseInt(years, 10),
-      months: months === undefined ? 0 : parseInt(months, 10),
-      days: days === undefined ? 0 : parseInt(days, 10),
-      hours: hours === undefined ? 0 : parseInt(hours, 10),
-      minutes: minutes === undefined ? 0 : parseInt(minutes, 10),
-      seconds: seconds === undefined ? 0 : parseInt(seconds, 10)
-    }
   }
 
   /**
@@ -167,6 +137,84 @@ export class DateInterval {
     interval.s += value
   }
 
+  private static parseSpec (spec: string): DateIntervalParts {
+    const match = ISO8601_DURATION_PATTERN.exec(spec)
+
+    if (match === null) {
+      throw new Error(`DateInterval: Unknown or bad format (${spec})`)
+    }
+
+    const [, years, months, days, hours, minutes, seconds] = match
+
+    if (
+      years === undefined &&
+      months === undefined &&
+      days === undefined &&
+      hours === undefined &&
+      minutes === undefined &&
+      seconds === undefined
+    ) {
+      throw new Error(`DateInterval: Unknown or bad format (${spec})`)
+    }
+
+    return {
+      years: years === undefined ? 0 : parseInt(years, 10),
+      months: months === undefined ? 0 : parseInt(months, 10),
+      days: days === undefined ? 0 : parseInt(days, 10),
+      hours: hours === undefined ? 0 : parseInt(hours, 10),
+      minutes: minutes === undefined ? 0 : parseInt(minutes, 10),
+      seconds: seconds === undefined ? 0 : parseInt(seconds, 10)
+    }
+  }
+
+  /**
+   * Returns a new Date advanced by this interval.
+   * Mirrors PHP's DateTime::add().
+   */
+  addTo (date: Date): Date {
+    const sign = this.invert === INVERT_PAST ? -1 : 1
+    const result = new Date(date.getTime())
+    const totalMonths = this.y * MONTHS_PER_YEAR + this.m
+
+    if (totalMonths !== 0) {
+      result.setMonth(result.getMonth() + sign * totalMonths)
+    }
+
+    if (this.d !== 0) {
+      result.setDate(result.getDate() + sign * this.d)
+    }
+
+    if (this.h !== 0) {
+      result.setHours(result.getHours() + sign * this.h)
+    }
+
+    if (this.i !== 0) {
+      result.setMinutes(result.getMinutes() + sign * this.i)
+    }
+
+    if (this.s !== 0) {
+      result.setSeconds(result.getSeconds() + sign * this.s)
+    }
+
+    return result
+  }
+
+  clone (): DateInterval {
+    const copy = new DateInterval({
+      years: this.y,
+      months: this.m,
+      days: this.d,
+      hours: this.h,
+      minutes: this.i,
+      seconds: this.s,
+      invert: this.invert
+    })
+
+    copy.days = this.days
+
+    return copy
+  }
+
   /**
    * Mirrors DateInterval::format(). Supported specifiers:
    * %Y %y %M %m %D %d %a %H %h %I %i %S %s %R %r %%
@@ -217,53 +265,5 @@ export class DateInterval {
       this.s
 
     return this.invert === INVERT_PAST ? -totalSeconds : totalSeconds
-  }
-
-  /**
-   * Returns a new Date advanced by this interval.
-   * Mirrors PHP's DateTime::add().
-   */
-  addTo (date: Date): Date {
-    const sign = this.invert === INVERT_PAST ? -1 : 1
-    const result = new Date(date.getTime())
-    const totalMonths = this.y * MONTHS_PER_YEAR + this.m
-
-    if (totalMonths !== 0) {
-      result.setMonth(result.getMonth() + sign * totalMonths)
-    }
-
-    if (this.d !== 0) {
-      result.setDate(result.getDate() + sign * this.d)
-    }
-
-    if (this.h !== 0) {
-      result.setHours(result.getHours() + sign * this.h)
-    }
-
-    if (this.i !== 0) {
-      result.setMinutes(result.getMinutes() + sign * this.i)
-    }
-
-    if (this.s !== 0) {
-      result.setSeconds(result.getSeconds() + sign * this.s)
-    }
-
-    return result
-  }
-
-  clone (): DateInterval {
-    const copy = new DateInterval({
-      years: this.y,
-      months: this.m,
-      days: this.d,
-      hours: this.h,
-      minutes: this.i,
-      seconds: this.s,
-      invert: this.invert
-    })
-
-    copy.days = this.days
-
-    return copy
   }
 }

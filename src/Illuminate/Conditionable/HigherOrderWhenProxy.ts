@@ -2,13 +2,6 @@ import { instanceProxy } from '../Support'
 
 export class HigherOrderWhenProxy<TTarget> {
   /**
-   * The target being conditionally operated on.
-   *
-   * @var mixed
-   */
-  protected target: TTarget
-
-  /**
    * The condition for proxying.
    *
    * @var bool
@@ -29,27 +22,17 @@ export class HigherOrderWhenProxy<TTarget> {
    */
   protected negateConditionOnCaptureProperty: boolean = false
 
+  /**
+   * The target being conditionally operated on.
+   *
+   * @var mixed
+   */
+  protected target: TTarget
+
   public constructor (target: TTarget) {
     this.target = target
 
     return instanceProxy(this)
-  }
-
-  public condition (value: boolean): this {
-    ;[this.conditionProperty, this.hasCondition] = [value, true]
-
-    return this
-  }
-
-  /**
-   * Indicate that the condition should be negated.
-   *
-   * @return $this
-   */
-  public negateConditionOnCapture (): this {
-    this.negateConditionOnCaptureProperty = true
-
-    return this
   }
 
   /**
@@ -85,5 +68,22 @@ export class HigherOrderWhenProxy<TTarget> {
     }
 
     return this.conditionProperty ? callTarget(this.target) : this.target
+  }
+
+  public condition (value: boolean): this {
+    ;[this.conditionProperty, this.hasCondition] = [value, true]
+
+    return this
+  }
+
+  /**
+   * Indicate that the condition should be negated.
+   *
+   * @return $this
+   */
+  public negateConditionOnCapture (): this {
+    this.negateConditionOnCaptureProperty = true
+
+    return this
   }
 }

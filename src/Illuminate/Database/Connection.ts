@@ -1,16 +1,17 @@
 import { dateFormat } from '@devnetic/utils'
 import { isNil } from 'es-toolkit'
 
+import type { DatabaseConfig } from '../Config/types'
 import type { Dispatcher } from '../Contracts'
-import type { Driver } from './Drivers/Driver'
-import type { Grammar } from './Grammar'
 import type { BindingValue, BindingValues } from './Query/Builder'
 import type { Grammar as SchemaGrammar } from './Schema/Grammars'
 import type { Statement } from './Statements'
 
 import { Arr } from '../Collections'
 import { DetectsLostConnections } from './DetectsLostConnections'
+import { Driver } from './Drivers/Driver'
 import { QueryExecuted, StatementPrepared } from './Events'
+import { Builder as QueryBuilder } from './Query/Builder'
 import { Expression } from './Query/Expression'
 import { Grammar as QueryGrammar } from './Query/Grammars/Grammar'
 import { Processor } from './Query/Processors/Processor'
@@ -25,7 +26,15 @@ export type QueryLogEntry = {
 
 export type ConnectionConfig = Record<string, unknown>
 export type Reconnector = (connection: Connection) => unknown
-export type DriverResolver = () => Driver
+// A lazy driver. `getDriver()` calls it with no arguments.
+export type DriverResolver = () => Driver | Promise<Driver>
+// A custom connection builder registered for a driver name.
+export type ConnectionResolver = (
+  connection: Driver | DriverResolver,
+  database: string,
+  tablePrefix: string,
+  config: DatabaseConfig
+) => Connection
 export type BeforeExecutingCallback = (
   query: string,
   bindings: BindingValues,
@@ -37,14 +46,74 @@ export type QueryCallback<TValue> = (
 ) => TValue | Promise<TValue>
 
 export class Connection extends DetectsLostConnections {
-  // The query grammar implementation.
-  protected queryGrammar: QueryGrammar | undefined = undefined
+  /**
+   * The connection resolvers.
+   *
+   * @var \Closure[]
+   */
+  protected static resolvers: Record<string, ConnectionResolver> = {}
+
+  /**
+   * The active driver connection.
+   *
+   * @protected
+   * @type {Driver}
+   */
+  driver!: Driver | DriverResolver | Promise<Driver>
+
+  /**
+   * All of the callbacks that should be invoked before a query is executed.
+   *
+   * @var (\Closure(string, array, \Illuminate\Database\Connection): mixed)[]
+   */
+  protected beforeExecutingCallbacks: BeforeExecutingCallback[] = []
+
+  // The database connection configuration options.
+  protected config: DatabaseConfig
 
   // The name of the connected database.
   protected database: string
 
+  /**
+   * The event dispatcher instance.
+   *
+   * @var \Illuminate\Contracts\Events\Dispatcher|null
+   */
+  protected events: Dispatcher | null = null
+
+  /**
+   * Indicates whether queries are being logged.
+   *
+   * @var bool
+   */
+  protected loggingQueries = false
+
   // The query post processor implementation.
-  protected postProcessor: Processor | undefined = undefined
+  protected postProcessor!: Processor
+
+  /**
+   * Indicates if the connection is in a "dry run".
+   *
+   * @var bool
+   */
+  protected pretendingProperty = false
+
+  // The query grammar implementation.
+  protected queryGrammar: QueryGrammar | undefined = undefined
+
+  /**
+   * All of the queries run against the connection.
+   *
+   * @var QueryLogEntry[]
+   */
+  protected queryLog: QueryLogEntry[] = []
+
+  /**
+   * The reconnector instance for the connection.
+   *
+   * @var (callable(\Illuminate\Database\Connection): mixed)
+   */
+  protected reconnector!: Reconnector
 
   /**
    * Indicates if changes have been made to the database.
@@ -60,47 +129,8 @@ export class Connection extends DetectsLostConnections {
    */
   protected schemaGrammar!: SchemaGrammar
 
-  /**
-   * The active driver connection.
-   *
-   * @protected
-   * @type {Driver}
-   */
-  driver: Driver | DriverResolver
-
   // The table prefix for the connection.
   protected tablePrefix = ''
-
-  // The database connection configuration options.
-  protected config: ConnectionConfig = {}
-
-  /**
-   * Indicates if the connection is in a "dry run".
-   *
-   * @var bool
-   */
-  protected pretendingProperty = false
-
-  /**
-   * The event dispatcher instance.
-   *
-   * @var \Illuminate\Contracts\Events\Dispatcher|null
-   */
-  protected events: Dispatcher | null = null
-
-  /**
-   * All of the callbacks that should be invoked before a query is executed.
-   *
-   * @var (\Closure(string, array, \Illuminate\Database\Connection): mixed)[]
-   */
-  protected beforeExecutingCallbacks: BeforeExecutingCallback[] = []
-
-  /**
-   * The number of active transactions.
-   *
-   * @var number
-   */
-  protected transactions = 0
 
   /**
    * The duration of all executed queries in milliseconds.
@@ -110,25 +140,11 @@ export class Connection extends DetectsLostConnections {
   protected totalQueryDurationProperty = 0.0
 
   /**
-   * The reconnector instance for the connection.
+   * The number of active transactions.
    *
-   * @var (callable(\Illuminate\Database\Connection): mixed)
+   * @var number
    */
-  protected reconnector: Reconnector = () => {}
-
-  /**
-   * Indicates whether queries are being logged.
-   *
-   * @var bool
-   */
-  protected loggingQueries = false
-
-  /**
-   * All of the queries run against the connection.
-   *
-   * @var QueryLogEntry[]
-   */
-  protected queryLog: QueryLogEntry[] = []
+  protected transactions = 0
 
   /**
    * Create a new database connection instance.
@@ -139,10 +155,10 @@ export class Connection extends DetectsLostConnections {
    * @param  array  $config
    */
   constructor (
-    driver: Driver,
+    driver: Driver | DriverResolver,
     database: string = '',
     tablePrefix: string = '',
-    config: ConnectionConfig = {}
+    config: DatabaseConfig
   ) {
     super()
 
@@ -163,6 +179,91 @@ export class Connection extends DetectsLostConnections {
     this.useDefaultQueryGrammar()
 
     this.useDefaultPostProcessor()
+  }
+
+  /**
+   * Get the connection resolver for the given driver.
+   *
+   * @param  string  $driver
+   * @return \Closure|undefined
+   */
+  public static getResolver (driver: string): ConnectionResolver | undefined {
+    return this.resolvers[driver] ?? undefined
+  }
+
+  /**
+   * Run an SQL statement and get the number of rows affected.
+   *
+   * @param  string  $query
+   * @param  array  $bindings
+   * @return int
+   */
+  public affectingStatement (
+    query: string,
+    bindings: BindingValues = []
+  ): Promise<number> {
+    return this.run<number>(query, bindings, async (
+      query: string,
+      bindings: BindingValues
+    ): Promise<number> => {
+      if (this.pretending()) {
+        return 0
+      }
+
+      // For update or delete statements, we want to get the number of rows affected
+      // by the statement and return that back to the developer. We'll first need
+      // to execute the statement and then we'll use PDO to fetch the affected.
+      // const statement = this.getDriver().prepare(query)
+      const statement = this.prepared(
+        (await this.getDriver()).prepare(query)
+      )
+
+      this.bindValues(statement, this.prepareBindings(bindings))
+
+      await statement.execute()
+
+      const count = statement.rowCount()
+
+      this.recordsHaveBeenModified(count > 0)
+
+      return count
+    })
+  }
+
+  /**
+   * Bind values to their parameters in the given statement.
+   *
+   * @param  \PDOStatement  $statement
+   * @param  array  bindings
+   * @return void
+   */
+  public bindValues<TRow extends Record<string, unknown>>(
+    statement: Statement<TRow>,
+    bindings: BindingValues
+  ) {
+    for (const [key, value] of Object.entries(bindings)) {
+      statement.bindValue(
+        typeof key === 'string' ? key : Number(key) + 1,
+        value
+      )
+    }
+  }
+
+  /**
+   * Run a delete statement against the database.
+   *
+   * @param  string  $query
+   * @param  array  $bindings
+   * @return int
+   */
+  public delete (query: string, bindings: BindingValues = []): Promise<number> {
+    return this.affectingStatement(query, bindings)
+  }
+
+  public async disconnect (): Promise<void> {
+    const driver = await this.getDriver()
+
+    await driver.disconnect()
   }
 
   /**
@@ -208,25 +309,143 @@ export class Connection extends DetectsLostConnections {
   }
 
   /**
-   * Get a new raw query expression.
+   * Get an option from the configuration options.
    *
-   * @param  literal-string|int|float  $value
-   * @return \Illuminate\Contracts\Database\Query\Expression
+   * @param  [string]  option
+   * @return unknown
    */
-  public raw (value: string | number): Expression {
-    return new Expression(value)
+  public getConfig<TValue>(option?: string): TValue | undefined {
+    return Arr.get<TValue>(this.config, option)
   }
 
   /**
-   * Indicate if any records have been modified.
+   * Get the name of the connected database.
    *
-   * @param  bool  $value
-   * @return void
+   * @return string
    */
-  public recordsHaveBeenModified (value: boolean = true) {
-    if (!this.recordsModified) {
-      this.recordsModified = value
+  public getDatabaseName () {
+    return this.database
+  }
+
+  /**
+   * Get the current Driver connection.
+   *
+   * @return {Driver}
+   */
+  public async getDriver (): Promise<Driver> {
+    if (typeof this.driver === 'function') {
+      this.driver = this.driver()
     }
+
+    if (this.driver instanceof Promise) {
+      this.driver = await this.driver
+    }
+
+    return this.driver
+  }
+
+  /**
+   * Get the PDO driver name.
+   *
+   * @return string
+   */
+  public getDriverName (): string {
+    const driver = this.getConfig('driver')
+
+    return typeof driver === 'string' ? driver : ''
+  }
+
+  /**
+   * Get a human-readable name for the given connection driver.
+   *
+   * @return string
+   */
+  public async getDriverTitle (): Promise<string> {
+    return this.getDriverName()
+  }
+
+  /**
+   * Get the database connection name.
+   *
+   * @return string|null
+   */
+  public getName (): string {
+    const name = this.getConfig('name')
+
+    return typeof name === 'string' ? name : ''
+  }
+
+  /**
+   * Get the query post processor used by the connection.
+   *
+   * @return \Illuminate\Database\Query\Processors\Processor
+   */
+  public getPostProcessor (): Processor {
+    return this.postProcessor
+  }
+
+  /**
+   * Get the query grammar used by the connection.
+   *
+   * @return \Illuminate\Database\Query\Grammars\Grammar
+   */
+  public getQueryGrammar (): QueryGrammar {
+    if (this.queryGrammar === undefined) {
+      throw new Error('Query grammar has not been set.')
+    }
+
+    return this.queryGrammar
+  }
+
+  /**
+   * Get a schema builder instance for the connection.
+   *
+   * @return \Illuminate\Database\Schema\Builder
+   */
+  public getSchemaBuilder (): SchemaBuilder {
+    if (this.schemaGrammar === undefined) {
+      this.useDefaultSchemaGrammar()
+    }
+
+    return new SchemaBuilder(this)
+  }
+
+  /**
+   * Get the schema grammar used by the connection.
+   *
+   * @return \Illuminate\Database\Schema\Grammars\Grammar
+   */
+  public getSchemaGrammar (): SchemaGrammar {
+    return this.schemaGrammar
+  }
+
+  /**
+   * Get the server version for the connection.
+   *
+   * @return string
+   */
+  public async getServerVersion (): Promise<string> {
+    const driver = await this.getDriver()
+
+    return String(await driver.getAttribute(Driver.ATTR_SERVER_VERSION))
+  }
+
+  /**
+   * Escape a binary value for safe SQL embedding.
+   *
+   * @param  string  $value
+   * @return string
+   *
+   * @throws \RuntimeException
+   */
+
+  /**
+   * Get the table prefix for the connection.
+   *
+   * @return string
+   */
+  public getTablePrefix (): string {
+    return this.tablePrefix
   }
 
   /**
@@ -244,58 +463,184 @@ export class Connection extends DetectsLostConnections {
   }
 
   /**
-   * Run a delete statement against the database.
+   * Determine if the given database exception was caused by a unique constraint violation.
    *
-   * @param  string  $query
-   * @param  array  $bindings
-   * @return int
+   * @param  \Exception  $exception
+   * @return bool
    */
-  public delete (query: string, bindings: BindingValues = []): Promise<number> {
-    return this.affectingStatement(query, bindings)
+
+  /**
+   * Log a query in the connection's query log.
+   *
+   * @param  string  query
+   * @param  array  bindings
+   * @param  float|null  time
+   * @return void
+   */
+  public logQuery (query: string, bindings: BindingValues, time: number) {
+    this.totalQueryDurationProperty += time ?? 0.0
+
+    this.event(new QueryExecuted(query, bindings, time, this))
+
+    query =
+      this.pretendingProperty === true
+        ? (this.queryGrammar?.substituteBindingsIntoRawSql(query, bindings) ??
+          query)
+        : query
+
+    if (this.loggingQueries) {
+      this.queryLog.push({ query, bindings, time })
+    }
   }
 
   /**
-   * Get the schema grammar used by the connection.
+   * Prepare the query bindings for execution.
    *
-   * @return \Illuminate\Database\Schema\Grammars\Grammar
+   * @param  array  bindings
+   * @return array
    */
-  public getSchemaGrammar (): SchemaGrammar {
-    return this.schemaGrammar
+  public prepareBindings (bindings: BindingValues) {
+    const grammar = this.getQueryGrammar()
+
+    for (const [key, value] of bindings.entries()) {
+      // We need to transform all instances of DateTimeInterface into the actual
+      // date string. Each query grammar maintains its own date string format
+      // so we'll just ask the grammar for the format to get from the date.
+      if (value instanceof Date) {
+        bindings[key] = dateFormat(value, grammar.getDateFormat())
+      } else if (typeof value === 'boolean') {
+        bindings[key] = value ? 1 : 0
+      }
+    }
+
+    return bindings
   }
 
   /**
-   * Run an SQL statement and get the number of rows affected.
+   * Determine if the connection is in a "dry run".
+   *
+   * @return bool
+   */
+  public pretending (): boolean {
+    return this.pretendingProperty === true
+  }
+
+  /**
+   * Get a new query builder instance.
+   *
+   * @return {QueryBuilder}
+   */
+  public query (): QueryBuilder {
+    return new QueryBuilder(this, this.getQueryGrammar(), this.getPostProcessor())
+  }
+
+  /**
+   * Get a new raw query expression.
+   *
+   * @param  literal-string|int|float  $value
+   * @return \Illuminate\Contracts\Database\Query\Expression
+   */
+  public raw (value: string | number): Expression {
+    return new Expression(value)
+  }
+
+  /**
+   * Reconnect to the database.
+   *
+   * @return mixed|false
+   *
+   * @throws \Illuminate\Database\LostConnectionException
+   */
+  public reconnect () {
+    if (typeof this.reconnector === 'function') {
+      return this.reconnector(this)
+    }
+
+    throw new Error(
+      'LostConnectionException: Lost connection and no reconnector available.'
+    )
+  }
+
+  /**
+   * Reconnect to the database if a PDO connection is missing.
+   *
+   * @return void
+   */
+  public reconnectIfMissingConnection () {
+    if (isNil(this.driver)) {
+      this.reconnect()
+    }
+  }
+
+  /**
+   * Indicate if any records have been modified.
+   *
+   * @param  bool  $value
+   * @return void
+   */
+  public recordsHaveBeenModified (value: boolean = true) {
+    if (!this.recordsModified) {
+      this.recordsModified = value
+    }
+  }
+
+  /**
+   * Run a select statement against the database.
    *
    * @param  string  $query
    * @param  array  $bindings
-   * @return int
+   * @return array
    */
-  public affectingStatement (
-    query: string,
-    bindings: BindingValues = []
-  ): Promise<number> {
-    return this.run<number>(query, bindings, async (
+  public async select<
+    TResult extends Record<string, unknown> = Record<string, unknown>
+  >(query: string, bindings: BindingValues): Promise<TResult[]> {
+    return await this.run<TResult[]>(query, bindings, async (
       query: string,
       bindings: BindingValues
-    ): Promise<number> => {
+    ) => {
       if (this.pretending()) {
-        return 0
+        return []
       }
 
-      // For update or delete statements, we want to get the number of rows affected
-      // by the statement and return that back to the developer. We'll first need
-      // to execute the statement and then we'll use PDO to fetch the affected.
-      const statement = this.getDriver().prepare(query)
+      // For select statements, we'll simply execute the query and return an array
+      // of the database result set. Each element in the array will be a single
+      // row from the database table, and will either be an array or objects.
+      const driver = await this.getDriver()
+      const statement = await this.prepared(
+        driver.prepare(query)
+      )
 
       this.bindValues(statement, this.prepareBindings(bindings))
 
-      statement.execute()
+      await statement.execute()
 
-      const count = statement.rowCount()
-      this.recordsHaveBeenModified(count > 0)
-
-      return count
+      return statement.fetchAll()
     })
+  }
+
+  /**
+   * Run a select statement against the database.
+   *
+   * @param  string  $query
+   * @param  array  $bindings
+   * @return array
+   */
+  public selectFromWriteConnection<
+    TResult extends Record<string, unknown> = Record<string, unknown>
+  >(query: string, bindings: BindingValues = []): Promise<TResult[]> {
+    return this.select<TResult>(query, bindings)
+  }
+
+  /**
+   * Set the reconnect instance on the connection.
+   *
+   * @param  (callable(\Illuminate\Database\Connection): mixed)  $reconnector
+   * @return $this
+   */
+  public setReconnector (reconnector: Reconnector): this {
+    this.reconnector = reconnector
+
+    return this
   }
 
   /**
@@ -309,7 +654,7 @@ export class Connection extends DetectsLostConnections {
     query: string,
     bindings: BindingValues = []
   ): Promise<boolean> {
-    return await this.run(query, bindings, (
+    return await this.run(query, bindings, async (
       query: string,
       bindings: BindingValues
     ) => {
@@ -317,16 +662,75 @@ export class Connection extends DetectsLostConnections {
         return true
       }
 
-      const statement = this.getDriver().prepare(query)
+      const statement = (await this.getDriver()).prepare(query)
 
       this.bindValues(statement, this.prepareBindings(bindings))
 
-      const count = statement.rowCount()
+      this.recordsHaveBeenModified()
 
-      this.recordsHaveBeenModified(count > 0)
+      await statement.execute()
 
-      return statement.execute()
+      return true
     })
+  }
+
+  /**
+   * Run an update statement against the database.
+   *
+   * @param  string  $query
+   * @param  array  $bindings
+   * @return int
+   */
+  public update (query: string, bindings: BindingValues = []): Promise<number> {
+    return this.affectingStatement(query, bindings)
+  }
+
+  /**
+   * Set the query post processor to the default implementation.
+   *
+   * @return void
+   */
+  public useDefaultPostProcessor () {
+    this.postProcessor = this.getDefaultPostProcessor()
+  }
+
+  /**
+   * Set the query grammar to the default implementation.
+   *
+   * @return void
+   */
+  public useDefaultQueryGrammar () {
+    this.queryGrammar = this.getDefaultQueryGrammar()
+  }
+
+  /**
+   * Set the schema grammar to the default implementation.
+   *
+   * @return void
+   */
+  public useDefaultSchemaGrammar () {
+    // @ts-expect-error - expected error, schemaGrammar is not set in the constructor
+    this.schemaGrammar = this.getDefaultSchemaGrammar()
+  }
+
+  protected escapeBinary (
+    // @ts-expect-error - expected error, value is not used in this method
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    value: string | number | boolean | BindingValue
+  ): string {
+    throw new Error(
+      'RuntimeException: The database connection does not support escaping binary values.'
+    )
+  }
+
+  /**
+   * Escape a boolean value for safe SQL embedding.
+   *
+   * @param  bool  $value
+   * @return string
+   */
+  protected escapeBool (value: boolean): string {
+    return value ? '1' : '0'
   }
 
   /**
@@ -338,6 +742,120 @@ export class Connection extends DetectsLostConnections {
    */
   protected escapeString (value: string): string {
     return this.quote(value)
+  }
+
+  /**
+   * Fire the given event if possible.
+   *
+   * @param  mixed  event
+   * @return void
+   */
+  protected event (event: string | object) {
+    this.events?.dispatch(event)
+  }
+
+  /**
+   * Get the default post processor instance.
+   *
+   * @return \Illuminate\Database\Query\Processors\Processor
+   */
+  protected getDefaultPostProcessor () {
+    return new Processor()
+  }
+
+  /**
+   * Get the default query grammar instance.
+   *
+   * @return \Illuminate\Database\Query\Grammars\Grammar
+   */
+  protected getDefaultQueryGrammar () {
+    return new QueryGrammar(this)
+  }
+
+  /**
+   * Get the default schema grammar instance.
+   *
+   * @return \Illuminate\Database\Schema\Grammars\Grammar|null
+   */
+  protected getDefaultSchemaGrammar (): SchemaGrammar | undefined {
+    return undefined
+  }
+
+  /**
+   * Get the elapsed time in milliseconds since a given starting point.
+   *
+   * @param  float  $start
+   * @return float
+   */
+  protected getElapsedTime (start: number): number {
+    return Number(Math.round((Date.now() - start) * 1000).toPrecision(2))
+  }
+
+  /**
+   * Handle a query exception.
+   *
+   * @param  \Illuminate\Database\QueryException  $e
+   * @param  string  $query
+   * @param  array  $bindings
+   * @param  \Closure  $callback
+   * @return mixed
+   *
+   * @throws \Illuminate\Database\QueryException
+   */
+  protected handleQueryException<TValue>(
+    e: Error,
+    query: string,
+    bindings: BindingValues,
+    callback: QueryCallback<TValue>
+  ): Promise<TValue> {
+    if (this.transactions >= 1) {
+      throw e
+    }
+
+    return this.tryAgainIfCausedByLostConnection(e, query, bindings, callback)
+  }
+
+  /**
+   * Determine if the given database exception was caused by an invalid or out of range value.
+   */
+  // @ts-expect-error - expected error, exception is not used in this method
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  protected isDataTypeError (exception: Error): boolean {
+    return false
+  }
+
+  // @ts-expect-error - expected error, exception is not used in this method
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  protected isUniqueConstraintError (exception: Error): boolean {
+    return false
+  }
+
+  /**
+   * Extract the index and columns that caused a unique constraint violation.
+   *
+   * @param  Exception  $exception
+   * @return array{index: string|null, columns: list<string>}
+   */
+  protected parseUniqueConstraintViolation (
+    // @ts-expect-error - expected error, exception is not used in this method
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    exception: Error
+  ): { index: string | undefined, columns: string[] } {
+    return { index: undefined, columns: [] }
+  }
+
+  /**
+   * Configure the PDO prepared statement.
+   *
+   * @param  \PDOStatement  statement
+   * @return \PDOStatement
+   */
+  protected prepared (
+    statement: Statement
+  ): Statement {
+    this.event(new StatementPrepared(this, statement))
+
+    return statement
   }
 
   /**
@@ -353,82 +871,6 @@ export class Connection extends DetectsLostConnections {
   }
 
   /**
-   * Escape a boolean value for safe SQL embedding.
-   *
-   * @param  bool  $value
-   * @return string
-   */
-  protected escapeBool (value: boolean): string {
-    return value ? '1' : '0'
-  }
-
-  /**
-   * Escape a binary value for safe SQL embedding.
-   *
-   * @param  string  $value
-   * @return string
-   *
-   * @throws \RuntimeException
-   */
-
-  protected escapeBinary (
-    // @ts-expect-error - expected error, value is not used in this method
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    value: string | number | boolean | BindingValue
-  ): string {
-    throw new Error(
-      'RuntimeException: The database connection does not support escaping binary values.'
-    )
-  }
-
-  /**
-   * Run a select statement against the database.
-   *
-   * @param  string  $query
-   * @param  array  $bindings
-   * @return array
-   */
-  async select<
-    TResult extends Record<string, unknown> = Record<string, unknown>
-  > (query: string, bindings: BindingValues): Promise<TResult[]> {
-    return await this.run<TResult[]>(query, bindings, (
-      query: string,
-      bindings: BindingValues
-    ) => {
-      if (this.pretending()) {
-        return []
-      }
-
-      // For select statements, we'll simply execute the query and return an array
-      // of the database result set. Each element in the array will be a single
-      // row from the database table, and will either be an array or objects.
-      const statement = this.prepared(
-        // this.connection, query
-        this.getDriver().prepare<TResult>(query)
-      )
-
-      this.bindValues(statement, this.prepareBindings(bindings))
-
-      statement.execute()
-
-      return statement.fetchAll()
-    })
-  }
-
-  /**
-   * Determine if the given database exception was caused by a unique constraint violation.
-   *
-   * @param  \Exception  $exception
-   * @return bool
-   */
-
-  // @ts-expect-error - expected error, exception is not used in this method
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  protected isUniqueConstraintError (exception: Error): boolean {
-    return false
-  }
-
-  /**
    * Run a SQL statement and log its execution context.
    *
    * @param  string  query
@@ -438,7 +880,7 @@ export class Connection extends DetectsLostConnections {
    *
    * @throws \Illuminate\Database\QueryException
    */
-  protected async run<TValue> (
+  protected async run<TValue>(
     query: string,
     bindings: BindingValues,
     callback: QueryCallback<TValue>
@@ -471,99 +913,44 @@ export class Connection extends DetectsLostConnections {
   }
 
   /**
-   * Get the elapsed time in milliseconds since a given starting point.
+   * Run a SQL statement.
    *
-   * @param  float  $start
-   * @return float
-   */
-  protected getElapsedTime (start: number): number {
-    return Number(Math.round((Date.now() - start) * 1000).toPrecision(2))
-  }
-
-  /**
-   * Handle a query exception.
-   *
-   * @param  \Illuminate\Database\QueryException  $e
-   * @param  string  $query
-   * @param  array  $bindings
-   * @param  \Closure  $callback
+   * @param  string  query
+   * @param  array  bindings
+   * @param  \Closure  callback
    * @return mixed
    *
    * @throws \Illuminate\Database\QueryException
    */
-  protected handleQueryException<TValue> (
-    e: Error,
+  protected async runQueryCallback<TValue>(
     query: string,
     bindings: BindingValues,
     callback: QueryCallback<TValue>
   ): Promise<TValue> {
-    if (this.transactions >= 1) {
-      throw e
+    // To execute the statement, we'll simply call the callback, which will actually
+    // run the SQL against the PDO connection. Then we can calculate the time it
+    // took to execute and log the query SQL, bindings and time in our memory.
+    try {
+      return await callback(query, bindings)
+    } catch (error) {
+      // If an exception occurs when attempting to run a query, we'll format the error
+      // message to include the bindings with SQL, which will make this exception a
+      // lot more helpful to the developer instead of just the database's errors.
+      const exceptionType = this.isUniqueConstraintError(error as Error)
+        ? 'UniqueConstraintViolationException'
+        : 'QueryException'
+
+      throw new Error(
+        JSON.stringify({
+          type: exceptionType,
+          name: this.getName(),
+          query,
+          bindings: this.prepareBindings(bindings),
+          error
+        }),
+        { cause: error }
+      )
     }
-
-    return this.tryAgainIfCausedByLostConnection(e, query, bindings, callback)
-  }
-
-  /**
-   * Get the database connection name.
-   *
-   * @return string|null
-   */
-  public getName (): string {
-    const name = this.getConfig('name')
-
-    return typeof name === 'string' ? name : ''
-  }
-
-  /**
-   * Get an option from the configuration options.
-   *
-   * @param  [string]  option
-   * @return unknown
-   */
-  public getConfig (option?: string) {
-    return Arr.get(this.config, option)
-  }
-
-  /**
-   * Log a query in the connection's query log.
-   *
-   * @param  string  query
-   * @param  array  bindings
-   * @param  float|null  time
-   * @return void
-   */
-  public logQuery (query: string, bindings: BindingValues, time: number) {
-    this.totalQueryDurationProperty += time ?? 0.0
-
-    this.event(new QueryExecuted(query, bindings, time, this))
-
-    query =
-      this.pretendingProperty === true
-        ? (this.queryGrammar?.substituteBindingsIntoRawSql(query, bindings) ??
-          query)
-        : query
-
-    if (this.loggingQueries) {
-      this.queryLog.push({ query, bindings, time })
-    }
-  }
-
-  /**
-   * Reconnect to the database.
-   *
-   * @return mixed|false
-   *
-   * @throws \Illuminate\Database\LostConnectionException
-   */
-  reconnect () {
-    if (typeof this.reconnector === 'function') {
-      return this.reconnector(this)
-    }
-
-    throw new Error(
-      'LostConnectionException: Lost connection and no reconnector available.'
-    )
   }
 
   /**
@@ -577,7 +964,7 @@ export class Connection extends DetectsLostConnections {
    *
    * @throws \Illuminate\Database\QueryException
    */
-  protected tryAgainIfCausedByLostConnection<TValue> (
+  protected tryAgainIfCausedByLostConnection<TValue>(
     e: Error,
     query: string,
     bindings: BindingValues,
@@ -590,277 +977,5 @@ export class Connection extends DetectsLostConnections {
     }
 
     throw e
-  }
-
-  /**
-   * Run an update statement against the database.
-   *
-   * @param  string  $query
-   * @param  array  $bindings
-   * @return int
-   */
-  public update (query: string, bindings: BindingValues = []): Promise<number> {
-    return this.affectingStatement(query, bindings)
-  }
-
-  /**
-   * Run a SQL statement.
-   *
-   * @param  string  query
-   * @param  array  bindings
-   * @param  \Closure  callback
-   * @return mixed
-   *
-   * @throws \Illuminate\Database\QueryException
-   */
-  protected async runQueryCallback<TValue> (
-    query: string,
-    bindings: BindingValues,
-    callback: QueryCallback<TValue>
-  ): Promise<TValue> {
-    // To execute the statement, we'll simply call the callback, which will actually
-    // run the SQL against the PDO connection. Then we can calculate the time it
-    // took to execute and log the query SQL, bindings and time in our memory.
-    try {
-      return await callback(query, bindings)
-    } catch (e) {
-      // If an exception occurs when attempting to run a query, we'll format the error
-      // message to include the bindings with SQL, which will make this exception a
-      // lot more helpful to the developer instead of just the database's errors.
-      const exceptionType = this.isUniqueConstraintError(e as Error)
-        ? 'UniqueConstraintViolationException'
-        : 'QueryException'
-
-      throw new Error(
-        JSON.stringify({
-          type: exceptionType,
-          name: this.getName(),
-          query,
-          bindings: this.prepareBindings(bindings),
-          e
-        }),
-        { cause: e }
-      )
-    }
-  }
-
-  /**
-   * Reconnect to the database if a PDO connection is missing.
-   *
-   * @return void
-   */
-  public reconnectIfMissingConnection () {
-    if (isNil(this.driver)) {
-      this.reconnect()
-    }
-  }
-
-  /**
-   * Prepare the query bindings for execution.
-   *
-   * @param  array  bindings
-   * @return array
-   */
-  public prepareBindings (bindings: BindingValues) {
-    const grammar = this.getQueryGrammar()
-
-    for (const [key, value] of bindings.entries()) {
-      // We need to transform all instances of DateTimeInterface into the actual
-      // date string. Each query grammar maintains its own date string format
-      // so we'll just ask the grammar for the format to get from the date.
-      if (value instanceof Date) {
-        bindings[key] = dateFormat(value, grammar.getDateFormat())
-      } else if (typeof value === 'boolean') {
-        bindings[key] = value ? 1 : 0
-      }
-    }
-
-    return bindings
-  }
-
-  /**
-   * Get the current Driver connection.
-   *
-   * @return {Driver}
-   */
-  public getDriver (): Driver {
-    if (typeof this.driver === 'function') {
-      return this.driver()
-    }
-
-    return this.driver
-  }
-
-  /**
-   * Bind values to their parameters in the given statement.
-   *
-   * @param  \PDOStatement  $statement
-   * @param  array  bindings
-   * @return void
-   */
-  public bindValues<TRow extends Record<string, unknown>> (
-    statement: Statement<TRow>,
-    bindings: BindingValues
-  ) {
-    for (const [key, value] of Object.entries(bindings)) {
-      statement.bindValue(
-        typeof key === 'string' ? key : Number(key) + 1,
-        value
-      )
-    }
-  }
-
-  /**
-   * Run a select statement against the database.
-   *
-   * @param  string  $query
-   * @param  array  $bindings
-   * @return array
-   */
-  public selectFromWriteConnection<
-    TResult extends Record<string, unknown> = Record<string, unknown>
-  > (query: string, bindings: BindingValues = []): Promise<TResult[]> {
-    return this.select<TResult>(query, bindings)
-  }
-
-  /**
-   * Fire the given event if possible.
-   *
-   * @param  mixed  event
-   * @return void
-   */
-  protected event (event: string | object) {
-    this.events?.dispatch(event)
-  }
-
-  /**
-   * Configure the PDO prepared statement.
-   *
-   * @param  \PDOStatement  statement
-   * @return \PDOStatement
-   */
-  protected prepared<TRow extends Record<string, unknown>> (
-    statement: Statement<TRow>
-  ): Statement<TRow> {
-    this.event(new StatementPrepared(this, statement))
-
-    return statement
-  }
-
-  /**
-   * Determine if the connection is in a "dry run".
-   *
-   * @return bool
-   */
-  public pretending (): boolean {
-    return this.pretendingProperty === true
-  }
-
-  /**
-   * Get the table prefix for the connection.
-   *
-   * @return string
-   */
-  public getTablePrefix (): string {
-    return this.tablePrefix
-  }
-
-  /**
-   * Get a schema builder instance for the connection.
-   *
-   * @return \Illuminate\Database\Schema\Builder
-   */
-  public getSchemaBuilder (): SchemaBuilder {
-    if (this.schemaGrammar === undefined) {
-      this.useDefaultSchemaGrammar()
-    }
-
-    return new SchemaBuilder(this)
-  }
-
-  /**
-   * Set the schema grammar to the default implementation.
-   *
-   * @return void
-   */
-  public useDefaultSchemaGrammar () {
-    // @ts-expect-error - expected error, schemaGrammar is not set in the constructor
-    this.schemaGrammar = this.getDefaultSchemaGrammar()
-  }
-
-  /**
-   * Get the default schema grammar instance.
-   *
-   * @return \Illuminate\Database\Schema\Grammars\Grammar|null
-   */
-  protected getDefaultSchemaGrammar (): SchemaGrammar | undefined {
-    return undefined
-  }
-
-  /**
-   * Get the query grammar used by the connection.
-   *
-   * @return \Illuminate\Database\Query\Grammars\Grammar
-   */
-  public getQueryGrammar (): Grammar {
-    if (this.queryGrammar === undefined) {
-      throw new Error('Query grammar has not been set.')
-    }
-
-    return this.queryGrammar
-  }
-
-  /**
-   * Get the query post processor used by the connection.
-   *
-   * @return \Illuminate\Database\Query\Processors\Processor
-   */
-  public getPostProcessor () {
-    return this.postProcessor
-  }
-
-  /**
-   * Get the name of the connected database.
-   *
-   * @return string
-   */
-  public getDatabaseName () {
-    return this.database
-  }
-
-  /**
-   * Set the query grammar to the default implementation.
-   *
-   * @return void
-   */
-  public useDefaultQueryGrammar () {
-    this.queryGrammar = this.getDefaultQueryGrammar()
-  }
-
-  /**
-   * Get the default query grammar instance.
-   *
-   * @return \Illuminate\Database\Query\Grammars\Grammar
-   */
-  protected getDefaultQueryGrammar () {
-    return new QueryGrammar(this)
-  }
-
-  /**
-   * Set the query post processor to the default implementation.
-   *
-   * @return void
-   */
-  public useDefaultPostProcessor () {
-    this.postProcessor = this.getDefaultPostProcessor()
-  }
-
-  /**
-   * Get the default post processor instance.
-   *
-   * @return \Illuminate\Database\Query\Processors\Processor
-   */
-  protected getDefaultPostProcessor () {
-    return new Processor()
   }
 }

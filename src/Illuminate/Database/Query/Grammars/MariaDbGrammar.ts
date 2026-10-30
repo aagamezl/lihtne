@@ -14,10 +14,12 @@ export class MariaDbGrammar extends MySqlGrammar {
    * @throws \RuntimeException
    */
   public override compileJoinLateral (
+    // @ts-expect-error expected error; join is required by the base compileJoinLateral signature
     // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base compileJoinLateral signature
-    _join: JoinLateralClause,
+    join: JoinLateralClause,
+    // @ts-expect-error expected error; expression is required by the base compileJoinLateral signature
     // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base compileJoinLateral signature
-    _expression: string
+    expression: string
   ): string {
     throw new Error(
       'RuntimeException: This database engine does not support lateral joins.'
@@ -30,7 +32,7 @@ export class MariaDbGrammar extends MySqlGrammar {
    * @param  string  $value
    * @return string
    */
-  public compileJsonValueCast (value: string): string {
+  public override compileJsonValueCast (value: string): string {
     return `json_query(${value}, '$')`
   }
 
@@ -39,7 +41,7 @@ export class MariaDbGrammar extends MySqlGrammar {
    *
    * @return string
    */
-  public compileThreadCount (): string {
+  public override compileThreadCount (): string {
     return "select variable_value as `Value` from information_schema.global_status where variable_name = 'THREADS_CONNECTED'"
   }
 
@@ -68,8 +70,9 @@ export class MariaDbGrammar extends MySqlGrammar {
    * @param  \Illuminate\Database\Query\Builder  $query
    * @return bool
    */
+  // @ts-expect-error expected error; query is not used in this method
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by the base useLegacyGroupLimit signature
-  public useLegacyGroupLimit (_query: Builder): boolean {
+  public override async useLegacyGroupLimit (query: Builder): Promise<boolean> {
     return false
   }
 

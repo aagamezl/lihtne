@@ -34,6 +34,7 @@
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^22.20.3",
+    "@types/pg": "^8.23.1",
     "commitizen": "^4.3.2",
     "cz-conventional-changelog": "^3.3.0",
     "eslint": "^10.10.0",
@@ -58,6 +59,11 @@
   },
   "dependencies": {
     "@devnetic/utils": "^2.2.0",
-    "dayjs": "^1.11.23"
+    "commander": "^15.0.0",
+    "dayjs": "^1.11.23",
+    "inquirer": "^14.2.3",
+    "mariadb": "^3.5.4",
+    "mysql2": "^3.24.6",
+    "pg": "^8.23.1"
   }
 }

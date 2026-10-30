@@ -1,3 +1,5 @@
+import { isPlainObject } from '@devnetic/utils'
+
 import { HigherOrderTapProxy } from './HigherOrderTapProxy'
 
 export type Entries<T> = {
@@ -22,6 +24,27 @@ export const iterationKey = <TKey extends PropertyKey>(
   key: PropertyKey
 ): TKey => {
   return (isNumeric(key) ? Number(key) : key) as TKey
+}
+
+export const objectDiffKey = <TTarget extends Record<string, unknown>, TFrom extends Record<string, unknown>[]>(
+  target: TTarget,
+  ...from: TFrom
+): Partial<TTarget> => {
+  // const keys = from.flatMap(obj => Object.keys(obj))
+  // return Object.fromEntries(
+  //   Object.entries(target).filter(([key]) => !keys.includes(key))
+  // )
+  const keys = from.reduce((result, current) => {
+    return result.concat(Object.keys(current))
+  }, [])
+
+  return Object.entries(target).reduce((result, [key, value]) => {
+    if (!keys.includes(key)) {
+      result[key] = value
+    }
+
+    return result
+  }, {})
 }
 
 export const isEnum = (value: unknown): boolean => {
@@ -53,6 +76,16 @@ export const iterableValues = <TValue>(
   return Array.isArray(value) ? value : Object.values(value)
 }
 
+/**
+ * `isPlainObject` does not narrow, so `set` would still see a record in the
+ * computed property name of the scalar branch.
+ */
+export const isPlainRecord = (
+  key: Record<string, unknown> | string | number
+): key is Record<string, unknown> => {
+  return isPlainObject(key)
+}
+
 export const getValue = <TValue>(
   value: TValue | ((...args: PropertyKey[]) => TValue),
   ...args: PropertyKey[]
@@ -65,6 +98,29 @@ export function typedEntries<TValue> (
 ): [string, TValue][]
 export function typedEntries (obj: object): [string, unknown][] {
   return Object.entries(obj)
+}
+
+/**
+ * Get a value from the array, and remove it.
+ *
+ * @param  {Record<string, unknown>}  array
+ * @param  {string}  key
+ * @param  {any}  [defaultValue=undefined]
+ * @return {any}
+ */
+export const pull = <
+  TRecord extends Record<string, unknown>,
+  TKey extends keyof TRecord & string
+>(
+  array: TRecord,
+  key: TKey,
+  defaultValue?: TRecord[TKey]
+): TRecord[TKey] | undefined => {
+  const value = array[key] ?? defaultValue
+
+  delete array[key]
+
+  return value
 }
 
 /**

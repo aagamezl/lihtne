@@ -5,12 +5,6 @@ import { Collection } from '../Collection'
 
 export abstract class EnumeratesValues<TValue> {
   /**
-   * Rows owned by the class that uses this trait.
-   * `Collection` declares the field; these methods only read it.
-   */
-  protected items!: TValue[] | Record<string, TValue>
-
-  /**
    * The methods that can be proxied.
    */
   static proxies: string[] = [
@@ -51,41 +45,10 @@ export abstract class EnumeratesValues<TValue> {
   protected entries: boolean = false
 
   /**
-   * Results array of items from Collection or Arrayable.
-   *
-   * @param  mixed  $items
-   * @return array<TKey, TValue>
+   * Rows owned by the class that uses this trait.
+   * `Collection` declares the field; these methods only read it.
    */
-  protected getArrayableItems (items?: TValue[] | Record<string, TValue>) {
-    // return isPrimitive(items) || isEnum(items)
-    //   ? Arr.wrap<TValue>(items as TValue)
-    //   : Arr.from(items)
-    if (Array.isArray(items) /*  || items instanceof Map */) {
-      return items
-    } else if (items instanceof Collection) {
-      return items.all()
-    } else if (isPlainObject(items)) {
-      this.entries = true
-      // return Object.entries(items)
-      return items
-    } else if (items === undefined) {
-      return []
-    }
-
-    return [items]
-  }
-
-  /**
-   * Determine if the given value is callable, but not a string.
-   *
-   * @param  mixed  $value
-   * @return bool
-   */
-  public useAsCallable (
-    value: unknown
-  ): value is (...args: never[]) => unknown {
-    return typeof value === 'function'
-  }
+  protected items!: TValue[] | Record<string, TValue>
 
   /**
    * Execute a callback over each item.
@@ -124,5 +87,42 @@ export abstract class EnumeratesValues<TValue> {
     // return withMap(this).map((value: TValue) => value).all()
     // @ts-expect-error - `map` is not defined on the `EnumeratesValues` class
     return this.map((value: TValue) => value).all()
+  }
+
+  /**
+   * Determine if the given value is callable, but not a string.
+   *
+   * @param  mixed  $value
+   * @return bool
+   */
+  public useAsCallable (
+    value: unknown
+  ): value is (...args: never[]) => unknown {
+    return typeof value === 'function'
+  }
+
+  /**
+   * Results array of items from Collection or Arrayable.
+   *
+   * @param  mixed  $items
+   * @return array<TKey, TValue>
+   */
+  protected getArrayableItems (items?: TValue[] | Record<string, TValue>) {
+    // return isPrimitive(items) || isEnum(items)
+    //   ? Arr.wrap<TValue>(items as TValue)
+    //   : Arr.from(items)
+    if (Array.isArray(items) /*  || items instanceof Map */) {
+      return items
+    } else if (items instanceof Collection) {
+      return items.all()
+    } else if (isPlainObject(items)) {
+      this.entries = true
+      // return Object.entries(items)
+      return items
+    } else if (items === undefined) {
+      return []
+    }
+
+    return [items]
   }
 }

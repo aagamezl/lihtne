@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+FAKER_CLI="@faker-js/cli"
+DEFAULT_RECORD_COUNT=5
+RECORD_COUNT=${1:-$DEFAULT_RECORD_COUNT}
+
+faker() {
+  npx --yes "$FAKER_CLI" "$@"
+}
+
+for ((i = 0; i < RECORD_COUNT; i++)); do
+  id=$(faker uuid)
+  name=$(faker fullName)
+  email=$(faker email)
+  city=$(faker city)
+  job=$(faker jobTitle)
+
+  printf '{"id":"%s","name":"%s","email":"%s","city":"%s","job":"%s"}\n' \
+    "$id" "$name" "$email" "$city" "$job"
+done

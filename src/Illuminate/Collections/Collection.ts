@@ -61,52 +61,6 @@ export class Collection<
   // }
 
   /**
-   * Create a new instance of the collection.
-   *
-   * Mirrors the protected `Collection::newInstance()`, used internally
-   * wherever PHP would call `new static($items)` to preserve the
-   * concrete subclass. TypeScript has no `static::class` equivalent that
-   * works generically across subclasses without reflection, so this
-   * always builds a plain `Collection` — faithful for this port's scope,
-   * since no subclassing is exercised here.
-   */
-  protected newInstance<TNewValue = TValue> (
-    items: TNewValue[] | Record<string, TNewValue> = []
-  ): Collection<TKey, TNewValue> {
-    return new Collection<TKey, TNewValue>(items)
-  }
-
-  /**
-   * Determine if the collection is empty or not.
-   *
-   * @phpstan-assert-if-true null $this->first()
-   * @phpstan-assert-if-true null $this->last()
-   *
-   * @phpstan-assert-if-false TValue $this->first()
-   * @phpstan-assert-if-false TValue $this->last()
-   *
-   * @return bool
-   */
-  public isEmpty (): boolean {
-    return Object.keys(this.items).length === 0
-  }
-
-  /**
-   * Determine if the collection is not empty.
-   *
-   * @phpstan-assert-if-true TValue $this->first()
-   * @phpstan-assert-if-true TValue $this->last()
-   *
-   * @phpstan-assert-if-false null $this->first()
-   * @phpstan-assert-if-false null $this->last()
-   *
-   * @return bool
-   */
-  public isNotEmpty (): boolean {
-    return !this.isEmpty()
-  }
-
-  /**
    * Get all of the items in the collection.
    *
    * Mirrors `Collection::all()`. List-shaped collections (dense numeric
@@ -122,69 +76,6 @@ export class Collection<
   }
 
   /**
-   * Reverse items order.
-   *
-   * @return static
-   */
-  public reverse (): Collection<TKey, TValue> {
-    return this.newInstance(
-      Array.isArray(this.items)
-        ? this.items.reverse()
-        : Object.values(this.items).reverse()
-    )
-  }
-
-  /**
-   * Count the number of items in the collection.
-   *
-   * @return int<0, max>
-   */
-  public count (): number {
-    return Object.keys(this.items).length
-  }
-
-  /**
-   * Slice the underlying collection array.
-   *
-   * @param  int  $offset
-   * @param  int|null  $length
-   * @return static
-   */
-  public slice (
-    offset: number,
-    length: number | undefined
-  ): Collection<TKey, TValue> {
-    return this.newInstance(
-      Array.isArray(this.items)
-        ? this.items.slice(offset, length)
-        : Object.values(this.items).slice(offset, length)
-    )
-  }
-
-  /**
-   * Merge the collection with the given items.
-   *
-   * @template TMergeValue
-   *
-   * @param  \Illuminate\Contracts\Support\Arrayable<TKey, TMergeValue>|iterable<TKey, TMergeValue>  $items
-   * @return static<TKey, TValue|TMergeValue>
-   */
-  public merge (
-    items: TValue[] | Record<string, TValue>
-  ): Collection<TKey, TValue | TValue> {
-    return this.newInstance(
-      Object.assign({}, this.items, this.getArrayableItems(items))
-    )
-  }
-
-  /**
-   * Mirrors PHP's `IteratorAggregate`: iterating a collection yields its values.
-   */
-  * [Symbol.iterator] (): Iterator<TValue> {
-    yield * Object.values(this.items)
-  }
-
-  /**
    * Collapse the collection of items into a single array.
    *
    * @return static<int, mixed>
@@ -194,21 +85,12 @@ export class Collection<
   }
 
   /**
-   * Get the first item from the collection passing the given truth test.
+   * Count the number of items in the collection.
    *
-   * Mirrors `Collection::first()`, which delegates straight to
-   * `Arr::first()` over the collection's underlying items.
+   * @return int<0, max>
    */
-  public first<TRow extends TValue> (): TRow | undefined
-  public first<TDefault = undefined> (
-    callback?: (value: TValue, key: TKey) => boolean,
-    defaultValue?: TDefault | (() => TDefault)
-  ): TValue | TDefault | undefined
-  public first (
-    callback?: (value: TValue, key: TKey) => boolean,
-    defaultValue?: unknown
-  ): unknown {
-    return Arr.first<TValue, TKey, unknown>(this.items, callback, defaultValue)
+  public count (): number {
+    return Object.keys(this.items).length
   }
 
   /**
@@ -235,28 +117,21 @@ export class Collection<
   }
 
   /**
-   * Create a collection of all elements that do not pass a given truth test.
-   */
-  public reject (
-    callback:
-      ((value: TValue, key: TKey) => boolean | TValue) | boolean | TValue = true
-  ): Collection<TKey, TValue> {
-    if (typeof callback !== 'function') {
-      return this.filter((value) => value !== callback)
-    }
-
-    return this.filter(
-      (value, key) => !Reflect.apply(callback, undefined, [value, key])
-    )
-  }
-
-  /**
-   * Reset the keys on the underlying array.
+   * Get the first item from the collection passing the given truth test.
    *
-   * @return static<int, TValue>
+   * Mirrors `Collection::first()`, which delegates straight to
+   * `Arr::first()` over the collection's underlying items.
    */
-  public values (): Collection<TKey, TValue> {
-    return this.newInstance(Object.values(this.items))
+  public first<TRow extends TValue> (): TRow | undefined
+  public first<TDefault = undefined> (
+    callback?: (value: TValue, key: TKey) => boolean,
+    defaultValue?: TDefault | (() => TDefault)
+  ): TValue | TDefault | undefined
+  public first (
+    callback?: (value: TValue, key: TKey) => boolean,
+    defaultValue?: unknown
+  ): unknown {
+    return Arr.first<TValue, TKey, unknown>(this.items, callback, defaultValue)
   }
 
   /**
@@ -312,6 +187,36 @@ export class Collection<
   }
 
   /**
+   * Determine if the collection is empty or not.
+   *
+   * @phpstan-assert-if-true null $this->first()
+   * @phpstan-assert-if-true null $this->last()
+   *
+   * @phpstan-assert-if-false TValue $this->first()
+   * @phpstan-assert-if-false TValue $this->last()
+   *
+   * @return bool
+   */
+  public isEmpty (): boolean {
+    return Object.keys(this.items).length === 0
+  }
+
+  /**
+   * Determine if the collection is not empty.
+   *
+   * @phpstan-assert-if-true TValue $this->first()
+   * @phpstan-assert-if-true TValue $this->last()
+   *
+   * @phpstan-assert-if-false null $this->first()
+   * @phpstan-assert-if-false null $this->last()
+   *
+   * @return bool
+   */
+  public isNotEmpty (): boolean {
+    return !this.isEmpty()
+  }
+
+  /**
    * Run a map over each of the items.
    *
    * Mirrors `Collection::map()`, which delegates to `Arr::map()`.
@@ -322,6 +227,22 @@ export class Collection<
     const mapped = Arr.map<TKey, TValue, TMapped>(this.items, callback)
 
     return this.newInstance<TMapped>(mapped)
+  }
+
+  /**
+   * Merge the collection with the given items.
+   *
+   * @template TMergeValue
+   *
+   * @param  \Illuminate\Contracts\Support\Arrayable<TKey, TMergeValue>|iterable<TKey, TMergeValue>  $items
+   * @return static<TKey, TValue|TMergeValue>
+   */
+  public merge (
+    items: TValue[] | Record<string, TValue>
+  ): Collection<TKey, TValue | TValue> {
+    return this.newInstance(
+      Object.assign({}, this.items, this.getArrayableItems(items))
+    )
   }
 
   /**
@@ -340,6 +261,85 @@ export class Collection<
     )
 
     return new Collection<PropertyKey, TPlucked | undefined>(plucked)
+  }
+
+  /**
+   * Create a collection of all elements that do not pass a given truth test.
+   */
+  public reject (
+    callback:
+      ((value: TValue, key: TKey) => boolean | TValue) | boolean | TValue = true
+  ): Collection<TKey, TValue> {
+    if (typeof callback !== 'function') {
+      return this.filter((value) => value !== callback)
+    }
+
+    return this.filter(
+      (value, key) => !Reflect.apply(callback, undefined, [value, key])
+    )
+  }
+
+  /**
+   * Reverse items order.
+   *
+   * @return static
+   */
+  public reverse (): Collection<TKey, TValue> {
+    return this.newInstance(
+      Array.isArray(this.items)
+        ? this.items.reverse()
+        : Object.values(this.items).reverse()
+    )
+  }
+
+  /**
+   * Slice the underlying collection array.
+   *
+   * @param  int  $offset
+   * @param  int|null  $length
+   * @return static
+   */
+  public slice (
+    offset: number,
+    length: number | undefined
+  ): Collection<TKey, TValue> {
+    return this.newInstance(
+      Array.isArray(this.items)
+        ? this.items.slice(offset, length)
+        : Object.values(this.items).slice(offset, length)
+    )
+  }
+
+  /**
+   * Mirrors PHP's `IteratorAggregate`: iterating a collection yields its values.
+   */
+  * [Symbol.iterator] (): Iterator<TValue> {
+    yield * Object.values(this.items)
+  }
+
+  /**
+   * Reset the keys on the underlying array.
+   *
+   * @return static<int, TValue>
+   */
+  public values (): Collection<TKey, TValue> {
+    return this.newInstance(Object.values(this.items))
+  }
+
+  /**
+   * Create a new instance of the collection.
+   *
+   * Mirrors the protected `Collection::newInstance()`, used internally
+   * wherever PHP would call `new static($items)` to preserve the
+   * concrete subclass. TypeScript has no `static::class` equivalent that
+   * works generically across subclasses without reflection, so this
+   * always builds a plain `Collection` — faithful for this port's scope,
+   * since no subclassing is exercised here.
+   */
+  protected newInstance<TNewValue = TValue> (
+    items: TNewValue[] | Record<string, TNewValue> = []
+  ): Collection<TKey, TNewValue> {
+    return new Collection<TKey, TNewValue>(items)
   }
 
   /**

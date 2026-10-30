@@ -18,6 +18,13 @@ export default {
         newlinesBetween: ONE_BLANK_LINE_BETWEEN_IMPORT_GROUPS
       }
     ],
+    'perfectionist/sort-classes': [
+      'error',
+      {
+        type: 'alphabetical',
+        order: 'asc'
+      }
+    ],
     'perfectionist/sort-named-imports': ['error', { type: 'natural', order: 'asc' }],
     'perfectionist/sort-named-exports': ['error', { type: 'natural', order: 'asc' }],
     'perfectionist/sort-exports': ['error', { type: 'natural', order: 'asc' }]

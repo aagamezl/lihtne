@@ -1,3 +1,4 @@
+// Collection.first finds the first inactive user, then pluck reads a nested path.
 import { Collection } from '../src/Illuminate/Collections/CollectionNew'
 
 // const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]

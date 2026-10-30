@@ -18,6 +18,16 @@ export abstract class Grammar {
   }
 
   /**
+   * Convert an array of column names into a delimited string.
+   *
+   * @param  array<\Illuminate\Contracts\Database\Query\Expression|string>  $columns
+   * @return string
+   */
+  public columnize (columns: Array<Expression | string>): string {
+    return columns.map((column) => this.wrap(column)).join(', ')
+  }
+
+  /**
    * Escapes a value for safe SQL embedding.
    *
    * @param  string|float|int|bool|null  $value
@@ -39,6 +49,94 @@ export abstract class Grammar {
     throw new Error(
       'RuntimeException: The database connection does not support escaping this value.'
     )
+  }
+
+  /**
+   * Get the format for database stored dates.
+   *
+   * @return string
+   */
+  public getDateFormat (): string {
+    return 'Y-m-d H:i:s'
+  }
+
+  /**
+   * Transforms expressions to their scalar types.
+   *
+   * @param {Expression | string | number} expression - The expression to transform.
+   * @returns {string | number} - The transformed value.
+   */
+  public getValue (expression: Expression | string | number): string {
+    if (this.isExpression(expression)) {
+      return this.getValue(expression.getValue(this))
+    }
+
+    return String(expression)
+  }
+
+  /**
+   * Determine if the given value is a raw expression.
+   *
+   * @param  mixed  $value
+   * @return bool
+   */
+  public isExpression (value: unknown) {
+    return value instanceof Expression
+  }
+
+  /**
+   * Get the appropriate query parameter place-holder for a value.
+   *
+   * @param  mixed  $value
+   * @return string
+   */
+  public parameter (value: unknown) {
+    return this.isExpression(value) ? this.getValue(value) : '?'
+  }
+
+  /**
+   * Create query parameter place-holders for an array.
+   *
+   * @param  array<mixed>  $values
+   * @return string
+   */
+  public parameterize (values: unknown): string {
+    // return values.map((value) => this.parameter(value)).join(', ')
+    const list = Array.isArray(values) ? values : Object.values(values ?? {})
+
+    return list
+      .map((value) => {
+        return this.parameter(value)
+      })
+      .join(', ')
+  }
+
+  /**
+   * Wrap a value in keyword identifiers.
+   *
+   * @param  \Illuminate\Contracts\Database\Query\Expression|string  $value
+   * @return string
+   */
+  public wrap<TValue extends Expression | string> (value: TValue): string {
+    if (this.isExpression(value)) {
+      return this.getValue(value)
+    }
+
+    // If the value being wrapped has a column alias we will need to separate out
+    // the pieces so we can wrap each of the segments of the expression on its
+    // own, and then join these both back together using the "as" connector.
+    if (value.includes(' as ')) {
+      return this.wrapAliasedValue(value)
+    }
+
+    // If the given value is a JSON selector we will wrap it differently than a
+    // traditional value. We will need to split this path and wrap each part
+    // wrapped, etc. Otherwise, we will simply wrap the value as a string.
+    if (this.isJsonSelector(value)) {
+      return this.wrapJsonSelector(value)
+    }
+
+    return this.wrapSegments(value.split('.'))
   }
 
   /**
@@ -86,45 +184,13 @@ export abstract class Grammar {
   }
 
   /**
-   * Wrap a value in keyword identifiers.
-   *
-   * @param  \Illuminate\Contracts\Database\Query\Expression|string  $value
-   * @return string
-   */
-  public wrap<TValue extends Expression | string> (value: TValue): string {
-    if (this.isExpression(value)) {
-      return this.getValue(value)
-    }
-
-    // If the value being wrapped has a column alias we will need to separate out
-    // the pieces so we can wrap each of the segments of the expression on its
-    // own, and then join these both back together using the "as" connector.
-    if (value.includes(' as ')) {
-      return this.wrapAliasedValue(value)
-    }
-
-    // If the given value is a JSON selector we will wrap it differently than a
-    // traditional value. We will need to split this path and wrap each part
-    // wrapped, etc. Otherwise, we will simply wrap the value as a string.
-    if (this.isJsonSelector(value)) {
-      return this.wrapJsonSelector(value)
-    }
-
-    return this.wrapSegments(value.split('.'))
-  }
-
-  /**
-   * Wrap a value that has an alias.
+   * Determine if the given string is a JSON selector.
    *
    * @param  string  $value
-   * @return string
+   * @return bool
    */
-  protected wrapAliasedValue (value: string): string {
-    const segments = value.split(/\s+as\s+/i)
-
-    return (
-      this.wrap(segments[0] ?? '') + ' as ' + this.wrapValue(segments[1] ?? '')
-    )
+  protected isJsonSelector (value: string): boolean {
+    return value.includes('->')
   }
 
   /**
@@ -150,50 +216,17 @@ export abstract class Grammar {
   }
 
   /**
-   * Wrap the given value segments.
+   * Wrap a value that has an alias.
    *
-   * @param  list<string>  $segments
+   * @param  string  $value
    * @return string
    */
-  protected wrapSegments (segments: string[]) {
-    return new Collection(segments)
-      .map((segment: string, key: PropertyKey) => {
-        return key === 0 && segments.length > 1
-          ? this.wrapTable(segment)
-          : this.wrapValue(segment)
-      })
-      .implode('.')
-  }
+  protected wrapAliasedValue (value: string): string {
+    const segments = value.split(/\s+as\s+/i)
 
-  /**
-   * Create query parameter place-holders for an array.
-   *
-   * @param  array<mixed>  $values
-   * @return string
-   */
-  public parameterize (values: unknown): string {
-    // return values.map((value) => this.parameter(value)).join(', ')
-    const list = Array.isArray(values) ? values : Object.values(values ?? {})
-
-    return list
-      .map((value) => {
-        return this.parameter(value)
-      })
-      .join(', ')
-  }
-
-  /**
-   * Wrap a single string in keyword identifiers.
-   *
-   * @param  string  value
-   * @return string
-   */
-  protected wrapValue (value: string): string {
-    if (value !== '*') {
-      return '"' + value.replace('"', '""') + '"'
-    }
-
-    return value
+    return (
+      this.wrap(segments[0] ?? '') + ' as ' + this.wrapValue(segments[1] ?? '')
+    )
   }
 
   /**
@@ -212,65 +245,32 @@ export abstract class Grammar {
   }
 
   /**
-   * Determine if the given string is a JSON selector.
+   * Wrap the given value segments.
    *
-   * @param  string  $value
-   * @return bool
-   */
-  protected isJsonSelector (value: string): boolean {
-    return value.includes('->')
-  }
-
-  /**
-   * Convert an array of column names into a delimited string.
-   *
-   * @param  array<\Illuminate\Contracts\Database\Query\Expression|string>  $columns
+   * @param  list<string>  $segments
    * @return string
    */
-  public columnize (columns: Array<Expression | string>): string {
-    return columns.map((column) => this.wrap(column)).join(', ')
+  protected wrapSegments (segments: string[]) {
+    return new Collection(segments)
+      .map((segment: string, key: PropertyKey) => {
+        return key === 0 && segments.length > 1
+          ? this.wrapTable(segment)
+          : this.wrapValue(segment)
+      })
+      .implode('.')
   }
 
   /**
-   * Get the appropriate query parameter place-holder for a value.
+   * Wrap a single string in keyword identifiers.
    *
-   * @param  mixed  $value
+   * @param  string  value
    * @return string
    */
-  public parameter (value: unknown) {
-    return this.isExpression(value) ? this.getValue(value) : '?'
-  }
-
-  /**
-   * Determine if the given value is a raw expression.
-   *
-   * @param  mixed  $value
-   * @return bool
-   */
-  public isExpression (value: unknown) {
-    return value instanceof Expression
-  }
-
-  /**
-   * Transforms expressions to their scalar types.
-   *
-   * @param {Expression | string | number} expression - The expression to transform.
-   * @returns {string | number} - The transformed value.
-   */
-  public getValue (expression: Expression | string | number): string {
-    if (this.isExpression(expression)) {
-      return this.getValue(expression.getValue(this))
+  protected wrapValue (value: string): string {
+    if (value !== '*') {
+      return '"' + value.replace('"', '""') + '"'
     }
 
-    return String(expression)
-  }
-
-  /**
-   * Get the format for database stored dates.
-   *
-   * @return string
-   */
-  public getDateFormat (): string {
-    return 'Y-m-d H:i:s'
+    return value
   }
 }

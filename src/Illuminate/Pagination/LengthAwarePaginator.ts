@@ -5,14 +5,14 @@ export class LengthAwarePaginator<
   TKey extends PropertyKey = PropertyKey,
   TValue = unknown
 > extends AbstractPaginator<TKey, TValue> {
-  protected totalCount: number
-
   /**
    * The last available page.
    *
    * @var int
    */
   protected lastPage: number
+
+  protected totalCount: number
 
   constructor (
     items: Collection<TKey, TValue> | TValue[] | null,
@@ -40,12 +40,12 @@ export class LengthAwarePaginator<
         : new Collection<TKey, TValue>(items ?? [])
   }
 
-  public total (): number {
-    return this.totalCount
-  }
-
   public itemsCollection (): Collection<TKey, TValue> {
     return this.items
+  }
+
+  public total (): number {
+    return this.totalCount
   }
 
   /**

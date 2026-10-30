@@ -49,11 +49,11 @@ function applyInterval (
 }
 
 export class DatePeriod implements Iterable<Date> {
-  readonly start: Date
-  readonly interval: DateInterval
   readonly end: Date | null
-  readonly recurrences: number | null
+  readonly interval: DateInterval
   readonly options: number
+  readonly recurrences: number | null
+  readonly start: Date
 
   /**
    * Overload 1: new DatePeriod(start, interval, end, options?)
@@ -135,28 +135,20 @@ export class DatePeriod implements Iterable<Date> {
     }
   }
 
-  private includesStart (): boolean {
-    return (this.options & EXCLUDE_START_DATE) === FLAG_UNSET
-  }
-
-  private includesEnd (): boolean {
-    return (this.options & INCLUDE_END_DATE) !== FLAG_UNSET
-  }
-
-  getStartDate (): Date {
-    return this.start
+  getDateInterval (): DateInterval {
+    return this.interval
   }
 
   getEndDate (): Date | null {
     return this.end
   }
 
-  getDateInterval (): DateInterval {
-    return this.interval
-  }
-
   getRecurrences (): number | null {
     return this.recurrences
+  }
+
+  getStartDate (): Date {
+    return this.start
   }
 
   * [Symbol.iterator] (): Iterator<Date> {
@@ -170,25 +162,16 @@ export class DatePeriod implements Iterable<Date> {
     }
   }
 
-  /**
-   * Recurrence-bounded period: always walks exactly
-   * `recurrences + 1` calendar points (start plus N steps),
-   * then EXCLUDE_START_DATE simply omits the first of those points.
-   */
-  private * iterateByRecurrences (recurrences: number): Generator<Date> {
-    const invert = this.interval.invert === INVERT_PAST
-    const totalPoints = recurrences + RECURRENCE_OFFSET
-    let current = this.start
+  toArray (): Date[] {
+    return [...this]
+  }
 
-    for (let index = FLAG_UNSET; index < totalPoints; index += 1) {
-      const isFirst = index === FLAG_UNSET
+  private includesEnd (): boolean {
+    return (this.options & INCLUDE_END_DATE) !== FLAG_UNSET
+  }
 
-      if (!isFirst || this.includesStart()) {
-        yield current
-      }
-
-      current = applyInterval(current, this.interval, invert)
-    }
+  private includesStart (): boolean {
+    return (this.options & EXCLUDE_START_DATE) === FLAG_UNSET
   }
 
   /**
@@ -215,7 +198,24 @@ export class DatePeriod implements Iterable<Date> {
     }
   }
 
-  toArray (): Date[] {
-    return [...this]
+  /**
+   * Recurrence-bounded period: always walks exactly
+   * `recurrences + 1` calendar points (start plus N steps),
+   * then EXCLUDE_START_DATE simply omits the first of those points.
+   */
+  private * iterateByRecurrences (recurrences: number): Generator<Date> {
+    const invert = this.interval.invert === INVERT_PAST
+    const totalPoints = recurrences + RECURRENCE_OFFSET
+    let current = this.start
+
+    for (let index = FLAG_UNSET; index < totalPoints; index += 1) {
+      const isFirst = index === FLAG_UNSET
+
+      if (!isFirst || this.includesStart()) {
+        yield current
+      }
+
+      current = applyInterval(current, this.interval, invert)
+    }
   }
 }

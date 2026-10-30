@@ -4,21 +4,6 @@ import { isNumeric } from '../../../Support/helpers'
 
 export class Processor {
   /**
-   * Process the results of a "select" query.
-   *
-   * @param  \Illuminate\Database\Query\Builder  $query
-   * @param  array  $results
-   * @return array
-   */
-  public processSelect<TResult> (
-    // @ts-expect-error -- assertion parameter is type-only
-    query: Builder,
-    results: TResult
-  ): TResult {
-    return results
-  }
-
-  /**
    * Process an  "insert get ID" query.
    *
    * @param  \Illuminate\Database\Query\Builder  $query
@@ -33,10 +18,26 @@ export class Processor {
     values: BindingValues,
     sequence?: string
   ): Promise<string | number> {
-    query.getConnection().insert(sql, values)
+    await query.getConnection().insert(sql, values)
 
-    const id = await query.getConnection().getDriver().lastInsertId(sequence)
+    const driver = await query.getConnection().getDriver()
+    const id = await driver.lastInsertId(sequence)
 
     return isNumeric(id) ? Number(id) : id
+  }
+
+  /**
+   * Process the results of a "select" query.
+   *
+   * @param  \Illuminate\Database\Query\Builder  $query
+   * @param  array  $results
+   * @return array
+   */
+  public processSelect<TResult> (
+    // @ts-expect-error -- assertion parameter is type-only
+    query: Builder,
+    results: TResult
+  ): TResult {
+    return results
   }
 }

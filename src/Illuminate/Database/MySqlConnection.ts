@@ -1,7 +1,15 @@
+import type { DatabaseConfig } from '../Config/types'
+import type { Filesystem } from '../Filesystem/Filesystem'
 import type { Driver } from './Drivers/Driver'
 import type { BindingValues } from './Query/Builder'
 
-import { Connection, type ConnectionConfig } from './Connection'
+import { Str } from '../Support/Str'
+import { Connection, type DriverResolver } from './Connection'
+import { MySqlGrammar as QueryGrammar } from './Query/Grammars/MySqlGrammar'
+import { MySqlProcessor } from './Query/Processors/MySqlProcessor'
+import { MySqlGrammar as SchemaGrammar } from './Schema/Grammars/MySqlGrammar'
+import { MySqlBuilder } from './Schema/MySqlBuilder'
+import { MySqlSchemaState } from './Schema/MySqlSchemaState'
 
 export class MySqlConnection extends Connection {
   /**
@@ -12,12 +20,19 @@ export class MySqlConnection extends Connection {
   protected lastInsertId: string | number | undefined
 
   constructor (
-    driver: Driver,
+    driver: Driver | DriverResolver,
     database: string = '',
     tablePrefix: string = '',
-    config: ConnectionConfig = {}
+    config: DatabaseConfig
   ) {
     super(driver, database, tablePrefix, config)
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public override async getDriverTitle (): Promise<string> {
+    return (await this.isMaria()) ? 'MariaDB' : 'MySQL'
   }
 
   /**
@@ -27,6 +42,46 @@ export class MySqlConnection extends Connection {
    */
   public getLastInsertId (): string | number | undefined {
     return this.lastInsertId
+  }
+
+  /**
+   * Get a schema builder instance for the connection.
+   *
+   * @return \Illuminate\Database\Schema\MySqlBuilder
+   */
+  public override getSchemaBuilder (): MySqlBuilder {
+    if (this.schemaGrammar === undefined) {
+      this.useDefaultSchemaGrammar()
+    }
+
+    return new MySqlBuilder(this)
+  }
+
+  /**
+   * Get the schema state for the connection.
+   *
+   * @param  \Illuminate\Filesystem\Filesystem|null  $files
+   * @param  callable|null  $processFactory
+   * @return \Illuminate\Database\Schema\MySqlSchemaState
+   */
+  public getSchemaState (
+    files?: Filesystem,
+    processFactory?: ((...args: unknown[]) => unknown)
+  ): MySqlSchemaState {
+    return new MySqlSchemaState(this, files, processFactory)
+  }
+
+  /**
+   * Get the server version for the connection.
+   *
+   * @return string
+   */
+  public override async getServerVersion (): Promise<string> {
+    const version = await super.getServerVersion()
+
+    return version.includes('MariaDB')
+      ? Str.beforeLast(Str.after(version, '5.5.5-'), '-MariaDB')
+      : version
   }
 
   /**
@@ -50,17 +105,104 @@ export class MySqlConnection extends Connection {
         return true
       }
 
-      const statement = this.getDriver().prepare(query)
+      const driver = await this.getDriver()
+      const statement = driver.prepare(query)
 
       this.bindValues(statement, this.prepareBindings(bindings))
 
       this.recordsHaveBeenModified()
 
-      const result = await statement.execute(bindings)
+      await statement.execute(bindings)
 
-      this.lastInsertId = this.getDriver().lastInsertId(sequence)
+      this.lastInsertId = await driver.lastInsertId(sequence)
 
-      return result
+      return true
     })
+  }
+
+  /**
+   * Determine if the connected database is a MariaDB database.
+   *
+   * @return bool
+   */
+  public async isMaria (): Promise<boolean> {
+    return (await this.getServerVersion()).includes('MariaDB')
+  }
+
+  /**
+   * Escape a binary value for safe SQL embedding.
+   *
+   * @param  string  $value
+   * @return string
+   */
+  protected override escapeBinary (value: string): string {
+    const hex = Buffer.from(value).toString('hex')
+
+    return `x'${hex}'`
+  }
+
+  /**
+   * Get the default post processor instance.
+   *
+   * @return \Illuminate\Database\Query\Processors\MySqlProcessor
+   */
+  protected override getDefaultPostProcessor (): MySqlProcessor {
+    return new MySqlProcessor()
+  }
+
+  /**
+   * Get the default query grammar instance.
+   *
+   * @return \Illuminate\Database\Query\Grammars\MySqlGrammar
+   */
+  protected override getDefaultQueryGrammar (): QueryGrammar {
+    return new QueryGrammar(this)
+  }
+
+  /**
+   * Get the default schema grammar instance.
+   *
+   * @return \Illuminate\Database\Schema\Grammars\MySqlGrammar
+   */
+  protected override getDefaultSchemaGrammar (): SchemaGrammar {
+    return new SchemaGrammar(this)
+  }
+
+  /**
+   * Determine if the given database exception was caused by an invalid or out of range value.
+   */
+  protected override isDataTypeError (exception: Error & { code: string }): boolean {
+    return [
+      '22001', // String data, right truncation
+      '22003', // Numeric value out of range
+      '22007' // Invalid datetime format
+    ].includes(exception.code) ||
+      // 1264: Out of range value, 1292: Truncated incorrect value,
+      // 1366: Incorrect integer value, 1406: Data too long
+      /General error: (1264|1292|1366|1406)\b/i.test(exception.message)
+  }
+
+  /**
+   * Determine if the given database exception was caused by a unique constraint violation.
+   *
+   * @param  \Exception  $exception
+   * @return bool
+   */
+  protected override isUniqueConstraintError (exception: Error): boolean {
+    return /Integrity constraint violation: 1062/i.test(exception.message)
+  }
+
+  /**
+   * Extract the index that caused a unique constraint violation.
+   *
+   * @param  Exception  $exception
+   * @return array{index: string|null, columns: list<string>}
+   */
+  protected override parseUniqueConstraintViolation (
+    exception: Error
+  ): { index: string | undefined, columns: string[] } {
+    const matches = exception.message.match(/Duplicate entry '.*?' for key '(?:.*?\.)?(.+?)'/i)
+
+    return { columns: [], index: matches?.[1] ?? undefined }
   }
 }
