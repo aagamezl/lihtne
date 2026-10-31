@@ -507,9 +507,15 @@ export class Grammar
    * @param  array  $groups
    * @return string
    */
+<<<<<<< HEAD
   protected compileGroups (
     // @ts-expect-error expected error; query is not used in this method
     // @eslint-disable-next-line @typescript-eslint/no-unused-vars
+=======
+  // @ts-expect-error expected error; query is not used in this method
+  // @eslint-disable-next-line @typescript-eslint/no-unused-vars
+  protected compileGroups (
+>>>>>>> 7be5cf5 (style(lint): style and linting fixes)
     query: Builder,
     groups: Array<Expression | string>
   ): string {

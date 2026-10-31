@@ -1765,9 +1765,9 @@ export class Builder extends mixing().useTrait([
     const bindings = this.cleanBindings([
       ...Arr.flatten(values, 1),
       ...(new Collection(update)
-      // @ts-expect-error - value is not used
 
-        .reject(
+      .reject(
+        // @ts-expect-error expected error; value is not used
           (value: string | Expression, key: PropertyKey) =>
             typeof key === 'number'
         )
